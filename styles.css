@@ -77,11 +77,11 @@ canvas {
 
 /* Touch Controls */
 #touch-controls {
-    position: absolute;
+    position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
-    height: 40%;
+    padding: 20px;
     pointer-events: none;
     z-index: 20;
     display: none; /* Hidden by default, will be shown on touch devices */
@@ -92,11 +92,8 @@ canvas {
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 10px;
-    position: absolute;
-    bottom: 20px;
-    left: 0;
     width: 100%;
-    padding: 0 20px;
+    max-width: 100%;
 }
 
 .control-button {
@@ -112,6 +109,7 @@ canvas {
     pointer-events: auto;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+    margin: 0 auto;
 }
 
 .control-button.active {
@@ -127,6 +125,23 @@ canvas {
 
 .jump-button.active {
     background-color: rgba(220, 90, 90, 0.9);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .control-button {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 400px) {
+    .control-button {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
 }
 
 /* Show touch controls on mobile devices */
