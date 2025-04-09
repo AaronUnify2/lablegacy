@@ -2,19 +2,7 @@ export class DungeonGenerator {
     constructor() {
         // Settings for dungeon generation
         this.settings = {
-            x + width / 2,
-            height / 2,
-            y + depth / 2
-        );
-        
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        
-        group.add(wallMesh);
-        
-        return wallMesh;
-    }
-}// Room settings
+            // Room settings
             centralRoomSize: 40,
             minRoomSize: 25,
             maxRoomSize: 40,
