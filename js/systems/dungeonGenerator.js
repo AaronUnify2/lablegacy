@@ -768,4 +768,35 @@ export class DungeonGenerator {
             const endX = x + width;
             if (currentX < endX) {
                 const segmentWidth = endX - currentX;
-                const wallM
+                const wallMesh = this.createWall(
+                    group, 
+                    currentX, 
+                    y, 
+                    segmentWidth, 
+                    height, 
+                    depth, 
+                    material
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        }
+    }
+    
+    createWall(group, x, y, width, height, depth, material) {
+        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+        const wallMesh = new THREE.Mesh(wallGeometry, material);
+        
+        wallMesh.position.set(
+            x + width / 2,
+            height / 2,
+            y + depth / 2
+        );
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        
+        return wallMesh;
+    }
+}
