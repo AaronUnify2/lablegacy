@@ -81,7 +81,7 @@ canvas {
     bottom: 0;
     left: 0;
     width: 100%;
-    padding: 20px;
+    padding: 10px;
     pointer-events: none;
     z-index: 20;
     display: none; /* Hidden by default, will be shown on touch devices */
@@ -91,21 +91,21 @@ canvas {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 10px;
+    gap: 5px;
     width: 100%;
     max-width: 100%;
 }
 
 .control-button {
-    width: 60px;
-    height: 60px;
+    width: 55px;
+    height: 55px;
     background-color: rgba(80, 80, 80, 0.7);
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     color: white;
-    font-size: 24px;
+    font-size: 22px;
     pointer-events: auto;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
@@ -127,20 +127,53 @@ canvas {
     background-color: rgba(220, 90, 90, 0.9);
 }
 
-/* Responsive adjustments */
-@media (max-width: 600px) {
+/* Improved responsive adjustments */
+@media (max-width: 800px) {
+    .control-grid {
+        grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+        gap: 4px;
+    }
+    
     .control-button {
-        width: 50px;
-        height: 50px;
+        width: 52px;
+        height: 52px;
         font-size: 20px;
     }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 600px) {
+    .control-grid {
+        gap: 3px;
+    }
+    
     .control-button {
-        width: 40px;
-        height: 40px;
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+    
+    .jump-button {
         font-size: 16px;
+    }
+}
+
+@media (max-width: 400px) {
+    #touch-controls {
+        padding: 5px;
+    }
+    
+    .control-grid {
+        gap: 2px;
+    }
+    
+    .control-button {
+        width: 42px;
+        height: 42px;
+        font-size: 16px;
+    }
+    
+    .jump-button {
+        font-size: 14px;
     }
 }
 
