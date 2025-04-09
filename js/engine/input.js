@@ -14,6 +14,7 @@ export class InputManager {
         // Camera controls
         this.lookSpeed = 0.1;
         this.moveSpeed = 10;
+        this.zoomSpeed = 2;
         
         // Mouse state
         this.mouseX = 0;
@@ -21,9 +22,8 @@ export class InputManager {
         this.mouseDragging = false;
         
         // Touch controls
-        this.leftJoystick = null;
-        this.rightJoystick = null;
         this.touchEnabled = false;
+        this.buttons = {};
         
         // Initialize event listeners
         this.initKeyboardControls();
@@ -129,90 +129,200 @@ export class InputManager {
     }
     
     initTouchControls() {
-        if (typeof nipplejs === 'undefined') {
-            console.error('NippleJS library not loaded!');
-            return;
+        // Create the control buttons
+        this.createTouchButtons();
+        
+        // Add event listeners for button touches
+        this.setupButtonEventListeners();
+    }
+    
+    createTouchButtons() {
+        const touchControls = document.getElementById('touch-controls');
+        
+        // Clear existing content
+        touchControls.innerHTML = '';
+        
+        // Create the grid container
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'control-grid';
+        touchControls.appendChild(gridContainer);
+        
+        // Define the button layout
+        const buttonLayout = [
+            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
+            ['move-left', 'move-center', 'move-right', 'camera-left', 'jump'],
+            ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
+        ];
+        
+        // Define button icons
+        const buttonIcons = {
+            'move-up-left': '↖',
+            'move-up': '↑',
+            'move-up-right': '↗',
+            'move-left': '←',
+            'move-center': '',
+            'move-right': '→',
+            'move-down-left': '↙',
+            'move-down': '↓',
+            'move-down-right': '↘',
+            'camera-up': '↑',
+            'camera-left': '←',
+            'jump': 'JUMP',
+            'camera-right': '→',
+            'camera-down': '↓',
+            'zoom-in': '+',
+            'zoom-out': '-'
+        };
+        
+        // Create buttons according to layout
+        for (let row = 0; row < buttonLayout.length; row++) {
+            for (let col = 0; col < buttonLayout[row].length; col++) {
+                const buttonId = buttonLayout[row][col];
+                if (buttonId !== '') {
+                    const button = document.createElement('div');
+                    button.id = buttonId;
+                    button.className = 'control-button';
+                    
+                    // Add special class for the jump button
+                    if (buttonId === 'jump') {
+                        button.className += ' jump-button';
+                    }
+                    
+                    button.textContent = buttonIcons[buttonId];
+                    
+                    // Position the button in the grid
+                    button.style.gridRow = row + 1;
+                    button.style.gridColumn = col + 1;
+                    
+                    gridContainer.appendChild(button);
+                    
+                    // Store button reference
+                    this.buttons[buttonId] = button;
+                }
+            }
+        }
+    }
+    
+    setupButtonEventListeners() {
+        // Movement buttons
+        this.setupButtonTouch('move-up', () => this.moveForward = true, () => this.moveForward = false);
+        this.setupButtonTouch('move-down', () => this.moveBackward = true, () => this.moveBackward = false);
+        this.setupButtonTouch('move-left', () => this.moveLeft = true, () => this.moveLeft = false);
+        this.setupButtonTouch('move-right', () => this.moveRight = true, () => this.moveRight = false);
+        
+        // Diagonal movement buttons
+        this.setupButtonTouch('move-up-left', 
+            () => { this.moveForward = true; this.moveLeft = true; }, 
+            () => { this.moveForward = false; this.moveLeft = false; }
+        );
+        this.setupButtonTouch('move-up-right', 
+            () => { this.moveForward = true; this.moveRight = true; }, 
+            () => { this.moveForward = false; this.moveRight = false; }
+        );
+        this.setupButtonTouch('move-down-left', 
+            () => { this.moveBackward = true; this.moveLeft = true; }, 
+            () => { this.moveBackward = false; this.moveLeft = false; }
+        );
+        this.setupButtonTouch('move-down-right', 
+            () => { this.moveBackward = true; this.moveRight = true; }, 
+            () => { this.moveBackward = false; this.moveRight = false; }
+        );
+        
+        // Camera rotation buttons
+        this.setupButtonTouch('camera-up', 
+            () => this.rotateCamera(0, -0.05), 
+            null, 
+            true
+        );
+        this.setupButtonTouch('camera-down', 
+            () => this.rotateCamera(0, 0.05), 
+            null, 
+            true
+        );
+        this.setupButtonTouch('camera-left', 
+            () => this.rotateCamera(0.05, 0), 
+            null, 
+            true
+        );
+        
+        // Add camera-right button (wasn't in original layout but adding for completeness)
+        if (this.buttons['camera-right']) {
+            this.setupButtonTouch('camera-right', 
+                () => this.rotateCamera(-0.05, 0), 
+                null, 
+                true
+            );
         }
         
-        // Create left joystick for movement
-        this.leftJoystick = nipplejs.create({
-            zone: document.getElementById('left-joystick'),
-            mode: 'static',
-            position: { left: '50%', top: '50%' },
-            color: 'white',
-            size: 120
-        });
+        // Zoom buttons
+        this.setupButtonTouch('zoom-in', 
+            () => this.zoomCamera(-this.zoomSpeed), 
+            null, 
+            true
+        );
+        this.setupButtonTouch('zoom-out', 
+            () => this.zoomCamera(this.zoomSpeed), 
+            null, 
+            true
+        );
         
-        // Create right joystick for camera rotation
-        this.rightJoystick = nipplejs.create({
-            zone: document.getElementById('right-joystick'),
-            mode: 'static',
-            position: { left: '50%', top: '50%' },
-            color: 'white',
-            size: 120
-        });
+        // Jump button (not functional yet)
+        if (this.buttons['jump']) {
+            this.setupButtonTouch('jump', 
+                () => console.log('Jump pressed (not implemented)'), 
+                () => console.log('Jump released')
+            );
+        }
+    }
+    
+    setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false) {
+        const button = this.buttons[buttonId];
+        if (!button) return;
         
-        // Set up left joystick events for movement
-        this.leftJoystick.on('move', (event, data) => {
-            const force = Math.min(data.force, 1);
-            const angle = data.angle.radian;
+        let pressInterval;
+        
+        // Handle touch/mouse events
+        const startPress = () => {
+            button.classList.add('active');
+            if (pressCallback) pressCallback();
             
-            // Reset movement flags
-            this.moveForward = false;
-            this.moveBackward = false;
-            this.moveLeft = false;
-            this.moveRight = false;
-            
-            // Set movement based on joystick direction
-            if (angle >= 0 && angle < Math.PI / 2) {
-                // Forward-right quadrant
-                this.moveForward = true;
-                this.moveRight = true;
-                this.forwardIntensity = Math.cos(angle) * force;
-                this.rightIntensity = Math.sin(angle) * force;
-            } else if (angle >= Math.PI / 2 && angle < Math.PI) {
-                // Backward-right quadrant
-                this.moveBackward = true;
-                this.moveRight = true;
-                this.backwardIntensity = Math.cos(angle - Math.PI) * force * -1;
-                this.rightIntensity = Math.sin(angle - Math.PI) * force * -1;
-            } else if (angle >= Math.PI && angle < 3 * Math.PI / 2) {
-                // Backward-left quadrant
-                this.moveBackward = true;
-                this.moveLeft = true;
-                this.backwardIntensity = Math.cos(angle - Math.PI) * force;
-                this.leftIntensity = Math.sin(angle - Math.PI) * force;
-            } else {
-                // Forward-left quadrant
-                this.moveForward = true;
-                this.moveLeft = true;
-                this.forwardIntensity = Math.cos(angle) * force;
-                this.leftIntensity = Math.sin(angle - 2 * Math.PI) * force * -1;
+            if (continuousPress) {
+                // For continuous actions like camera rotation, run the callback repeatedly
+                pressInterval = setInterval(() => {
+                    if (pressCallback) pressCallback();
+                }, 16); // roughly 60fps
             }
+        };
+        
+        const endPress = () => {
+            button.classList.remove('active');
+            if (releaseCallback) releaseCallback();
+            
+            if (pressInterval) {
+                clearInterval(pressInterval);
+                pressInterval = null;
+            }
+        };
+        
+        // Mouse events
+        button.addEventListener('mousedown', startPress);
+        button.addEventListener('mouseup', endPress);
+        button.addEventListener('mouseleave', endPress);
+        
+        // Touch events
+        button.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent default behavior
+            startPress();
         });
         
-        // Reset movement when joystick is released
-        this.leftJoystick.on('end', () => {
-            this.moveForward = false;
-            this.moveBackward = false;
-            this.moveLeft = false;
-            this.moveRight = false;
-            this.forwardIntensity = 0;
-            this.backwardIntensity = 0;
-            this.leftIntensity = 0;
-            this.rightIntensity = 0;
+        button.addEventListener('touchend', (e) => {
+            e.preventDefault(); // Prevent default behavior
+            endPress();
         });
         
-        // Set up right joystick events for camera rotation
-        this.rightJoystick.on('move', (event, data) => {
-            const force = Math.min(data.force, 1);
-            const angle = data.angle.radian;
-            
-            // Rotate camera based on joystick input
-            const rotateX = Math.cos(angle) * force * this.lookSpeed;
-            const rotateY = Math.sin(angle) * force * this.lookSpeed;
-            
-            this.rotateCamera(rotateX, rotateY);
+        button.addEventListener('touchcancel', (e) => {
+            e.preventDefault(); // Prevent default behavior
+            endPress();
         });
     }
     
@@ -221,18 +331,28 @@ export class InputManager {
         const quaternion = new THREE.Quaternion();
         
         // Rotate around the world up vector (Y-axis) for left/right rotations
-        quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaX);
-        this.camera.quaternion.premultiply(quaternion);
+        if (deltaX !== 0) {
+            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaX);
+            this.camera.quaternion.premultiply(quaternion);
+        }
         
         // Get the camera's right vector for up/down rotations
-        const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-        
-        // Rotate around the camera's right vector for up/down rotations
-        quaternion.setFromAxisAngle(rightVector, deltaY);
-        this.camera.quaternion.premultiply(quaternion);
+        if (deltaY !== 0) {
+            const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+            
+            // Rotate around the camera's right vector for up/down rotations
+            quaternion.setFromAxisAngle(rightVector, deltaY);
+            this.camera.quaternion.premultiply(quaternion);
+        }
         
         // Normalize the quaternion to prevent accumulation errors
         this.camera.quaternion.normalize();
+    }
+    
+    zoomCamera(amount) {
+        // Simple zoom implementation - move camera forward/backward
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        this.camera.position.addScaledVector(forward, amount);
     }
     
     update(deltaTime) {
@@ -244,22 +364,18 @@ export class InputManager {
         // Calculate movement speed with delta time
         const speedPerFrame = this.moveSpeed * deltaTime;
         
-        // Apply movements based on keyboard input
+        // Apply movements based on keyboard or touch input
         if (this.moveForward) {
-            const intensity = this.touchEnabled ? this.forwardIntensity || 1 : 1;
-            this.camera.position.addScaledVector(forward, speedPerFrame * intensity);
+            this.camera.position.addScaledVector(forward, speedPerFrame);
         }
         if (this.moveBackward) {
-            const intensity = this.touchEnabled ? this.backwardIntensity || 1 : 1;
-            this.camera.position.addScaledVector(forward, -speedPerFrame * intensity);
+            this.camera.position.addScaledVector(forward, -speedPerFrame);
         }
         if (this.moveRight) {
-            const intensity = this.touchEnabled ? this.rightIntensity || 1 : 1;
-            this.camera.position.addScaledVector(right, speedPerFrame * intensity);
+            this.camera.position.addScaledVector(right, speedPerFrame);
         }
         if (this.moveLeft) {
-            const intensity = this.touchEnabled ? this.leftIntensity || 1 : 1;
-            this.camera.position.addScaledVector(right, -speedPerFrame * intensity);
+            this.camera.position.addScaledVector(right, -speedPerFrame);
         }
         if (this.moveUp) {
             this.camera.position.addScaledVector(up, speedPerFrame);
