@@ -147,7 +147,7 @@ export class InputManager {
         gridContainer.className = 'control-grid';
         touchControls.appendChild(gridContainer);
         
-        // Define the button layout
+        // Define the button layout - reorganized for better spacing
         const buttonLayout = [
             ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
             ['move-left', 'move-center', 'move-right', 'camera-left', 'jump'],
@@ -168,10 +168,9 @@ export class InputManager {
             'camera-up': '↑',
             'camera-left': '←',
             'jump': 'JUMP',
-            'camera-right': '→',
-            'camera-down': '↓',
             'zoom-in': '+',
-            'zoom-out': '-'
+            'zoom-out': '-',
+            'camera-down': '↓'
         };
         
         // Create buttons according to layout
@@ -200,6 +199,32 @@ export class InputManager {
                     this.buttons[buttonId] = button;
                 }
             }
+        }
+        
+        // Adjust layout based on screen size
+        this.adjustButtonSizes();
+        window.addEventListener('resize', this.adjustButtonSizes.bind(this));
+    }
+    
+    // Add this new method to the InputManager class
+    adjustButtonSizes() {
+        const screenWidth = window.innerWidth;
+        const containerWidth = document.getElementById('touch-controls').offsetWidth;
+        
+        // Check if buttons might overflow
+        if (containerWidth > screenWidth * 0.95) {
+            const buttons = document.querySelectorAll('.control-button');
+            const screenRatio = Math.min(1, (screenWidth * 0.95) / containerWidth);
+            
+            buttons.forEach(button => {
+                // Dynamically adjust button size based on screen width
+                const newSize = Math.floor(parseInt(getComputedStyle(button).width) * screenRatio);
+                button.style.width = newSize + 'px';
+                button.style.height = newSize + 'px';
+                
+                // Adjust font size as well
+                button.style.fontSize = Math.max(14, Math.floor(newSize * 0.4)) + 'px';
+            });
         }
     }
     
