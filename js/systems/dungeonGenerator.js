@@ -807,8 +807,7 @@ export class DungeonGenerator {
         const wallGeometry = new THREE.BoxGeometry(width, height, depth);
         const wallMesh = new THREE.Mesh(wallGeometry, material);
         
-        wallMesh.position.set(
-            x + width / 2,
+        wallMesh.position.set(x + width / 2,
             height / 2,
             y + depth / 2
         );
@@ -821,4 +820,3 @@ export class DungeonGenerator {
         return wallMesh;
     }
 }
- 
