@@ -1,6 +1,7 @@
 import { Renderer } from './engine/renderer.js';
 import { InputManager } from './engine/input.js';
 import { DungeonGenerator } from './systems/dungeonGenerator.js';
+import { CollisionManager } from './engine/collision.js';
 
 class Game {
     constructor() {
@@ -8,6 +9,7 @@ class Game {
         this.renderer = new Renderer();
         this.input = new InputManager(this.renderer.camera, this.renderer.domElement);
         this.dungeonGenerator = new DungeonGenerator();
+        this.collisionManager = new CollisionManager();
         
         // Game state
         this.isRunning = false;
@@ -29,6 +31,22 @@ class Game {
         
         // Add the dungeon to the scene
         this.renderer.scene.add(dungeon.mesh);
+        
+        // Register dungeon colliders
+        if (dungeon.mesh.colliderMeshes) {
+            console.log(`Registering ${dungeon.mesh.colliderMeshes.length} colliders...`);
+            for (const mesh of dungeon.mesh.colliderMeshes) {
+                this.collisionManager.addCollider(mesh);
+            }
+        }
+        
+        // Start the player in a safe position above the first room
+        const firstRoom = dungeon.rooms[0];
+        this.renderer.camera.position.set(
+            firstRoom.x + firstRoom.width / 2,
+            2, // Start slightly above the floor
+            firstRoom.y + firstRoom.height / 2
+        );
         
         // Hide loading screen
         this.loadingScreen.style.display = 'none';
@@ -57,8 +75,8 @@ class Game {
         const pos = this.renderer.camera.position;
         this.positionInfo.textContent = `Position: X: ${pos.x.toFixed(2)}, Y: ${pos.y.toFixed(2)}, Z: ${pos.z.toFixed(2)}`;
         
-        // Update input and movement
-        this.input.update(deltaTime);
+        // Update input and movement with collision detection
+        this.input.update(deltaTime, this.collisionManager);
         
         // Render the scene
         this.renderer.render();
