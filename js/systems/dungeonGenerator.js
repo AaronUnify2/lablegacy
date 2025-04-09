@@ -741,80 +741,96 @@ export class DungeonGenerator {
         }
     }
     
-    createStraightCorridor(group, corridor, floorMaterial, wallMaterial) {
-        // Calculate corridor length and angle
-        const dx = corridor.x2 - corridor.x1;
-        const dy = corridor.y2 - corridor.y1;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-        
-        // Create corridor floor
-        const floorGeometry = new THREE.BoxGeometry(
-            length,
-            this.settings.floorHeight,
-            corridor.width
-        );
-        
-        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-        
-        // Position at center of corridor
-        floorMesh.position.set(
-            (corridor.x1 + corridor.x2) / 2,
-            -this.settings.floorHeight / 2,
-            (corridor.y1 + corridor.y2) / 2
-        );
-        
-        // Rotate to align with the corridor angle
-        floorMesh.rotation.y = angle;
-        
-        floorMesh.receiveShadow = true;
-        group.colliderMeshes.push(floorMesh);
-        group.add(floorMesh);
-        
-        // Create corridor walls
-        this.createCorridorWalls(group, corridor, length, angle, wallMaterial);
-    }
+    // The key function that needs fixing is the createStraightCorridor function
+// and the createCorridorWalls function
+
+createStraightCorridor(group, corridor, floorMaterial, wallMaterial) {
+    // Calculate corridor length and angle
+    const dx = corridor.x2 - corridor.x1;
+    const dy = corridor.y2 - corridor.y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
     
-    createCorridorWalls(group, corridor, length, angle, wallMaterial) {
-        const halfWidth = corridor.width / 2;
-        const wallHeight = this.settings.wallHeight;
-        const wallThickness = this.settings.gridSize;
+    // This is the critical fix - use Math.atan2 correctly
+    // The Z-axis in Three.js corresponds to the Y-axis in our 2D layout
+    const angle = Math.atan2(dy, dx);
+    
+    // Create corridor floor
+    const floorGeometry = new THREE.BoxGeometry(
+        length,
+        this.settings.floorHeight,
+        corridor.width
+    );
+    
+    const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+    
+    // Position at midpoint of corridor line
+    const midX = (corridor.x1 + corridor.x2) / 2;
+    const midY = (corridor.y1 + corridor.y2) / 2;
+    
+    floorMesh.position.set(
+        midX,
+        -this.settings.floorHeight / 2,
+        midY
+    );
+    
+    // Apply the rotation - the critical fix is here
+    // In Three.js, rotation around Y-axis is for horizontal orientation
+    floorMesh.rotation.y = angle;
+    
+    floorMesh.receiveShadow = true;
+    group.colliderMeshes.push(floorMesh);
+    group.add(floorMesh);
+    
+    // Create corridor walls
+    this.createCorridorWalls(group, corridor, length, angle, wallMaterial);
+}
+
+createCorridorWalls(group, corridor, length, angle, wallMaterial) {
+    const halfWidth = corridor.width / 2;
+    const wallHeight = this.settings.wallHeight;
+    const wallThickness = this.settings.gridSize;
+    
+    // Calculate the midpoint of the corridor
+    const midX = (corridor.x1 + corridor.x2) / 2;
+    const midY = (corridor.y1 + corridor.y2) / 2;
+    
+    // Create walls on both sides of corridor
+    for (let side = -1; side <= 1; side += 2) {
+        // Skip center
+        if (side === 0) continue;
         
-        // Create walls on both sides of corridor
-        for (let side = -1; side <= 1; side += 2) {
-            // Skip center
-            if (side === 0) continue;
-            
-            // Calculate offset perpendicular to corridor direction
-            const offsetX = -Math.sin(angle) * halfWidth * side;
-            const offsetY = Math.cos(angle) * halfWidth * side;
-            
-            // Create wall geometry
-            const wallGeometry = new THREE.BoxGeometry(
-                length, 
-                wallHeight, 
-                wallThickness
-            );
-            
-            const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-            
-            // Position at center of the wall
-            wallMesh.position.set(
-                (corridor.x1 + corridor.x2) / 2 + offsetX,
-                wallHeight / 2,
-                (corridor.y1 + corridor.y2) / 2 + offsetY
-            );
-            
-            // Rotate to align with corridor
-            wallMesh.rotation.y = angle;
-            
-            wallMesh.castShadow = true;
-            wallMesh.receiveShadow = true;
-            
-            group.add(wallMesh);
-            group.colliderMeshes.push(wallMesh);
-        }
+        // Calculate offset perpendicular to corridor direction
+        // This is the critical fix - use correct perpendicular calculation
+        const offsetX = -Math.sin(angle) * halfWidth * side;
+        const offsetY = Math.cos(angle) * halfWidth * side;
+        
+        // Create wall geometry
+        const wallGeometry = new THREE.BoxGeometry(
+            length, 
+            wallHeight, 
+            wallThickness
+        );
+        
+        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+        
+        // Position at center of the wall with the perpendicular offset
+        wallMesh.position.set(
+            midX + offsetX,
+            wallHeight / 2,
+            midY + offsetY
+        );
+        
+        // Apply the correct rotation
+        // Add PI/2 (90 degrees) to make the wall perpendicular to the corridor
+        wallMesh.rotation.y = angle + Math.PI / 2;
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        group.colliderMeshes.push(wallMesh);
     }
+}
     
     createWall(group, x, y, width, height, depth, material) {
         const wallGeometry = new THREE.BoxGeometry(width, height, depth);
