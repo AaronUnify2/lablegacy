@@ -147,38 +147,32 @@ export class InputManager {
         gridContainer.className = 'control-grid';
         touchControls.appendChild(gridContainer);
         
-        // Define the button layout - reorganized for better spacing
+        // Define the button layout
         const buttonLayout = [
             ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
             ['move-left', 'move-center', 'move-right', 'camera-left', 'jump'],
             ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
         ];
-        // Define the button layout - updated to include camera-right button
-const buttonLayout = [
-    ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
-    ['move-left', 'move-center', 'move-right', 'camera-left', 'jump', 'camera-right'],
-    ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
-];
-
-// Define button icons
-const buttonIcons = {
-    'move-up-left': '↖',
-    'move-up': '↑',
-    'move-up-right': '↗',
-    'move-left': '←',
-    'move-center': '',
-    'move-right': '→',
-    'move-down-left': '↙',
-    'move-down': '↓',
-    'move-down-right': '↘',
-    'camera-up': '↑',
-    'camera-left': '←',
-    'camera-right': '→',
-    'jump': 'Bounce',
-    'zoom-in': '+',
-    'zoom-out': '-',
-    'camera-down': '↓'
-};
+        
+        // Define button icons
+        const buttonIcons = {
+            'move-up-left': '↖',
+            'move-up': '↑',
+            'move-up-right': '↗',
+            'move-left': '←',
+            'move-center': '',
+            'move-right': '→',
+            'move-down-left': '↙',
+            'move-down': '↓',
+            'move-down-right': '↘',
+            'camera-up': '↑',
+            'camera-left': '←',
+            'jump': 'Bounce',
+            'zoom-in': '+',
+            'zoom-out': '-',
+            'camera-down': '↓',
+            'camera-right': '→'
+        };
         
         // Create buttons according to layout
         for (let row = 0; row < buttonLayout.length; row++) {
@@ -208,12 +202,26 @@ const buttonIcons = {
             }
         }
         
+        // Add camera-right button separately
+        const cameraRightBtn = document.createElement('div');
+        cameraRightBtn.id = 'camera-right';
+        cameraRightBtn.className = 'control-button';
+        cameraRightBtn.textContent = buttonIcons['camera-right'];
+        
+        // Position it to the right of the camera-left button
+        cameraRightBtn.style.position = 'absolute';
+        cameraRightBtn.style.right = '20px';
+        cameraRightBtn.style.top = '50%';
+        cameraRightBtn.style.transform = 'translateY(-50%)';
+        
+        touchControls.appendChild(cameraRightBtn);
+        this.buttons['camera-right'] = cameraRightBtn;
+        
         // Adjust layout based on screen size
         this.adjustButtonSizes();
         window.addEventListener('resize', this.adjustButtonSizes.bind(this));
     }
     
-    // Add this new method to the InputManager class
     adjustButtonSizes() {
         const screenWidth = window.innerWidth;
         const containerWidth = document.getElementById('touch-controls').offsetWidth;
@@ -277,14 +285,12 @@ const buttonIcons = {
             true
         );
         
-        // Add camera-right button (wasn't in original layout but adding for completeness)
-        if (this.buttons['camera-right']) {
-            this.setupButtonTouch('camera-right', 
-                () => this.rotateCamera(-0.05, 0), 
-                null, 
-                true
-            );
-        }
+        // Camera-right button
+        this.setupButtonTouch('camera-right', 
+            () => this.rotateCamera(-0.05, 0), 
+            null, 
+            true
+        );
         
         // Zoom buttons
         this.setupButtonTouch('zoom-in', 
