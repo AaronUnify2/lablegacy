@@ -167,8 +167,8 @@ export class InputManager {
             'move-down-right': '↘',
             'camera-up': '↑',
             'camera-left': '←',
-            'camera-right': '→',
             'jump': 'Bounce',
+            'camera-right': '→',
             'zoom-in': '+',
             'zoom-out': '-',
             'camera-down': '↓'
