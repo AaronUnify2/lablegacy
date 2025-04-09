@@ -282,7 +282,8 @@ export class InputManager {
         let pressInterval;
         
         // Handle touch/mouse events
-        const startPress = () => {
+        const startPress = (e) => {
+            if (e) e.preventDefault(); // Prevent default behavior
             button.classList.add('active');
             if (pressCallback) pressCallback();
             
@@ -294,7 +295,8 @@ export class InputManager {
             }
         };
         
-        const endPress = () => {
+        const endPress = (e) => {
+            if (e) e.preventDefault(); // Prevent default behavior
             button.classList.remove('active');
             if (releaseCallback) releaseCallback();
             
@@ -310,20 +312,9 @@ export class InputManager {
         button.addEventListener('mouseleave', endPress);
         
         // Touch events
-        button.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent default behavior
-            startPress();
-        });
-        
-        button.addEventListener('touchend', (e) => {
-            e.preventDefault(); // Prevent default behavior
-            endPress();
-        });
-        
-        button.addEventListener('touchcancel', (e) => {
-            e.preventDefault(); // Prevent default behavior
-            endPress();
-        });
+        button.addEventListener('touchstart', startPress);
+        button.addEventListener('touchend', endPress);
+        button.addEventListener('touchcancel', endPress);
     }
     
     rotateCamera(deltaX, deltaY) {
