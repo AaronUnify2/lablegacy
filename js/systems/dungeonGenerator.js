@@ -1,3 +1,6 @@
+// Import THREE.js
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+
 export class DungeonGenerator {
     constructor() {
         // Settings for dungeon generation
@@ -705,99 +708,77 @@ export class DungeonGenerator {
             { x: corridor.x2 + perpX * halfWidth, y: corridor.y2 + perpY * halfWidth }
         ];
         
-        // Create a custom geometry for the corridor floor
-        const shape = new THREE.Shape();
-        shape.moveTo(corners[0].x, corners[0].y);
-        shape.lineTo(corners[1].x, corners[1].y);
-        shape.lineTo(corners[2].x, corners[2].y);
-        shape.lineTo(corners[3].x, corners[3].y);
-        shape.lineTo(corners[0].x, corners[0].y);
+        // Create corridor floor using standard geometry instead of shape extrusion
+        // This is simpler and less error-prone
         
-        const extrudeSettings = {
-            steps: 1,
-            depth: this.settings.floorHeight,
-            bevelEnabled: false
-        };
-        
-        const floorGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-        
-        // Position the floor mesh
-        floorMesh.rotation.x = Math.PI / 2; // Rotate to horizontal
-        floorMesh.position.set(0, -this.settings.floorHeight, 0);
-        
+        // First, create a SimpleCorridorGeometry for floor
+        const floorMesh = this.createSimpleCorridorFloor(corridor, halfWidth, floorMaterial);
         floorMesh.receiveShadow = true;
         group.add(floorMesh);
-        
-        // Add collision to floor
         group.colliderMeshes.push(floorMesh);
         
-        // Create walls for the corridor
-        // Calculate the wall positions based on the corners and corridor height
-        
-        // Create the first wall
-        const wall1Shape = new THREE.Shape();
-        wall1Shape.moveTo(corners[0].x, corners[0].y);
-        wall1Shape.lineTo(corners[3].x, corners[3].y);
-        wall1Shape.lineTo(corners[3].x, corners[3].y);
-        wall1Shape.lineTo(corners[0].x, corners[0].y);
-        
-        const wall1ExtrudeSettings = {
-            steps: 1,
-            depth: this.settings.wallHeight,
-            bevelEnabled: false
-        };
-        
-        const wall1Geometry = new THREE.ExtrudeGeometry(wall1Shape, wall1ExtrudeSettings);
-        const wall1Mesh = new THREE.Mesh(wall1Geometry, wallMaterial);
-        
-        wall1Mesh.rotation.x = -Math.PI / 2; // Rotate to vertical
-        wall1Mesh.position.set(0, 0, 0);
-        
-        wall1Mesh.castShadow = true;
-        wall1Mesh.receiveShadow = true;
-        group.add(wall1Mesh);
-        group.colliderMeshes.push(wall1Mesh);
-        
-        // Create the second wall
-        const wall2Shape = new THREE.Shape();
-        wall2Shape.moveTo(corners[1].x, corners[1].y);
-        wall2Shape.lineTo(corners[2].x, corners[2].y);
-        wall2Shape.lineTo(corners[2].x, corners[2].y);
-        wall2Shape.lineTo(corners[1].x, corners[1].y);
-        
-        const wall2ExtrudeSettings = {
-            steps: 1,
-            depth: this.settings.wallHeight,
-            bevelEnabled: false
-        };
-        
-        const wall2Geometry = new THREE.ExtrudeGeometry(wall2Shape, wall2ExtrudeSettings);
-        const wall2Mesh = new THREE.Mesh(wall2Geometry, wallMaterial);
-        
-        wall2Mesh.rotation.x = -Math.PI / 2; // Rotate to vertical
-        wall2Mesh.position.set(0, 0, 0);
-        
-        wall2Mesh.castShadow = true;
-        wall2Mesh.receiveShadow = true;
-        group.add(wall2Mesh);
-        group.colliderMeshes.push(wall2Mesh);
+        // Create walls using simple boxes
+        this.createSimpleCorridorWalls(group, corridor, halfWidth, this.settings.wallHeight, wallMaterial);
     }
     
-    createWall(group, x, y, width, height, depth, material) {
-        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-        const wallMesh = new THREE.Mesh(wallGeometry, material);
+    createSimpleCorridorFloor(corridor, halfWidth, material) {
+        // Calculate direction vectors
+        const dx = corridor.x2 - corridor.x1;
+        const dy = corridor.y2 - corridor.y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
         
-        wallMesh.position.set(
-            x + width / 2,
-            height / 2,
-            y + depth / 2
+        // Create floor geometry
+        const corridorWidth = halfWidth * 2;
+        const floorGeometry = new THREE.BoxGeometry(length, this.settings.floorHeight, corridorWidth);
+        const floorMesh = new THREE.Mesh(floorGeometry, material);
+        
+        // Position and rotate the floor
+        // Calculate angle to rotate
+        const angle = Math.atan2(dy, dx);
+        floorMesh.rotation.y = angle;
+        
+        // Position at center of corridor
+        floorMesh.position.set(
+            corridor.x1 + dx/2,
+            -this.settings.floorHeight/2,
+            corridor.y1 + dy/2
         );
         
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
+        return floorMesh;
+    }
+    
+    createSimpleCorridorWalls(group, corridor, halfWidth, wallHeight, material) {
+        const dx = corridor.x2 - corridor.x1;
+        const dy = corridor.y2 - corridor.y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
         
-        group.add(wallMesh);
+        // Create two walls along the corridor
+        const wallGeometry = new THREE.BoxGeometry(length, wallHeight, 1);
         
-        return wallMesh;
+        // First wall
+        const wall1 = new THREE.Mesh(wallGeometry, material);
+        wall1.rotation.y = angle;
+        wall1.position.set(
+            corridor.x1 + dx/2,
+            wallHeight/2,
+            corridor.y1 + dy/2 + halfWidth
+        );
+        wall1.castShadow = true;
+        wall1.receiveShadow = true;
+        group.add(wall1);
+        group.colliderMeshes.push(wall1);
+        
+        // Second wall
+        const wall2 = new THREE.Mesh(wallGeometry, material);
+        wall2.rotation.y = angle;
+        wall2.position.set(
+            corridor.x1 + dx/2,
+            wallHeight/2,
+            corridor.y1 + dy/2 - halfWidth
+        );
+        wall2.castShadow = true;
+        wall2.receiveShadow = true;
+        group.add(wall2);
+        group.colliderMeshes.push(wall2);
     }
