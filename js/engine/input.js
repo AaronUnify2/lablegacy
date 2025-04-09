@@ -153,25 +153,32 @@ export class InputManager {
             ['move-left', 'move-center', 'move-right', 'camera-left', 'jump'],
             ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
         ];
-        
-        // Define button icons
-        const buttonIcons = {
-            'move-up-left': '↖',
-            'move-up': '↑',
-            'move-up-right': '↗',
-            'move-left': '←',
-            'move-center': '',
-            'move-right': '→',
-            'move-down-left': '↙',
-            'move-down': '↓',
-            'move-down-right': '↘',
-            'camera-up': '↑',
-            'camera-left': '←',
-            'jump': 'Bounce',
-            'zoom-in': '+',
-            'zoom-out': '-',
-            'camera-down': '↓'
-        };
+        // Define the button layout - updated to include camera-right button
+const buttonLayout = [
+    ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
+    ['move-left', 'move-center', 'move-right', 'camera-left', 'jump', 'camera-right'],
+    ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
+];
+
+// Define button icons
+const buttonIcons = {
+    'move-up-left': '↖',
+    'move-up': '↑',
+    'move-up-right': '↗',
+    'move-left': '←',
+    'move-center': '',
+    'move-right': '→',
+    'move-down-left': '↙',
+    'move-down': '↓',
+    'move-down-right': '↘',
+    'camera-up': '↑',
+    'camera-left': '←',
+    'camera-right': '→',
+    'jump': 'Bounce',
+    'zoom-in': '+',
+    'zoom-out': '-',
+    'camera-down': '↓'
+};
         
         // Create buttons according to layout
         for (let row = 0; row < buttonLayout.length; row++) {
