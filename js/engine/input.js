@@ -147,11 +147,11 @@ export class InputManager {
         gridContainer.className = 'control-grid';
         touchControls.appendChild(gridContainer);
         
-        // Define the button layout
+        // Define the button layout using a 6x3 grid
         const buttonLayout = [
-            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up'],
-            ['move-left', 'move-center', 'move-right', 'camera-left', 'jump'],
-            ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down']
+            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', ''],
+            ['move-left', 'move-center', 'move-right', 'camera-left', 'camera-right', 'jump'],
+            ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down', '']
         ];
         
         // Define button icons
@@ -167,11 +167,11 @@ export class InputManager {
             'move-down-right': '↘',
             'camera-up': '↑',
             'camera-left': '←',
+            'camera-right': '→',
             'jump': 'Bounce',
             'zoom-in': '+',
             'zoom-out': '-',
-            'camera-down': '↓',
-            'camera-right': '→'
+            'camera-down': '↓'
         };
         
         // Create buttons according to layout
@@ -201,21 +201,6 @@ export class InputManager {
                 }
             }
         }
-        
-        // Add camera-right button separately
-        const cameraRightBtn = document.createElement('div');
-        cameraRightBtn.id = 'camera-right';
-        cameraRightBtn.className = 'control-button';
-        cameraRightBtn.textContent = buttonIcons['camera-right'];
-        
-        // Position it to the right of the camera-left button
-        cameraRightBtn.style.position = 'absolute';
-        cameraRightBtn.style.right = '20px';
-        cameraRightBtn.style.top = '50%';
-        cameraRightBtn.style.transform = 'translateY(-50%)';
-        
-        touchControls.appendChild(cameraRightBtn);
-        this.buttons['camera-right'] = cameraRightBtn;
         
         // Adjust layout based on screen size
         this.adjustButtonSizes();
@@ -304,7 +289,7 @@ export class InputManager {
             true
         );
         
-        // Jump button (not functional yet)
+        // Jump button
         if (this.buttons['jump']) {
             this.setupButtonTouch('jump', 
                 () => console.log('Jump pressed (not implemented)'), 
