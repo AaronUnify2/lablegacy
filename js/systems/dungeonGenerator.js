@@ -2,7 +2,19 @@ export class DungeonGenerator {
     constructor() {
         // Settings for dungeon generation
         this.settings = {
-            // Room settings
+            x + width / 2,
+            height / 2,
+            y + depth / 2
+        );
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        
+        return wallMesh;
+    }
+}// Room settings
             centralRoomSize: 40,
             minRoomSize: 25,
             maxRoomSize: 40,
@@ -35,10 +47,7 @@ export class DungeonGenerator {
         const rooms = [centralRoom, ...radialRooms];
         
         // Connect rooms with corridors - using direct connections to walls
-        const corridors = this.connectRoomsToCenter(centralRoom, radialRooms);
-        
-        // Create doorways where corridors meet rooms
-        this.createDoorways(rooms, corridors);
+        const corridors = this.connectRoomsWithSimpleCorridors(centralRoom, radialRooms);
         
         // Place the key in the furthest room from center
         const keyPosition = this.placeKey(radialRooms);
@@ -204,316 +213,207 @@ export class DungeonGenerator {
         }
     }
     
-    connectRoomsToCenter(centralRoom, radialRooms) {
+    // Simplified corridor connection approach - more reliable
+    connectRoomsWithSimpleCorridors(centralRoom, radialRooms) {
         const corridors = [];
         
-        // Calculate the center of the central room
-        const centralX = centralRoom.x + centralRoom.width / 2;
-        const centralY = centralRoom.y + centralRoom.height / 2;
-        
-        // Calculate central room boundaries
-        const centralLeft = centralRoom.x;
-        const centralRight = centralRoom.x + centralRoom.width;
-        const centralTop = centralRoom.y;
-        const centralBottom = centralRoom.y + centralRoom.height;
+        // Get central room boundaries
+        const centralRoomCenterX = centralRoom.x + centralRoom.width / 2;
+        const centralRoomCenterY = centralRoom.y + centralRoom.height / 2;
         
         // Connect each radial room to the central room
-        for (const room of radialRooms) {
-            // Calculate the angle to determine which wall of the central room to connect from
-            const angleRad = room.angle * (Math.PI / 180);
+        for (const radialRoom of radialRooms) {
+            // Determine the angle between central room and radial room
+            const angleRadians = Math.atan2(
+                radialRoom.centerY - centralRoomCenterY,
+                radialRoom.centerX - centralRoomCenterX
+            );
             
-            // Determine exit point from central room
-            let exitX, exitY;
+            // Find the point where a ray from the center of the central room 
+            // would intersect with the central room's wall
+            const centralRoomExitPoint = this.findRoomWallIntersection(
+                centralRoom, 
+                centralRoomCenterX, 
+                centralRoomCenterY,
+                angleRadians
+            );
             
-            // Determine which quadrant the radial room is in relative to central room
-            if (Math.abs(Math.cos(angleRad)) > Math.abs(Math.sin(angleRad))) {
-                // Room is more along the x-axis (east or west)
-                if (Math.cos(angleRad) > 0) {
-                    // Room is to the east of central room
-                    exitX = centralRight;
-                    exitY = centralY;
-                } else {
-                    // Room is to the west of central room
-                    exitX = centralLeft;
-                    exitY = centralY;
-                }
-            } else {
-                // Room is more along the y-axis (north or south)
-                if (Math.sin(angleRad) > 0) {
-                    // Room is to the south of central room
-                    exitX = centralX;
-                    exitY = centralBottom;
-                } else {
-                    // Room is to the north of central room
-                    exitX = centralX;
-                    exitY = centralTop;
-                }
-            }
+            // Find the point where a ray from the center of the radial room
+            // (going toward the central room) would intersect with the radial room's wall
+            const oppositeAngleRadians = angleRadians + Math.PI; // Opposite direction
+            const radialRoomEntryPoint = this.findRoomWallIntersection(
+                radialRoom,
+                radialRoom.centerX,
+                radialRoom.centerY,
+                oppositeAngleRadians
+            );
             
-            // Calculate radial room boundaries
-            const roomLeft = room.x;
-            const roomRight = room.x + room.width;
-            const roomTop = room.y;
-            const roomBottom = room.y + room.height;
+            // Create a direct corridor between these two points
+            const corridor = {
+                x1: centralRoomExitPoint.x,
+                y1: centralRoomExitPoint.y,
+                x2: radialRoomEntryPoint.x,
+                y2: radialRoomEntryPoint.y,
+                width: this.settings.corridorWidth,
+                isHorizontal: Math.abs(Math.cos(angleRadians)) > Math.abs(Math.sin(angleRadians)),
+                angle: radialRoom.angle,
+                startRoom: centralRoom,
+                endRoom: radialRoom,
+                // Add doorway info for corridor exits/entries
+                exitWall: centralRoomExitPoint.wall,
+                entryWall: radialRoomEntryPoint.wall
+            };
             
-            // Determine entry point to radial room
-            let entryX, entryY;
+            // Create doorways for both rooms at corridor connection points
+            this.addDoorwayToRoom(centralRoom, corridor, true);
+            this.addDoorwayToRoom(radialRoom, corridor, false);
             
-            // Determine which side of the radial room should have the entry
-            if (Math.abs(Math.cos(angleRad)) > Math.abs(Math.sin(angleRad))) {
-                // Connect horizontally
-                if (Math.cos(angleRad) > 0) {
-                    // Room is to the east, enter from west wall
-                    entryX = roomLeft;
-                    entryY = room.centerY;
-                } else {
-                    // Room is to the west, enter from east wall
-                    entryX = roomRight;
-                    entryY = room.centerY;
-                }
-            } else {
-                // Connect vertically
-                if (Math.sin(angleRad) > 0) {
-                    // Room is to the south, enter from north wall
-                    entryX = room.centerX;
-                    entryY = roomTop;
-                } else {
-                    // Room is to the north, enter from south wall
-                    entryX = room.centerX;
-                    entryY = roomBottom;
-                }
-            }
-            
-            // Determine if corridor is more horizontal or vertical
-            if (Math.abs(exitX - centralX) > 0 || Math.abs(entryX - room.centerX) > 0) {
-                // Corridor has horizontal components
-                
-                // Check if exit and entry are in line (roughly same Y)
-                const margin = this.settings.corridorWidth * 2;
-                if (Math.abs(exitY - entryY) <= margin) {
-                    // Direct horizontal corridor
-                    corridors.push({
-                        x1: exitX,
-                        y1: exitY,
-                        x2: entryX,
-                        y2: entryY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: true,
-                        isStraight: true,
-                        angle: room.angle,
-                        startRoom: centralRoom,
-                        endRoom: room
-                    });
-                } else {
-                    // L-shaped corridor
-                    // First segment (from central room)
-                    corridors.push({
-                        x1: exitX,
-                        y1: exitY,
-                        x2: entryX,
-                        y2: exitY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: true,
-                        isStraight: false,
-                        angle: room.angle,
-                        startRoom: centralRoom,
-                        endRoom: null
-                    });
-                    
-                    // Second segment (to radial room)
-                    corridors.push({
-                        x1: entryX,
-                        y1: exitY,
-                        x2: entryX,
-                        y2: entryY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: false,
-                        isStraight: false,
-                        angle: room.angle,
-                        startRoom: null,
-                        endRoom: room
-                    });
-                }
-            } else {
-                // Corridor has vertical components
-                
-                // Check if exit and entry are in line (roughly same X)
-                const margin = this.settings.corridorWidth * 2;
-                if (Math.abs(exitX - entryX) <= margin) {
-                    // Direct vertical corridor
-                    corridors.push({
-                        x1: exitX,
-                        y1: exitY,
-                        x2: entryX,
-                        y2: entryY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: false,
-                        isStraight: true,
-                        angle: room.angle,
-                        startRoom: centralRoom,
-                        endRoom: room
-                    });
-                } else {
-                    // L-shaped corridor
-                    // First segment (from central room)
-                    corridors.push({
-                        x1: exitX,
-                        y1: exitY,
-                        x2: exitX,
-                        y2: entryY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: false,
-                        isStraight: false,
-                        angle: room.angle,
-                        startRoom: centralRoom,
-                        endRoom: null
-                    });
-                    
-                    // Second segment (to radial room)
-                    corridors.push({
-                        x1: exitX,
-                        y1: entryY,
-                        x2: entryX,
-                        y2: entryY,
-                        width: this.settings.corridorWidth,
-                        isHorizontal: true,
-                        isStraight: false,
-                        angle: room.angle,
-                        startRoom: null,
-                        endRoom: room
-                    });
-                }
-            }
+            corridors.push(corridor);
             
             // Mark rooms as connected
-            centralRoom.connections.push(room);
-            room.connections.push(centralRoom);
+            centralRoom.connections.push(radialRoom);
+            radialRoom.connections.push(centralRoom);
         }
         
         return corridors;
     }
     
-    createDoorways(rooms, corridors) {
-        // Process each corridor to create doorways in the rooms they connect
-        for (const corridor of corridors) {
-            if (corridor.startRoom) {
-                const room = corridor.startRoom;
-                
-                if (corridor.isHorizontal) {
-                    // Horizontal corridor, doorway on east/west wall
-                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
-                    
-                    if (corridor.x1 < corridor.x2) {
-                        // Corridor goes east from room
-                        doorX = room.x + room.width;
-                        isEastWall = true;
-                    } else {
-                        // Corridor goes west from room
-                        doorX = room.x;
-                        isEastWall = false;
-                    }
-                    
-                    doorY = corridor.y1 - this.settings.doorwayWidth / 2;
-                    doorWidth = this.settings.gridSize; // Door thickness is one grid cell
-                    doorHeight = this.settings.doorwayWidth;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: isEastWall,
-                        isNorthWall: false
-                    });
-                } else {
-                    // Vertical corridor, doorway on north/south wall
-                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
-                    
-                    doorX = corridor.x1 - this.settings.doorwayWidth / 2;
-                    
-                    if (corridor.y1 < corridor.y2) {
-                        // Corridor goes south from room
-                        doorY = room.y + room.height;
-                        isNorthWall = false;
-                    } else {
-                        // Corridor goes north from room
-                        doorY = room.y;
-                        isNorthWall = true;
-                    }
-                    
-                    doorWidth = this.settings.doorwayWidth;
-                    doorHeight = this.settings.gridSize; // Door thickness is one grid cell
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: false,
-                        isNorthWall: isNorthWall
-                    });
-                }
-            }
-            
-            if (corridor.endRoom) {
-                const room = corridor.endRoom;
-                
-                if (corridor.isHorizontal) {
-                    // Horizontal corridor, doorway on east/west wall
-                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
-                    
-                    if (corridor.x1 < corridor.x2) {
-                        // Corridor goes east to room
-                        doorX = room.x;
-                        isEastWall = false;
-                    } else {
-                        // Corridor goes west to room
-                        doorX = room.x + room.width;
-                        isEastWall = true;
-                    }
-                    
-                    doorY = corridor.y2 - this.settings.doorwayWidth / 2;
-                    doorWidth = this.settings.gridSize;
-                    doorHeight = this.settings.doorwayWidth;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: isEastWall,
-                        isNorthWall: false
-                    });
-                } else {
-                    // Vertical corridor, doorway on north/south wall
-                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
-                    
-                    doorX = corridor.x2 - this.settings.doorwayWidth / 2;
-                    
-                    if (corridor.y1 < corridor.y2) {
-                        // Corridor goes south to room
-                        doorY = room.y;
-                        isNorthWall = true;
-                    } else {
-                        // Corridor goes north to room
-                        doorY = room.y + room.height;
-                        isNorthWall = false;
-                    }
-                    
-                    doorWidth = this.settings.doorwayWidth;
-                    doorHeight = this.settings.gridSize;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: false,
-                        isNorthWall: isNorthWall
-                    });
-                }
+    // Find the point where a ray from the center intersects with the room's wall
+    findRoomWallIntersection(room, startX, startY, angleRadians) {
+        // Room boundaries
+        const leftX = room.x;
+        const rightX = room.x + room.width;
+        const topY = room.y;
+        const bottomY = room.y + room.height;
+        
+        // Direction vector from the angle
+        const dx = Math.cos(angleRadians);
+        const dy = Math.sin(angleRadians);
+        
+        // Find intersections with all four walls
+        let intersections = [];
+        
+        // Check top wall (y = topY)
+        if (dy < 0) {
+            const t = (topY - startY) / dy;
+            const x = startX + t * dx;
+            if (x >= leftX && x <= rightX) {
+                intersections.push({
+                    x: x,
+                    y: topY,
+                    distance: t,
+                    wall: 'north'
+                });
             }
         }
+        
+        // Check bottom wall (y = bottomY)
+        if (dy > 0) {
+            const t = (bottomY - startY) / dy;
+            const x = startX + t * dx;
+            if (x >= leftX && x <= rightX) {
+                intersections.push({
+                    x: x,
+                    y: bottomY,
+                    distance: t,
+                    wall: 'south'
+                });
+            }
+        }
+        
+        // Check left wall (x = leftX)
+        if (dx < 0) {
+            const t = (leftX - startX) / dx;
+            const y = startY + t * dy;
+            if (y >= topY && y <= bottomY) {
+                intersections.push({
+                    x: leftX,
+                    y: y,
+                    distance: t,
+                    wall: 'west'
+                });
+            }
+        }
+        
+        // Check right wall (x = rightX)
+        if (dx > 0) {
+            const t = (rightX - startX) / dx;
+            const y = startY + t * dy;
+            if (y >= topY && y <= bottomY) {
+                intersections.push({
+                    x: rightX,
+                    y: y,
+                    distance: t,
+                    wall: 'east'
+                });
+            }
+        }
+        
+        // Find the closest intersection (should be only one valid one)
+        if (intersections.length > 0) {
+            // Sort by distance and return the closest one
+            intersections.sort((a, b) => a.distance - b.distance);
+            return intersections[0];
+        }
+        
+        // Fallback (shouldn't happen)
+        console.error("No wall intersection found!");
+        return { x: startX, y: startY, wall: 'none' };
+    }
+    
+    // Add a doorway to the room at the corridor connection point
+    addDoorwayToRoom(room, corridor, isStart) {
+        const wallSide = isStart ? corridor.exitWall : corridor.entryWall;
+        const doorX = isStart ? corridor.x1 : corridor.x2;
+        const doorY = isStart ? corridor.y1 : corridor.y2;
+        
+        // Create doorway based on which wall the corridor connects to
+        let doorwaySpec = {
+            isEastWall: false,
+            isNorthWall: false,
+            width: 0,
+            height: 0,
+            x: 0,
+            y: 0
+        };
+        
+        // Configure doorway based on which wall it's on
+        switch (wallSide) {
+            case 'north':
+                doorwaySpec.isNorthWall = true;
+                doorwaySpec.width = this.settings.doorwayWidth;
+                doorwaySpec.height = this.settings.gridSize;
+                doorwaySpec.x = doorX - this.settings.doorwayWidth / 2;
+                doorwaySpec.y = room.y;
+                break;
+                
+            case 'south':
+                doorwaySpec.isNorthWall = false;
+                doorwaySpec.width = this.settings.doorwayWidth;
+                doorwaySpec.height = this.settings.gridSize;
+                doorwaySpec.x = doorX - this.settings.doorwayWidth / 2;
+                doorwaySpec.y = room.y + room.height - this.settings.gridSize;
+                break;
+                
+            case 'east':
+                doorwaySpec.isEastWall = true;
+                doorwaySpec.width = this.settings.gridSize;
+                doorwaySpec.height = this.settings.doorwayWidth;
+                doorwaySpec.x = room.x + room.width - this.settings.gridSize;
+                doorwaySpec.y = doorY - this.settings.doorwayWidth / 2;
+                break;
+                
+            case 'west':
+                doorwaySpec.isEastWall = false;
+                doorwaySpec.width = this.settings.gridSize;
+                doorwaySpec.height = this.settings.doorwayWidth;
+                doorwaySpec.x = room.x;
+                doorwaySpec.y = doorY - this.settings.doorwayWidth / 2;
+                break;
+        }
+        
+        // Add the doorway to the room
+        room.doorways.push(doorwaySpec);
     }
     
     placeKey(radialRooms) {
@@ -771,87 +671,135 @@ export class DungeonGenerator {
         // Determine corridor orientation and dimensions
         let width, depth, x, z;
         
-        if (corridor.isHorizontal) {
-            // Horizontal corridor
-            width = Math.abs(corridor.x2 - corridor.x1);
+        // Calculate the angle of the corridor
+        const angle = Math.atan2(corridor.y2 - corridor.y1, corridor.x2 - corridor.x1);
+        const length = Math.sqrt(
+            Math.pow(corridor.x2 - corridor.x1, 2) + 
+            Math.pow(corridor.y2 - corridor.y1, 2)
+        );
+        
+        // Determine corridor dimensions based on orientation
+        const isMoreHorizontal = Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle));
+        
+        if (isMoreHorizontal) {
+            // Corridor is more horizontal than vertical
+            width = length;
             depth = corridor.width * this.settings.gridSize;
             x = Math.min(corridor.x1, corridor.x2);
-            z = corridor.y1 - depth / 2;
+            z = (corridor.y1 + corridor.y2) / 2 - depth / 2;
+            
+            if (corridor.x1 > corridor.x2) {
+                // If corridor goes from right to left, adjust x
+                x = corridor.x2;
+            }
         } else {
-            // Vertical corridor
+            // Corridor is more vertical than horizontal
             width = corridor.width * this.settings.gridSize;
-            depth = Math.abs(corridor.y2 - corridor.y1);
-            x = corridor.x1 - width / 2;
+            depth = length;
+            x = (corridor.x1 + corridor.x2) / 2 - width / 2;
             z = Math.min(corridor.y1, corridor.y2);
+            
+            if (corridor.y1 > corridor.y2) {
+                // If corridor goes from bottom to top, adjust z
+                z = corridor.y2;
+            }
         }
         
         // Create corridor floor
         const corridorGeometry = new THREE.BoxGeometry(width, this.settings.floorHeight, depth);
         const corridorMesh = new THREE.Mesh(corridorGeometry, floorMaterial);
         
-        corridorMesh.position.set(
-            x + width / 2,
-            -this.settings.floorHeight / 2,
-            z + depth / 2
-        );
+        // Position and rotate the corridor
+        if (isMoreHorizontal) {
+            // For horizontal-like corridors
+            corridorMesh.position.set(
+                x + width / 2,
+                -this.settings.floorHeight / 2,
+                z + depth / 2
+            );
+            
+            if (Math.abs(angle) > 0.01) {
+                // Only rotate if not perfectly horizontal
+                corridorMesh.rotation.y = angle;
+                // Adjust position to account for rotation
+                corridorMesh.position.x = (corridor.x1 + corridor.x2) / 2;
+                corridorMesh.position.z = (corridor.y1 + corridor.y2) / 2;
+            }
+        } else {
+            // For vertical-like corridors
+            corridorMesh.position.set(
+                x + width / 2,
+                -this.settings.floorHeight / 2,
+                z + depth / 2
+            );
+            
+            if (Math.abs(angle - Math.PI/2) > 0.01 && Math.abs(angle + Math.PI/2) > 0.01) {
+                // Only rotate if not perfectly vertical
+                corridorMesh.rotation.y = angle;
+                // Adjust position to account for rotation
+                corridorMesh.position.x = (corridor.x1 + corridor.x2) / 2;
+                corridorMesh.position.z = (corridor.y1 + corridor.y2) / 2;
+            }
+        }
         
         corridorMesh.receiveShadow = true;
         group.colliderMeshes.push(corridorMesh);
         group.add(corridorMesh);
         
-        // Add walls along the corridor
-        if (corridor.isHorizontal) {
-            // Add north and south walls for horizontal corridors
+        // Add walls along the corridor sides
+        this.addCorridorWalls(group, corridor, wallMaterial);
+    }
+    
+    addCorridorWalls(group, corridor, wallMaterial) {
+        // Add simple walls along a direct corridor
+        const angle = Math.atan2(corridor.y2 - corridor.y1, corridor.x2 - corridor.x1);
+        const length = Math.sqrt(
+            Math.pow(corridor.x2 - corridor.x1, 2) + 
+            Math.pow(corridor.y2 - corridor.y1, 2)
+        );
+        const halfWidth = corridor.width / 2;
+        
+        // Calculate perpendicular direction for wall offset
+        const perpX = -Math.sin(angle);
+        const perpY = Math.cos(angle);
+        
+        // Create walls on both sides of the corridor
+        for (let side = -1; side <= 1; side += 2) {
+            // Skip center position
+            if (side === 0) continue;
             
-            // North wall
-            const northWall = this.createWall(
-                group,
-                x,
-                z,
-                width,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            group.colliderMeshes.push(northWall);
+            // Calculate wall position (offset from corridor center line)
+            const offsetX = perpX * halfWidth * side;
+            const offsetY = perpY * halfWidth * side;
             
-            // South wall
-            const southWall = this.createWall(
-                group,
-                x,
-                z + depth - this.settings.gridSize,
-                width,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            group.colliderMeshes.push(southWall);
-        } else {
-            // Add east and west walls for vertical corridors
+            // Wall dimensions
+            const wallLength = length;
+            const wallHeight = this.settings.wallHeight;
+            const wallWidth = this.settings.gridSize;
             
-            // West wall
-            const westWall = this.createWall(
-                group,
-                x,
-                z,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                depth,
-                wallMaterial
-            );
-            group.colliderMeshes.push(westWall);
+            // Position wall at center of its length
+            const wallCenterX = (corridor.x1 + corridor.x2) / 2 + offsetX;
+            const wallCenterY = (corridor.y1 + corridor.y2) / 2 + offsetY;
             
-            // East wall
-            const eastWall = this.createWall(
-                group,
-                x + width - this.settings.gridSize,
-                z,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                depth,
-                wallMaterial
+            // Create wall geometry and mesh
+            const wallGeometry = new THREE.BoxGeometry(wallWidth, wallHeight, wallLength);
+            const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+            
+            // Position and rotate the wall
+            wallMesh.position.set(
+                wallCenterX,
+                wallHeight / 2,
+                wallCenterY
             );
-            group.colliderMeshes.push(eastWall);
+            
+            // Rotate wall to align with corridor
+            wallMesh.rotation.y = angle + Math.PI / 2; // Perpendicular to corridor
+            
+            wallMesh.castShadow = true;
+            wallMesh.receiveShadow = true;
+            
+            group.add(wallMesh);
+            group.colliderMeshes.push(wallMesh);
         }
     }
     
@@ -873,3 +821,4 @@ export class DungeonGenerator {
         return wallMesh;
     }
 }
+ 
