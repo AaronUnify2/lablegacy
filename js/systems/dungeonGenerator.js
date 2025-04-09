@@ -1,18 +1,19 @@
 export class DungeonGenerator {
-    constructor() {
-        // Updated settings for dungeon generation
-        this.settings = {
-            minRooms: 5,
-            maxRooms: 15,
-            roomSizeMin: 20, // 5x larger (was 4)
-            roomSizeMax: 50, // 5x larger (was 10)
-            corridorWidth: 4, // 2x wider (was 2)
-            floorHeight: 0.2,
-            wallHeight: 3,
-            gridSize: 1, // Size of each grid cell
-            doorwayWidth: 3 // Width of doorways between rooms
-        };
-    }
+    // Update this in the DungeonGenerator constructor
+constructor() {
+    // Updated settings for dungeon generation
+    this.settings = {
+        minRooms: 5,
+        maxRooms: 15,
+        roomSizeMin: 20,
+        roomSizeMax: 50,
+        corridorWidth: 5, // Increased from 4 to 5
+        floorHeight: 0.2,
+        wallHeight: 3,
+        gridSize: 1,
+        doorwayWidth: 5 // Increased from 3 to 5
+    };
+}
     
     generateFloor(floorLevel) {
         console.log(`Generating floor level ${floorLevel}...`);
