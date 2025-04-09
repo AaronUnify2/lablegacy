@@ -369,8 +369,14 @@ export class InputManager {
         this.camera.position.addScaledVector(forward, amount);
     }
     
-    // Replace the update method in input.js with this improved version
+// Replace the update method in input.js with this version that includes wall sliding
 update(deltaTime, collisionManager) {
+    if (!collisionManager) {
+        // Without collision, just use simple movement
+        this.updateSimpleMovement(deltaTime);
+        return;
+    }
+    
     // Store the previous position for collision resolution
     const previousPosition = this.camera.position.clone();
     
@@ -382,52 +388,123 @@ update(deltaTime, collisionManager) {
     // Calculate movement speed with delta time
     const speedPerFrame = this.moveSpeed * deltaTime;
     
-    // Create a new position for testing collisions
-    let newPosition = this.camera.position.clone();
+    // Calculate movement vector based on input
+    let moveVector = new THREE.Vector3(0, 0, 0);
+    
+    if (this.moveForward) moveVector.add(forward);
+    if (this.moveBackward) moveVector.sub(forward);
+    if (this.moveRight) moveVector.add(right);
+    if (this.moveLeft) moveVector.sub(right);
+    if (this.moveUp) moveVector.add(up);
+    if (this.moveDown) moveVector.sub(up);
+    
+    // Normalize movement vector if it's not zero length
+    if (moveVector.lengthSq() > 0) {
+        moveVector.normalize().multiplyScalar(speedPerFrame);
+    } else {
+        return; // No movement, exit early
+    }
+    
+    // Try full movement first
+    const targetPosition = previousPosition.clone().add(moveVector);
+    const playerRadius = 0.5;
+    
+    const fullCollision = collisionManager.checkCollision(targetPosition, playerRadius);
+    
+    if (!fullCollision.collides) {
+        // No collision, full movement is possible
+        this.camera.position.copy(targetPosition);
+        return;
+    }
+    
+    // Collision detected, try wall sliding
+    
+    // First, handle vertical movement separately (y-axis)
+    const verticalMovement = new THREE.Vector3(0, moveVector.y, 0);
+    const verticalTarget = previousPosition.clone().add(verticalMovement);
+    
+    if (!collisionManager.checkCollision(verticalTarget, playerRadius).collides) {
+        this.camera.position.y = verticalTarget.y;
+    }
+    
+    // Now handle horizontal movement with sliding (x-z plane)
+    const horizontalMovement = new THREE.Vector3(moveVector.x, 0, moveVector.z);
+    
+    if (horizontalMovement.lengthSq() > 0) {
+        // Try sliding along the wall by projecting movement along the axes
+        
+        // Try X movement
+        const xMovement = new THREE.Vector3(moveVector.x, 0, 0);
+        const xTarget = previousPosition.clone();
+        xTarget.x += xMovement.x;
+        
+        if (!collisionManager.checkCollision(xTarget, playerRadius).collides) {
+            this.camera.position.x = xTarget.x;
+        }
+        
+        // Try Z movement
+        const zMovement = new THREE.Vector3(0, 0, moveVector.z);
+        const zTarget = previousPosition.clone();
+        zTarget.z += zMovement.z; 
+        
+        // Update Z from current position (may have changed from X movement)
+        zTarget.x = this.camera.position.x;
+        
+        if (!collisionManager.checkCollision(zTarget, playerRadius).collides) {
+            this.camera.position.z = zTarget.z;
+        }
+        
+        // If we're still in the same position, try moving at reduced speed
+        if (this.camera.position.distanceToSquared(previousPosition) < 0.001) {
+            // Try half-speed movement in X
+            const reducedX = previousPosition.clone();
+            reducedX.x += xMovement.x * 0.5;
+            
+            if (!collisionManager.checkCollision(reducedX, playerRadius).collides) {
+                this.camera.position.x = reducedX.x;
+            }
+            
+            // Try half-speed movement in Z
+            const reducedZ = this.camera.position.clone();
+            reducedZ.z += zMovement.z * 0.5;
+            
+            if (!collisionManager.checkCollision(reducedZ, playerRadius).collides) {
+                this.camera.position.z = reducedZ.z;
+            }
+        }
+    }
+}
+
+// Helper method for movement without collision
+updateSimpleMovement(deltaTime) {
+    // Get direction vectors from camera orientation
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0);
+    
+    // Calculate movement speed with delta time
+    const speedPerFrame = this.moveSpeed * deltaTime;
     
     // Apply movements based on keyboard or touch input
     if (this.moveForward) {
-        newPosition.addScaledVector(forward, speedPerFrame);
+        this.camera.position.addScaledVector(forward, speedPerFrame);
     }
     if (this.moveBackward) {
-        newPosition.addScaledVector(forward, -speedPerFrame);
+        this.camera.position.addScaledVector(forward, -speedPerFrame);
     }
     if (this.moveRight) {
-        newPosition.addScaledVector(right, speedPerFrame);
+        this.camera.position.addScaledVector(right, speedPerFrame);
     }
     if (this.moveLeft) {
-        newPosition.addScaledVector(right, -speedPerFrame);
+        this.camera.position.addScaledVector(right, -speedPerFrame);
     }
     if (this.moveUp) {
-        newPosition.addScaledVector(up, speedPerFrame);
+        this.camera.position.addScaledVector(up, speedPerFrame);
     }
     if (this.moveDown) {
-        newPosition.addScaledVector(up, -speedPerFrame);
+        this.camera.position.addScaledVector(up, -speedPerFrame);
     }
-    
-    // Check for collisions and resolve if needed
-    if (collisionManager) {
-        // Smaller player radius for easier navigation
-        const playerRadius = 0.5; // Reduced from 0.8
-        
-        // Try checking for collisions component by component
-        // This creates a sliding effect along walls
-        
-        // Try moving in X direction
-        let testPosition = previousPosition.clone();
-        testPosition.x = newPosition.x;
-        
-        if (!collisionManager.checkCollision(testPosition, playerRadius).collides) {
-            this.camera.position.x = newPosition.x;
-        } else {
-            // Try moving a bit less in X direction (helps with corners)
-            const moveDirection = Math.sign(newPosition.x - previousPosition.x);
-            const reducedPosition = previousPosition.clone();
-            reducedPosition.x += moveDirection * (speedPerFrame * 0.5);
-            
-            if (!collisionManager.checkCollision(reducedPosition, playerRadius).collides) {
-                this.camera.position.x = reducedPosition.x;
-            }
+}
         }
         
         // Try moving in Z direction
