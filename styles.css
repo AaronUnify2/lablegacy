@@ -89,7 +89,7 @@ canvas {
 
 .control-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr); /* Changed from 5 to 6 columns */
     grid-template-rows: repeat(3, 1fr);
     gap: 5px;
     width: 100%;
@@ -130,13 +130,13 @@ canvas {
 /* Improved responsive adjustments */
 @media (max-width: 800px) {
     .control-grid {
-        grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+        grid-template-columns: repeat(6, 1fr);
         gap: 4px;
     }
     
     .control-button {
-        width: 52px;
-        height: 52px;
+        width: 50px;
+        height: 50px;
         font-size: 20px;
     }
 }
@@ -147,8 +147,8 @@ canvas {
     }
     
     .control-button {
-        width: 48px;
-        height: 48px;
+        width: 45px;
+        height: 45px;
         font-size: 18px;
     }
     
@@ -167,8 +167,8 @@ canvas {
     }
     
     .control-button {
-        width: 42px;
-        height: 42px;
+        width: 40px;
+        height: 40px;
         font-size: 16px;
     }
     
