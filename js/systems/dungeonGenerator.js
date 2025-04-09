@@ -1,15 +1,16 @@
 export class DungeonGenerator {
     constructor() {
-        // Default settings for dungeon generation
+        // Updated settings for dungeon generation
         this.settings = {
             minRooms: 5,
             maxRooms: 15,
-            roomSizeMin: 4,
-            roomSizeMax: 10,
-            corridorWidth: 2,
+            roomSizeMin: 20, // 5x larger (was 4)
+            roomSizeMax: 50, // 5x larger (was 10)
+            corridorWidth: 4, // 2x wider (was 2)
             floorHeight: 0.2,
             wallHeight: 3,
-            gridSize: 1 // Size of each grid cell
+            gridSize: 1, // Size of each grid cell
+            doorwayWidth: 3 // Width of doorways between rooms
         };
     }
     
@@ -28,6 +29,9 @@ export class DungeonGenerator {
         
         // Connect rooms with corridors
         const corridors = this.connectRooms(rooms);
+        
+        // Add doorways to rooms
+        this.createDoorways(rooms, corridors);
         
         // Place the key
         const keyPosition = this.placeKey(rooms);
@@ -56,6 +60,10 @@ export class DungeonGenerator {
         const gridWidth = Math.ceil(Math.sqrt(numRooms));
         const gridHeight = Math.ceil(numRooms / gridWidth);
         
+        // Calculate spacing between room centers to accommodate larger rooms
+        const roomSpacingX = Math.max(this.settings.roomSizeMax + 25, 80) * gridSize;
+        const roomSpacingY = Math.max(this.settings.roomSizeMax + 25, 80) * gridSize;
+        
         for (let i = 0; i < numRooms; i++) {
             const gridX = i % gridWidth;
             const gridY = Math.floor(i / gridWidth);
@@ -69,18 +77,19 @@ export class DungeonGenerator {
                 this.settings.roomSizeMin;
             
             // Add some randomness to the position within the grid cell
-            const roomX = gridX * (this.settings.roomSizeMax + 5) * gridSize + 
-                (Math.random() * 3 - 1.5) * gridSize;
+            const roomX = gridX * roomSpacingX + 
+                (Math.random() * 10 - 5) * gridSize;
             
-            const roomY = gridY * (this.settings.roomSizeMax + 5) * gridSize + 
-                (Math.random() * 3 - 1.5) * gridSize;
+            const roomY = gridY * roomSpacingY + 
+                (Math.random() * 10 - 5) * gridSize;
             
             rooms.push({
                 x: roomX,
                 y: roomY,
                 width: roomWidth,
                 height: roomHeight,
-                connections: []
+                connections: [],
+                doorways: [] // Will store doorway information
             });
         }
         
@@ -106,7 +115,10 @@ export class DungeonGenerator {
                 y1: startY,
                 x2: endX,
                 y2: startY,
-                width: this.settings.corridorWidth
+                width: this.settings.corridorWidth,
+                isHorizontal: true,
+                startRoom: startRoom,
+                endRoom: null // Will be connected to vertical corridor
             };
             
             const corridorY = {
@@ -114,7 +126,10 @@ export class DungeonGenerator {
                 y1: startY,
                 x2: endX,
                 y2: endY,
-                width: this.settings.corridorWidth
+                width: this.settings.corridorWidth,
+                isHorizontal: false,
+                startRoom: null, // Connected from horizontal corridor
+                endRoom: endRoom
             };
             
             corridors.push(corridorX);
@@ -153,7 +168,10 @@ export class DungeonGenerator {
                     y1: startY,
                     x2: endX,
                     y2: startY,
-                    width: this.settings.corridorWidth
+                    width: this.settings.corridorWidth,
+                    isHorizontal: true,
+                    startRoom: startRoom,
+                    endRoom: null
                 };
                 
                 const corridorY = {
@@ -161,7 +179,10 @@ export class DungeonGenerator {
                     y1: startY,
                     x2: endX,
                     y2: endY,
-                    width: this.settings.corridorWidth
+                    width: this.settings.corridorWidth,
+                    isHorizontal: false,
+                    startRoom: null,
+                    endRoom: endRoom
                 };
                 
                 corridors.push(corridorX);
@@ -174,6 +195,129 @@ export class DungeonGenerator {
         }
         
         return corridors;
+    }
+    
+    createDoorways(rooms, corridors) {
+        // Process each corridor to create doorways in the rooms they connect
+        for (const corridor of corridors) {
+            if (corridor.startRoom) {
+                const room = corridor.startRoom;
+                
+                if (corridor.isHorizontal) {
+                    // Horizontal corridor, doorway on east/west wall
+                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
+                    
+                    if (corridor.x1 < corridor.x2) {
+                        // Corridor goes east from room
+                        doorX = room.x + room.width;
+                        isEastWall = true;
+                    } else {
+                        // Corridor goes west from room
+                        doorX = room.x;
+                        isEastWall = false;
+                    }
+                    
+                    doorY = corridor.y1 - this.settings.doorwayWidth / 2;
+                    doorWidth = this.settings.gridSize; // Door thickness is one grid cell
+                    doorHeight = this.settings.doorwayWidth;
+                    
+                    room.doorways.push({
+                        x: doorX,
+                        y: doorY,
+                        width: doorWidth,
+                        height: doorHeight,
+                        isEastWall: isEastWall,
+                        isNorthWall: false
+                    });
+                } else {
+                    // Vertical corridor, doorway on north/south wall
+                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
+                    
+                    doorX = corridor.x1 - this.settings.doorwayWidth / 2;
+                    
+                    if (corridor.y1 < corridor.y2) {
+                        // Corridor goes south from room
+                        doorY = room.y + room.height;
+                        isNorthWall = false;
+                    } else {
+                        // Corridor goes north from room
+                        doorY = room.y;
+                        isNorthWall = true;
+                    }
+                    
+                    doorWidth = this.settings.doorwayWidth;
+                    doorHeight = this.settings.gridSize; // Door thickness is one grid cell
+                    
+                    room.doorways.push({
+                        x: doorX,
+                        y: doorY,
+                        width: doorWidth,
+                        height: doorHeight,
+                        isEastWall: false,
+                        isNorthWall: isNorthWall
+                    });
+                }
+            }
+            
+            if (corridor.endRoom) {
+                const room = corridor.endRoom;
+                
+                if (corridor.isHorizontal) {
+                    // Horizontal corridor, doorway on east/west wall
+                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
+                    
+                    if (corridor.x1 < corridor.x2) {
+                        // Corridor goes east to room
+                        doorX = room.x;
+                        isEastWall = false;
+                    } else {
+                        // Corridor goes west to room
+                        doorX = room.x + room.width;
+                        isEastWall = true;
+                    }
+                    
+                    doorY = corridor.y1 - this.settings.doorwayWidth / 2;
+                    doorWidth = this.settings.gridSize;
+                    doorHeight = this.settings.doorwayWidth;
+                    
+                    room.doorways.push({
+                        x: doorX,
+                        y: doorY,
+                        width: doorWidth,
+                        height: doorHeight,
+                        isEastWall: isEastWall,
+                        isNorthWall: false
+                    });
+                } else {
+                    // Vertical corridor, doorway on north/south wall
+                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
+                    
+                    doorX = corridor.x1 - this.settings.doorwayWidth / 2;
+                    
+                    if (corridor.y1 < corridor.y2) {
+                        // Corridor goes south to room
+                        doorY = room.y;
+                        isNorthWall = true;
+                    } else {
+                        // Corridor goes north to room
+                        doorY = room.y + room.height;
+                        isNorthWall = false;
+                    }
+                    
+                    doorWidth = this.settings.doorwayWidth;
+                    doorHeight = this.settings.gridSize;
+                    
+                    room.doorways.push({
+                        x: doorX,
+                        y: doorY,
+                        width: doorWidth,
+                        height: doorHeight,
+                        isEastWall: false,
+                        isNorthWall: isNorthWall
+                    });
+                }
+            }
+        }
     }
     
     placeKey(rooms) {
@@ -212,6 +356,9 @@ export class DungeonGenerator {
             emissiveIntensity: 0.5
         });
         
+        // Array to store collider meshes
+        dungeonGroup.colliderMeshes = [];
+        
         // Add room floors and walls
         for (const room of rooms) {
             // Create floor
@@ -228,85 +375,19 @@ export class DungeonGenerator {
                 room.y + (room.height * this.settings.gridSize) / 2
             );
             floorMesh.receiveShadow = true;
+            
+            // Add collision to floor - prevents falling through
+            dungeonGroup.colliderMeshes.push(floorMesh);
+            
             dungeonGroup.add(floorMesh);
             
-            // Create walls
-            // North wall
-            this.createWall(
-                dungeonGroup,
-                room.x,
-                room.y,
-                room.width * this.settings.gridSize,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            
-            // South wall
-            this.createWall(
-                dungeonGroup,
-                room.x,
-                room.y + room.height * this.settings.gridSize - this.settings.gridSize,
-                room.width * this.settings.gridSize,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            
-            // West wall
-            this.createWall(
-                dungeonGroup,
-                room.x,
-                room.y,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                room.height * this.settings.gridSize,
-                wallMaterial
-            );
-            
-            // East wall
-            this.createWall(
-                dungeonGroup,
-                room.x + room.width * this.settings.gridSize - this.settings.gridSize,
-                room.y,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                room.height * this.settings.gridSize,
-                wallMaterial
-            );
+            // Create walls with doorways
+            this.createRoomWalls(dungeonGroup, room, wallMaterial);
         }
         
-        // Add corridor floors
+        // Add corridor floors and walls
         for (const corridor of corridors) {
-            // Determine corridor orientation and dimensions
-            let width, depth;
-            if (corridor.x1 === corridor.x2) {
-                // Vertical corridor
-                width = corridor.width * this.settings.gridSize;
-                depth = Math.abs(corridor.y2 - corridor.y1);
-            } else {
-                // Horizontal corridor
-                width = Math.abs(corridor.x2 - corridor.x1);
-                depth = corridor.width * this.settings.gridSize;
-            }
-            
-            const corridorGeometry = new THREE.BoxGeometry(
-                width,
-                this.settings.floorHeight,
-                depth
-            );
-            
-            const corridorMesh = new THREE.Mesh(corridorGeometry, floorMaterial);
-            
-            // Position corridor
-            corridorMesh.position.set(
-                Math.min(corridor.x1, corridor.x2) + width / 2,
-                -this.settings.floorHeight / 2,
-                Math.min(corridor.y1, corridor.y2) + depth / 2
-            );
-            
-            corridorMesh.receiveShadow = true;
-            dungeonGroup.add(corridorMesh);
+            this.createCorridorWithWalls(dungeonGroup, corridor, floorMaterial, wallMaterial);
         }
         
         // Add key
@@ -327,6 +408,245 @@ export class DungeonGenerator {
         dungeonGroup.add(keyMesh);
         
         return dungeonGroup;
+    }
+    
+    createRoomWalls(group, room, wallMaterial) {
+        // Get doorway info for this room
+        const doorways = room.doorways || [];
+        
+        // Create north wall with possible doorway gaps
+        this.createWallWithDoorways(
+            group,
+            room.x,
+            room.y,
+            room.width * this.settings.gridSize,
+            this.settings.wallHeight,
+            this.settings.gridSize,
+            wallMaterial,
+            doorways.filter(d => d.isNorthWall)
+        );
+        
+        // Create south wall with possible doorway gaps
+        this.createWallWithDoorways(
+            group,
+            room.x,
+            room.y + room.height * this.settings.gridSize - this.settings.gridSize,
+            room.width * this.settings.gridSize,
+            this.settings.wallHeight,
+            this.settings.gridSize,
+            wallMaterial,
+            doorways.filter(d => !d.isNorthWall && !d.isEastWall)
+        );
+        
+        // Create west wall with possible doorway gaps
+        this.createWallWithDoorways(
+            group,
+            room.x,
+            room.y,
+            this.settings.gridSize,
+            this.settings.wallHeight,
+            room.height * this.settings.gridSize,
+            wallMaterial,
+            doorways.filter(d => !d.isEastWall),
+            true
+        );
+        
+        // Create east wall with possible doorway gaps
+        this.createWallWithDoorways(
+            group,
+            room.x + room.width * this.settings.gridSize - this.settings.gridSize,
+            room.y,
+            this.settings.gridSize,
+            this.settings.wallHeight,
+            room.height * this.settings.gridSize,
+            wallMaterial,
+            doorways.filter(d => d.isEastWall),
+            true
+        );
+    }
+    
+    createWallWithDoorways(group, x, y, width, height, depth, material, doorways, isVertical = false) {
+        // If no doorways, create a single wall
+        if (!doorways || doorways.length === 0) {
+            const wallMesh = this.createWall(group, x, y, width, height, depth, material);
+            group.colliderMeshes.push(wallMesh);
+            return;
+        }
+        
+        // For walls with doorways, create wall segments
+        if (isVertical) {
+            // Vertical wall (west or east wall)
+            // Sort doorways by Y position
+            doorways.sort((a, b) => a.y - b.y);
+            
+            let currentY = y;
+            
+            for (const doorway of doorways) {
+                // Create wall segment from current position to doorway
+                if (doorway.y > currentY) {
+                    const segmentHeight = doorway.y - currentY;
+                    const wallMesh = this.createWall(
+                        group, 
+                        x, 
+                        currentY, 
+                        width, 
+                        height, 
+                        segmentHeight, 
+                        material
+                    );
+                    group.colliderMeshes.push(wallMesh);
+                }
+                
+                // Skip the doorway
+                currentY = doorway.y + doorway.height;
+            }
+            
+            // Create final wall segment after the last doorway
+            const endY = y + depth;
+            if (currentY < endY) {
+                const segmentHeight = endY - currentY;
+                const wallMesh = this.createWall(
+                    group, 
+                    x, 
+                    currentY, 
+                    width, 
+                    height, 
+                    segmentHeight, 
+                    material
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        } else {
+            // Horizontal wall (north or south wall)
+            // Sort doorways by X position
+            doorways.sort((a, b) => a.x - b.x);
+            
+            let currentX = x;
+            
+            for (const doorway of doorways) {
+                // Create wall segment from current position to doorway
+                if (doorway.x > currentX) {
+                    const segmentWidth = doorway.x - currentX;
+                    const wallMesh = this.createWall(
+                        group, 
+                        currentX, 
+                        y, 
+                        segmentWidth, 
+                        height, 
+                        depth, 
+                        material
+                    );
+                    group.colliderMeshes.push(wallMesh);
+                }
+                
+                // Skip the doorway
+                currentX = doorway.x + doorway.width;
+            }
+            
+            // Create final wall segment after the last doorway
+            const endX = x + width;
+            if (currentX < endX) {
+                const segmentWidth = endX - currentX;
+                const wallMesh = this.createWall(
+                    group, 
+                    currentX, 
+                    y, 
+                    segmentWidth, 
+                    height, 
+                    depth, 
+                    material
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        }
+    }
+    
+    createCorridorWithWalls(group, corridor, floorMaterial, wallMaterial) {
+        // Determine corridor orientation and dimensions
+        let width, depth, x, z;
+        
+        if (corridor.isHorizontal) {
+            // Horizontal corridor
+            width = Math.abs(corridor.x2 - corridor.x1);
+            depth = corridor.width * this.settings.gridSize;
+            x = Math.min(corridor.x1, corridor.x2);
+            z = corridor.y1 - depth / 2;
+        } else {
+            // Vertical corridor
+            width = corridor.width * this.settings.gridSize;
+            depth = Math.abs(corridor.y2 - corridor.y1);
+            x = corridor.x1 - width / 2;
+            z = Math.min(corridor.y1, corridor.y2);
+        }
+        
+        // Create corridor floor
+        const corridorGeometry = new THREE.BoxGeometry(width, this.settings.floorHeight, depth);
+        const corridorMesh = new THREE.Mesh(corridorGeometry, floorMaterial);
+        
+        corridorMesh.position.set(
+            x + width / 2,
+            -this.settings.floorHeight / 2,
+            z + depth / 2
+        );
+        
+        corridorMesh.receiveShadow = true;
+        group.colliderMeshes.push(corridorMesh);
+        group.add(corridorMesh);
+        
+        // Add walls along the corridor
+        if (corridor.isHorizontal) {
+            // Add north and south walls for horizontal corridors
+            
+            // North wall
+            const northWall = this.createWall(
+                group,
+                x,
+                z,
+                width,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(northWall);
+            
+            // South wall
+            const southWall = this.createWall(
+                group,
+                x,
+                z + depth - this.settings.gridSize,
+                width,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(southWall);
+        } else {
+            // Add east and west walls for vertical corridors
+            
+            // West wall
+            const westWall = this.createWall(
+                group,
+                x,
+                z,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                depth,
+                wallMaterial
+            );
+            group.colliderMeshes.push(westWall);
+            
+            // East wall
+            const eastWall = this.createWall(
+                group,
+                x + width - this.settings.gridSize,
+                z,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                depth,
+                wallMaterial
+            );
+            group.colliderMeshes.push(eastWall);
+        }
     }
     
     createWall(group, x, y, width, height, depth, material) {
