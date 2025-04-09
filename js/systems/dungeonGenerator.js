@@ -5,7 +5,7 @@ export class DungeonGenerator {
             // Room sizes
             hubRoomSize: 50, // Size of the central hub
             outerRoomSizeMin: 30,
-            outerRoomSizeMax: 50,
+            outerRoomSizeMax: 45,
             satelliteRoomSizeMin: 15,
             satelliteRoomSizeMax: 25,
             
@@ -28,7 +28,11 @@ export class DungeonGenerator {
             floorHeight: 0.2,
             wallHeight: 3,
             gridSize: 1,
-            doorwayWidth: 5
+            doorwayWidth: 5,
+            
+            // Spacing
+            minRoomSpacing: 20, // Minimum distance between rooms
+            hubDistanceMultiplier: 1.8 // Controls how far rooms are from the hub
         };
     }
     
@@ -48,10 +52,10 @@ export class DungeonGenerator {
         const allRooms = [hubRoom, ...outerRooms, ...satelliteRooms];
         
         // Connect rooms with corridors
-        const corridors = this.connectRooms(hubRoom, outerRooms, satelliteRooms);
+        const corridors = this.connectRooms(hubRoom, outerRooms, satelliteRooms, allRooms);
         
         // Add features to rooms (pillars, alcoves)
-        this.addRoomFeatures(allRooms);
+        this.addRoomFeatures(allRooms, corridors);
         
         // Add doorways to rooms where corridors connect
         this.createDoorways(allRooms, corridors);
@@ -105,8 +109,12 @@ export class DungeonGenerator {
     generateOuterRooms(hubRoom) {
         const outerRooms = [];
         const numRooms = this.settings.numOuterRooms;
-        const hubRadius = this.settings.hubRoomSize / 2;
-        const distanceFromHub = hubRadius + 25; // Distance from hub center to outer room center
+        const hubRadius = (this.settings.hubRoomSize / 2);
+        
+        // Calculate base distance to ensure rooms don't overlap with the hub
+        // Use the diagonal of the hub room and add minimum spacing
+        const hubDiagonal = Math.sqrt(Math.pow(hubRoom.width, 2) + Math.pow(hubRoom.height, 2));
+        const baseDistance = (hubDiagonal / 2) * this.settings.hubDistanceMultiplier;
         
         // Place rooms in a circle around the hub
         for (let i = 0; i < numRooms; i++) {
@@ -118,6 +126,10 @@ export class DungeonGenerator {
             const roomHeight = Math.floor(Math.random() * 
                 (this.settings.outerRoomSizeMax - this.settings.outerRoomSizeMin + 1)) + 
                 this.settings.outerRoomSizeMin;
+            
+            // Distance from hub center to outer room center
+            // Add room size to base distance to ensure edge rooms don't overlap
+            const distanceFromHub = baseDistance + Math.max(roomWidth, roomHeight) / 2;
             
             // Position is at center of room
             const centerX = Math.cos(angle) * distanceFromHub;
@@ -141,10 +153,46 @@ export class DungeonGenerator {
                 index: i
             };
             
-            outerRooms.push(room);
+            // Check if this room overlaps with any existing outer room
+            let overlaps = false;
+            for (const existingRoom of outerRooms) {
+                if (this.roomsOverlap(room, existingRoom, this.settings.minRoomSpacing)) {
+                    overlaps = true;
+                    break;
+                }
+            }
+            
+            // If no overlap, add the room
+            if (!overlaps) {
+                outerRooms.push(room);
+            } else {
+                // If overlap, adjust the angle slightly and try again (retry logic could be improved)
+                i--; // Retry this room
+            }
         }
         
         return outerRooms;
+    }
+    
+    roomsOverlap(roomA, roomB, spacing = 0) {
+        // Add spacing to room dimensions
+        const aLeft = roomA.x - spacing;
+        const aRight = roomA.x + roomA.width + spacing;
+        const aTop = roomA.y - spacing;
+        const aBottom = roomA.y + roomA.height + spacing;
+        
+        const bLeft = roomB.x - spacing;
+        const bRight = roomB.x + roomB.width + spacing;
+        const bTop = roomB.y - spacing;
+        const bBottom = roomB.y + roomB.height + spacing;
+        
+        // Check for overlap
+        return !(
+            aRight < bLeft ||
+            aLeft > bRight ||
+            aBottom < bTop ||
+            aTop > bBottom
+        );
     }
     
     generateSatelliteRooms(outerRooms) {
@@ -155,7 +203,7 @@ export class DungeonGenerator {
             if (Math.random() < this.settings.satelliteRoomChance) {
                 const parentAngle = outerRoom.angle;
                 
-                // Continue in the same direction from hub, but farther out
+                // Size of the satellite room
                 const satelliteWidth = Math.floor(Math.random() * 
                     (this.settings.satelliteRoomSizeMax - this.settings.satelliteRoomSizeMin + 1)) + 
                     this.settings.satelliteRoomSizeMin;
@@ -163,25 +211,29 @@ export class DungeonGenerator {
                     (this.settings.satelliteRoomSizeMax - this.settings.satelliteRoomSizeMin + 1)) + 
                     this.settings.satelliteRoomSizeMin;
                 
-                // Position the satellite beyond the outer room
-                // Direction is away from hub (same angle)
-                const distanceFromParent = 20; // Gap between rooms
+                // Distance between rooms (spacing)
+                const distanceFromParent = this.settings.minRoomSpacing;
                 
-                // Find the edge center of the parent room
-                const parentCenterX = outerRoom.x + outerRoom.width / 2;
-                const parentCenterY = outerRoom.y + outerRoom.height / 2;
+                // Get which edge of the parent room to connect to based on angle
+                const attachEdge = this.getEdgeForAngle(parentAngle);
                 
-                // Move outward in the same direction
-                // Use the angle to determine which edge to connect to
-                let attachPoint = this.getEdgeAttachPoint(outerRoom, parentAngle);
+                // Calculate the position of the satellite room
+                let satelliteX, satelliteY;
                 
-                // Calculate satellite position
-                const satelliteCenterX = attachPoint.x + Math.cos(parentAngle) * distanceFromParent;
-                const satelliteCenterY = attachPoint.y + Math.sin(parentAngle) * distanceFromParent;
-                
-                // Adjust to get the top-left corner
-                const satelliteX = satelliteCenterX - satelliteWidth / 2;
-                const satelliteY = satelliteCenterY - satelliteHeight / 2;
+                // Position satellite based on which edge we're attaching to
+                if (attachEdge === 'east') {
+                    satelliteX = outerRoom.x + outerRoom.width + distanceFromParent;
+                    satelliteY = outerRoom.y + (outerRoom.height - satelliteHeight) / 2;
+                } else if (attachEdge === 'west') {
+                    satelliteX = outerRoom.x - satelliteWidth - distanceFromParent;
+                    satelliteY = outerRoom.y + (outerRoom.height - satelliteHeight) / 2;
+                } else if (attachEdge === 'north') {
+                    satelliteX = outerRoom.x + (outerRoom.width - satelliteWidth) / 2;
+                    satelliteY = outerRoom.y - satelliteHeight - distanceFromParent;
+                } else { // south
+                    satelliteX = outerRoom.x + (outerRoom.width - satelliteWidth) / 2;
+                    satelliteY = outerRoom.y + outerRoom.height + distanceFromParent;
+                }
                 
                 // Create the satellite room
                 const satelliteRoom = {
@@ -191,29 +243,38 @@ export class DungeonGenerator {
                     height: satelliteHeight,
                     angle: parentAngle,
                     parentRoom: outerRoom,
+                    attachEdge: attachEdge,
                     connections: [],
                     doorways: [],
                     features: [],
                     type: 'satellite'
                 };
                 
-                // Store the connection
-                outerRoom.connections.push(satelliteRoom);
-                satelliteRoom.connections.push(outerRoom);
+                // Check if this satellite room overlaps with any existing room
+                let overlaps = false;
+                for (const room of [...outerRooms, ...satelliteRooms]) {
+                    if (room !== outerRoom && this.roomsOverlap(satelliteRoom, room, this.settings.minRoomSpacing / 2)) {
+                        overlaps = true;
+                        break;
+                    }
+                }
                 
-                satelliteRooms.push(satelliteRoom);
+                // If no overlap, add the room
+                if (!overlaps) {
+                    // Store the connection
+                    outerRoom.connections.push(satelliteRoom);
+                    satelliteRoom.connections.push(outerRoom);
+                    
+                    satelliteRooms.push(satelliteRoom);
+                }
             }
         }
         
         return satelliteRooms;
     }
     
-    // Helper to find the center point of a room's edge based on angle
-    getEdgeAttachPoint(room, angle) {
-        // Get room center
-        const centerX = room.x + room.width / 2;
-        const centerY = room.y + room.height / 2;
-        
+    // Helper to determine which edge to connect to based on angle
+    getEdgeForAngle(angle) {
         // Normalize angle to 0-2π
         const normalizedAngle = ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         
@@ -222,35 +283,50 @@ export class DungeonGenerator {
         // North: π/4 to 3π/4
         // West: 3π/4 to 5π/4
         // South: 5π/4 to 7π/4
-        let edgeX, edgeY;
         
         if (normalizedAngle < Math.PI / 4 || normalizedAngle >= Math.PI * 7 / 4) {
-            // East edge
-            edgeX = room.x + room.width;
-            edgeY = centerY;
+            return 'east';
         } else if (normalizedAngle < Math.PI * 3 / 4) {
-            // North edge
-            edgeX = centerX;
-            edgeY = room.y;
+            return 'north';
         } else if (normalizedAngle < Math.PI * 5 / 4) {
-            // West edge
-            edgeX = room.x;
-            edgeY = centerY;
+            return 'west';
         } else {
-            // South edge
-            edgeX = centerX;
-            edgeY = room.y + room.height;
+            return 'south';
         }
-        
-        return { x: edgeX, y: edgeY };
     }
     
-    connectRooms(hubRoom, outerRooms, satelliteRooms) {
+    // Helper to find the center point of a room's edge based on edge type
+    getEdgeAttachPoint(room, edge) {
+        let point = {x: 0, y: 0};
+        
+        switch(edge) {
+            case 'north':
+                point.x = room.x + room.width / 2;
+                point.y = room.y;
+                break;
+            case 'south':
+                point.x = room.x + room.width / 2;
+                point.y = room.y + room.height;
+                break;
+            case 'east':
+                point.x = room.x + room.width;
+                point.y = room.y + room.height / 2;
+                break;
+            case 'west':
+                point.x = room.x;
+                point.y = room.y + room.height / 2;
+                break;
+        }
+        
+        return point;
+    }
+    
+    connectRooms(hubRoom, outerRooms, satelliteRooms, allRooms) {
         const corridors = [];
         
         // 1. Connect hub to each outer room
         for (const outerRoom of outerRooms) {
-            const corridor = this.createCorridorBetweenRooms(hubRoom, outerRoom);
+            const corridor = this.createCorridorBetweenRooms(hubRoom, outerRoom, allRooms);
             if (corridor) {
                 corridors.push(corridor);
                 
@@ -265,7 +341,7 @@ export class DungeonGenerator {
         // 2. Connect outer rooms to their satellites
         for (const satelliteRoom of satelliteRooms) {
             const parentRoom = satelliteRoom.parentRoom;
-            const corridor = this.createCorridorBetweenRooms(parentRoom, satelliteRoom);
+            const corridor = this.createDirectCorridorBetweenRooms(parentRoom, satelliteRoom, satelliteRoom.attachEdge);
             if (corridor) {
                 corridors.push(corridor);
             }
@@ -280,7 +356,7 @@ export class DungeonGenerator {
                     
                     // Avoid connecting rooms that are already connected
                     if (!roomA.connections.includes(roomB)) {
-                        const corridor = this.createCorridorBetweenRooms(roomA, roomB);
+                        const corridor = this.createCorridorBetweenRooms(roomA, roomB, allRooms);
                         if (corridor) {
                             corridors.push(corridor);
                             
@@ -296,42 +372,203 @@ export class DungeonGenerator {
         return corridors;
     }
     
-    createCorridorBetweenRooms(roomA, roomB) {
+    // Create a direct corridor between two rooms (for satellites)
+    createDirectCorridorBetweenRooms(roomA, roomB, attachEdge) {
+        // Get the connection points on the appropriate edges
+        const pointA = this.getEdgeAttachPoint(roomA, attachEdge);
+        
+        // Get the opposite edge for room B
+        const oppositeEdge = this.getOppositeEdge(attachEdge);
+        const pointB = this.getEdgeAttachPoint(roomB, oppositeEdge);
+        
+        // Create a single-segment corridor
+        return {
+            points: [pointA, pointB],
+            width: this.settings.corridorWidth,
+            startRoom: roomA,
+            endRoom: roomB,
+            startEdge: attachEdge,
+            endEdge: oppositeEdge
+        };
+    }
+    
+    // Get the opposite edge
+    getOppositeEdge(edge) {
+        switch(edge) {
+            case 'north': return 'south';
+            case 'south': return 'north';
+            case 'east': return 'west';
+            case 'west': return 'east';
+            default: return 'north';
+        }
+    }
+    
+    // Create a corridor between two rooms with pathfinding to avoid other rooms
+    createCorridorBetweenRooms(roomA, roomB, allRooms) {
         // Find the best connection points between the rooms
         const connection = this.findBestConnectionPoints(roomA, roomB);
         
         if (connection && connection.startPoint && connection.endPoint) {
-            // Determine if we need an L-shaped or straight corridor
-            const isHorizontalFirst = Math.random() > 0.5;
+            // Pathfind to avoid rooms
+            const path = this.findPathBetweenPoints(
+                connection.startPoint, 
+                connection.endPoint, 
+                allRooms,
+                roomA,
+                roomB
+            );
             
-            if (isHorizontalFirst) {
-                // First horizontal, then vertical
+            if (path.length > 0) {
                 return {
-                    points: [
-                        { x: connection.startPoint.x, y: connection.startPoint.y },
-                        { x: connection.endPoint.x, y: connection.startPoint.y },
-                        { x: connection.endPoint.x, y: connection.endPoint.y }
-                    ],
+                    points: path,
                     width: this.settings.corridorWidth,
                     startRoom: roomA,
-                    endRoom: roomB
-                };
-            } else {
-                // First vertical, then horizontal
-                return {
-                    points: [
-                        { x: connection.startPoint.x, y: connection.startPoint.y },
-                        { x: connection.startPoint.x, y: connection.endPoint.y },
-                        { x: connection.endPoint.x, y: connection.endPoint.y }
-                    ],
-                    width: this.settings.corridorWidth,
-                    startRoom: roomA,
-                    endRoom: roomB
+                    endRoom: roomB,
+                    startEdge: connection.startEdge ? connection.startEdge.dir : null,
+                    endEdge: connection.endEdge ? connection.endEdge.dir : null
                 };
             }
         }
         
         return null;
+    }
+    
+    // Pathfinding to create corridors that avoid rooms
+    findPathBetweenPoints(start, end, allRooms, startRoom, endRoom) {
+        // For simplicity, we'll just create an L-shaped path
+        // and check if it intersects any rooms
+        
+        // Create two potential paths - horizontal first or vertical first
+        const horizontalFirst = [
+            { x: start.x, y: start.y },
+            { x: end.x, y: start.y },
+            { x: end.x, y: end.y }
+        ];
+        
+        const verticalFirst = [
+            { x: start.x, y: start.y },
+            { x: start.x, y: end.y },
+            { x: end.x, y: end.y }
+        ];
+        
+        // Check which path is better (doesn't intersect other rooms)
+        const isHorizontalValid = !this.pathIntersectsRooms(horizontalFirst, allRooms, startRoom, endRoom);
+        const isVerticalValid = !this.pathIntersectsRooms(verticalFirst, allRooms, startRoom, endRoom);
+        
+        // Choose the best path, prioritize non-intersecting
+        if (isHorizontalValid && !isVerticalValid) {
+            return horizontalFirst;
+        } else if (!isHorizontalValid && isVerticalValid) {
+            return verticalFirst;
+        } else if (isHorizontalValid && isVerticalValid) {
+            // Both are valid, choose randomly or by shortest path
+            const hDist = Math.abs(start.x - end.x) + Math.abs(start.y - end.y);
+            const vDist = Math.abs(start.x - end.x) + Math.abs(start.y - end.y);
+            return (hDist <= vDist) ? horizontalFirst : verticalFirst;
+        } else {
+            // Neither is valid, we need a more complex path
+            // For now, just return direct points and we'll handle collisions later
+            return [start, end];
+        }
+    }
+    
+    // Check if a path intersects any rooms (except start and end rooms)
+    pathIntersectsRooms(path, allRooms, startRoom, endRoom) {
+        // Expand path into line segments
+        for (let i = 0; i < path.length - 1; i++) {
+            const segmentStart = path[i];
+            const segmentEnd = path[i + 1];
+            
+            // Check if this segment intersects any rooms
+            for (const room of allRooms) {
+                // Skip the start and end rooms
+                if (room === startRoom || room === endRoom) continue;
+                
+                // Expand room bounds slightly to account for corridor width
+                const expandedRoom = {
+                    x: room.x - this.settings.corridorWidth / 2,
+                    y: room.y - this.settings.corridorWidth / 2,
+                    width: room.width + this.settings.corridorWidth,
+                    height: room.height + this.settings.corridorWidth
+                };
+                
+                // Check if segment intersects this room
+                if (this.lineIntersectsRect(segmentStart, segmentEnd, expandedRoom)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // Check if a line segment intersects a rectangle
+    lineIntersectsRect(lineStart, lineEnd, rect) {
+        // Simplification: check if line segment bounding box overlaps with rect
+        const minX = Math.min(lineStart.x, lineEnd.x);
+        const maxX = Math.max(lineStart.x, lineEnd.x);
+        const minY = Math.min(lineStart.y, lineEnd.y);
+        const maxY = Math.max(lineStart.y, lineEnd.y);
+        
+        // Rectangle bounds
+        const rectLeft = rect.x;
+        const rectRight = rect.x + rect.width;
+        const rectTop = rect.y;
+        const rectBottom = rect.y + rect.height;
+        
+        // Check if bounding boxes don't overlap
+        if (maxX < rectLeft || minX > rectRight || maxY < rectTop || minY > rectBottom) {
+            return false;
+        }
+        
+        // For horizontal or vertical lines, bounding box check is sufficient
+        if (lineStart.x === lineEnd.x || lineStart.y === lineEnd.y) {
+            return true;
+        }
+        
+        // For diagonal lines, check intersection with all 4 edges of rectangle
+        // This is a simplified version that may have edge cases
+        const edges = [
+            [{x: rectLeft, y: rectTop}, {x: rectRight, y: rectTop}], // Top
+            [{x: rectRight, y: rectTop}, {x: rectRight, y: rectBottom}], // Right
+            [{x: rectLeft, y: rectBottom}, {x: rectRight, y: rectBottom}], // Bottom
+            [{x: rectLeft, y: rectTop}, {x: rectLeft, y: rectBottom}]  // Left
+        ];
+        
+        for (const edge of edges) {
+            if (this.lineSegmentsIntersect(lineStart, lineEnd, edge[0], edge[1])) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // Check if two line segments intersect
+    lineSegmentsIntersect(p1, p2, p3, p4) {
+        const d1 = this.direction(p3, p4, p1);
+        const d2 = this.direction(p3, p4, p2);
+        const d3 = this.direction(p1, p2, p3);
+        const d4 = this.direction(p1, p2, p4);
+        
+        // Check if lines intersect
+        return (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+                ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) ||
+               (d1 === 0 && this.onSegment(p3, p4, p1)) ||
+               (d2 === 0 && this.onSegment(p3, p4, p2)) ||
+               (d3 === 0 && this.onSegment(p1, p2, p3)) ||
+               (d4 === 0 && this.onSegment(p1, p2, p4));
+    }
+    
+    // Calculate the direction of point p3 relative to line segment p1-p2
+    direction(p1, p2, p3) {
+        return (p3.x - p1.x) * (p2.y - p1.y) - (p2.x - p1.x) * (p3.y - p1.y);
+    }
+    
+    // Check if point p3 lies on segment p1-p2
+    onSegment(p1, p2, p3) {
+        return p3.x <= Math.max(p1.x, p2.x) && p3.x >= Math.min(p1.x, p2.x) &&
+               p3.y <= Math.max(p1.y, p2.y) && p3.y >= Math.min(p1.y, p2.y);
     }
     
     findBestConnectionPoints(roomA, roomB) {
@@ -583,9 +820,9 @@ export class DungeonGenerator {
         };
     }
     
-    addRoomFeatures(rooms) {
+    addRoomFeatures(allRooms, corridors) {
         // Skip the hub room as we already added a central pillar
-        for (const room of rooms) {
+        for (const room of allRooms) {
             if (room.isHub) continue;
             
             // Chance to add a pillar to the room
@@ -609,11 +846,11 @@ export class DungeonGenerator {
             }
             
             // Add alcoves to some edges without doorways
-            this.addAlcovesToRoom(room);
+            this.addAlcovesToRoom(room, corridors);
         }
     }
     
-    addAlcovesToRoom(room) {
+    addAlcovesToRoom(room, corridors) {
         // Check each edge of the room
         const edges = ['north', 'south', 'east', 'west'];
         
@@ -621,13 +858,10 @@ export class DungeonGenerator {
             // Skip if there's already a connection on this edge
             let hasConnectionOnEdge = false;
             
-            for (const connection of room.connections) {
-                // For each connection, check if it's on this edge
-                // This is a simplified check - a more accurate one would look at doorway positions
-                if ((edge === 'north' && connection.y < room.y) ||
-                    (edge === 'south' && connection.y > room.y + room.height) ||
-                    (edge === 'east' && connection.x > room.x + room.width) ||
-                    (edge === 'west' && connection.x < room.x)) {
+            // Check corridors to see if any connect to this edge
+            for (const corridor of corridors) {
+                if ((corridor.startRoom === room && corridor.startEdge === edge) ||
+                    (corridor.endRoom === room && corridor.endEdge === edge)) {
                     hasConnectionOnEdge = true;
                     break;
                 }
@@ -676,8 +910,48 @@ export class DungeonGenerator {
                     width: alcoveW,
                     height: alcoveH
                 });
+                
+                // Add a doorway for the alcove
+                this.addDoorwayForAlcove(room, edge, alcoveX, alcoveY, alcoveW, alcoveH);
             }
         }
+    }
+    
+    // Add a doorway to connect the alcove to the room
+    addDoorwayForAlcove(room, edge, alcoveX, alcoveY, alcoveWidth, alcoveHeight) {
+        let doorX, doorY, doorWidth, doorHeight;
+        
+        // Position doorway based on which edge the alcove is on
+        if (edge === 'north') {
+            doorX = alcoveX + (alcoveWidth - this.settings.doorwayWidth) / 2;
+            doorY = room.y - this.settings.gridSize;
+            doorWidth = this.settings.doorwayWidth;
+            doorHeight = this.settings.gridSize;
+        } else if (edge === 'south') {
+            doorX = alcoveX + (alcoveWidth - this.settings.doorwayWidth) / 2;
+            doorY = room.y + room.height;
+            doorWidth = this.settings.doorwayWidth;
+            doorHeight = this.settings.gridSize;
+        } else if (edge === 'east') {
+            doorX = room.x + room.width;
+            doorY = alcoveY + (alcoveHeight - this.settings.doorwayWidth) / 2;
+            doorWidth = this.settings.gridSize;
+            doorHeight = this.settings.doorwayWidth;
+        } else if (edge === 'west') {
+            doorX = room.x - this.settings.gridSize;
+            doorY = alcoveY + (alcoveHeight - this.settings.doorwayWidth) / 2;
+            doorWidth = this.settings.gridSize;
+            doorHeight = this.settings.doorwayWidth;
+        }
+        
+        room.doorways.push({
+            x: doorX,
+            y: doorY,
+            width: doorWidth,
+            height: doorHeight,
+            isEastWall: edge === 'east',
+            isNorthWall: edge === 'north'
+        });
     }
     
     createDoorways(rooms, corridors) {
@@ -688,42 +962,67 @@ export class DungeonGenerator {
             const points = corridor.points;
             
             // Create doorway at the start point
-            this.createDoorwayForRoom(startRoom, points[0], points[1]);
+            this.createDoorwayForRoom(startRoom, points[0], points[1], corridor.startEdge);
             
             // Create doorway at the end point
-            this.createDoorwayForRoom(endRoom, points[points.length - 1], points[points.length - 2]);
+            this.createDoorwayForRoom(endRoom, points[points.length - 1], points[points.length - 2], corridor.endEdge);
         }
     }
     
-    createDoorwayForRoom(room, doorPoint, corridorPoint) {
-        // Determine which wall the doorway is on
-        let wallType;
+    createDoorwayForRoom(room, doorPoint, corridorPoint, edgeDir) {
+        // Determine which wall the doorway is on if not provided
+        let wallType = edgeDir;
         
-        // Check if doorway is on the north wall
-        if (Math.abs(doorPoint.y - room.y) < 0.1) {
-            wallType = 'north';
+        if (!wallType) {
+            // Check if doorway is on the north wall
+            if (Math.abs(doorPoint.y - room.y) < 0.1) {
+                wallType = 'north';
+            }
+            // Check if doorway is on the south wall
+            else if (Math.abs(doorPoint.y - (room.y + room.height)) < 0.1) {
+                wallType = 'south';
+            }
+            // Check if doorway is on the west wall
+            else if (Math.abs(doorPoint.x - room.x) < 0.1) {
+                wallType = 'west';
+            }
+            // Check if doorway is on the east wall
+            else if (Math.abs(doorPoint.x - (room.x + room.width)) < 0.1) {
+                wallType = 'east';
+            }
         }
-        // Check if doorway is on the south wall
-        else if (Math.abs(doorPoint.y - (room.y + room.height)) < 0.1) {
-            wallType = 'south';
-        }
-        // Check if doorway is on the west wall
-        else if (Math.abs(doorPoint.x - room.x) < 0.1) {
-            wallType = 'west';
-        }
-        // Check if doorway is on the east wall
-        else if (Math.abs(doorPoint.x - (room.x + room.width)) < 0.1) {
-            wallType = 'east';
+        
+        let doorX, doorY, doorWidth, doorHeight;
+        
+        // Position doorway based on the wall type
+        if (wallType === 'north') {
+            doorX = doorPoint.x - this.settings.doorwayWidth / 2;
+            doorY = room.y - this.settings.gridSize;
+            doorWidth = this.settings.doorwayWidth;
+            doorHeight = this.settings.gridSize;
+        } else if (wallType === 'south') {
+            doorX = doorPoint.x - this.settings.doorwayWidth / 2;
+            doorY = room.y + room.height;
+            doorWidth = this.settings.doorwayWidth;
+            doorHeight = this.settings.gridSize;
+        } else if (wallType === 'east') {
+            doorX = room.x + room.width;
+            doorY = doorPoint.y - this.settings.doorwayWidth / 2;
+            doorWidth = this.settings.gridSize;
+            doorHeight = this.settings.doorwayWidth;
+        } else if (wallType === 'west') {
+            doorX = room.x - this.settings.gridSize;
+            doorY = doorPoint.y - this.settings.doorwayWidth / 2;
+            doorWidth = this.settings.gridSize;
+            doorHeight = this.settings.doorwayWidth;
         }
         
         // Create the doorway object
         const doorway = {
-            x: doorPoint.x - this.settings.doorwayWidth / 2,
-            y: doorPoint.y - this.settings.doorwayWidth / 2,
-            width: wallType === 'north' || wallType === 'south' ? 
-                  this.settings.doorwayWidth : this.settings.gridSize,
-            height: wallType === 'east' || wallType === 'west' ? 
-                   this.settings.doorwayWidth : this.settings.gridSize,
+            x: doorX,
+            y: doorY,
+            width: doorWidth,
+            height: doorHeight,
             isEastWall: wallType === 'east',
             isNorthWall: wallType === 'north'
         };
@@ -1132,8 +1431,7 @@ export class DungeonGenerator {
             this.settings.wallHeight,
             room.height * this.settings.gridSize,
             wallMaterial,
-            doorways.filter(d => !d.isEastWall),
-            true
+            doorways.filter(d => !d.isEastWall),true
         );
         
         // Create east wall with possible doorway gaps
@@ -1267,4 +1565,8 @@ export class DungeonGenerator {
         
         return wallMesh;
     }
-                }
+}
+
+
+
+
