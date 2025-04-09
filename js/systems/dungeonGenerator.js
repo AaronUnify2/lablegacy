@@ -772,4 +772,268 @@ export class DungeonGenerator {
     
     createWallWithDoorways(group, x, y, width, height, depth, material, doorways, isVertical = false) {
         // If no doorways, create a single wall
-        if (!doorways || door
+        if (!doorways || doorways.length === 0) {
+            const wallMesh = this.createWall(group, x, y, width, height, depth, material, isVertical);
+            group.colliderMeshes.push(wallMesh);
+            return;
+        }
+        
+        // For walls with doorways, create wall segments
+        if (isVertical) {
+            // Vertical wall (west or east wall)
+            // Sort doorways by Y position
+            doorways.sort((a, b) => a.y - b.y);
+            
+            let currentY = y;
+            
+            for (const doorway of doorways) {
+                // Create wall segment from current position to doorway
+                if (doorway.y > currentY) {
+                    const segmentHeight = doorway.y - currentY;
+                    const wallMesh = this.createWall(
+                        group, 
+                        x, 
+                        currentY, 
+                        width, 
+                        height, 
+                        segmentHeight, 
+                        material,
+                        isVertical
+                    );
+                    group.colliderMeshes.push(wallMesh);
+                }
+                
+                // Skip the doorway
+                currentY = doorway.y + doorway.height;
+            }
+            
+            // Create final wall segment after the last doorway
+            const endY = y + depth;
+            if (currentY < endY) {
+                const segmentHeight = endY - currentY;
+                const wallMesh = this.createWall(
+                    group, 
+                    x, 
+                    currentY, 
+                    width, 
+                    height, 
+                    segmentHeight, 
+                    material,
+                    isVertical
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        } else {
+            // Horizontal wall (north or south wall)
+            // Sort doorways by X position
+            doorways.sort((a, b) => a.x - b.x);
+            
+            let currentX = x;
+            
+            for (const doorway of doorways) {
+                // Create wall segment from current position to doorway
+                if (doorway.x > currentX) {
+                    const segmentWidth = doorway.x - currentX;
+                    const wallMesh = this.createWall(
+                        group, 
+                        currentX, 
+                        y, 
+                        segmentWidth, 
+                        height, 
+                        depth, 
+                        material,
+                        isVertical
+                    );
+                    group.colliderMeshes.push(wallMesh);
+                }
+                
+                // Skip the doorway
+                currentX = doorway.x + doorway.width;
+            }
+            
+            // Create final wall segment after the last doorway
+            const endX = x + width;
+            if (currentX < endX) {
+                const segmentWidth = endX - currentX;
+                const wallMesh = this.createWall(
+                    group, 
+                    currentX, 
+                    y, 
+                    segmentWidth, 
+                    height, 
+                    depth, 
+                    material,
+                    isVertical
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        }
+    }
+    
+    createWall(group, x, y, width, height, depth, material, isVertical = false) {
+        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+        const wallMesh = new THREE.Mesh(wallGeometry, material);
+        
+        wallMesh.position.set(
+            x + width / 2,
+            height / 2,
+            y + depth / 2
+        );
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        
+        return wallMesh;
+    }
+    
+    createPillar(group, pillarInfo, material) {
+        let pillarGeometry;
+        const pillarHeight = this.settings.wallHeight * 1.5; // Make pillars a bit taller
+        
+        // Create different shaped pillars
+        if (pillarInfo.shape === 'square') {
+            pillarGeometry = new THREE.BoxGeometry(
+                pillarInfo.width, 
+                pillarHeight, 
+                pillarInfo.height
+            );
+        } else if (pillarInfo.shape === 'circle') {
+            const radius = pillarInfo.width / 2;
+            pillarGeometry = new THREE.CylinderGeometry(
+                radius, // top radius
+                radius, // bottom radius
+                pillarHeight, // height
+                16 // segments
+            );
+            // Rotate to stand upright
+            pillarGeometry.rotateX(Math.PI / 2);
+        } else if (pillarInfo.shape === 'triangle') {
+            // Create a triangular prism
+            const shape = new THREE.Shape();
+            const size = pillarInfo.width;
+            
+            shape.moveTo(0, 0);
+            shape.lineTo(size, 0);
+            shape.lineTo(size / 2, size);
+            shape.lineTo(0, 0);
+            
+            const extrudeSettings = {
+                steps: 1,
+                depth: pillarHeight,
+                bevelEnabled: false
+            };
+            
+            pillarGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+            // Rotate to stand upright
+            pillarGeometry.rotateX(Math.PI / 2);
+        }
+        
+        const pillarMesh = new THREE.Mesh(pillarGeometry, material);
+        
+        // Position the pillar
+        if (pillarInfo.shape === 'square' || pillarInfo.shape === 'circle') {
+            pillarMesh.position.set(
+                pillarInfo.x + pillarInfo.width / 2,
+                pillarHeight / 2, // Position on the floor
+                pillarInfo.y + pillarInfo.height / 2
+            );
+        } else if (pillarInfo.shape === 'triangle') {
+            pillarMesh.position.set(
+                pillarInfo.x,
+                0, // Position on the floor
+                pillarInfo.y
+            );
+        }
+        
+        pillarMesh.castShadow = true;
+        pillarMesh.receiveShadow = true;
+        
+        // Add collision to the pillar
+        group.colliderMeshes.push(pillarMesh);
+        group.add(pillarMesh);
+    }
+    
+    createAlcove(group, room, alcoveInfo, floorMaterial, wallMaterial) {
+        // Create the alcove floor
+        const floorGeometry = new THREE.BoxGeometry(
+            alcoveInfo.width * this.settings.gridSize,
+            this.settings.floorHeight,
+            alcoveInfo.height * this.settings.gridSize
+        );
+        
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.position.set(
+            alcoveInfo.x + (alcoveInfo.width * this.settings.gridSize) / 2,
+            -this.settings.floorHeight / 2,
+            alcoveInfo.y + (alcoveInfo.height * this.settings.gridSize) / 2
+        );
+        floorMesh.receiveShadow = true;
+        
+        // Add collision to floor
+        group.colliderMeshes.push(floorMesh);
+        group.add(floorMesh);
+        
+        // Create walls for the alcove
+        // Based on which edge the alcove is connected to, we'll skip that wall
+        const skipEdge = alcoveInfo.edge;
+        
+        // Create north wall if not connected to the room's north
+        if (skipEdge !== 'north') {
+            const wallMesh = this.createWall(
+                group,
+                alcoveInfo.x,
+                alcoveInfo.y,
+                alcoveInfo.width * this.settings.gridSize,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(wallMesh);
+        }
+        
+        // Create south wall if not connected to the room's south
+        if (skipEdge !== 'south') {
+            const wallMesh = this.createWall(
+                group,
+                alcoveInfo.x,
+                alcoveInfo.y + alcoveInfo.height * this.settings.gridSize - this.settings.gridSize,
+                alcoveInfo.width * this.settings.gridSize,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(wallMesh);
+        }
+        
+        // Create west wall if not connected to the room's west
+        if (skipEdge !== 'west') {
+            const wallMesh = this.createWall(
+                group,
+                alcoveInfo.x,
+                alcoveInfo.y,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                alcoveInfo.height * this.settings.gridSize,
+                wallMaterial,
+                true
+            );
+            group.colliderMeshes.push(wallMesh);
+        }
+        
+        // Create east wall if not connected to the room's east
+        if (skipEdge !== 'east') {
+            const wallMesh = this.createWall(
+                group,
+                alcoveInfo.x + alcoveInfo.width * this.settings.gridSize - this.settings.gridSize,
+                alcoveInfo.y,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                alcoveInfo.height * this.settings.gridSize,
+                wallMaterial,
+                true
+            );
+            group.colliderMeshes.push(wallMesh);
+        }
+    }
