@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Labyrinth Legacy</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading-screen">
+            <div class="loading-content">
+                <h1>Labyrinth Legacy</h1>
+                <div class="spinner"></div>
+                <p>Loading...</p>
+            </div>
+        </div>
+        <div id="hud">
+            <div id="fps-counter">FPS: 60</div>
+            <div id="position-info">Position: X: 0, Y: 0, Z: 0</div>
+        </div>
+        <div id="touch-controls">
+            <div id="left-joystick" class="joystick-container">
+                <div class="joystick-base">
+                    <div class="joystick-handle"></div>
+                </div>
+            </div>
+            <div id="right-joystick" class="joystick-container">
+                <div class="joystick-base">
+                    <div class="joystick-handle"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Third-party libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+    
+    <!-- Engine modules -->
+    <script src="js/engine/renderer.js" type="module"></script>
+    <script src="js/engine/input.js" type="module"></script>
+    
+    <!-- Game systems -->
+    <script src="js/systems/dungeonGenerator.js" type="module"></script>
+    
+    <!-- Main game -->
+    <script src="js/main.js" type="module"></script>
+</body>
+</html>
