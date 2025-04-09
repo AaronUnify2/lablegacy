@@ -368,8 +368,11 @@ export class InputManager {
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
         this.camera.position.addScaledVector(forward, amount);
     }
+
     
-// Replace the update method in input.js with this version that includes wall sliding
+    
+
+    // Replace the update method in input.js with this version that includes wall sliding
 update(deltaTime, collisionManager) {
     if (!collisionManager) {
         // Without collision, just use simple movement
@@ -505,35 +508,8 @@ updateSimpleMovement(deltaTime) {
         this.camera.position.addScaledVector(up, -speedPerFrame);
     }
 }
-        }
-        
-        // Try moving in Z direction
-        testPosition = this.camera.position.clone();
-        testPosition.z = newPosition.z;
-        
-        if (!collisionManager.checkCollision(testPosition, playerRadius).collides) {
-            this.camera.position.z = newPosition.z;
-        } else {
-            // Try moving a bit less in Z direction
-            const moveDirection = Math.sign(newPosition.z - previousPosition.z);
-            const reducedPosition = this.camera.position.clone();
-            reducedPosition.z += moveDirection * (speedPerFrame * 0.5);
-            
-            if (!collisionManager.checkCollision(reducedPosition, playerRadius).collides) {
-                this.camera.position.z = reducedPosition.z;
-            }
-        }
-        
-        // Try moving in Y direction
-        testPosition = this.camera.position.clone();
-        testPosition.y = newPosition.y;
-        
-        if (!collisionManager.checkCollision(testPosition, playerRadius).collides) {
-            this.camera.position.y = newPosition.y;
-        }
-    } else {
-        // No collision manager, just apply movement directly
-        this.camera.position.copy(newPosition);
-    }
-}
-}
+    
+    
+    
+    
+    
