@@ -1,41 +1,49 @@
 export class DungeonGenerator {
-    // Update this in the DungeonGenerator constructor
-constructor() {
-    // Updated settings for dungeon generation
-    this.settings = {
-        minRooms: 5,
-        maxRooms: 15,
-        roomSizeMin: 20,
-        roomSizeMax: 50,
-        corridorWidth: 5, // Increased from 4 to 5
-        floorHeight: 0.2,
-        wallHeight: 3,
-        gridSize: 1,
-        doorwayWidth: 5 // Increased from 3 to 5
-    };
-}
+    constructor() {
+        // Settings for dungeon generation
+        this.settings = {
+            // Room settings
+            centralRoomSize: 40,
+            minRoomSize: 25,
+            maxRoomSize: 40,
+            numRadialRooms: 5,
+            gridSize: 1,
+            
+            // Corridor settings
+            corridorWidth: 5,
+            
+            // Architectural settings
+            floorHeight: 0.2,
+            wallHeight: 3,
+            doorwayWidth: 5,
+            
+            // Spacing settings
+            minDistanceFromCenter: 60,  // Minimum distance of radial rooms from center
+            maxDistanceFromCenter: 100, // Maximum distance of radial rooms from center
+            minAngleBetweenRooms: 30    // Minimum angle between radial rooms in degrees
+        };
+    }
     
     generateFloor(floorLevel) {
-        console.log(`Generating floor level ${floorLevel}...`);
+        console.log(`Generating floor level ${floorLevel} with hub-and-spoke layout...`);
         
-        // Adjust settings based on floor level if desired
-        // For example, higher floors could have more rooms
-        const numRooms = Math.min(
-            this.settings.minRooms + Math.floor(floorLevel / 2),
-            this.settings.maxRooms
-        );
+        // Generate the central room
+        const centralRoom = this.generateCentralRoom();
         
-        // Generate rooms
-        const rooms = this.generateRooms(numRooms);
+        // Generate radial rooms around the central room
+        const radialRooms = this.generateRadialRooms(centralRoom);
         
-        // Connect rooms with corridors
-        const corridors = this.connectRooms(rooms);
+        // Combine all rooms
+        const rooms = [centralRoom, ...radialRooms];
         
-        // Add doorways to rooms
+        // Connect the central room to each radial room with corridors
+        const corridors = this.connectRoomsToCenter(centralRoom, radialRooms);
+        
+        // Create doorways where corridors meet rooms
         this.createDoorways(rooms, corridors);
         
-        // Place the key
-        const keyPosition = this.placeKey(rooms);
+        // Place the key in the furthest room from center
+        const keyPosition = this.placeKey(radialRooms);
         
         // Create the dungeon mesh
         const dungeonMesh = this.createDungeonMesh(rooms, corridors, keyPosition);
@@ -50,285 +58,389 @@ constructor() {
         };
     }
     
-    generateRooms(numRooms) {
-        const rooms = [];
-        const gridSize = this.settings.gridSize;
+    generateCentralRoom() {
+        // Create a central room at the origin
+        const size = this.settings.centralRoomSize;
         
-        // For this basic implementation, we'll create a simple grid of rooms
-        // A more sophisticated approach would use proper procedural generation
+        return {
+            x: -size / 2,          // Center the room at origin
+            y: -size / 2,
+            width: size,
+            height: size,
+            connections: [],        // Will store connected rooms
+            doorways: [],          // Will store doorway information
+            isCentral: true        // Flag to identify the central room
+        };
+    }
+    
+    generateRadialRooms(centralRoom) {
+        const radialRooms = [];
+        const numRooms = this.settings.numRadialRooms;
         
-        // Create a basic maze with rooms in a grid pattern for testing
-        const gridWidth = Math.ceil(Math.sqrt(numRooms));
-        const gridHeight = Math.ceil(numRooms / gridWidth);
+        // Calculate the center position of the central room
+        const centerX = centralRoom.x + centralRoom.width / 2;
+        const centerY = centralRoom.y + centralRoom.height / 2;
         
-        // Calculate spacing between room centers to accommodate larger rooms
-        const roomSpacingX = Math.max(this.settings.roomSizeMax + 25, 80) * gridSize;
-        const roomSpacingY = Math.max(this.settings.roomSizeMax + 25, 80) * gridSize;
+        // Calculate angular separation for even distribution
+        const angleStep = 360 / numRooms;
         
         for (let i = 0; i < numRooms; i++) {
-            const gridX = i % gridWidth;
-            const gridY = Math.floor(i / gridWidth);
+            // Add some randomness to the angle within safe bounds
+            const baseAngle = i * angleStep;
+            const angleVariance = (angleStep - this.settings.minAngleBetweenRooms) / 2;
+            const angle = baseAngle + (Math.random() * angleVariance * 2 - angleVariance);
             
+            // Convert angle to radians
+            const radians = angle * (Math.PI / 180);
+            
+            // Randomize the distance from center within bounds
+            const distance = this.settings.minDistanceFromCenter + 
+                Math.random() * (this.settings.maxDistanceFromCenter - this.settings.minDistanceFromCenter);
+            
+            // Calculate the room center position using polar coordinates
+            const roomCenterX = centerX + Math.cos(radians) * distance;
+            const roomCenterY = centerY + Math.sin(radians) * distance;
+            
+            // Randomize room size
             const roomWidth = Math.floor(Math.random() * 
-                (this.settings.roomSizeMax - this.settings.roomSizeMin + 1)) + 
-                this.settings.roomSizeMin;
+                (this.settings.maxRoomSize - this.settings.minRoomSize + 1)) + 
+                this.settings.minRoomSize;
             
             const roomHeight = Math.floor(Math.random() * 
-                (this.settings.roomSizeMax - this.settings.roomSizeMin + 1)) + 
-                this.settings.roomSizeMin;
+                (this.settings.maxRoomSize - this.settings.minRoomSize + 1)) + 
+                this.settings.minRoomSize;
             
-            // Add some randomness to the position within the grid cell
-            const roomX = gridX * roomSpacingX + 
-                (Math.random() * 10 - 5) * gridSize;
+            // Calculate top-left corner of room
+            const roomX = roomCenterX - roomWidth / 2;
+            const roomY = roomCenterY - roomHeight / 2;
             
-            const roomY = gridY * roomSpacingY + 
-                (Math.random() * 10 - 5) * gridSize;
-            
-            rooms.push({
+            // Store the room with its angle from center for corridor calculation
+            radialRooms.push({
                 x: roomX,
                 y: roomY,
                 width: roomWidth,
                 height: roomHeight,
                 connections: [],
-                doorways: [] // Will store doorway information
+                doorways: [],
+                angle: angle,            // Store the angle for corridor alignment
+                distanceFromCenter: distance,  // Store distance for key placement
+                centerX: roomCenterX,    // Store room center
+                centerY: roomCenterY
             });
         }
         
-        return rooms;
-    }
-    
-    connectRooms(rooms) {
-        const corridors = [];
+        // Make sure rooms don't overlap by checking and adjusting if needed
+        let placementAttempts = 0;
+        const maxAttempts = 100;
         
-        // Simple approach: connect each room to the next one
-        for (let i = 0; i < rooms.length - 1; i++) {
-            const startRoom = rooms[i];
-            const endRoom = rooms[i + 1];
-            
-            const startX = startRoom.x + startRoom.width / 2;
-            const startY = startRoom.y + startRoom.height / 2;
-            const endX = endRoom.x + endRoom.width / 2;
-            const endY = endRoom.y + endRoom.height / 2;
-            
-            // Create an L-shaped corridor
-            const corridorX = {
-                x1: startX,
-                y1: startY,
-                x2: endX,
-                y2: startY,
-                width: this.settings.corridorWidth,
-                isHorizontal: true,
-                startRoom: startRoom,
-                endRoom: null // Will be connected to vertical corridor
-            };
-            
-            const corridorY = {
-                x1: endX,
-                y1: startY,
-                x2: endX,
-                y2: endY,
-                width: this.settings.corridorWidth,
-                isHorizontal: false,
-                startRoom: null, // Connected from horizontal corridor
-                endRoom: endRoom
-            };
-            
-            corridors.push(corridorX);
-            corridors.push(corridorY);
-            
-            // Mark rooms as connected
-            startRoom.connections.push(endRoom);
-            endRoom.connections.push(startRoom);
+        while (this.hasOverlappingRooms(radialRooms, centralRoom) && placementAttempts < maxAttempts) {
+            // Try to resolve overlapping by moving rooms
+            this.resolveRoomOverlaps(radialRooms, centralRoom);
+            placementAttempts++;
         }
         
-        // Optionally add some random connections for more interesting layouts
-        if (rooms.length > 3) {
-            const numExtraConnections = Math.floor(rooms.length / 3);
-            
-            for (let i = 0; i < numExtraConnections; i++) {
-                const roomIndex1 = Math.floor(Math.random() * rooms.length);
-                let roomIndex2 = Math.floor(Math.random() * rooms.length);
-                
-                // Ensure we're connecting different rooms
-                while (roomIndex2 === roomIndex1 || 
-                       rooms[roomIndex1].connections.includes(rooms[roomIndex2])) {
-                    roomIndex2 = Math.floor(Math.random() * rooms.length);
-                }
-                
-                const startRoom = rooms[roomIndex1];
-                const endRoom = rooms[roomIndex2];
-                
-                const startX = startRoom.x + startRoom.width / 2;
-                const startY = startRoom.y + startRoom.height / 2;
-                const endX = endRoom.x + endRoom.width / 2;
-                const endY = endRoom.y + endRoom.height / 2;
-                
-                // Create an L-shaped corridor
-                const corridorX = {
-                    x1: startX,
-                    y1: startY,
-                    x2: endX,
-                    y2: startY,
-                    width: this.settings.corridorWidth,
-                    isHorizontal: true,
-                    startRoom: startRoom,
-                    endRoom: null
-                };
-                
-                const corridorY = {
-                    x1: endX,
-                    y1: startY,
-                    x2: endX,
-                    y2: endY,
-                    width: this.settings.corridorWidth,
-                    isHorizontal: false,
-                    startRoom: null,
-                    endRoom: endRoom
-                };
-                
-                corridors.push(corridorX);
-                corridors.push(corridorY);
-                
-                // Mark rooms as connected
-                startRoom.connections.push(endRoom);
-                endRoom.connections.push(startRoom);
+        return radialRooms;
+    }
+    
+    hasOverlappingRooms(rooms, centralRoom) {
+        // Check if any rooms overlap with each other or the central room
+        
+        // First check if any radial room overlaps with the central room
+        for (const room of rooms) {
+            if (this.roomsOverlap(room, centralRoom)) {
+                return true;
             }
+        }
+        
+        // Then check if any radial rooms overlap with each other
+        for (let i = 0; i < rooms.length; i++) {
+            for (let j = i + 1; j < rooms.length; j++) {
+                if (this.roomsOverlap(rooms[i], rooms[j])) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    roomsOverlap(room1, room2) {
+        // Check if two rooms overlap
+        // Add a small buffer zone around rooms
+        const buffer = 5;
+        
+        return !(
+            room1.x + room1.width + buffer < room2.x ||
+            room2.x + room2.width + buffer < room1.x ||
+            room1.y + room1.height + buffer < room2.y ||
+            room2.y + room2.height + buffer < room1.y
+        );
+    }
+    
+    resolveRoomOverlaps(rooms, centralRoom) {
+        // Calculate the center position of the central room
+        const centerX = centralRoom.x + centralRoom.width / 2;
+        const centerY = centralRoom.y + centralRoom.height / 2;
+        
+        // Try to resolve overlaps by adjusting room positions
+        for (const room of rooms) {
+            // If this room overlaps with the central room or any other room
+            if (this.roomsOverlap(room, centralRoom) || 
+                rooms.some(r => r !== room && this.roomsOverlap(r, room))) {
+                
+                // Move the room further away from center
+                const angle = room.angle * (Math.PI / 180);
+                const newDistance = room.distanceFromCenter + 10; // Move 10 units further
+                
+                // Calculate new center position
+                const newCenterX = centerX + Math.cos(angle) * newDistance;
+                const newCenterY = centerY + Math.sin(angle) * newDistance;
+                
+                // Update room position and distance
+                room.x = newCenterX - room.width / 2;
+                room.y = newCenterY - room.height / 2;
+                room.centerX = newCenterX;
+                room.centerY = newCenterY;
+                room.distanceFromCenter = newDistance;
+            }
+        }
+    }
+    
+    connectRoomsToCenter(centralRoom, radialRooms) {
+        const corridors = [];
+        
+        // Calculate the center of the central room
+        const centralX = centralRoom.x + centralRoom.width / 2;
+        const centralY = centralRoom.y + centralRoom.height / 2;
+        
+        // Connect each radial room to the central room
+        for (const room of radialRooms) {
+            // Calculate the center of the radial room
+            const roomCenterX = room.centerX;
+            const roomCenterY = room.centerY;
+            
+            // Create a straight corridor from center to the radial room
+            corridors.push({
+                x1: centralX,
+                y1: centralY,
+                x2: roomCenterX,
+                y2: roomCenterY,
+                width: this.settings.corridorWidth,
+                isStraight: true,  // Flag for straight corridors
+                angle: room.angle, // Store the angle for alignment
+                startRoom: centralRoom,
+                endRoom: room
+            });
+            
+            // Mark rooms as connected
+            centralRoom.connections.push(room);
+            room.connections.push(centralRoom);
         }
         
         return corridors;
     }
     
     createDoorways(rooms, corridors) {
-        // Process each corridor to create doorways in the rooms they connect
+        // For each corridor, create doorways where it meets rooms
         for (const corridor of corridors) {
-            if (corridor.startRoom) {
-                const room = corridor.startRoom;
+            if (corridor.startRoom && corridor.endRoom) {
+                // Calculate the corridor angle in radians
+                const angleRad = corridor.angle * (Math.PI / 180);
                 
-                if (corridor.isHorizontal) {
-                    // Horizontal corridor, doorway on east/west wall
-                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
-                    
-                    if (corridor.x1 < corridor.x2) {
-                        // Corridor goes east from room
-                        doorX = room.x + room.width;
-                        isEastWall = true;
-                    } else {
-                        // Corridor goes west from room
-                        doorX = room.x;
-                        isEastWall = false;
-                    }
-                    
-                    doorY = corridor.y1 - this.settings.doorwayWidth / 2;
-                    doorWidth = this.settings.gridSize; // Door thickness is one grid cell
-                    doorHeight = this.settings.doorwayWidth;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: isEastWall,
-                        isNorthWall: false
-                    });
-                } else {
-                    // Vertical corridor, doorway on north/south wall
-                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
-                    
-                    doorX = corridor.x1 - this.settings.doorwayWidth / 2;
-                    
-                    if (corridor.y1 < corridor.y2) {
-                        // Corridor goes south from room
-                        doorY = room.y + room.height;
-                        isNorthWall = false;
-                    } else {
-                        // Corridor goes north from room
-                        doorY = room.y;
-                        isNorthWall = true;
-                    }
-                    
-                    doorWidth = this.settings.doorwayWidth;
-                    doorHeight = this.settings.gridSize; // Door thickness is one grid cell
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: false,
-                        isNorthWall: isNorthWall
-                    });
-                }
-            }
-            
-            if (corridor.endRoom) {
-                const room = corridor.endRoom;
+                // Calculate unit vector along corridor direction
+                const dirX = Math.cos(angleRad);
+                const dirY = Math.sin(angleRad);
                 
-                if (corridor.isHorizontal) {
-                    // Horizontal corridor, doorway on east/west wall
-                    let doorX, doorY, doorWidth, doorHeight, isEastWall;
-                    
-                    if (corridor.x1 < corridor.x2) {
-                        // Corridor goes east to room
-                        doorX = room.x;
-                        isEastWall = false;
-                    } else {
-                        // Corridor goes west to room
-                        doorX = room.x + room.width;
-                        isEastWall = true;
-                    }
-                    
-                    doorY = corridor.y1 - this.settings.doorwayWidth / 2;
-                    doorWidth = this.settings.gridSize;
-                    doorHeight = this.settings.doorwayWidth;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: isEastWall,
-                        isNorthWall: false
-                    });
-                } else {
-                    // Vertical corridor, doorway on north/south wall
-                    let doorX, doorY, doorWidth, doorHeight, isNorthWall;
-                    
-                    doorX = corridor.x1 - this.settings.doorwayWidth / 2;
-                    
-                    if (corridor.y1 < corridor.y2) {
-                        // Corridor goes south to room
-                        doorY = room.y;
-                        isNorthWall = true;
-                    } else {
-                        // Corridor goes north to room
-                        doorY = room.y + room.height;
-                        isNorthWall = false;
-                    }
-                    
-                    doorWidth = this.settings.doorwayWidth;
-                    doorHeight = this.settings.gridSize;
-                    
-                    room.doorways.push({
-                        x: doorX,
-                        y: doorY,
-                        width: doorWidth,
-                        height: doorHeight,
-                        isEastWall: false,
-                        isNorthWall: isNorthWall
-                    });
-                }
+                // Create doorway for the start room (central room)
+                this.createDoorwayForRoom(corridor.startRoom, corridor, true, dirX, dirY);
+                
+                // Create doorway for the end room (radial room)
+                this.createDoorwayForRoom(corridor.endRoom, corridor, false, dirX, dirY);
             }
         }
     }
     
-    placeKey(rooms) {
-        // Place the key in the last room for simplicity
-        // In a more sophisticated system, this could be more strategic
-        const keyRoom = rooms[rooms.length - 1];
+    createDoorwayForRoom(room, corridor, isStartRoom, dirX, dirY) {
+        // Find where the corridor intersects with the room walls
         
+        // Room boundaries
+        const roomLeft = room.x;
+        const roomRight = room.x + room.width;
+        const roomTop = room.y;
+        const roomBottom = room.y + room.height;
+        
+        // Corridor line parameters
+        let startX, startY, endX, endY;
+        
+        if (isStartRoom) {
+            // For start room, line goes from room center outward
+            startX = room.x + room.width / 2;
+            startY = room.y + room.height / 2;
+            // Extend line far enough to ensure it crosses room boundary
+            endX = startX + dirX * room.width * 2;
+            endY = startY + dirY * room.height * 2;
+        } else {
+            // For end room, line goes from outside toward room center
+            endX = room.x + room.width / 2;
+            endY = room.y + room.height / 2;
+            // Start line far enough to ensure it crosses room boundary
+            startX = endX - dirX * room.width * 2;
+            startY = endY - dirY * room.height * 2;
+        }
+        
+        // Find intersection with room walls
+        let intersectionX = null;
+        let intersectionY = null;
+        let isEastWall = false;
+        let isNorthWall = false;
+        
+        // Helper function to check line segment intersection
+        const lineIntersection = (x1, y1, x2, y2, x3, y3, x4, y4) => {
+            const denominator = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+            
+            // Lines are parallel
+            if (denominator === 0) return null;
+            
+            const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator;
+            const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator;
+            
+            // Check if intersection is on both line segments
+            if (ua < 0 || ua > 1 || ub < 0 || ub > 1) return null;
+            
+            const x = x1 + ua * (x2 - x1);
+            const y = y1 + ua * (y2 - y1);
+            
+            return { x, y };
+        };
+        
+        // Check intersection with left wall
+        const leftIntersection = lineIntersection(
+            startX, startY, endX, endY,
+            roomLeft, roomTop, roomLeft, roomBottom
+        );
+        
+        // Check intersection with right wall
+        const rightIntersection = lineIntersection(
+            startX, startY, endX, endY,
+            roomRight, roomTop, roomRight, roomBottom
+        );
+        
+        // Check intersection with top wall
+        const topIntersection = lineIntersection(
+            startX, startY, endX, endY,
+            roomLeft, roomTop, roomRight, roomTop
+        );
+        
+        // Check intersection with bottom wall
+        const bottomIntersection = lineIntersection(
+            startX, startY, endX, endY,
+            roomLeft, roomBottom, roomRight, roomBottom
+        );
+        
+        // Find the valid intersection closest to the appropriate point
+        const distanceSq = (x1, y1, x2, y2) => {
+            return Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2);
+        };
+        
+        let minDistance = Infinity;
+        let bestIntersection = null;
+        
+        if (leftIntersection) {
+            const dist = isStartRoom ? 
+                distanceSq(startX, startY, leftIntersection.x, leftIntersection.y) :
+                distanceSq(endX, endY, leftIntersection.x, leftIntersection.y);
+                
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestIntersection = leftIntersection;
+                isEastWall = false;
+                isNorthWall = false;
+            }
+        }
+        
+        if (rightIntersection) {
+            const dist = isStartRoom ? 
+                distanceSq(startX, startY, rightIntersection.x, rightIntersection.y) :
+                distanceSq(endX, endY, rightIntersection.x, rightIntersection.y);
+                
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestIntersection = rightIntersection;
+                isEastWall = true;
+                isNorthWall = false;
+            }
+        }
+        
+        if (topIntersection) {
+            const dist = isStartRoom ? 
+                distanceSq(startX, startY, topIntersection.x, topIntersection.y) :
+                distanceSq(endX, endY, topIntersection.x, topIntersection.y);
+                
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestIntersection = topIntersection;
+                isEastWall = false;
+                isNorthWall = true;
+            }
+        }
+        
+        if (bottomIntersection) {
+            const dist = isStartRoom ? 
+                distanceSq(startX, startY, bottomIntersection.x, bottomIntersection.y) :
+                distanceSq(endX, endY, bottomIntersection.x, bottomIntersection.y);
+                
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestIntersection = bottomIntersection;
+                isEastWall = false;
+                isNorthWall = false;
+            }
+        }
+        
+        // If we found an intersection, create a doorway
+        if (bestIntersection) {
+            intersectionX = bestIntersection.x;
+            intersectionY = bestIntersection.y;
+            
+            // Calculate doorway dimensions and position
+            let doorX, doorY, doorWidth, doorHeight;
+            
+            if (isEastWall || (!isEastWall && !isNorthWall && Math.abs(dirX) > Math.abs(dirY))) {
+                // Doorway on east or west wall (vertical wall)
+                doorX = isEastWall ? roomRight - 1 : roomLeft;
+                doorY = intersectionY - this.settings.doorwayWidth / 2;
+                doorWidth = 1;
+                doorHeight = this.settings.doorwayWidth;
+            } else {
+                // Doorway on north or south wall (horizontal wall)
+                doorX = intersectionX - this.settings.doorwayWidth / 2;
+                doorY = isNorthWall ? roomTop : roomBottom - 1;
+                doorWidth = this.settings.doorwayWidth;
+                doorHeight = 1;
+            }
+            
+            // Add doorway to room
+            room.doorways.push({
+                x: doorX,
+                y: doorY,
+                width: doorWidth,
+                height: doorHeight,
+                isEastWall: isEastWall,
+                isNorthWall: isNorthWall
+            });
+        }
+    }
+    
+    placeKey(radialRooms) {
+        // Find the room furthest from center
+        const furthestRoom = radialRooms.reduce((prev, current) => 
+            (current.distanceFromCenter > prev.distanceFromCenter) ? current : prev
+        );
+        
+        // Place key in the center of that room
         return {
-            x: keyRoom.x + keyRoom.width / 2,
-            y: keyRoom.y + keyRoom.height / 2
+            x: furthestRoom.x + furthestRoom.width / 2,
+            y: furthestRoom.y + furthestRoom.height / 2
         };
     }
     
@@ -336,7 +448,7 @@ constructor() {
         // Create a group to hold all dungeon meshes
         const dungeonGroup = new THREE.Group();
         
-        // Create floor materials
+        // Create materials
         const floorMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x666666,
             roughness: 0.7,
@@ -347,6 +459,12 @@ constructor() {
             color: 0x444444,
             roughness: 0.9,
             metalness: 0.1
+        });
+        
+        const centralRoomFloorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8a9c8f,
+            roughness: 0.5,
+            metalness: 0.3
         });
         
         const keyMaterial = new THREE.MeshStandardMaterial({
@@ -362,6 +480,9 @@ constructor() {
         
         // Add room floors and walls
         for (const room of rooms) {
+            // Choose material based on room type
+            const roomFloorMaterial = room.isCentral ? centralRoomFloorMaterial : floorMaterial;
+            
             // Create floor
             const floorGeometry = new THREE.BoxGeometry(
                 room.width * this.settings.gridSize,
@@ -369,7 +490,7 @@ constructor() {
                 room.height * this.settings.gridSize
             );
             
-            const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+            const floorMesh = new THREE.Mesh(floorGeometry, roomFloorMaterial);
             floorMesh.position.set(
                 room.x + (room.width * this.settings.gridSize) / 2,
                 -this.settings.floorHeight / 2,
@@ -379,16 +500,15 @@ constructor() {
             
             // Add collision to floor - prevents falling through
             dungeonGroup.colliderMeshes.push(floorMesh);
-            
             dungeonGroup.add(floorMesh);
             
             // Create walls with doorways
             this.createRoomWalls(dungeonGroup, room, wallMaterial);
         }
         
-        // Add corridor floors and walls
+        // Add corridors
         for (const corridor of corridors) {
-            this.createCorridorWithWalls(dungeonGroup, corridor, floorMaterial, wallMaterial);
+            this.createStraightCorridor(dungeonGroup, corridor, floorMaterial, wallMaterial);
         }
         
         // Add key
@@ -562,92 +682,106 @@ constructor() {
         }
     }
     
-    createCorridorWithWalls(group, corridor, floorMaterial, wallMaterial) {
-        // Determine corridor orientation and dimensions
-        let width, depth, x, z;
+    createStraightCorridor(group, corridor, floorMaterial, wallMaterial) {
+        // For straight corridors from center to rooms
         
-        if (corridor.isHorizontal) {
-            // Horizontal corridor
-            width = Math.abs(corridor.x2 - corridor.x1);
-            depth = corridor.width * this.settings.gridSize;
-            x = Math.min(corridor.x1, corridor.x2);
-            z = corridor.y1 - depth / 2;
-        } else {
-            // Vertical corridor
-            width = corridor.width * this.settings.gridSize;
-            depth = Math.abs(corridor.y2 - corridor.y1);
-            x = corridor.x1 - width / 2;
-            z = Math.min(corridor.y1, corridor.y2);
-        }
+        // Calculate the direction vector
+        const dx = corridor.x2 - corridor.x1;
+        const dy = corridor.y2 - corridor.y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
         
-        // Create corridor floor
-        const corridorGeometry = new THREE.BoxGeometry(width, this.settings.floorHeight, depth);
-        const corridorMesh = new THREE.Mesh(corridorGeometry, floorMaterial);
+        // Calculate perpendicular direction vector
+        const perpX = -dy / length;
+        const perpY = dx / length;
         
-        corridorMesh.position.set(
-            x + width / 2,
-            -this.settings.floorHeight / 2,
-            z + depth / 2
-        );
+        // Half width of the corridor
+        const halfWidth = this.settings.corridorWidth / 2;
         
-        corridorMesh.receiveShadow = true;
-        group.colliderMeshes.push(corridorMesh);
-        group.add(corridorMesh);
+        // Calculate corridor corners
+        const corners = [
+            { x: corridor.x1 + perpX * halfWidth, y: corridor.y1 + perpY * halfWidth },
+            { x: corridor.x1 - perpX * halfWidth, y: corridor.y1 - perpY * halfWidth },
+            { x: corridor.x2 - perpX * halfWidth, y: corridor.y2 - perpY * halfWidth },
+            { x: corridor.x2 + perpX * halfWidth, y: corridor.y2 + perpY * halfWidth }
+        ];
         
-        // Add walls along the corridor
-        if (corridor.isHorizontal) {
-            // Add north and south walls for horizontal corridors
-            
-            // North wall
-            const northWall = this.createWall(
-                group,
-                x,
-                z,
-                width,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            group.colliderMeshes.push(northWall);
-            
-            // South wall
-            const southWall = this.createWall(
-                group,
-                x,
-                z + depth - this.settings.gridSize,
-                width,
-                this.settings.wallHeight,
-                this.settings.gridSize,
-                wallMaterial
-            );
-            group.colliderMeshes.push(southWall);
-        } else {
-            // Add east and west walls for vertical corridors
-            
-            // West wall
-            const westWall = this.createWall(
-                group,
-                x,
-                z,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                depth,
-                wallMaterial
-            );
-            group.colliderMeshes.push(westWall);
-            
-            // East wall
-            const eastWall = this.createWall(
-                group,
-                x + width - this.settings.gridSize,
-                z,
-                this.settings.gridSize,
-                this.settings.wallHeight,
-                depth,
-                wallMaterial
-            );
-            group.colliderMeshes.push(eastWall);
-        }
+        // Create a custom geometry for the corridor floor
+        const shape = new THREE.Shape();
+        shape.moveTo(corners[0].x, corners[0].y);
+        shape.lineTo(corners[1].x, corners[1].y);
+        shape.lineTo(corners[2].x, corners[2].y);
+        shape.lineTo(corners[3].x, corners[3].y);
+        shape.lineTo(corners[0].x, corners[0].y);
+        
+        const extrudeSettings = {
+            steps: 1,
+            depth: this.settings.floorHeight,
+            bevelEnabled: false
+        };
+        
+        const floorGeometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        
+        // Position the floor mesh
+        floorMesh.rotation.x = Math.PI / 2; // Rotate to horizontal
+        floorMesh.position.set(0, -this.settings.floorHeight, 0);
+        
+        floorMesh.receiveShadow = true;
+        group.add(floorMesh);
+        
+        // Add collision to floor
+        group.colliderMeshes.push(floorMesh);
+        
+        // Create walls for the corridor
+        // Calculate the wall positions based on the corners and corridor height
+        
+        // Create the first wall
+        const wall1Shape = new THREE.Shape();
+        wall1Shape.moveTo(corners[0].x, corners[0].y);
+        wall1Shape.lineTo(corners[3].x, corners[3].y);
+        wall1Shape.lineTo(corners[3].x, corners[3].y);
+        wall1Shape.lineTo(corners[0].x, corners[0].y);
+        
+        const wall1ExtrudeSettings = {
+            steps: 1,
+            depth: this.settings.wallHeight,
+            bevelEnabled: false
+        };
+        
+        const wall1Geometry = new THREE.ExtrudeGeometry(wall1Shape, wall1ExtrudeSettings);
+        const wall1Mesh = new THREE.Mesh(wall1Geometry, wallMaterial);
+        
+        wall1Mesh.rotation.x = -Math.PI / 2; // Rotate to vertical
+        wall1Mesh.position.set(0, 0, 0);
+        
+        wall1Mesh.castShadow = true;
+        wall1Mesh.receiveShadow = true;
+        group.add(wall1Mesh);
+        group.colliderMeshes.push(wall1Mesh);
+        
+        // Create the second wall
+        const wall2Shape = new THREE.Shape();
+        wall2Shape.moveTo(corners[1].x, corners[1].y);
+        wall2Shape.lineTo(corners[2].x, corners[2].y);
+        wall2Shape.lineTo(corners[2].x, corners[2].y);
+        wall2Shape.lineTo(corners[1].x, corners[1].y);
+        
+        const wall2ExtrudeSettings = {
+            steps: 1,
+            depth: this.settings.wallHeight,
+            bevelEnabled: false
+        };
+        
+        const wall2Geometry = new THREE.ExtrudeGeometry(wall2Shape, wall2ExtrudeSettings);
+        const wall2Mesh = new THREE.Mesh(wall2Geometry, wallMaterial);
+        
+        wall2Mesh.rotation.x = -Math.PI / 2; // Rotate to vertical
+        wall2Mesh.position.set(0, 0, 0);
+        
+        wall2Mesh.castShadow = true;
+        wall2Mesh.receiveShadow = true;
+        group.add(wall2Mesh);
+        group.colliderMeshes.push(wall2Mesh);
     }
     
     createWall(group, x, y, width, height, depth, material) {
@@ -667,4 +801,3 @@ constructor() {
         
         return wallMesh;
     }
-}
