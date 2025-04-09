@@ -147,12 +147,12 @@ export class InputManager {
         gridContainer.className = 'control-grid';
         touchControls.appendChild(gridContainer);
         
-        // Define the button layout using a 6x3 grid
-        const buttonLayout = [
-            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', ''],
-            ['move-left', 'move-center', 'move-right', 'camera-left', 'camera-right', 'jump'],
-            ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down', '']
-        ];
+// Define the button layout using a 6x3 grid
+const buttonLayout = [
+    ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', ''],
+    ['move-left', 'move-center', 'move-right', 'camera-left', 'jump', 'camera-right'],
+    ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down', '']
+];
         
         // Define button icons
         const buttonIcons = {
