@@ -34,8 +34,8 @@ export class DungeonGenerator {
         // Combine all rooms
         const rooms = [centralRoom, ...radialRooms];
         
-        // Step 3 & 4: Connect rooms with direct corridors
-        const corridors = this.connectRoomsWithDirectCorridors(centralRoom, radialRooms);
+        // Step 3: Connect rooms with corridors
+        const corridors = this.connectRoomsWithCorridors(centralRoom, radialRooms);
         
         // Place the key in the furthest room from center
         const keyPosition = this.placeKey(radialRooms);
@@ -201,41 +201,36 @@ export class DungeonGenerator {
         }
     }
     
-    // Steps 3, 4, & 5: Find shortest path, connect with hallway, and create openings
-    connectRoomsWithDirectCorridors(centralRoom, radialRooms) {
+    // New improved corridor generation approach
+    connectRoomsWithCorridors(centralRoom, radialRooms) {
         const corridors = [];
         
-        // Get central room center and boundaries
+        // Calculate central room boundaries and center
         const centralRoomCenterX = centralRoom.x + centralRoom.width / 2;
         const centralRoomCenterY = centralRoom.y + centralRoom.height / 2;
         
-        // For each radial room, create a direct connection to the central room
         for (const radialRoom of radialRooms) {
-            // Find the closest points between the central room and this radial room
-            const connectionPoints = this.findClosestPointsBetweenRooms(centralRoom, radialRoom);
+            // Calculate radial room center
+            const radialRoomCenterX = radialRoom.x + radialRoom.width / 2;
+            const radialRoomCenterY = radialRoom.y + radialRoom.height / 2;
             
-            // Create a corridor between these points
-            const corridor = {
-                // Start point (on central room)
-                x1: connectionPoints.point1.x,
-                y1: connectionPoints.point1.y,
-                // End point (on radial room)
-                x2: connectionPoints.point2.x,
-                y2: connectionPoints.point2.y,
-                // Corridor properties
-                width: this.settings.corridorWidth,
-                startRoom: centralRoom,
-                endRoom: radialRoom,
-                // Wall information for doorway creation
-                startWall: connectionPoints.wall1,
-                endWall: connectionPoints.wall2
-            };
+            // Determine if we need orthogonal corridors (L-shaped) or a straight corridor
+            // Based on room positions, choose the most efficient approach
             
-            // Create doorways at the connection points
-            this.createDoorway(centralRoom, corridor, connectionPoints.wall1, true);
-            this.createDoorway(radialRoom, corridor, connectionPoints.wall2, false);
+            // Calculate differences in coordinates
+            const dx = radialRoomCenterX - centralRoomCenterX;
+            const dy = radialRoomCenterY - centralRoomCenterY;
             
-            corridors.push(corridor);
+            // If rooms are approximately aligned, create a straight corridor
+            const alignmentThreshold = 10; // Threshold for considering rooms aligned
+            
+            if (Math.abs(dx) < alignmentThreshold || Math.abs(dy) < alignmentThreshold) {
+                // Create a straight corridor
+                this.createStraightCorridor(centralRoom, radialRoom, corridors);
+            } else {
+                // Create an L-shaped corridor
+                this.createLShapedCorridor(centralRoom, radialRoom, corridors);
+            }
             
             // Mark rooms as connected
             centralRoom.connections.push(radialRoom);
@@ -245,197 +240,232 @@ export class DungeonGenerator {
         return corridors;
     }
     
-    // Find the closest points between two rooms
-    findClosestPointsBetweenRooms(room1, room2) {
-        // Room boundaries
-        const room1Left = room1.x;
-        const room1Right = room1.x + room1.width;
-        const room1Top = room1.y;
-        const room1Bottom = room1.y + room1.height;
+    // Create a straight corridor between two rooms
+    createStraightCorridor(room1, room2, corridorsList) {
+        // Find the best connection points between rooms
+        const connectionPoints = this.findOptimalConnectionPoints(room1, room2);
         
-        const room2Left = room2.x;
-        const room2Right = room2.x + room2.width;
-        const room2Top = room2.y;
-        const room2Bottom = room2.y + room2.height;
+        // Create a corridor object
+        const corridor = {
+            type: 'straight',
+            width: this.settings.corridorWidth,
+            startRoom: room1,
+            endRoom: room2,
+            startWall: connectionPoints.wall1,
+            endWall: connectionPoints.wall2,
+            points: [
+                { x: connectionPoints.point1.x, y: connectionPoints.point1.y },
+                { x: connectionPoints.point2.x, y: connectionPoints.point2.y }
+            ]
+        };
         
-        // Find the closest points and which walls they are on
-        let minDistance = Infinity;
-        let closestPoint1 = null;
-        let closestPoint2 = null;
-        let wall1 = '';
-        let wall2 = '';
+        // Create doorways at the connection points
+        this.createDoorway(room1, corridor, connectionPoints.wall1, true);
+        this.createDoorway(room2, corridor, connectionPoints.wall2, false);
         
-        // Check every possible wall pair combination between the two rooms
+        corridorsList.push(corridor);
+    }
+    
+    // Create an L-shaped corridor between two rooms
+    createLShapedCorridor(room1, room2, corridorsList) {
+        // Get room centers
+        const room1CenterX = room1.x + room1.width / 2;
+        const room1CenterY = room1.y + room1.height / 2;
+        const room2CenterX = room2.x + room2.width / 2;
+        const room2CenterY = room2.y + room2.height / 2;
         
-        // Room1 left wall to Room2 right wall
-        if (room1Left > room2Right) {
-            // Room2 is to the left of Room1
-            const yOverlap = this.findVerticalOverlap(room1Top, room1Bottom, room2Top, room2Bottom);
-            if (yOverlap) {
-                const distance = room1Left - room2Right;
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint1 = { x: room1Left, y: yOverlap.center };
-                    closestPoint2 = { x: room2Right, y: yOverlap.center };
-                    wall1 = 'west';
-                    wall2 = 'east';
-                }
-            }
+        // Randomly choose whether to go horizontal first then vertical, or vice versa
+        const horizontalFirst = Math.random() > 0.5;
+        
+        // Find connection points to the rooms
+        const room1ConnectionPoints = this.findClosestWallPoint(room1, room2, horizontalFirst);
+        const room2ConnectionPoints = this.findClosestWallPoint(room2, room1, !horizontalFirst);
+        
+        // Create the corner point (intersection of two segments)
+        let cornerX, cornerY;
+        
+        if (horizontalFirst) {
+            cornerX = room2ConnectionPoints.point.x;
+            cornerY = room1ConnectionPoints.point.y;
+        } else {
+            cornerX = room1ConnectionPoints.point.x;
+            cornerY = room2ConnectionPoints.point.y;
         }
         
-        // Room1 right wall to Room2 left wall
-        if (room1Right < room2Left) {
-            // Room2 is to the right of Room1
-            const yOverlap = this.findVerticalOverlap(room1Top, room1Bottom, room2Top, room2Bottom);
-            if (yOverlap) {
-                const distance = room2Left - room1Right;
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint1 = { x: room1Right, y: yOverlap.center };
-                    closestPoint2 = { x: room2Left, y: yOverlap.center };
-                    wall1 = 'east';
-                    wall2 = 'west';
-                }
-            }
-        }
+        // Create corridor object
+        const corridor = {
+            type: 'L-shaped',
+            width: this.settings.corridorWidth,
+            startRoom: room1,
+            endRoom: room2,
+            startWall: room1ConnectionPoints.wall,
+            endWall: room2ConnectionPoints.wall,
+            points: [
+                { x: room1ConnectionPoints.point.x, y: room1ConnectionPoints.point.y },
+                { x: cornerX, y: cornerY },
+                { x: room2ConnectionPoints.point.x, y: room2ConnectionPoints.point.y }
+            ]
+        };
         
-        // Room1 top wall to Room2 bottom wall
-        if (room1Top > room2Bottom) {
-            // Room2 is above Room1
-            const xOverlap = this.findHorizontalOverlap(room1Left, room1Right, room2Left, room2Right);
-            if (xOverlap) {
-                const distance = room1Top - room2Bottom;
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint1 = { x: xOverlap.center, y: room1Top };
-                    closestPoint2 = { x: xOverlap.center, y: room2Bottom };
-                    wall1 = 'north';
-                    wall2 = 'south';
-                }
-            }
-        }
+        // Create doorways
+        this.createDoorway(room1, corridor, room1ConnectionPoints.wall, true);
+        this.createDoorway(room2, corridor, room2ConnectionPoints.wall, false);
         
-        // Room1 bottom wall to Room2 top wall
-        if (room1Bottom < room2Top) {
-            // Room2 is below Room1
-            const xOverlap = this.findHorizontalOverlap(room1Left, room1Right, room2Left, room2Right);
-            if (xOverlap) {
-                const distance = room2Top - room1Bottom;
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestPoint1 = { x: xOverlap.center, y: room1Bottom };
-                    closestPoint2 = { x: xOverlap.center, y: room2Top };
-                    wall1 = 'south';
-                    wall2 = 'north';
-                }
-            }
-        }
+        corridorsList.push(corridor);
+    }
+    
+    // Find the best wall point based on direction preference
+    findClosestWallPoint(room, targetRoom, preferHorizontal) {
+        const roomCenterX = room.x + room.width / 2;
+        const roomCenterY = room.y + room.height / 2;
+        const targetCenterX = targetRoom.x + targetRoom.width / 2;
+        const targetCenterY = targetRoom.y + targetRoom.height / 2;
         
-        // If no direct wall-to-wall path is found (e.g., rooms are diagonal to each other)
-        if (!closestPoint1 || !closestPoint2) {
-            // Find the closest corners as a fallback
-            let minCornerDistance = Infinity;
-            
-            // Check each corner of room1 against each corner of room2
-            const corners1 = [
-                { x: room1Left, y: room1Top, wallX: 'west', wallY: 'north' },
-                { x: room1Right, y: room1Top, wallX: 'east', wallY: 'north' },
-                { x: room1Left, y: room1Bottom, wallX: 'west', wallY: 'south' },
-                { x: room1Right, y: room1Bottom, wallX: 'east', wallY: 'south' }
-            ];
-            
-            const corners2 = [
-                { x: room2Left, y: room2Top, wallX: 'west', wallY: 'north' },
-                { x: room2Right, y: room2Top, wallX: 'east', wallY: 'north' },
-                { x: room2Left, y: room2Bottom, wallX: 'west', wallY: 'south' },
-                { x: room2Right, y: room2Bottom, wallX: 'east', wallY: 'south' }
-            ];
-            
-            for (const corner1 of corners1) {
-                for (const corner2 of corners2) {
-                    const distance = this.calculateDistance(corner1.x, corner1.y, corner2.x, corner2.y);
-                    if (distance < minCornerDistance) {
-                        minCornerDistance = distance;
-                        
-                        // If rooms are diagonal to each other, use the corners for connection
-                        closestPoint1 = { x: corner1.x, y: corner1.y };
-                        closestPoint2 = { x: corner2.x, y: corner2.y };
-                        
-                        // Select the wall based on which direction is more prominent
-                        const dx = Math.abs(corner2.x - corner1.x);
-                        const dy = Math.abs(corner2.y - corner1.y);
-                        
-                        // Choose the wall based on the more significant dimension
-                        if (dx > dy) {
-                            wall1 = corner1.wallX;
-                            wall2 = corner2.wallX;
-                        } else {
-                            wall1 = corner1.wallY;
-                            wall2 = corner2.wallY;
-                        }
-                    }
-                }
-            }
-        }
+        // Determine best wall to connect based on direction preference
+        let wall, pointX, pointY;
         
-        // Final fallback - use centers of rooms if all else fails
-        if (!closestPoint1 || !closestPoint2) {
-            closestPoint1 = { x: room1.x + room1.width / 2, y: room1.y + room1.height / 2 };
-            closestPoint2 = { x: room2.x + room2.width / 2, y: room2.y + room2.height / 2 };
-            wall1 = 'center';
-            wall2 = 'center';
+        if (preferHorizontal) {
+            // Prefer horizontal connection (east or west wall)
+            if (targetCenterX > roomCenterX) {
+                // Target is to the east, use east wall
+                wall = 'east';
+                pointX = room.x + room.width;
+                pointY = this.clamp(targetCenterY, room.y + this.settings.doorwayWidth/2, 
+                                    room.y + room.height - this.settings.doorwayWidth/2);
+            } else {
+                // Target is to the west, use west wall
+                wall = 'west';
+                pointX = room.x;
+                pointY = this.clamp(targetCenterY, room.y + this.settings.doorwayWidth/2, 
+                                    room.y + room.height - this.settings.doorwayWidth/2);
+            }
+        } else {
+            // Prefer vertical connection (north or south wall)
+            if (targetCenterY > roomCenterY) {
+                // Target is to the south, use south wall
+                wall = 'south';
+                pointY = room.y + room.height;
+                pointX = this.clamp(targetCenterX, room.x + this.settings.doorwayWidth/2, 
+                                    room.x + room.width - this.settings.doorwayWidth/2);
+            } else {
+                // Target is to the north, use north wall
+                wall = 'north';
+                pointY = room.y;
+                pointX = this.clamp(targetCenterX, room.x + this.settings.doorwayWidth/2, 
+                                    room.x + room.width - this.settings.doorwayWidth/2);
+            }
         }
         
         return {
-            point1: closestPoint1,
-            point2: closestPoint2,
+            wall: wall,
+            point: { x: pointX, y: pointY }
+        };
+    }
+    
+    // Helper function to clamp a value between min and max
+    clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+    
+    // Find optimal connection points between two rooms
+    findOptimalConnectionPoints(room1, room2) {
+        // Room centers
+        const room1CenterX = room1.x + room1.width / 2;
+        const room1CenterY = room1.y + room1.height / 2;
+        const room2CenterX = room2.x + room2.width / 2;
+        const room2CenterY = room2.y + room2.height / 2;
+        
+        // Determine primary direction based on room positions
+        const dx = room2CenterX - room1CenterX;
+        const dy = room2CenterY - room1CenterY;
+        
+        let wall1, wall2, point1, point2;
+        
+        // Determine which walls to connect based on primary direction
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Primarily horizontal connection
+            if (dx > 0) {
+                // Room2 is to the east of Room1
+                wall1 = 'east';
+                wall2 = 'west';
+                point1 = { 
+                    x: room1.x + room1.width,
+                    y: this.clamp(room2CenterY, room1.y + this.settings.doorwayWidth/2, 
+                                 room1.y + room1.height - this.settings.doorwayWidth/2)
+                };
+                point2 = {
+                    x: room2.x,
+                    y: this.clamp(room1CenterY, room2.y + this.settings.doorwayWidth/2,
+                                 room2.y + room2.height - this.settings.doorwayWidth/2)
+                };
+            } else {
+                // Room2 is to the west of Room1
+                wall1 = 'west';
+                wall2 = 'east';
+                point1 = { 
+                    x: room1.x,
+                    y: this.clamp(room2CenterY, room1.y + this.settings.doorwayWidth/2, 
+                                 room1.y + room1.height - this.settings.doorwayWidth/2)
+                };
+                point2 = {
+                    x: room2.x + room2.width,
+                    y: this.clamp(room1CenterY, room2.y + this.settings.doorwayWidth/2,
+                                 room2.y + room2.height - this.settings.doorwayWidth/2)
+                };
+            }
+        } else {
+            // Primarily vertical connection
+            if (dy > 0) {
+                // Room2 is to the south of Room1
+                wall1 = 'south';
+                wall2 = 'north';
+                point1 = { 
+                    x: this.clamp(room2CenterX, room1.x + this.settings.doorwayWidth/2, 
+                                 room1.x + room1.width - this.settings.doorwayWidth/2),
+                    y: room1.y + room1.height
+                };
+                point2 = {
+                    x: this.clamp(room1CenterX, room2.x + this.settings.doorwayWidth/2,
+                                 room2.x + room2.width - this.settings.doorwayWidth/2),
+                    y: room2.y
+                };
+            } else {
+                // Room2 is to the north of Room1
+                wall1 = 'north';
+                wall2 = 'south';
+                point1 = { 
+                    x: this.clamp(room2CenterX, room1.x + this.settings.doorwayWidth/2, 
+                                 room1.x + room1.width - this.settings.doorwayWidth/2),
+                    y: room1.y
+                };
+                point2 = {
+                    x: this.clamp(room1CenterX, room2.x + this.settings.doorwayWidth/2,
+                                 room2.x + room2.width - this.settings.doorwayWidth/2),
+                    y: room2.y + room2.height
+                };
+            }
+        }
+        
+        return {
+            point1: point1,
+            point2: point2,
             wall1: wall1,
             wall2: wall2
         };
     }
     
-    // Find vertical overlap between two intervals
-    findVerticalOverlap(top1, bottom1, top2, bottom2) {
-        const overlapStart = Math.max(top1, top2);
-        const overlapEnd = Math.min(bottom1, bottom2);
-        
-        if (overlapStart < overlapEnd) {
-            return {
-                start: overlapStart,
-                end: overlapEnd,
-                center: (overlapStart + overlapEnd) / 2
-            };
-        }
-        
-        return null; // No overlap
-    }
-    
-    // Find horizontal overlap between two intervals
-    findHorizontalOverlap(left1, right1, left2, right2) {
-        const overlapStart = Math.max(left1, left2);
-        const overlapEnd = Math.min(right1, right2);
-        
-        if (overlapStart < overlapEnd) {
-            return {
-                start: overlapStart,
-                end: overlapEnd,
-                center: (overlapStart + overlapEnd) / 2
-            };
-        }
-        
-        return null; // No overlap
-    }
-    
-    // Calculate distance between two points
-    calculateDistance(x1, y1, x2, y2) {
-        return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-    }
-    
     // Create a doorway in a room wall
     createDoorway(room, corridor, wallSide, isStart) {
-        // Point where corridor meets the room
-        const connectionX = isStart ? corridor.x1 : corridor.x2;
-        const connectionY = isStart ? corridor.y1 : corridor.y2;
+        // Get the connection point based on corridor type and whether it's start or end
+        let connectionPoint;
+        if (corridor.type === 'straight') {
+            connectionPoint = isStart ? corridor.points[0] : corridor.points[1];
+        } else if (corridor.type === 'L-shaped') {
+            connectionPoint = isStart ? corridor.points[0] : corridor.points[2];
+        }
+        
+        const connectionX = connectionPoint.x;
+        const connectionY = connectionPoint.y;
         
         // Create doorway based on which wall the corridor connects to
         let doorwaySpec = {
@@ -567,7 +597,11 @@ export class DungeonGenerator {
         
         // Add corridor floors and walls
         for (const corridor of corridors) {
-            this.createStraightCorridor(dungeonGroup, corridor, floorMaterial, wallMaterial);
+            if (corridor.type === 'straight') {
+                this.createStraightCorridorMesh(dungeonGroup, corridor, floorMaterial, wallMaterial);
+            } else if (corridor.type === 'L-shaped') {
+                this.createLShapedCorridorMesh(dungeonGroup, corridor, floorMaterial, wallMaterial);
+            }
         }
         
         // Add key
@@ -588,6 +622,169 @@ export class DungeonGenerator {
         dungeonGroup.add(keyMesh);
         
         return dungeonGroup;
+    }
+    
+    // Create a straight corridor mesh
+    createStraightCorridorMesh(group, corridor, floorMaterial, wallMaterial) {
+        const startPoint = corridor.points[0];
+        const endPoint = corridor.points[1];
+        
+        // Calculate corridor dimensions
+        const dx = endPoint.x - startPoint.x;
+        const dy = endPoint.y - startPoint.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        // Determine corridor orientation
+        let width, depth, position, rotation;
+        
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal corridor
+            width = length;
+            depth = corridor.width;
+            position = {
+                x: (startPoint.x + endPoint.x) / 2,
+                y: -this.settings.floorHeight / 2,
+                z: startPoint.y
+            };
+            rotation = 0;
+        } else {
+            // Vertical corridor
+            width = corridor.width;
+            depth = length;
+            position = {
+                x: startPoint.x,
+                y: -this.settings.floorHeight / 2,
+                z: (startPoint.y + endPoint.y) / 2
+            };
+            rotation = Math.PI / 2; // 90 degrees
+        }
+        
+        // Create floor
+        const floorGeometry = new THREE.BoxGeometry(
+            width,
+            this.settings.floorHeight,
+            depth
+        );
+        
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.position.set(position.x, position.y, position.z);
+        floorMesh.rotation.y = rotation;
+        floorMesh.receiveShadow = true;
+        
+        group.colliderMeshes.push(floorMesh);
+        group.add(floorMesh);
+        
+        // Create walls
+        this.createStraightCorridorWalls(group, corridor, wallMaterial);
+    }
+    
+    // Create straight corridor walls
+    createStraightCorridorWalls(group, corridor, wallMaterial) {
+        const startPoint = corridor.points[0];
+        const endPoint = corridor.points[1];
+        const corridorWidth = corridor.width;
+        
+        // Calculate corridor properties
+        const dx = endPoint.x - startPoint.x;
+        const dy = endPoint.y - startPoint.y;
+        const isHorizontal = Math.abs(dx) > Math.abs(dy);
+        
+        // Create walls based on corridor orientation
+        if (isHorizontal) {
+            // Horizontal corridor - create north and south walls
+            const length = Math.abs(dx);
+            const wallHeight = this.settings.wallHeight;
+            const wallThickness = this.settings.gridSize;
+            
+            // North wall (lower in Z)
+            const northWallGeometry = new THREE.BoxGeometry(length, wallHeight, wallThickness);
+            const northWallMesh = new THREE.Mesh(northWallGeometry, wallMaterial);
+            northWallMesh.position.set(
+                (startPoint.x + endPoint.x) / 2,
+                wallHeight / 2,
+                startPoint.y - corridorWidth / 2
+            );
+            northWallMesh.castShadow = true;
+            northWallMesh.receiveShadow = true;
+            group.add(northWallMesh);
+            group.colliderMeshes.push(northWallMesh);
+            
+            // South wall (higher in Z)
+            const southWallGeometry = new THREE.BoxGeometry(length, wallHeight, wallThickness);
+            const southWallMesh = new THREE.Mesh(southWallGeometry, wallMaterial);
+            southWallMesh.position.set(
+                (startPoint.x + endPoint.x) / 2,
+                wallHeight / 2,
+                startPoint.y + corridorWidth / 2
+            );
+            southWallMesh.castShadow = true;
+            southWallMesh.receiveShadow = true;
+            group.add(southWallMesh);
+            group.colliderMeshes.push(southWallMesh);
+        } else {
+            // Vertical corridor - create east and west walls
+            const length = Math.abs(dy);
+            const wallHeight = this.settings.wallHeight;
+            const wallThickness = this.settings.gridSize;
+            
+            // West wall (lower in X)
+            const westWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, length);
+            const westWallMesh = new THREE.Mesh(westWallGeometry, wallMaterial);
+            westWallMesh.position.set(
+                startPoint.x - corridorWidth / 2,
+                wallHeight / 2,
+                (startPoint.y + endPoint.y) / 2
+            );
+            westWallMesh.castShadow = true;
+            westWallMesh.receiveShadow = true;
+            group.add(westWallMesh);
+            group.colliderMeshes.push(westWallMesh);
+            
+            // East wall (higher in X)
+            const eastWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, length);
+            const eastWallMesh = new THREE.Mesh(eastWallGeometry, wallMaterial);
+            eastWallMesh.position.set(
+                startPoint.x + corridorWidth / 2,
+                wallHeight / 2,
+                (startPoint.y + endPoint.y) / 2
+            );
+            eastWallMesh.castShadow = true;
+            eastWallMesh.receiveShadow = true;
+            group.add(eastWallMesh);
+            group.colliderMeshes.push(eastWallMesh);
+        }
+    }
+    
+    // Create an L-shaped corridor mesh
+    createLShapedCorridorMesh(group, corridor, floorMaterial, wallMaterial) {
+        const startPoint = corridor.points[0];
+        const cornerPoint = corridor.points[1];
+        const endPoint = corridor.points[2];
+        
+        // Create two straight segments for the L-shape
+        // First segment: from start to corner
+        const firstSegment = {
+            type: 'straight',
+            width: corridor.width,
+            points: [
+                { x: startPoint.x, y: startPoint.y },
+                { x: cornerPoint.x, y: cornerPoint.y }
+            ]
+        };
+        
+        // Second segment: from corner to end
+        const secondSegment = {
+            type: 'straight',
+            width: corridor.width,
+            points: [
+                { x: cornerPoint.x, y: cornerPoint.y },
+                { x: endPoint.x, y: endPoint.y }
+            ]
+        };
+        
+        // Create the floor and walls for both segments
+        this.createStraightCorridorMesh(group, firstSegment, floorMaterial, wallMaterial);
+        this.createStraightCorridorMesh(group, secondSegment, floorMaterial, wallMaterial);
     }
     
     createRoomWalls(group, room, wallMaterial) {
@@ -740,97 +937,6 @@ export class DungeonGenerator {
             }
         }
     }
-    
-    // The key function that needs fixing is the createStraightCorridor function
-// and the createCorridorWalls function
-
-createStraightCorridor(group, corridor, floorMaterial, wallMaterial) {
-    // Calculate corridor length and angle
-    const dx = corridor.x2 - corridor.x1;
-    const dy = corridor.y2 - corridor.y1;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    
-    // This is the critical fix - use Math.atan2 correctly
-    // The Z-axis in Three.js corresponds to the Y-axis in our 2D layout
-    const angle = Math.atan2(dy, dx);
-    
-    // Create corridor floor
-    const floorGeometry = new THREE.BoxGeometry(
-        length,
-        this.settings.floorHeight,
-        corridor.width
-    );
-    
-    const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-    
-    // Position at midpoint of corridor line
-    const midX = (corridor.x1 + corridor.x2) / 2;
-    const midY = (corridor.y1 + corridor.y2) / 2;
-    
-    floorMesh.position.set(
-        midX,
-        -this.settings.floorHeight / 2,
-        midY
-    );
-    
-    // Apply the rotation - the critical fix is here
-    // In Three.js, rotation around Y-axis is for horizontal orientation
-    floorMesh.rotation.y = angle;
-    
-    floorMesh.receiveShadow = true;
-    group.colliderMeshes.push(floorMesh);
-    group.add(floorMesh);
-    
-    // Create corridor walls
-    this.createCorridorWalls(group, corridor, length, angle, wallMaterial);
-}
-
-createCorridorWalls(group, corridor, length, angle, wallMaterial) {
-    const halfWidth = corridor.width / 2;
-    const wallHeight = this.settings.wallHeight;
-    const wallThickness = this.settings.gridSize;
-    
-    // Calculate the midpoint of the corridor
-    const midX = (corridor.x1 + corridor.x2) / 2;
-    const midY = (corridor.y1 + corridor.y2) / 2;
-    
-    // Create walls on both sides of corridor
-    for (let side = -1; side <= 1; side += 2) {
-        // Skip center
-        if (side === 0) continue;
-        
-        // Calculate offset perpendicular to corridor direction
-        // This is the critical fix - use correct perpendicular calculation
-        const offsetX = -Math.sin(angle) * halfWidth * side;
-        const offsetY = Math.cos(angle) * halfWidth * side;
-        
-        // Create wall geometry
-        const wallGeometry = new THREE.BoxGeometry(
-            length, 
-            wallHeight, 
-            wallThickness
-        );
-        
-        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-        
-        // Position at center of the wall with the perpendicular offset
-        wallMesh.position.set(
-            midX + offsetX,
-            wallHeight / 2,
-            midY + offsetY
-        );
-        
-        // Apply the correct rotation
-        // Add PI/2 (90 degrees) to make the wall perpendicular to the corridor
-        wallMesh.rotation.y = angle + Math.PI / 2;
-        
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        
-        group.add(wallMesh);
-        group.colliderMeshes.push(wallMesh);
-    }
-}
     
     createWall(group, x, y, width, height, depth, material) {
         const wallGeometry = new THREE.BoxGeometry(width, height, depth);
