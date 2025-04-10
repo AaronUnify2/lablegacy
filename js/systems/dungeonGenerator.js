@@ -27,16 +27,16 @@ export class DungeonGenerator {
             centralTorchColor: 0x3366ff,    // Blue torches
             cardinalTorchColor: 0xff3333,   // Red torches
             cornerTorchColor: 0x990099,     // Purple torches
-            torchIntensity: 2,
-            torchDistance: 15,
+            torchIntensity: 6,
+            torchDistance: 40,
             torchHeight: 8,
             
             // Ambient shadow intensity
-            shadowIntensity: 0.7,           // Heavy shadow effect
+            shadowIntensity: 0.3,           // Heavy shadow effect
             
             // Fog settings
             fogColor: 0x000000,             // Black fog
-            fogDensity: 0.03                // Moderate fog density
+            fogDensity: 0.015               // Moderate fog density
         };
         
         // Create texture loader
