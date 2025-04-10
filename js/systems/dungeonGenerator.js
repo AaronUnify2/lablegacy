@@ -21,8 +21,9 @@ export class DungeonGenerator {
             // Pillar settings
             pillarRadius: 2,
             pillarHeight: 15, // 5x taller (was 3)
-            pillarChance: 0.5, // 50% chance of spawning a pillar
-            
+            pillarChance: 0.5 // 50% chance of spawning a pillar
+
+                
             // New lighting settings
             centralTorchColor: 0x3366ff,    // Blue torches
             cardinalTorchColor: 0xff3333,   // Red torches
@@ -36,12 +37,15 @@ export class DungeonGenerator {
             
             // Fog settings
             fogColor: 0x000000,             // Black fog
-            fogDensity: 0.03,               // Moderate fog density
+            fogDensity: 0.03,               
+
+            
         };
+
         
         // Create texture loader
         this.textureLoader = new THREE.TextureLoader();
-    }
+}
     
     generateFloor(floorLevel) {
         console.log(`Generating floor level ${floorLevel}...`);
@@ -754,7 +758,7 @@ export class DungeonGenerator {
                 endRoom.doorways.push({
                     isEastWall: false,
                     isNorthWall: false,
-                   x: corridor.x,
+                    x: corridor.x,
                     y: endRoom.y + endRoom.height - this.settings.gridSize,
                     width: corridor.width,
                     height: this.settings.gridSize
@@ -774,97 +778,73 @@ export class DungeonGenerator {
         };
     }
     
-    // Create materials with textures
-    createMaterials() {
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // Modified createDungeonMesh method
+    createDungeonMesh(rooms, corridors, keyPosition) {
+        // Create a group to hold all dungeon meshes
+        const dungeonGroup = new THREE.Group();
+        
         // Set up textures
         this.setupTextures();
         
-        return {
-            central: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x666666,
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0xaaaaaa,
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x888888,
-                })
-            },
-            cardinal: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x442222, // Reddish tint
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x884444, // Reddish tint
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x664444, // Reddish tint
-                })
-            },
-            corner: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x442244, // Purple tint
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x664466, // Purple tint
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x553355, // Purple tint
-                })
-            },
-            corridor: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.corridorFloor,
-                    roughness: 0.8,
-                    metalness: 0.1,
-                    color: 0x333333,
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x555555,
-                })
-            },
-            key: new THREE.MeshStandardMaterial({
-                color: 0xffcc00,
-                roughness: 0.3,
-                metalness: 0.8,
-                emissive: 0xffcc00,
-                emissiveIntensity: 0.5
-            })
-        };
+        // Create materials with textures
+        const materials = this.createMaterials();
+        
+        // Add fog to the scene
+        this.addFogToScene();
+        
+        // Array to store collider meshes
+        dungeonGroup.colliderMeshes = [];
+        
+        // Create room meshes
+        for (const room of rooms) {
+            this.createRoomMesh(dungeonGroup, room, materials, room.type);
+        }
+        
+        // Create corridor meshes
+        for (const corridor of corridors) {
+            this.createCorridorMesh(dungeonGroup, corridor, materials.corridor.floor, materials.corridor.wall);
+        }
+        
+        // Create key
+        const keyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const keyMesh = new THREE.Mesh(keyGeometry, materials.key);
+        keyMesh.position.set(
+            keyPosition.x,
+            1, // Floating above the floor
+            keyPosition.y
+        );
+        
+        // Add a point light to the key to make it glow
+        const keyLight = new THREE.PointLight(0xffcc00, 1.5, 10);
+        keyLight.position.copy(keyMesh.position);
+        dungeonGroup.add(keyLight);
+        
+        keyMesh.castShadow = true;
+        dungeonGroup.add(keyMesh);
+        
+        // Add torch lighting to rooms
+        this.addTorchLighting(dungeonGroup, rooms);
+        
+        // Add ceiling of darkness
+        this.createDarkCeiling(dungeonGroup, rooms, corridors);
+        
+        return dungeonGroup;
     }
     
-    // Setup textures method
+    // New method to set up textures
     setupTextures() {
         // We'll use procedural textures for now, but you could load image textures
         this.textures = {
@@ -1029,53 +1009,91 @@ export class DungeonGenerator {
         return texture;
     }
     
-    createDungeonMesh(rooms, corridors, keyPosition) {
-        // Create a group to hold all dungeon meshes
-        const dungeonGroup = new THREE.Group();
-        
-        // Create materials
-        const materials = this.createMaterials();
-        
-        // Add fog to the scene
-        this.addFogToScene();
-        
-        // Array to store collider meshes
-        dungeonGroup.colliderMeshes = [];
-        
-        // Create room meshes
-        for (const room of rooms) {
-            this.createRoomMesh(dungeonGroup, room, materials, room.type);
-        }
-        
-        // Create corridor meshes
-        for (const corridor of corridors) {
-            this.createCorridorMesh(dungeonGroup, corridor, materials.corridor.floor, materials.corridor.wall);
-        }
-        
-        // Create key
-        const keyGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-        const keyMesh = new THREE.Mesh(keyGeometry, materials.key);
-        keyMesh.position.set(
-            keyPosition.x,
-            1, // Floating above the floor
-            keyPosition.y
-        );
-        
-        // Add a point light to the key to make it glow
-        const keyLight = new THREE.PointLight(0xffcc00, 1.5, 10);
-        keyLight.position.copy(keyMesh.position);
-        dungeonGroup.add(keyLight);
-        
-        keyMesh.castShadow = true;
-        dungeonGroup.add(keyMesh);
-        
-        // Add torch lighting to rooms
-        this.addTorchLighting(dungeonGroup, rooms);
-        
-        // Add ceiling of darkness
-        this.createDarkCeiling(dungeonGroup, rooms, corridors);
-        
-        return dungeonGroup;
+    // Create materials with textures
+    createMaterials() {
+        return {
+            central: {
+                floor: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.mosaicFloor,
+                    roughness: 0.7,
+                    metalness: 0.2,
+                    color: 0x666666,
+                }),
+                wall: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.sandstone,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    color: 0xaaaaaa,
+                }),
+                pillar: new THREE.MeshStandardMaterial({
+                    map: this.textures.pillar,
+                    roughness: 0.8,
+                    metalness: 0.3,
+                    color: 0x888888,
+                })
+            },
+            cardinal: {
+                floor: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.mosaicFloor,
+                    roughness: 0.7,
+                    metalness: 0.2,
+                    color: 0x442222, // Reddish tint
+                }),
+                wall: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.sandstone,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    color: 0x884444, // Reddish tint
+                }),
+                pillar: new THREE.MeshStandardMaterial({
+                    map: this.textures.pillar,
+                    roughness: 0.8,
+                    metalness: 0.3,
+                    color: 0x664444, // Reddish tint
+                })
+            },
+            corner: {
+                floor: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.mosaicFloor,
+                    roughness: 0.7,
+                    metalness: 0.2,
+                    color: 0x442244, // Purple tint
+                }),
+                wall: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.sandstone,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    color: 0x664466, // Purple tint
+                }),
+                pillar: new THREE.MeshStandardMaterial({
+                    map: this.textures.pillar,
+                    roughness: 0.8,
+                    metalness: 0.3,
+                    color: 0x553355, // Purple tint
+                })
+            },
+            corridor: {
+                floor: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.corridorFloor,
+                    roughness: 0.8,
+                    metalness: 0.1,
+                    color: 0x333333,
+                }),
+                wall: new THREE.MeshStandardMaterial({ 
+                    map: this.textures.sandstone,
+                    roughness: 0.9,
+                    metalness: 0.1,
+                    color: 0x555555,
+                })
+            },
+            key: new THREE.MeshStandardMaterial({
+                color: 0xffcc00,
+                roughness: 0.3,
+                metalness: 0.8,
+                emissive: 0xffcc00,
+                emissiveIntensity: 0.5
+            })
+        };
     }
     
     // Add fog to scene
@@ -1137,8 +1155,8 @@ export class DungeonGenerator {
             this.createRoomPillar(group, room, materialSet.pillar);
         }
     }
-
-// Add torch lighting to rooms
+    
+    // Add torch lighting to rooms
     addTorchLighting(group, rooms) {
         for (const room of rooms) {
             const centerX = room.x + room.width / 2;
@@ -1452,6 +1470,329 @@ export class DungeonGenerator {
         
         window.swayingObjects.push(object);
     }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    createRoomMesh(group, room, floorMaterial, wallMaterial, pillarMaterial) {
+        // Create main room floor
+        const floorGeometry = new THREE.BoxGeometry(
+            room.width * this.settings.gridSize,
+            this.settings.floorHeight,
+            room.height * this.settings.gridSize
+        );
+        
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.position.set(
+            room.x + (room.width * this.settings.gridSize) / 2,
+            -this.settings.floorHeight / 2,
+            room.y + (room.height * this.settings.gridSize) / 2
+        );
+        floorMesh.receiveShadow = true;
+        
+        // Add collision to floor - prevents falling through
+        group.colliderMeshes.push(floorMesh);
+        group.add(floorMesh);
+        
+        // Create walls with doorways for the main room
+        this.createRoomWalls(group, room, wallMaterial);
+        
+        // Create alcoves if the room has any
+        if (room.alcoves && room.alcoves.length > 0) {
+            this.createAlcoveMeshes(group, room, floorMaterial, wallMaterial, pillarMaterial);
+        }
+        
+        // Create pillar in room center if this room has a pillar
+        if (room.hasPillar) {
+            this.createRoomPillar(group, room, pillarMaterial);
+        }
+    }
+    
+    // Create a cylindrical pillar in the center of a room
+    createRoomPillar(group, room, pillarMaterial) {
+        // Calculate the center position of the room
+        const centerX = room.x + room.width / 2;
+        const centerY = room.y + room.height / 2;
+        
+        // Create the pillar geometry
+        const pillarGeometry = new THREE.CylinderGeometry(
+            this.settings.pillarRadius,  // top radius
+            this.settings.pillarRadius,  // bottom radius
+            this.settings.pillarHeight,  // height
+            16,                          // radial segments
+            1,                           // height segments
+            false                        // open-ended
+        );
+        
+        // Create the pillar mesh
+        const pillarMesh = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        
+        // Position the pillar in the center of the room
+        pillarMesh.position.set(
+            centerX,
+            this.settings.pillarHeight / 2, // Center vertically
+            centerY
+        );
+        
+        // Add shadow casting
+        pillarMesh.castShadow = true;
+        pillarMesh.receiveShadow = true;
+        
+        // Add the pillar to the collision meshes
+        group.colliderMeshes.push(pillarMesh);
+        group.add(pillarMesh);
+        
+        return pillarMesh;
+    }
+    
+    // Create meshes for all alcoves attached to a room
+    createAlcoveMeshes(group, room, floorMaterial, wallMaterial, pillarMaterial) {
+        for (const alcove of room.alcoves) {
+            // Create alcove floor
+            const alcoveFloorGeometry = new THREE.BoxGeometry(
+                alcove.width * this.settings.gridSize,
+                this.settings.floorHeight,
+                alcove.height * this.settings.gridSize
+            );
+            
+            const alcoveFloorMesh = new THREE.Mesh(alcoveFloorGeometry, floorMaterial);
+            alcoveFloorMesh.position.set(
+                alcove.x + (alcove.width * this.settings.gridSize) / 2,
+                -this.settings.floorHeight / 2,
+                alcove.y + (alcove.height * this.settings.gridSize) / 2
+            );
+            alcoveFloorMesh.receiveShadow = true;
+            
+            // Add collision to alcove floor
+            group.colliderMeshes.push(alcoveFloorMesh);
+            group.add(alcoveFloorMesh);
+            
+            // Create alcove walls
+            this.createAlcoveWalls(group, room, alcove, wallMaterial);
+            
+            // If this alcove has a pillar, create it
+            if (alcove.hasPillar) {
+                // Calculate the center of the alcove
+                const centerX = alcove.x + alcove.width / 2;
+                const centerY = alcove.y + alcove.height / 2;
+                
+                // Create the pillar geometry (smaller than room pillars)
+                const pillarGeometry = new THREE.CylinderGeometry(
+                    this.settings.pillarRadius * 0.8,  // top radius (slightly smaller)
+                    this.settings.pillarRadius * 0.8,  // bottom radius
+                    this.settings.pillarHeight,        // height
+                    12,                                // radial segments
+                    1,                                 // height segments
+                    false                              // open-ended
+                );
+                
+                // Create the pillar mesh
+                const pillarMesh = new THREE.Mesh(pillarGeometry, pillarMaterial);
+                
+                // Position the pillar in the center of the alcove
+                pillarMesh.position.set(
+                    centerX,
+                    this.settings.pillarHeight / 2, // Center vertically
+                    centerY
+                );
+                
+                // Add shadow casting
+                pillarMesh.castShadow = true;
+                pillarMesh.receiveShadow = true;
+                
+                // Add the pillar to the collision meshes
+                group.colliderMeshes.push(pillarMesh);
+                group.add(pillarMesh);
+            }
+        }
+    }
+    
+    // Create walls for an alcove
+    createAlcoveWalls(group, room, alcove, wallMaterial) {
+        const { x, y, width, height, wall } = alcove;
+        
+        // Create openings between room and alcove
+        switch (wall) {
+            case 'north':
+                // North alcove: create east, west, and north walls
+                // East wall
+                const northAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveEastWall);
+                
+                // West wall
+                const northAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveWestWall);
+                
+                // North wall
+                const northAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveNorthWall);
+                break;
+                
+            case 'east':
+                // East alcove: create north, south, and east walls
+                // North wall
+                const eastAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveNorthWall);
+                
+                // South wall
+                const eastAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveSouthWall);
+                
+                // East wall
+                const eastAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveEastWall);
+                break;
+                
+            case 'south':
+                // South alcove: create east, west, and south walls
+                // East wall
+                const southAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveEastWall);
+                
+                // West wall
+                const southAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveWestWall);
+                
+                // South wall
+                const southAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveSouthWall);
+                break;
+                
+            case 'west':
+                // West alcove: create north, south, and west walls
+                // North wall
+                const westAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveNorthWall);
+                
+                // South wall
+                const westAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveSouthWall);
+                
+                // West wall
+                const westAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveWestWall);
+                break;
+        }
+    }
     
     createRoomWalls(group, room, wallMaterial) {
         // Get doorway info for this room
@@ -1732,286 +2073,4 @@ export class DungeonGenerator {
         
         return wallMesh;
     }
-    
-    // Create a cylindrical pillar in the center of a room
-    createRoomPillar(group, room, pillarMaterial) {
-        // Calculate the center position of the room
-        const centerX = room.x + room.width / 2;
-        const centerY = room.y + room.height / 2;
-        
-        // Create the pillar geometry
-        const pillarGeometry = new THREE.CylinderGeometry(
-            this.settings.pillarRadius,  // top radius
-            this.settings.pillarRadius,  // bottom radius
-            this.settings.pillarHeight,  // height
-            16,                          // radial segments
-            1,                           // height segments
-            false                        // open-ended
-        );
-        
-        // Create the pillar mesh
-        const pillarMesh = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        
-        // Position the pillar in the center of the room
-        pillarMesh.position.set(
-            centerX,
-            this.settings.pillarHeight / 2, // Center vertically
-            centerY
-        );
-        
-        // Add shadow casting
-        pillarMesh.castShadow = true;
-        pillarMesh.receiveShadow = true;
-        
-        // Add the pillar to the collision meshes
-        group.colliderMeshes.push(pillarMesh);
-        group.add(pillarMesh);
-        
-        return pillarMesh;
-    }
-    
-    // Create meshes for all alcoves attached to a room
-    createAlcoveMeshes(group, room, floorMaterial, wallMaterial, pillarMaterial) {
-        for (const alcove of room.alcoves) {
-            // Create alcove floor
-            const alcoveFloorGeometry = new THREE.BoxGeometry(
-                alcove.width * this.settings.gridSize,
-                this.settings.floorHeight,
-                alcove.height * this.settings.gridSize
-            );
-            
-            const alcoveFloorMesh = new THREE.Mesh(alcoveFloorGeometry, floorMaterial);
-            alcoveFloorMesh.position.set(
-                alcove.x + (alcove.width * this.settings.gridSize) / 2,
-                -this.settings.floorHeight / 2,
-                alcove.y + (alcove.height * this.settings.gridSize) / 2
-            );
-            alcoveFloorMesh.receiveShadow = true;
-            
-            // Add collision to alcove floor
-            group.colliderMeshes.push(alcoveFloorMesh);
-            group.add(alcoveFloorMesh);
-            
-            // Create alcove walls
-            this.createAlcoveWalls(group, room, alcove, wallMaterial);
-            
-            // If this alcove has a pillar, create it
-            if (alcove.hasPillar) {
-                // Calculate the center of the alcove
-                const centerX = alcove.x + alcove.width / 2;
-                const centerY = alcove.y + alcove.height / 2;
-                
-                // Create the pillar geometry (smaller than room pillars)
-                const pillarGeometry = new THREE.CylinderGeometry(
-                    this.settings.pillarRadius * 0.8,  // top radius (slightly smaller)
-                    this.settings.pillarRadius * 0.8,  // bottom radius
-                    this.settings.pillarHeight,        // height
-                    12,                                // radial segments
-                    1,                                 // height segments
-                    false                              // open-ended
-                );
-                
-                // Create the pillar mesh
-                const pillarMesh = new THREE.Mesh(pillarGeometry, pillarMaterial);
-                
-                // Position the pillar in the center of the alcove
-                pillarMesh.position.set(
-                    centerX,
-                    this.settings.pillarHeight / 2, // Center vertically
-                    centerY
-                );
-                
-                // Add shadow casting
-                pillarMesh.castShadow = true;
-                pillarMesh.receiveShadow = true;
-                
-                // Add the pillar to the collision meshes
-                group.colliderMeshes.push(pillarMesh);
-                group.add(pillarMesh);
-            }
-        }
-    }
-    
-    // Create walls for an alcove
-    createAlcoveWalls(group, room, alcove, wallMaterial) {
-        const { x, y, width, height, wall } = alcove;
-        
-        // Create openings between room and alcove
-        switch (wall) {
-            case 'north':
-                // North alcove: create east, west, and north walls
-                // East wall
-                const northAlcoveEastWall = this.createWall(
-                    group,
-                    x + width * this.settings.gridSize - this.settings.gridSize,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(northAlcoveEastWall);
-                
-                // West wall
-                const northAlcoveWestWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(northAlcoveWestWall);
-                
-                // North wall
-                const northAlcoveNorthWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(northAlcoveNorthWall);
-                break;
-                
-            case 'east':
-                // East alcove: create north, south, and east walls
-                // North wall
-                const eastAlcoveNorthWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(eastAlcoveNorthWall);
-                
-                // South wall
-                const eastAlcoveSouthWall = this.createWall(
-                    group,
-                    x,
-                    y + height * this.settings.gridSize - this.settings.gridSize,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(eastAlcoveSouthWall);
-                
-                // East wall
-                const eastAlcoveEastWall = this.createWall(
-                    group,
-                    x + width * this.settings.gridSize - this.settings.gridSize,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(eastAlcoveEastWall);
-                break;
-                
-            case 'south':
-                // South alcove: create east, west, and south walls
-                // East wall
-                const southAlcoveEastWall = this.createWall(
-                    group,
-                    x + width * this.settings.gridSize - this.settings.gridSize,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(southAlcoveEastWall);
-                
-                // West wall
-                const southAlcoveWestWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(southAlcoveWestWall);
-                
-                // South wall
-                const southAlcoveSouthWall = this.createWall(
-                    group,
-                    x,
-                    y + height * this.settings.gridSize - this.settings.gridSize,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(southAlcoveSouthWall);
-                break;
-                
-            case 'west':
-                // West alcove: create north, south, and west walls
-                // North wall
-                const westAlcoveNorthWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(westAlcoveNorthWall);
-                
-                // South wall
-                const westAlcoveSouthWall = this.createWall(
-                    group,
-                    x,
-                    y + height * this.settings.gridSize - this.settings.gridSize,
-                    width * this.settings.gridSize,
-                    this.settings.wallHeight,
-                    this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(westAlcoveSouthWall);
-                
-                // West wall
-                const westAlcoveWestWall = this.createWall(
-                    group,
-                    x,
-                    y,
-                    this.settings.gridSize,
-                    this.settings.wallHeight,
-                    height * this.settings.gridSize,
-                    wallMaterial
-                );
-                group.colliderMeshes.push(westAlcoveWestWall);
-                break;
-        }
-    }
-}
-
-
-createWall(group, x, y, width, height, depth, material) {
-    const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-    const wallMesh = new THREE.Mesh(wallGeometry, material);
-    
-    wallMesh.position.set(
-        x + width / 2,
-        height / 2,
-        y + depth / 2
-    );
-    
-    wallMesh.castShadow = true;
-    wallMesh.receiveShadow = true;
-    
-    group.add(wallMesh);
-    
-    return wallMesh;
 }
