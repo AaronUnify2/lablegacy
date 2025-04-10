@@ -9,8 +9,13 @@ body, html {
     height: 100%;
     overflow: hidden;
     touch-action: none;
-    font-family: Arial, sans-serif;
+    font-family: 'Cinzel', serif; /* Consider including this font */
     background-color: #000;
+}
+
+@font-face {
+    font-family: 'Cinzel';
+    src: url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
 }
 
 #game-container {
@@ -25,57 +30,117 @@ canvas {
     height: 100%;
 }
 
-/* Loading Screen */
+/* Enhanced Loading Screen */
 #loading-screen {
     position: absolute;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.9);
+    background-color: #000;
     z-index: 100;
     display: flex;
     justify-content: center;
     align-items: center;
     color: white;
+    transition: opacity 1s ease-out;
+}
+
+#loading-screen.fade-out {
+    opacity: 0;
 }
 
 .loading-content {
     text-align: center;
+    max-width: 80%;
+}
+
+.loading-content h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    letter-spacing: 0.2em;
+    color: #9ab;
+    text-shadow: 0 0 10px #3366ff, 0 0 20px #3366ff;
+}
+
+.lore-text {
+    margin: 2rem 0;
+    line-height: 1.6;
+    color: #aaa;
+    font-family: 'Times New Roman', serif;
+    max-width: 600px;
+    margin: 0 auto 2rem auto;
+}
+
+.lore-text p {
+    margin-bottom: 0.8rem;
+    font-style: italic;
+    opacity: 0.8;
 }
 
 .spinner {
     width: 50px;
     height: 50px;
-    border: 5px solid rgba(255, 255, 255, 0.3);
+    border: 3px solid rgba(100, 100, 180, 0.2);
     border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
+    border-top-color: #3366ff;
+    border-left-color: #3366ff;
+    animation: spin 1.5s ease-in-out infinite;
     margin: 20px auto;
+    box-shadow: 0 0 20px #3366ff;
 }
 
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
 
-/* HUD */
+/* Flicker text effect */
+.flicker-text {
+    margin-top: 1rem;
+    color: #889;
+    font-family: monospace;
+    letter-spacing: 0.1em;
+    animation: textFlicker 4s infinite alternate;
+}
+
+@keyframes textFlicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        opacity: 0.8;
+        text-shadow: 0 0 4px #aaa;
+    }
+    20%, 22%, 24%, 55% {
+        opacity: 0.2;
+        text-shadow: none;
+    }
+}
+
+/* HUD with atmospheric styling */
 #hud {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    color: #fff;
+    top: 20px;
+    left: 20px;
+    color: #7a90cc;
     font-size: 14px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 5px #3366ff;
     pointer-events: none;
     z-index: 10;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+#hud:hover {
+    opacity: 1;
 }
 
 #fps-counter, #position-info {
-    margin-bottom: 5px;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 5px 10px;
-    border-radius: 5px;
+    margin-bottom: 8px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border-left: 2px solid #3366ff;
+    letter-spacing: 1px;
 }
 
-/* Touch Controls - Retro Arcade Style */
+/* Touch Controls - Retro Arcade Style with curse theme */
 #touch-controls {
     position: fixed;
     bottom: 0;
@@ -96,7 +161,7 @@ canvas {
     max-width: 100%;
 }
 
-/* Base button style - Arcade look */
+/* Base button style - Cursed look */
 .control-button {
     width: 55px;
     height: 55px;
@@ -104,82 +169,97 @@ canvas {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #fff;
+    color: #ccc;
     font-size: 22px;
     font-weight: bold;
-    text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+    text-shadow: 0 0 5px rgba(100, 120, 255, 0.7);
     pointer-events: auto;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     margin: 0 auto;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 5px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.3);
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(50, 100, 255, 0.2);
     position: relative;
     transition: all 0.07s ease-out;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(100, 100, 255, 0.3);
+    background: radial-gradient(circle at 30% 30%, #222, #111);
 }
 
 /* Movement buttons - blue theme */
 .control-button[id^="move"] {
-    background: radial-gradient(circle at 30% 30%, #4a8bf5, #215bcc);
-    border-color: #1d50b5;
+    background: radial-gradient(circle at 30% 30%, #161833, #090918);
+    border-color: #3344aa;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(50, 100, 255, 0.3);
 }
 
-/* Camera buttons - green theme */
+/* Camera buttons - red theme */
 .control-button[id^="camera"] {
-    background: radial-gradient(circle at 30% 30%, #4cda8e, #139853);
-    border-color: #0e7641;
+    background: radial-gradient(circle at 30% 30%, #331818, #180909);
+    border-color: #aa3333;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(255, 50, 50, 0.3);
 }
 
 /* Zoom buttons - purple theme */
 .control-button[id^="zoom"] {
-    background: radial-gradient(circle at 30% 30%, #b76aff, #7837c7);
-    border-color: #622ba3;
+    background: radial-gradient(circle at 30% 30%, #231833, #13091d);
+    border-color: #7722aa;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(150, 50, 255, 0.3);
 }
 
-/* Jump button - red theme */
+/* Jump button - green theme */
 .jump-button {
-    background: radial-gradient(circle at 30% 30%, #ff4654, #c92232) !important;
-    border-color: #a01d29 !important;
+    background: radial-gradient(circle at 30% 30%, #182818, #091809) !important;
+    border-color: #22aa33 !important;
     font-size: 16px !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    animation: pulse 1.5s infinite;
+    animation: pulse 2s infinite;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 5px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.3),
-                0 0 12px rgba(255, 70, 84, 0.5) !important;
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(50, 255, 100, 0.3) !important;
 }
 
-/* Active state for buttons */
+/* Active state for buttons - glowing effect */
 .control-button.active {
-    transform: translateY(4px);
+    transform: translateY(3px);
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                 0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5);
-    filter: brightness(1.2);
+                inset 0 0 10px rgba(0, 0, 0, 0.7),
+                0 0 20px rgba(100, 150, 255, 0.5);
+    filter: brightness(1.5);
 }
 
-/* Pulse animation for jump button */
+/* Pulse animation for jump button - ethereal glow */
 @keyframes pulse {
     0% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 5px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.3),
-                    0 0 8px rgba(255, 70, 84, 0.5); }
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(50, 255, 100, 0.4); }
     50% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                     0 5px 0 rgba(0, 0, 0, 0.8),
-                     inset 0 0 10px rgba(0, 0, 0, 0.3),
-                     0 0 20px rgba(255, 70, 84, 0.8); }
+                     0 4px 0 rgba(0, 0, 0, 0.8),
+                     inset 0 0 10px rgba(0, 0, 0, 0.5),
+                     0 0 25px rgba(50, 255, 100, 0.7); }
     100% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                      0 5px 0 rgba(0, 0, 0, 0.8),
-                      inset 0 0 10px rgba(0, 0, 0, 0.3),
-                      0 0 8px rgba(255, 70, 84, 0.5); }
+                      0 4px 0 rgba(0, 0, 0, 0.8),
+                      inset 0 0 10px rgba(0, 0, 0, 0.5),
+                      0 0 8px rgba(50, 255, 100, 0.4); }
 }
 
 /* Glow effect for buttons when hovered/touched */
 .control-button:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.2);
 }
 
 /* Improved responsive adjustments */
@@ -194,6 +274,10 @@ canvas {
         height: 50px;
         font-size: 20px;
     }
+    
+    .loading-content h1 {
+        font-size: 2.5rem;
+    }
 }
 
 @media (max-width: 600px) {
@@ -206,19 +290,19 @@ canvas {
         height: 45px;
         font-size: 18px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 8px rgba(0, 0, 0, 0.3);
+                    0 3px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 8px rgba(0, 0, 0, 0.5);
     }
     
-    .jump-button {
+    .    jump-button {
         font-size: 14px !important;
     }
     
     .control-button.active {
-        transform: translateY(3px);
+        transform: translateY(2px);
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 1px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 8px rgba(0, 0, 0, 0.5);
+                    inset 0 0 8px rgba(0, 0, 0, 0.7);
     }
 }
 
@@ -237,7 +321,7 @@ canvas {
         font-size: 16px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 3px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 6px rgba(0, 0, 0, 0.3);
+                    inset 0 0 6px rgba(0, 0, 0, 0.5);
     }
     
     .jump-button {
@@ -248,7 +332,15 @@ canvas {
         transform: translateY(2px);
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 1px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 6px rgba(0, 0, 0, 0.5);
+                    inset 0 0 6px rgba(0, 0, 0, 0.7);
+    }
+    
+    .loading-content h1 {
+        font-size: 1.8rem;
+    }
+    
+    .lore-text {
+        font-size: 0.9rem;
     }
 }
 
@@ -257,4 +349,48 @@ canvas {
     #touch-controls {
         display: block;
     }
+}
+
+/* Custom animation for the cursed atmosphere */
+.curse-pulse {
+    animation: cursePulse 4s infinite alternate ease-in-out;
+}
+
+@keyframes cursePulse {
+    0% { filter: brightness(1) blur(0); }
+    50% { filter: brightness(0.7) blur(1px); }
+    100% { filter: brightness(1) blur(0); }
+}
+
+/* Visual curse effect overlay */
+.curse-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 40, 0.3) 100%);
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+}
+
+/* Scanlines effect for retro/cursed feel */
+.scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        to bottom,
+        transparent 50%,
+        rgba(0, 0, 0, 0.1) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0.1;
+    mix-blend-mode: overlay;
 }
