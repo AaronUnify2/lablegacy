@@ -41,11 +41,11 @@ export class Renderer {
     
     setupLights() {
         // Ambient light - dimmer to emphasize torch lighting
-        const ambientLight = new THREE.AmbientLight(0x111111, 0.2);
+        const ambientLight = new THREE.AmbientLight(0x111111, 0.4);
         this.scene.add(ambientLight);
         
         // Directional light (sun-like) - removed or significantly dimmed for the cursed atmosphere
-        const directionalLight = new THREE.DirectionalLight(0x303050, 0.1); // Very dim, blue-tinted
+        const directionalLight = new THREE.DirectionalLight(0x303050, 0.3); // Very dim, blue-tinted
         directionalLight.position.set(50, 200, 100);
         directionalLight.castShadow = true;
         directionalLight.shadow.mapSize.width = 1024;
