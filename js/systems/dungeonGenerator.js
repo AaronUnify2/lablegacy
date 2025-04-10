@@ -17,7 +17,25 @@ export class DungeonGenerator {
             // Spacing settings
             minDistanceFromCenter: 20,
             maxDistanceFromCenter: 50
-        }
+        
+    createWall(group, x, y, width, height, depth, material) {
+        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+        const wallMesh = new THREE.Mesh(wallGeometry, material);
+        
+        wallMesh.position.set(
+            x + width / 2,
+            height / 2,
+            y + depth / 2
+        );
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        
+        return wallMesh;
+    }
+}
     
     placeKey(rooms) {
         // Choose a random room to place the key in
@@ -1274,6 +1292,141 @@ export class DungeonGenerator {
                 endWall: 'west'
             };
         } else {
+            // Horizontal wall (north or south wall)
+            
+            // Combine doorways and alcoves to find all gaps
+            const gaps = [...doorways];
+            
+            // Add alcoves as gaps
+            for (const alcove of alcoves) {
+                gaps.push({
+                    x: alcove.x,
+                    width: alcove.width * this.settings.gridSize,
+                    isAlcove: true
+                });
+            }
+            
+            // Sort gaps by X position
+            gaps.sort((a, b) => a.x - b.x);
+            
+            let currentX = x;
+            
+            for (const gap of gaps) {
+                // Create wall segment from current position to gap
+                if (gap.x > currentX) {
+                    const segmentWidth = gap.x - currentX;
+                    const wallMesh = this.createWall(
+                        group, 
+                        currentX, 
+                        y, 
+                        segmentWidth, 
+                        height, 
+                        depth, 
+                        material
+                    );
+                    group.colliderMeshes.push(wallMesh);
+                }
+                
+                // Skip the gap
+                currentX = gap.x + (gap.isAlcove ? gap.width : gap.width);
+            }
+            
+            // Create final wall segment after the last gap
+            const endX = x + width;
+            if (currentX < endX) {
+                const segmentWidth = endX - currentX;
+                const wallMesh = this.createWall(
+                    group, 
+                    currentX, 
+                    y, 
+                    segmentWidth, 
+                    height, 
+                    depth, 
+                    material
+                );
+                group.colliderMeshes.push(wallMesh);
+            }
+        }
+    }
+    
+    createWallWithDoorways(group, x, y, width, height, depth, material, doorways, isVertical = false) {
+        // Use the enhanced method with an empty alcoves array
+        this.createWallWithDoorwaysAndAlcoves(group, x, y, width, height, depth, material, doorways, [], isVertical);
+    }
+    
+    createCorridorMesh(group, corridor, floorMaterial, wallMaterial) {
+        // Create floor
+        const floorGeometry = new THREE.BoxGeometry(
+            corridor.width,
+            this.settings.floorHeight,
+            corridor.height
+        );
+        
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.position.set(
+            corridor.x + corridor.width / 2,
+            -this.settings.floorHeight / 2,
+            corridor.y + corridor.height / 2
+        );
+        floorMesh.receiveShadow = true;
+        
+        // Add collision to floor - prevents falling through
+        group.colliderMeshes.push(floorMesh);
+        group.add(floorMesh);
+        
+        // Create walls
+        if (corridor.type === 'horizontal') {
+            // Create north and south walls for horizontal corridors
+            // North wall
+            const northWallMesh = this.createWall(
+                group,
+                corridor.x,
+                corridor.y,
+                corridor.width,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(northWallMesh);
+            
+            // South wall
+            const southWallMesh = this.createWall(
+                group,
+                corridor.x,
+                corridor.y + corridor.height - this.settings.gridSize,
+                corridor.width,
+                this.settings.wallHeight,
+                this.settings.gridSize,
+                wallMaterial
+            );
+            group.colliderMeshes.push(southWallMesh);
+        } else if (corridor.type === 'vertical') {
+            // Create east and west walls for vertical corridors
+            // East wall
+            const eastWallMesh = this.createWall(
+                group,
+                corridor.x + corridor.width - this.settings.gridSize,
+                corridor.y,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                corridor.height,
+                wallMaterial
+            );
+            group.colliderMeshes.push(eastWallMesh);
+            
+            // West wall
+            const westWallMesh = this.createWall(
+                group,
+                corridor.x,
+                corridor.y,
+                this.settings.gridSize,
+                this.settings.wallHeight,
+                corridor.height,
+                wallMaterial
+            );
+            group.colliderMeshes.push(westWallMesh);
+        }
+    }
             // Primarily vertical
             const direction = room1CenterY < room2CenterY ? 'south' : 'north';
             const startRoom = direction === 'south' ? room1 : room2;
