@@ -924,55 +924,242 @@ export class DungeonGenerator {
                     // Add some random scratches
                     ctx.strokeStyle = 'rgba(90, 90, 90, 0.3)';
                     for (let i = 0; i < 20; i++) {
-                        ctx.beginPath();
-                        const x1 = Math.random() * width;
-                        const y1 = Math.random() * height;
-                        const x2 = x1 + (Math.random() * 30 - 15);
-                        const y2 = y1 + (Math.random() * 30 - 15);
-                        ctx.moveTo(x1, y1);
-                        ctx.lineTo(x2, y2);
-                        ctx.stroke();
-                    }
-                }
-            ),
-            
-            // Pillar texture
-            pillar: this.generateProceduralTexture(
-                (ctx, width, height) => {
-                    // Base stone color
-                    ctx.fillStyle = '#444444';
-                    ctx.fillRect(0, 0, width, height);
+setupTextures() {
+    // We'll use procedural textures for now, but you could load image textures
+    this.textures = {
+        // Generate an ancient brick texture procedurally
+        ancientBrick: this.generateProceduralTexture(
+            (ctx, width, height) => {
+                // Dark base for mortar
+                ctx.fillStyle = '#222220';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Brick parameters
+                const brickHeight = 20;
+                const brickWidth = 40;
+                const brickGap = 4;  // Mortar thickness
+                
+                // Draw bricks in a staggered pattern
+                for (let y = 0; y < height; y += brickHeight + brickGap) {
+                    // Offset every other row
+                    const rowOffset = (Math.floor(y / (brickHeight + brickGap)) % 2) * (brickWidth / 2);
                     
-                    // Add vertical striations
-                    for (let x = 0; x < width; x += 2) {
-                        const shade = Math.random() * 20 - 10;
-                        ctx.fillStyle = `rgba(80, 80, 80, ${Math.random() * 0.2})`;
-                        ctx.fillRect(x, 0, 2, height);
-                    }
-                    
-                    // Add some horizontal cracks
-                    ctx.strokeStyle = 'rgba(30, 30, 30, 0.5)';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i < 5; i++) {
-                        const y = Math.random() * height;
-                        ctx.beginPath();
-                        ctx.moveTo(0, y);
+                    for (let x = -rowOffset; x < width; x += brickWidth + brickGap) {
+                        // Base brick color - varying hues of ancient stone colors
+                        const hueVariation = Math.random() * 20;
+                        const baseColor = Math.random() < 0.7 ? 
+                            `rgb(${80 + hueVariation}, ${65 + hueVariation * 0.8}, ${55 + hueVariation * 0.6})` : // Regular stone
+                            `rgb(${60 + hueVariation}, ${50 + hueVariation * 0.7}, ${45 + hueVariation * 0.5})`; // Darker stone
                         
-                        // Create a jagged line
-                        let x = 0;
-                        while (x < width) {
-                            const stepX = Math.random() * 10 + 5;
-                            const stepY = Math.random() * 6 - 3;
-                            x += stepX;
-                            ctx.lineTo(x, y + stepY);
+                        ctx.fillStyle = baseColor;
+                        
+                        // Draw slightly irregular bricks
+                        const brickWidthVariation = Math.random() * 5 - 2.5;
+                        const brickHeightVariation = Math.random() * 3 - 1.5;
+                        ctx.fillRect(
+                            x, 
+                            y, 
+                            brickWidth + brickWidthVariation, 
+                            brickHeight + brickHeightVariation
+                        );
+                        
+                        // Add texture and wear to bricks
+                        ctx.save();
+                        ctx.globalAlpha = 0.4;
+                        
+                        // Add cracks and damage
+                        if (Math.random() < 0.4) {
+                            const crackCount = Math.floor(Math.random() * 3) + 1;
+                            ctx.strokeStyle = 'rgba(30, 25, 20, 0.6)';
+                            ctx.lineWidth = 1;
+                            
+                            for (let i = 0; i < crackCount; i++) {
+                                ctx.beginPath();
+                                const startX = x + Math.random() * brickWidth;
+                                const startY = y + Math.random() * brickHeight;
+                                ctx.moveTo(startX, startY);
+                                
+                                // Create jagged crack path
+                                let currentX = startX;
+                                let currentY = startY;
+                                const pathSegments = Math.floor(Math.random() * 3) + 2;
+                                
+                                for (let j = 0; j < pathSegments; j++) {
+                                    const angleVariation = (Math.random() - 0.5) * Math.PI * 0.5;
+                                    const length = Math.random() * 10 + 5;
+                                    currentX += Math.cos(angleVariation) * length;
+                                    currentY += Math.sin(angleVariation) * length;
+                                    ctx.lineTo(currentX, currentY);
+                                }
+                                
+                                ctx.stroke();
+                            }
                         }
                         
-                        ctx.stroke();
+                        // Add weathering and moss on some bricks
+                        if (Math.random() < 0.3) {
+                            ctx.fillStyle = 'rgba(40, 60, 30, 0.2)'; // Subtle moss
+                            const mossSize = Math.random() * 15 + 5;
+                            const mossX = x + Math.random() * (brickWidth - mossSize);
+                            const mossY = y + Math.random() * (brickHeight - mossSize);
+                            
+                            ctx.beginPath();
+                            ctx.arc(mossX, mossY, mossSize, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        
+                        // Add texture noise to each brick
+                        for (let tx = 0; tx < brickWidth; tx += 2) {
+                            for (let ty = 0; ty < brickHeight; ty += 2) {
+                                if (Math.random() < 0.3) {
+                                    const noiseValue = Math.random() * 20 - 10;
+                                    ctx.fillStyle = `rgba(${noiseValue}, ${noiseValue}, ${noiseValue}, 0.1)`;
+                                    ctx.fillRect(x + tx, y + ty, 2, 2);
+                                }
+                            }
+                        }
+                        
+                        ctx.restore();
                     }
                 }
-            )
-        };
-    }
+                
+                // Add overall ancient patina and wear
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.fillStyle = 'rgba(40, 35, 30, 0.2)';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Add some subtle dark stains and discoloration
+                for (let i = 0; i < 10; i++) {
+                    const stainX = Math.random() * width;
+                    const stainY = Math.random() * height;
+                    const stainSize = Math.random() * 100 + 50;
+                    
+                    const gradient = ctx.createRadialGradient(
+                        stainX, stainY, 0,
+                        stainX, stainY, stainSize
+                    );
+                    
+                    gradient.addColorStop(0, 'rgba(10, 5, 0, 0.3)');
+                    gradient.addColorStop(1, 'rgba(10, 5, 0, 0)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(stainX - stainSize, stainY - stainSize, stainSize * 2, stainSize * 2);
+                }
+            }
+        ),
+        
+        // Keep the other textures as they are in the original code
+        mosaicFloor: this.generateProceduralTexture(
+            (ctx, width, height) => {
+                // Background
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw mosaic tiles
+                const tileSize = 20;
+                const colors = [
+                    '#395A78', // Blue
+                    '#5E3978', // Purple
+                    '#78395A', // Magenta
+                    '#604C2A', // Brown
+                    '#2A604C', // Teal
+                ];
+                
+                for (let x = 0; x < width; x += tileSize) {
+                    for (let y = 0; y < height; y += tileSize) {
+                        const colorIndex = Math.floor(Math.random() * colors.length);
+                        
+                        // Add some variation to tile color
+                        const baseColor = colors[colorIndex];
+                        const r = parseInt(baseColor.substr(1, 2), 16);
+                        const g = parseInt(baseColor.substr(3, 2), 16);
+                        const b = parseInt(baseColor.substr(5, 2), 16);
+                        
+                        const variation = 15;
+                        const newR = Math.max(0, Math.min(255, r + (Math.random() * variation * 2 - variation)));
+                        const newG = Math.max(0, Math.min(255, g + (Math.random() * variation * 2 - variation)));
+                        const newB = Math.max(0, Math.min(255, b + (Math.random() * variation * 2 - variation)));
+                        
+                        ctx.fillStyle = `rgb(${newR}, ${newG}, ${newB})`;
+                        
+                        // Draw tile with small gap
+                        ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
+                    }
+                }
+            }
+        ),
+        
+        // Corridor floor texture
+        corridorFloor: this.generateProceduralTexture(
+            (ctx, width, height) => {
+                // Dark base
+                ctx.fillStyle = '#222222';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Add worn path effect down the middle
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, 'rgba(50, 50, 50, 0.8)');
+                gradient.addColorStop(0.5, 'rgba(60, 60, 60, 0.9)');
+                gradient.addColorStop(1, 'rgba(50, 50, 50, 0.8)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(width * 0.3, 0, width * 0.4, height);
+                
+                // Add some random scratches
+                ctx.strokeStyle = 'rgba(90, 90, 90, 0.3)';
+                for (let i = 0; i < 20; i++) {
+                    ctx.beginPath();
+                    const x1 = Math.random() * width;
+                    const y1 = Math.random() * height;
+                    const x2 = x1 + (Math.random() * 30 - 15);
+                    const y2 = y1 + (Math.random() * 30 - 15);
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+            }
+        ),
+        
+        // Pillar texture
+        pillar: this.generateProceduralTexture(
+            (ctx, width, height) => {
+                // Base stone color
+                ctx.fillStyle = '#444444';
+                ctx.fillRect(0, 0, width, height);
+                
+                // Add vertical striations
+                for (let x = 0; x < width; x += 2) {
+                    const shade = Math.random() * 20 - 10;
+                    ctx.fillStyle = `rgba(80, 80, 80, ${Math.random() * 0.2})`;
+                    ctx.fillRect(x, 0, 2, height);
+                }
+                
+                // Add some horizontal cracks
+                ctx.strokeStyle = 'rgba(30, 30, 30, 0.5)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i < 5; i++) {
+                    const y = Math.random() * height;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    
+                    // Create a jagged line
+                    let x = 0;
+                    while (x < width) {
+                        const stepX = Math.random() * 10 + 5;
+                        const stepY = Math.random() * 6 - 3;
+                        x += stepX;
+                        ctx.lineTo(x, y + stepY);
+                    }
+                    
+                    ctx.stroke();
+                }
+            }
+        )
+    };
+}
+
+
+
     
     // Helper to generate procedural textures
     generateProceduralTexture(drawFunction, size = 512) {
@@ -994,91 +1181,92 @@ export class DungeonGenerator {
     
     // Create materials with textures
     createMaterials() {
-        return {
-            central: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x666666,
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0xaaaaaa,
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x888888,
-                })
-            },
-            cardinal: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x442222, // Reddish tint
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x884444, // Reddish tint
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x664444, // Reddish tint
-                })
-            },
-            corner: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.mosaicFloor,
-                    roughness: 0.7,
-                    metalness: 0.2,
-                    color: 0x442244, // Purple tint
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x664466, // Purple tint
-                }),
-                pillar: new THREE.MeshStandardMaterial({
-                    map: this.textures.pillar,
-                    roughness: 0.8,
-                    metalness: 0.3,
-                    color: 0x553355, // Purple tint
-                })
-            },
-            corridor: {
-                floor: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.corridorFloor,
-                    roughness: 0.8,
-                    metalness: 0.1,
-                    color: 0x333333,
-                }),
-                wall: new THREE.MeshStandardMaterial({ 
-                    map: this.textures.sandstone,
-                    roughness: 0.9,
-                    metalness: 0.1,
-                    color: 0x555555,
-                })
-            },
-            key: new THREE.MeshStandardMaterial({
-                color: 0xffcc00,
-                roughness: 0.3,
-                metalness: 0.8,
-                emissive: 0xffcc00,
-                emissiveIntensity: 0.5
+    return {
+        central: {
+            floor: new THREE.MeshStandardMaterial({ 
+                map: this.textures.mosaicFloor,
+                roughness: 0.7,
+                metalness: 0.2,
+                color: 0x666666,
+            }),
+            wall: new THREE.MeshStandardMaterial({ 
+                map: this.textures.ancientBrick,  // Changed from sandstone to ancientBrick
+                roughness: 0.9,
+                metalness: 0.1,
+                color: 0xaaaaaa,
+            }),
+            pillar: new THREE.MeshStandardMaterial({
+                map: this.textures.pillar,
+                roughness: 0.8,
+                metalness: 0.3,
+                color: 0x888888,
             })
-        };
+        },
+        cardinal: {
+            floor: new THREE.MeshStandardMaterial({ 
+                map: this.textures.mosaicFloor,
+                roughness: 0.7,
+                metalness: 0.2,
+                color: 0x442222, // Reddish tint
+            }),
+            wall: new THREE.MeshStandardMaterial({ 
+                map: this.textures.ancientBrick,  // Changed from sandstone to ancientBrick
+                roughness: 0.9,
+                metalness: 0.1,
+                color: 0x884444, // Reddish tint
+            }),
+            pillar: new THREE.MeshStandardMaterial({
+                map: this.textures.pillar,
+                roughness: 0.8,
+                metalness: 0.3,
+                color: 0x664444, // Reddish tint
+            })
+        },
+        corner: {
+            floor: new THREE.MeshStandardMaterial({ 
+                map: this.textures.mosaicFloor,
+                roughness: 0.7,
+                metalness: 0.2,
+                color: 0x442244, // Purple tint
+            }),
+            wall: new THREE.MeshStandardMaterial({ 
+                map: this.textures.ancientBrick,  // Changed from sandstone to ancientBrick
+                roughness: 0.9,
+                metalness: 0.1,
+                color: 0x664466, // Purple tint
+            }),
+            pillar: new THREE.MeshStandardMaterial({
+                map: this.textures.pillar,
+                roughness: 0.8,
+                metalness: 0.3,
+                color: 0x553355, // Purple tint
+            })
+        },
+        corridor: {
+            floor: new THREE.MeshStandardMaterial({ 
+                map: this.textures.corridorFloor,
+                roughness: 0.8,
+                metalness: 0.1,
+                color: 0x333333,
+            }),
+            wall: new THREE.MeshStandardMaterial({ 
+                map: this.textures.ancientBrick,  // Changed from sandstone to ancientBrick
+                roughness: 0.9,
+                metalness: 0.1,
+                color: 0x555555,
+            })
+        },
+        key: new THREE.MeshStandardMaterial({
+            color: 0xffcc00,
+            roughness: 0.3,
+            metalness: 0.8,
+            emissive: 0xffcc00,
+            emissiveIntensity: 0.5
+        })
+    };
     }
-    
+
+                        
     // Add fog to scene
     addFogToScene() {
         // This needs to be called outside this class - will be returned as part of
