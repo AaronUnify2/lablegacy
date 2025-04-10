@@ -73,7 +73,8 @@ export class DungeonGenerator {
             height: size,
             connections: [],
             doorways: [],
-            type: 'central'
+            type: 'central',
+            alcoves: []
         };
     }
     
@@ -137,18 +138,239 @@ export class DungeonGenerator {
                     break;
             }
             
-            cardinalRooms.push({
+            const room = {
                 x: roomX,
                 y: roomY,
                 width: roomWidth,
                 height: roomHeight,
                 connections: [],
                 doorways: [],
-                type: direction
-            });
+                type: direction,
+                alcoves: []
+            };
+            
+            // Add alcoves to the room
+            this.addAlcovesToRoom(room, direction);
+            
+            cardinalRooms.push(room);
         }
         
         return cardinalRooms;
+    }
+    
+    // Add alcoves to the outer edges of rooms
+    addAlcovesToRoom(room, roomDirection) {
+        // Chance to add alcoves to each available wall
+        const alcoveChance = 0.4; // 40% chance per wall
+        
+        // Potential alcove walls based on room direction
+        // Only add alcoves to walls that face away from the central room
+        const availableWalls = [];
+        
+        switch (roomDirection) {
+            case 'north':
+                availableWalls.push('north', 'east', 'west');
+                break;
+            case 'east':
+                availableWalls.push('east', 'north', 'south');
+                break;
+            case 'south':
+                availableWalls.push('south', 'east', 'west');
+                break;
+            case 'west':
+                availableWalls.push('west', 'north', 'south');
+                break;
+            // For corner rooms, only add alcoves to the outer walls
+            case 'northeast':
+                availableWalls.push('north', 'east');
+                break;
+            case 'southeast':
+                availableWalls.push('east', 'south');
+                break;
+            case 'southwest':
+                availableWalls.push('south', 'west');
+                break;
+            case 'northwest':
+                availableWalls.push('north', 'west');
+                break;
+            case 'central':
+                return; // No alcoves for central room
+        }
+        
+        // For each available wall, decide if we add an alcove
+        for (const wall of availableWalls) {
+            if (Math.random() < alcoveChance) {
+                // Create an alcove
+                const alcove = this.createAlcove(room, wall);
+                if (alcove) {
+                    room.alcoves.push(alcove);
+                }
+            }
+        }
+    }
+    
+    // Create an alcove extending from a specific wall of a room
+    createAlcove(room, wall) {
+        // Alcove size: 20-40% of room width/height
+        const minSize = 0.2;
+        const maxSize = 0.4;
+        
+        let alcoveX, alcoveY, alcoveWidth, alcoveHeight;
+        
+        switch (wall) {
+            case 'north':
+                // Alcove extends north (top) from the room
+                alcoveWidth = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.width);
+                alcoveHeight = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.height);
+                
+                // Position alcove randomly along the north wall
+                alcoveX = room.x + Math.floor(Math.random() * (room.width - alcoveWidth));
+                alcoveY = room.y - alcoveHeight;
+                break;
+                
+            case 'east':
+                // Alcove extends east (right) from the room
+                alcoveWidth = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.width);
+                alcoveHeight = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.height);
+                
+                // Position alcove randomly along the east wall
+                alcoveX = room.x + room.width;
+                alcoveY = room.y + Math.floor(Math.random() * (room.height - alcoveHeight));
+                break;
+                
+            case 'south':
+                // Alcove extends south (bottom) from the room
+                alcoveWidth = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.width);
+                alcoveHeight = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.height);
+                
+                // Position alcove randomly along the south wall
+                alcoveX = room.x + Math.floor(Math.random() * (room.width - alcoveWidth));
+                alcoveY = room.y + room.height;
+                break;
+                
+            case 'west':
+                // Alcove extends west (left) from the room
+                alcoveWidth = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.width);
+                alcoveHeight = Math.floor((minSize + Math.random() * (maxSize - minSize)) * room.height);
+                
+                // Position alcove randomly along the west wall
+                alcoveX = room.x - alcoveWidth;
+                alcoveY = room.y + Math.floor(Math.random() * (room.height - alcoveHeight));
+                break;
+                
+            default:
+                return null;
+        }
+        
+        return {
+            x: alcoveX,
+            y: alcoveY,
+            width: alcoveWidth,
+            height: alcoveHeight,
+            wall: wall
+        };
+    }
+    
+    // Generate corner rooms with 50% chance of spawning each
+    generateCornerRooms(cardinalRooms) {
+        const cornerRooms = [];
+        
+        // Get reference to cardinal rooms by type
+        const northRoom = cardinalRooms.find(room => room.type === 'north');
+        const eastRoom = cardinalRooms.find(room => room.type === 'east');
+        const southRoom = cardinalRooms.find(room => room.type === 'south');
+        const westRoom = cardinalRooms.find(room => room.type === 'west');
+        
+        // Define corner positions and their parent cardinal rooms
+        const cornerConfigs = [
+            { type: 'northeast', cardinalRoom: northRoom, direction: 'east' },
+            { type: 'southeast', cardinalRoom: eastRoom, direction: 'south' },
+            { type: 'southwest', cardinalRoom: southRoom, direction: 'west' },
+            { type: 'northwest', cardinalRoom: westRoom, direction: 'north' }
+        ];
+        
+        // Generate each corner room with 50% chance
+        for (const config of cornerConfigs) {
+            // 50% chance to create this corner room
+            if (Math.random() < 0.5) {
+                const cornerRoom = this.createCornerRoom(config.cardinalRoom, config.direction, config.type);
+                if (cornerRoom) {
+                    cornerRooms.push(cornerRoom);
+                }
+            }
+        }
+        
+        return cornerRooms;
+    }
+    
+    // Create a corner room extending from a cardinal room
+    createCornerRoom(cardinalRoom, direction, type) {
+        if (!cardinalRoom) return null;
+        
+        // Room size should be smaller than cardinal rooms
+        const size = Math.floor(Math.random() * 
+            (this.settings.maxRoomSize - this.settings.minRoomSize) / 2 + 
+            this.settings.minRoomSize / 1.5);
+        
+        // Distance from cardinal room
+        const distance = this.settings.minDistanceFromCenter / 2 + 
+            Math.random() * (this.settings.maxDistanceFromCenter - this.settings.minDistanceFromCenter) / 2;
+        
+        let roomX, roomY, roomWidth, roomHeight;
+        
+        switch (direction) {
+            case 'east':
+                // Room extends to the east of the cardinal room
+                roomWidth = size;
+                roomHeight = size;
+                roomX = cardinalRoom.x + cardinalRoom.width + distance;
+                roomY = cardinalRoom.y - roomHeight / 2 + cardinalRoom.height / 2;
+                break;
+                
+            case 'south':
+                // Room extends to the south of the cardinal room
+                roomWidth = size;
+                roomHeight = size;
+                roomX = cardinalRoom.x - roomWidth / 2 + cardinalRoom.width / 2;
+                roomY = cardinalRoom.y + cardinalRoom.height + distance;
+                break;
+                
+            case 'west':
+                // Room extends to the west of the cardinal room
+                roomWidth = size;
+                roomHeight = size;
+                roomX = cardinalRoom.x - roomWidth - distance;
+                roomY = cardinalRoom.y - roomHeight / 2 + cardinalRoom.height / 2;
+                break;
+                
+            case 'north':
+                // Room extends to the north of the cardinal room
+                roomWidth = size;
+                roomHeight = size;
+                roomX = cardinalRoom.x - roomWidth / 2 + cardinalRoom.width / 2;
+                roomY = cardinalRoom.y - roomHeight - distance;
+                break;
+                
+            default:
+                return null;
+        }
+        
+        const room = {
+            x: roomX,
+            y: roomY,
+            width: roomWidth,
+            height: roomHeight,
+            connections: [],
+            doorways: [],
+            type: type,
+            parentRoom: cardinalRoom,
+            alcoves: []
+        };
+        
+        // Add alcoves to the corner room
+        this.addAlcovesToRoom(room, type);
+        
+        return room;
     }
     
     connectRoomsWithCorridors(centralRoom, cardinalRooms) {
@@ -264,200 +486,6 @@ export class DungeonGenerator {
         }
         
         return corridors;
-    }
-    
-    createDoorways(corridor) {
-        const startRoom = corridor.startRoom;
-        const endRoom = corridor.endRoom;
-        
-        // Create doorway specs based on corridor type and walls
-        if (corridor.type === 'horizontal') {
-            // For horizontal corridors
-            if (corridor.startWall === 'east') {
-                // Doorway on east wall of start room
-                startRoom.doorways.push({
-                    isEastWall: true,
-                    isNorthWall: false,
-                    x: startRoom.x + startRoom.width - this.settings.gridSize,
-                    y: corridor.y,
-                    width: this.settings.gridSize,
-                    height: corridor.height
-                });
-            } else if (corridor.startWall === 'west') {
-                // Doorway on west wall of start room
-                startRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: false,
-                    x: startRoom.x,
-                    y: corridor.y,
-                    width: this.settings.gridSize,
-                    height: corridor.height
-                });
-            }
-            
-            if (corridor.endWall === 'east') {
-                // Doorway on east wall of end room
-                endRoom.doorways.push({
-                    isEastWall: true,
-                    isNorthWall: false,
-                    x: endRoom.x + endRoom.width - this.settings.gridSize,
-                    y: corridor.y,
-                    width: this.settings.gridSize,
-                    height: corridor.height
-                });
-            } else if (corridor.endWall === 'west') {
-                // Doorway on west wall of end room
-                endRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: false,
-                    x: endRoom.x,
-                    y: corridor.y,
-                    width: this.settings.gridSize,
-                    height: corridor.height
-                });
-            }
-        } else if (corridor.type === 'vertical') {
-            // For vertical corridors
-            if (corridor.startWall === 'north') {
-                // Doorway on north wall of start room
-                startRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: true,
-                    x: corridor.x,
-                    y: startRoom.y,
-                    width: corridor.width,
-                    height: this.settings.gridSize
-                });
-            } else if (corridor.startWall === 'south') {
-                // Doorway on south wall of start room
-                startRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: false,
-                    x: corridor.x,
-                    y: startRoom.y + startRoom.height - this.settings.gridSize,
-                    width: corridor.width,
-                    height: this.settings.gridSize
-                });
-            }
-            
-            if (corridor.endWall === 'north') {
-                // Doorway on north wall of end room
-                endRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: true,
-                    x: corridor.x,
-                    y: endRoom.y,
-                    width: corridor.width,
-                    height: this.settings.gridSize
-                });
-            } else if (corridor.endWall === 'south') {
-                // Doorway on south wall of end room
-                endRoom.doorways.push({
-                    isEastWall: false,
-                    isNorthWall: false,
-                    x: corridor.x,
-                    y: endRoom.y + endRoom.height - this.settings.gridSize,
-                    width: corridor.width,
-                    height: this.settings.gridSize
-                });
-            }
-        }
-    }
-    
-    // Generate corner rooms with 50% chance of spawning each
-    generateCornerRooms(cardinalRooms) {
-        const cornerRooms = [];
-        
-        // Get reference to cardinal rooms by type
-        const northRoom = cardinalRooms.find(room => room.type === 'north');
-        const eastRoom = cardinalRooms.find(room => room.type === 'east');
-        const southRoom = cardinalRooms.find(room => room.type === 'south');
-        const westRoom = cardinalRooms.find(room => room.type === 'west');
-        
-        // Define corner positions and their parent cardinal rooms
-        const cornerConfigs = [
-            { type: 'northeast', cardinalRoom: northRoom, direction: 'east' },
-            { type: 'southeast', cardinalRoom: eastRoom, direction: 'south' },
-            { type: 'southwest', cardinalRoom: southRoom, direction: 'west' },
-            { type: 'northwest', cardinalRoom: westRoom, direction: 'north' }
-        ];
-        
-        // Generate each corner room with 50% chance
-        for (const config of cornerConfigs) {
-            // 50% chance to create this corner room
-            if (Math.random() < 0.5) {
-                const cornerRoom = this.createCornerRoom(config.cardinalRoom, config.direction, config.type);
-                if (cornerRoom) {
-                    cornerRooms.push(cornerRoom);
-                }
-            }
-        }
-        
-        return cornerRooms;
-    }
-    
-    // Create a corner room extending from a cardinal room
-    createCornerRoom(cardinalRoom, direction, type) {
-        if (!cardinalRoom) return null;
-        
-        // Room size should be smaller than cardinal rooms
-        const size = Math.floor(Math.random() * 
-            (this.settings.maxRoomSize - this.settings.minRoomSize) / 2 + 
-            this.settings.minRoomSize / 1.5);
-        
-        // Distance from cardinal room
-        const distance = this.settings.minDistanceFromCenter / 2 + 
-            Math.random() * (this.settings.maxDistanceFromCenter - this.settings.minDistanceFromCenter) / 2;
-        
-        let roomX, roomY, roomWidth, roomHeight;
-        
-        switch (direction) {
-            case 'east':
-                // Room extends to the east of the cardinal room
-                roomWidth = size;
-                roomHeight = size;
-                roomX = cardinalRoom.x + cardinalRoom.width + distance;
-                roomY = cardinalRoom.y - roomHeight / 2 + cardinalRoom.height / 2;
-                break;
-                
-            case 'south':
-                // Room extends to the south of the cardinal room
-                roomWidth = size;
-                roomHeight = size;
-                roomX = cardinalRoom.x - roomWidth / 2 + cardinalRoom.width / 2;
-                roomY = cardinalRoom.y + cardinalRoom.height + distance;
-                break;
-                
-            case 'west':
-                // Room extends to the west of the cardinal room
-                roomWidth = size;
-                roomHeight = size;
-                roomX = cardinalRoom.x - roomWidth - distance;
-                roomY = cardinalRoom.y - roomHeight / 2 + cardinalRoom.height / 2;
-                break;
-                
-            case 'north':
-                // Room extends to the north of the cardinal room
-                roomWidth = size;
-                roomHeight = size;
-                roomX = cardinalRoom.x - roomWidth / 2 + cardinalRoom.width / 2;
-                roomY = cardinalRoom.y - roomHeight - distance;
-                break;
-                
-            default:
-                return null;
-        }
-        
-        return {
-            x: roomX,
-            y: roomY,
-            width: roomWidth,
-            height: roomHeight,
-            connections: [],
-            doorways: [],
-            type: type,
-            parentRoom: cardinalRoom
-        };
     }
     
     // Connect corner rooms to their parent cardinal rooms
@@ -606,6 +634,104 @@ export class DungeonGenerator {
         }
     }
     
+    createDoorways(corridor) {
+        const startRoom = corridor.startRoom;
+        const endRoom = corridor.endRoom;
+        
+        // Create doorway specs based on corridor type and walls
+        if (corridor.type === 'horizontal') {
+            // For horizontal corridors
+            if (corridor.startWall === 'east') {
+                // Doorway on east wall of start room
+                startRoom.doorways.push({
+                    isEastWall: true,
+                    isNorthWall: false,
+                    x: startRoom.x + startRoom.width - this.settings.gridSize,
+                    y: corridor.y,
+                    width: this.settings.gridSize,
+                    height: corridor.height
+                });
+            } else if (corridor.startWall === 'west') {
+                // Doorway on west wall of start room
+                startRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: false,
+                    x: startRoom.x,
+                    y: corridor.y,
+                    width: this.settings.gridSize,
+                    height: corridor.height
+                });
+            }
+            
+            if (corridor.endWall === 'east') {
+                // Doorway on east wall of end room
+                endRoom.doorways.push({
+                    isEastWall: true,
+                    isNorthWall: false,
+                    x: endRoom.x + endRoom.width - this.settings.gridSize,
+                    y: corridor.y,
+                    width: this.settings.gridSize,
+                    height: corridor.height
+                });
+            } else if (corridor.endWall === 'west') {
+                // Doorway on west wall of end room
+                endRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: false,
+                    x: endRoom.x,
+                    y: corridor.y,
+                    width: this.settings.gridSize,
+                    height: corridor.height
+                });
+            }
+        } else if (corridor.type === 'vertical') {
+            // For vertical corridors
+            if (corridor.startWall === 'north') {
+                // Doorway on north wall of start room
+                startRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: true,
+                    x: corridor.x,
+                    y: startRoom.y,
+                    width: corridor.width,
+                    height: this.settings.gridSize
+                });
+            } else if (corridor.startWall === 'south') {
+                // Doorway on south wall of start room
+                startRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: false,
+                    x: corridor.x,
+                    y: startRoom.y + startRoom.height - this.settings.gridSize,
+                    width: corridor.width,
+                    height: this.settings.gridSize
+                });
+            }
+            
+            if (corridor.endWall === 'north') {
+                // Doorway on north wall of end room
+                endRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: true,
+                    x: corridor.x,
+                    y: endRoom.y,
+                    width: corridor.width,
+                    height: this.settings.gridSize
+                });
+            } else if (corridor.endWall === 'south') {
+                // Doorway on south wall of end room
+                endRoom.doorways.push({
+                    isEastWall: false,
+                    isNorthWall: false,
+                    x: corridor.x,
+                    y: endRoom.y + endRoom.height - this.settings.gridSize,
+                    width: corridor.width,
+                    height: this.settings.gridSize
+                });
+            }
+        }
+    }
+    
     placeKey(rooms) {
         // Choose a random room to place the key in
         const randomRoom = rooms[Math.floor(Math.random() * rooms.length)];
@@ -684,7 +810,7 @@ export class DungeonGenerator {
     }
     
     createRoomMesh(group, room, floorMaterial, wallMaterial) {
-        // Create floor
+        // Create main room floor
         const floorGeometry = new THREE.BoxGeometry(
             room.width * this.settings.gridSize,
             this.settings.floorHeight,
@@ -703,16 +829,212 @@ export class DungeonGenerator {
         group.colliderMeshes.push(floorMesh);
         group.add(floorMesh);
         
-        // Create walls with doorways
+        // Create walls with doorways for the main room
         this.createRoomWalls(group, room, wallMaterial);
+        
+        // Create alcoves if the room has any
+        if (room.alcoves && room.alcoves.length > 0) {
+            this.createAlcoveMeshes(group, room, floorMaterial, wallMaterial);
+        }
+    }
+    
+    // Create meshes for all alcoves attached to a room
+    createAlcoveMeshes(group, room, floorMaterial, wallMaterial) {
+        for (const alcove of room.alcoves) {
+            // Create alcove floor
+            const alcoveFloorGeometry = new THREE.BoxGeometry(
+                alcove.width * this.settings.gridSize,
+                this.settings.floorHeight,
+                alcove.height * this.settings.gridSize
+            );
+            
+            const alcoveFloorMesh = new THREE.Mesh(alcoveFloorGeometry, floorMaterial);
+            alcoveFloorMesh.position.set(
+                alcove.x + (alcove.width * this.settings.gridSize) / 2,
+                -this.settings.floorHeight / 2,
+                alcove.y + (alcove.height * this.settings.gridSize) / 2
+            );
+            alcoveFloorMesh.receiveShadow = true;
+            
+            // Add collision to alcove floor
+            group.colliderMeshes.push(alcoveFloorMesh);
+            group.add(alcoveFloorMesh);
+            
+            // Create alcove walls
+            this.createAlcoveWalls(group, room, alcove, wallMaterial);
+        }
+    }
+    
+    // Create walls for an alcove
+    createAlcoveWalls(group, room, alcove, wallMaterial) {
+        const { x, y, width, height, wall } = alcove;
+        
+        // Create openings between room and alcove
+        switch (wall) {
+            case 'north':
+                // North alcove: create east, west, and north walls
+                // East wall
+                const northAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveEastWall);
+                
+                // West wall
+                const northAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveWestWall);
+                
+                // North wall
+                const northAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(northAlcoveNorthWall);
+                break;
+                
+            case 'east':
+                // East alcove: create north, south, and east walls
+                // North wall
+                const eastAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveNorthWall);
+                
+                // South wall
+                const eastAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveSouthWall);
+                
+                // East wall
+                const eastAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(eastAlcoveEastWall);
+                break;
+                
+            case 'south':
+                // South alcove: create east, west, and south walls
+                // East wall
+                const southAlcoveEastWall = this.createWall(
+                    group,
+                    x + width * this.settings.gridSize - this.settings.gridSize,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveEastWall);
+                
+                // West wall
+                const southAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveWestWall);
+                
+                // South wall
+                const southAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(southAlcoveSouthWall);
+                break;
+                
+            case 'west':
+                // West alcove: create north, south, and west walls
+                // North wall
+                const westAlcoveNorthWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveNorthWall);
+                
+                // South wall
+                const westAlcoveSouthWall = this.createWall(
+                    group,
+                    x,
+                    y + height * this.settings.gridSize - this.settings.gridSize,
+                    width * this.settings.gridSize,
+                    this.settings.wallHeight,
+                    this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveSouthWall);
+                
+                // West wall
+                const westAlcoveWestWall = this.createWall(
+                    group,
+                    x,
+                    y,
+                    this.settings.gridSize,
+                    this.settings.wallHeight,
+                    height * this.settings.gridSize,
+                    wallMaterial
+                );
+                group.colliderMeshes.push(westAlcoveWestWall);
+                break;
+        }
     }
     
     createRoomWalls(group, room, wallMaterial) {
         // Get doorway info for this room
         const doorways = room.doorways || [];
         
-        // Create north wall with possible doorway gaps
-        this.createWallWithDoorways(
+        // Create north wall with possible doorway gaps and alcove openings
+        this.createWallWithDoorwaysAndAlcoves(
             group,
             room.x,
             room.y,
@@ -720,11 +1042,13 @@ export class DungeonGenerator {
             this.settings.wallHeight,
             this.settings.gridSize,
             wallMaterial,
-            doorways.filter(d => d.isNorthWall)
+            doorways.filter(d => d.isNorthWall),
+            room.alcoves ? room.alcoves.filter(a => a.wall === 'north') : [],
+            false
         );
         
-        // Create south wall with possible doorway gaps
-        this.createWallWithDoorways(
+        // Create south wall with possible doorway gaps and alcove openings
+        this.createWallWithDoorwaysAndAlcoves(
             group,
             room.x,
             room.y + room.height * this.settings.gridSize - this.settings.gridSize,
@@ -732,11 +1056,13 @@ export class DungeonGenerator {
             this.settings.wallHeight,
             this.settings.gridSize,
             wallMaterial,
-            doorways.filter(d => !d.isNorthWall && !d.isEastWall)
+            doorways.filter(d => !d.isNorthWall && !d.isEastWall),
+            room.alcoves ? room.alcoves.filter(a => a.wall === 'south') : [],
+            false
         );
         
-        // Create west wall with possible doorway gaps
-        this.createWallWithDoorways(
+        // Create west wall with possible doorway gaps and alcove openings
+        this.createWallWithDoorwaysAndAlcoves(
             group,
             room.x,
             room.y,
@@ -745,11 +1071,12 @@ export class DungeonGenerator {
             room.height * this.settings.gridSize,
             wallMaterial,
             doorways.filter(d => !d.isEastWall),
+            room.alcoves ? room.alcoves.filter(a => a.wall === 'west') : [],
             true
         );
         
-        // Create east wall with possible doorway gaps
-        this.createWallWithDoorways(
+        // Create east wall with possible doorway gaps and alcove openings
+        this.createWallWithDoorwaysAndAlcoves(
             group,
             room.x + room.width * this.settings.gridSize - this.settings.gridSize,
             room.y,
@@ -758,30 +1085,44 @@ export class DungeonGenerator {
             room.height * this.settings.gridSize,
             wallMaterial,
             doorways.filter(d => d.isEastWall),
+            room.alcoves ? room.alcoves.filter(a => a.wall === 'east') : [],
             true
         );
     }
     
-    createWallWithDoorways(group, x, y, width, height, depth, material, doorways, isVertical = false) {
-        // If no doorways, create a single wall
-        if (!doorways || doorways.length === 0) {
+    createWallWithDoorwaysAndAlcoves(group, x, y, width, height, depth, material, doorways, alcoves, isVertical = false) {
+        // If no doorways or alcoves, create a single wall
+        if ((!doorways || doorways.length === 0) && (!alcoves || alcoves.length === 0)) {
             const wallMesh = this.createWall(group, x, y, width, height, depth, material);
             group.colliderMeshes.push(wallMesh);
             return;
         }
         
-        // For walls with doorways, create wall segments
+        // For walls with doorways or alcoves, create wall segments
         if (isVertical) {
             // Vertical wall (west or east wall)
-            // Sort doorways by Y position
-            doorways.sort((a, b) => a.y - b.y);
+            
+            // Combine doorways and alcoves to find all gaps
+            const gaps = [...doorways];
+            
+            // Add alcoves as gaps
+            for (const alcove of alcoves) {
+                gaps.push({
+                    y: alcove.y,
+                    height: alcove.height * this.settings.gridSize,
+                    isAlcove: true
+                });
+            }
+            
+            // Sort gaps by Y position
+            gaps.sort((a, b) => a.y - b.y);
             
             let currentY = y;
             
-            for (const doorway of doorways) {
-                // Create wall segment from current position to doorway
-                if (doorway.y > currentY) {
-                    const segmentHeight = doorway.y - currentY;
+            for (const gap of gaps) {
+                // Create wall segment from current position to gap
+                if (gap.y > currentY) {
+                    const segmentHeight = gap.y - currentY;
                     const wallMesh = this.createWall(
                         group, 
                         x, 
@@ -794,11 +1135,11 @@ export class DungeonGenerator {
                     group.colliderMeshes.push(wallMesh);
                 }
                 
-                // Skip the doorway
-                currentY = doorway.y + doorway.height;
+                // Skip the gap
+                currentY = gap.y + (gap.isAlcove ? gap.height : gap.height);
             }
             
-            // Create final wall segment after the last doorway
+            // Create final wall segment after the last gap
             const endY = y + depth;
             if (currentY < endY) {
                 const segmentHeight = endY - currentY;
@@ -815,15 +1156,28 @@ export class DungeonGenerator {
             }
         } else {
             // Horizontal wall (north or south wall)
-            // Sort doorways by X position
-            doorways.sort((a, b) => a.x - b.x);
+            
+            // Combine doorways and alcoves to find all gaps
+            const gaps = [...doorways];
+            
+            // Add alcoves as gaps
+            for (const alcove of alcoves) {
+                gaps.push({
+                    x: alcove.x,
+                    width: alcove.width * this.settings.gridSize,
+                    isAlcove: true
+                });
+            }
+            
+            // Sort gaps by X position
+            gaps.sort((a, b) => a.x - b.x);
             
             let currentX = x;
             
-            for (const doorway of doorways) {
-                // Create wall segment from current position to doorway
-                if (doorway.x > currentX) {
-                    const segmentWidth = doorway.x - currentX;
+            for (const gap of gaps) {
+                // Create wall segment from current position to gap
+                if (gap.x > currentX) {
+                    const segmentWidth = gap.x - currentX;
                     const wallMesh = this.createWall(
                         group, 
                         currentX, 
@@ -836,11 +1190,11 @@ export class DungeonGenerator {
                     group.colliderMeshes.push(wallMesh);
                 }
                 
-                // Skip the doorway
-                currentX = doorway.x + doorway.width;
+                // Skip the gap
+                currentX = gap.x + (gap.isAlcove ? gap.width : gap.width);
             }
             
-            // Create final wall segment after the last doorway
+            // Create final wall segment after the last gap
             const endX = x + width;
             if (currentX < endX) {
                 const segmentWidth = endX - currentX;
@@ -858,22 +1212,9 @@ export class DungeonGenerator {
         }
     }
     
-    createWall(group, x, y, width, height, depth, material) {
-        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-        const wallMesh = new THREE.Mesh(wallGeometry, material);
-        
-        wallMesh.position.set(
-            x + width / 2,
-            height / 2,
-            y + depth / 2
-        );
-        
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        
-        group.add(wallMesh);
-        
-        return wallMesh;
+    createWallWithDoorways(group, x, y, width, height, depth, material, doorways, isVertical = false) {
+        // Use the enhanced method with an empty alcoves array
+        this.createWallWithDoorwaysAndAlcoves(group, x, y, width, height, depth, material, doorways, [], isVertical);
     }
     
     createCorridorMesh(group, corridor, floorMaterial, wallMaterial) {
@@ -948,5 +1289,23 @@ export class DungeonGenerator {
             );
             group.colliderMeshes.push(westWallMesh);
         }
+    }
+    
+    createWall(group, x, y, width, height, depth, material) {
+        const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+        const wallMesh = new THREE.Mesh(wallGeometry, material);
+        
+        wallMesh.position.set(
+            x + width / 2,
+            height / 2,
+            y + depth / 2
+        );
+        
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        group.add(wallMesh);
+        
+        return wallMesh;
     }
 }
