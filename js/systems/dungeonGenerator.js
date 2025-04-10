@@ -11,7 +11,7 @@ export class DungeonGenerator {
             gridSize: 1,
             corridorWidth: 5,
             floorHeight: 0.2,
-            wallHeight: 3,
+            wallHeight: 15, // 5x taller (was 3)
             doorwayWidth: 5,
             
             // Spacing settings
@@ -20,7 +20,7 @@ export class DungeonGenerator {
             
             // Pillar settings
             pillarRadius: 2,
-            pillarHeight: 3,
+            pillarHeight: 15, // 5x taller (was 3)
             pillarChance: 0.5 // 50% chance of spawning a pillar
         };
     }
@@ -80,8 +80,8 @@ export class DungeonGenerator {
             doorways: [],
             type: 'central',
             alcoves: [],
-            // Add pillar flag - 50% chance
-            hasPillar: Math.random() < this.settings.pillarChance
+            // Central room never has a pillar
+            hasPillar: false
         };
     }
     
@@ -759,8 +759,8 @@ export class DungeonGenerator {
     createDungeonMesh(rooms, corridors, keyPosition) {
         // Create a group to hold all dungeon meshes
         const dungeonGroup = new THREE.Group();
-        
-        // Create materials
+
+    // Create materials
         const floorMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x666666,
             roughness: 0.7,
