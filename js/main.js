@@ -83,7 +83,7 @@ class Game {
         const loreElement = document.createElement('div');
         loreElement.className = 'lore-text';
         loreElement.innerHTML = `
-            <p>The ancient structure, built by the one who bridged Heaven to Earth...</p>
+            <p>The ancient structure...</p>
             <p>Now consumed by darkness.</p>
             <p>You must discover the machine's purpose before the curse consumes you too.</p>
         `;
