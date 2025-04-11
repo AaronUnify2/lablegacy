@@ -2,7 +2,14 @@ export class Enemy {
     constructor(scene, position, collisionManager, player) {
         this.scene = scene;
         this.position = position.clone();
-        this.state = 'idle'; // Only need this for manager to check if 'dead'
+        this.state = 'idle'; // Changed to 'idle' from 'dead' to make enemies active
+        
+        // Add patrol properties
+        this.patrolRadius = 3; // Radius of patrol circle in world units
+        this.patrolSpeed = 0.5; // Speed of patrol movement (slow and steady)
+        this.patrolAngle = 0; // Current angle in the patrol circle
+        this.patrolCenter = position.clone(); // Center of patrol circle
+        this.patrolActive = true; // Flag to enable/disable patrol
         
         // Create a simple mesh for the enemy
         this.createMesh();
@@ -60,7 +67,40 @@ export class Enemy {
     }
     
     update(deltaTime, camera) {
-        // Most minimal update possible - just rotate slowly to show it's working
-        this.group.rotation.y += deltaTime * 0.5;
+        // Skip updates if enemy is inactive or deltaTime is invalid
+        if (this.state === 'dead' || !deltaTime || deltaTime > 1) {
+            return;
+        }
+        
+        // Add simple debug to monitor updates
+        if (Math.random() < 0.01) { // Only log occasionally to prevent console spam
+            console.log("Enemy update at position:", this.group.position);
+        }
+        
+        // Patrol in a circle if active
+        if (this.patrolActive) {
+            // Calculate new position on the circle
+            this.patrolAngle += this.patrolSpeed * deltaTime;
+            
+            // Calculate new x and z positions
+            const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
+            const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
+            
+            // Update group position (keeping y the same)
+            this.group.position.x = newX;
+            this.group.position.z = newZ;
+            
+            // Make the enemy face the direction of movement
+            const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
+            
+            // Only set lookAt if forward is a valid direction
+            if (forward.lengthSq() > 0) {
+                const lookAtPoint = new THREE.Vector3().addVectors(this.group.position, forward);
+                this.group.lookAt(lookAtPoint);
+            }
+        }
+        
+        // Rotate the body slightly to show it's active even if not moving
+        this.bodyMesh.rotation.y += deltaTime * 1.0;
     }
 }
