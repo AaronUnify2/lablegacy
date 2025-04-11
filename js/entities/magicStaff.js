@@ -4,6 +4,7 @@ export class MagicStaff {
         this.camera = camera;
         this.staff = null;
         this.light = null;
+        this.spotlight = null; // New spotlight for forward beam
         this.lightIntensity = 2.5;
         this.lightColor = 0x3366ff; // Blue-white light
         this.lightDistance = 3; // 3m radius
@@ -99,7 +100,7 @@ export class MagicStaff {
         const orb = new THREE.Mesh(orbGeometry, orbMaterial);
         orb.position.y = this.staffLength / 2 + this.orbSize * 0.8;
         
-        // Add a point light at the orb position
+        // Add a point light at the orb position (ambient pool light)
         this.light = new THREE.PointLight(
             this.lightColor,
             this.lightIntensity,
@@ -107,6 +108,23 @@ export class MagicStaff {
             1.5 // Light decay (quadratic)
         );
         this.light.position.copy(orb.position);
+        
+        // Add a spotlight at the orb position (directional beam)
+        this.spotlight = new THREE.SpotLight(
+            this.lightColor,
+            this.lightIntensity,  
+            10, // 10m beam distance
+            Math.PI / 6, // 30 degrees spread
+            0.5, // penumbra - soft edge
+            1.0 // decay
+        );
+        this.spotlight.position.copy(orb.position);
+        
+        // Create a spotlight target
+        this.spotlightTarget = new THREE.Object3D();
+        this.spotlightTarget.position.set(0, 0, -1); // Forward direction
+        this.staff.add(this.spotlightTarget);
+        this.spotlight.target = this.spotlightTarget;
         
         // Create a smaller inner orb for extra glow effect
         const innerOrbGeometry = new THREE.SphereGeometry(this.orbSize * 0.6, 16, 16);
@@ -142,6 +160,7 @@ export class MagicStaff {
         this.staff.add(innerOrb);
         this.staff.add(glowMesh);
         this.staff.add(this.light);
+        this.staff.add(this.spotlight);
         
         // Add the staff to the scene
         this.scene.add(this.staff);
@@ -274,8 +293,12 @@ export class MagicStaff {
         this.staff.quaternion.multiply(tiltQuaternion);
         
         // Animate the light intensity slightly
-        if (this.light) {
+        if (this.light && this.isLightOn) {
             this.light.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+        }
+        
+        if (this.spotlight && this.isLightOn) {
+            this.spotlight.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
         }
     }
     
@@ -284,6 +307,9 @@ export class MagicStaff {
         this.lightIntensity = intensity;
         if (this.light && this.isLightOn) {
             this.light.intensity = intensity;
+        }
+        if (this.spotlight && this.isLightOn) {
+            this.spotlight.intensity = intensity;
         }
     }
     
@@ -299,9 +325,15 @@ export class MagicStaff {
         this.isLightOn = !this.isLightOn;
         
         if (this.isLightOn) {
-            // Turn light on
+            // Turn point light on (3m pool)
             if (this.light) {
                 this.light.intensity = this.savedLightIntensity;
+                this.light.distance = 3; // 3m when on
+            }
+            
+            // Turn spotlight on
+            if (this.spotlight) {
+                this.spotlight.intensity = this.savedLightIntensity;
             }
             
             // Make orb glow
@@ -320,9 +352,17 @@ export class MagicStaff {
             this.showToggleEffect(true);
         } else {
             // Save current intensity
+            this.savedLightIntensity = this.lightIntensity;
+            
+            // Turn spotlight off completely
+            if (this.spotlight) {
+                this.spotlight.intensity = 0;
+            }
+            
+            // Keep point light on but dimmer and shorter range (1m pool)
             if (this.light) {
-                this.savedLightIntensity = this.light.intensity;
-                this.light.intensity = 0;
+                this.light.intensity = 0.4;
+                this.light.distance = 1; // 1m when off
             }
             
             // Make orb dim
