@@ -18,8 +18,15 @@ export class Enemy {
         this.collisionEnabled = true; // Flag to enable/disable collision
         this.lastValidPosition = position.clone(); // Store last valid position
         
+        // Height properties
+        this.bodyHeight = 1.8; // Height of the enemy body
+        this.groundOffset = 0; // Offset from the ground (will be set to 0)
+        
         // Create a simple mesh for the enemy
         this.createMesh();
+        
+        // Ensure enemy is placed on the ground
+        this.ensureOnGround();
         
         // Add to scene
         this.scene.add(this.group);
@@ -35,7 +42,7 @@ export class Enemy {
         const bodyGeometry = new THREE.CylinderGeometry(
             0.5, // top radius
             0.5, // bottom radius
-            1.8, // height
+            this.bodyHeight, // height
             8    // radial segments
         );
         
@@ -48,11 +55,11 @@ export class Enemy {
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
-        this.bodyMesh.position.y = 1.8 / 2; // Center vertically
+        // Position the mesh so its bottom is at y=0 of the group
+        this.bodyMesh.position.y = this.bodyHeight / 2;
         
         // Save body dimensions for collision detection
         this.bodyWidth = 1.0; // Diameter
-        this.bodyHeight = 1.8;
         
         // Add body to group
         this.group.add(this.bodyMesh);
@@ -63,38 +70,44 @@ export class Enemy {
             color: 0xffff00 // Bright yellow eyes
         });
         
-        // Left eye
+        // Left eye - position relative to body height
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.2, 1.5, -0.3);
+        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85, -0.3);
         this.group.add(this.leftEye);
         
-        // Right eye
+        // Right eye - position relative to body height
         this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.2, 1.5, -0.3);
+        this.rightEye.position.set(0.2, this.bodyHeight * 0.85, -0.3);
         this.group.add(this.rightEye);
         
-        // Position the entire group
+        // Position the entire group at the initial position
         this.group.position.copy(this.position);
+    }
+    
+    // Make sure enemy is properly placed on the ground
+    ensureOnGround() {
+        if (!this.collisionManager) return;
         
-        // Add an invisible collision cylinder for debug visualization (optional)
-        if (false) { // Set to true to see collision cylinder
-            const collisionGeometry = new THREE.CylinderGeometry(
-                this.collisionRadius,
-                this.collisionRadius,
-                this.bodyHeight,
-                8
-            );
+        // Create a ray starting from slightly above current position
+        const rayStart = new THREE.Vector3(
+            this.group.position.x,
+            this.group.position.y + 2, // Start above current position to avoid self-intersection
+            this.group.position.z
+        );
+        
+        // Cast ray downward
+        const floorHit = this.collisionManager.findFloorBelow(rayStart, 10);
+        
+        if (floorHit && floorHit.point) {
+            // Position exactly on the ground (no offset)
+            this.group.position.y = floorHit.point.y;
+            // Store this as a valid position
+            this.lastValidPosition.copy(this.group.position);
+            this.patrolCenter.y = floorHit.point.y;
             
-            const collisionMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.3,
-                wireframe: true
-            });
-            
-            this.collisionMesh = new THREE.Mesh(collisionGeometry, collisionMaterial);
-            this.collisionMesh.position.y = this.bodyHeight / 2;
-            this.group.add(this.collisionMesh);
+            console.log("Enemy placed on ground at Y:", floorHit.point.y);
+        } else {
+            console.warn("Could not find floor beneath enemy!");
         }
     }
     
@@ -112,11 +125,11 @@ export class Enemy {
             // Calculate new position on the circle
             this.patrolAngle += this.patrolSpeed * deltaTime;
             
-            // Calculate new x and z positions
+            // Calculate new x and z positions (keeping y the same)
             const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
             const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
             
-            // Create a potential new position
+            // Create a potential new position - maintaining current Y value
             const newPosition = new THREE.Vector3(
                 newX,
                 this.group.position.y,
@@ -144,8 +157,8 @@ export class Enemy {
                 }
                 
                 // Also check for ground
-                const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
-                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
+                const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 0.1, newPosition.z);
+                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 1);
                 
                 if (!groundHit) {
                     // No ground beneath, skip moving
@@ -153,6 +166,21 @@ export class Enemy {
                         console.log("No ground beneath enemy, skipping movement");
                     }
                     return;
+                }
+                
+                // Check for small height differences in the floor
+                if (groundHit && groundHit.point) {
+                    // Only adjust height for small changes (ramps, small steps)
+                    const heightDifference = Math.abs(groundHit.point.y - this.group.position.y);
+                    const maxStepHeight = 0.3; // Maximum step height enemy can handle
+                    
+                    if (heightDifference <= maxStepHeight) {
+                        // Adjust to match ground height
+                        newPosition.y = groundHit.point.y;
+                    } else if (heightDifference > maxStepHeight) {
+                        // Too big of a step, don't move in this direction
+                        return;
+                    }
                 }
             }
             
