@@ -1,3 +1,4 @@
+// Fix to initialize the staff light properly
 export class MagicStaff {
     constructor(scene, camera) {
         this.scene = scene;
@@ -20,12 +21,15 @@ export class MagicStaff {
         this.bobSpeed = 2;
         this.swaySpeed = 1.5;
         
-        // Light state
+        // Light state - initialized as true but will be properly set in createStaff
         this.isLightOn = true;
         this.savedLightIntensity = this.lightIntensity;
         
         // Create and add to scene
         this.createStaff();
+        
+        // Make sure the light is ON explicitly after creation
+        this.ensureLightState(true);
         
         // Set up event listener for toggling the light
         document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
@@ -36,6 +40,28 @@ export class MagicStaff {
                 this.toggleLight();
             }
         });
+    }
+    
+    // New method to explicitly ensure light state
+    ensureLightState(shouldBeOn) {
+        if (shouldBeOn !== this.isLightOn) {
+            this.toggleLight();
+        } else if (shouldBeOn && this.light) {
+            // Force update the light intensity even if already "on"
+            this.light.intensity = this.lightIntensity;
+            
+            // Update orb materials
+            if (this.staff) {
+                this.staff.children.forEach(child => {
+                    if (child.material && child.material.emissive) {
+                        child.material.emissive.set(0x3366ff);
+                        if (child.material.emissiveIntensity) {
+                            child.material.emissiveIntensity = 2.0;
+                        }
+                    }
+                });
+            }
+        }
     }
     
     createStaff() {
@@ -102,7 +128,7 @@ export class MagicStaff {
         // Add a point light at the orb position
         this.light = new THREE.PointLight(
             this.lightColor,
-            this.lightIntensity,
+            this.lightIntensity, // Start with full intensity
             this.lightDistance,
             1.5 // Light decay (quadratic)
         );
@@ -274,7 +300,7 @@ export class MagicStaff {
         this.staff.quaternion.multiply(tiltQuaternion);
         
         // Animate the light intensity slightly
-        if (this.light) {
+        if (this.light && this.isLightOn) {
             this.light.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
         }
     }
@@ -309,12 +335,15 @@ export class MagicStaff {
                 this.staff.children.forEach(child => {
                     if (child.material && child.material.emissive) {
                         child.material.emissive.set(0x3366ff);
-                        if (child.material.emissiveIntensity) {
+                        if (child.material.emissiveIntensity !== undefined) {
                             child.material.emissiveIntensity = 2.0;
                         }
                     }
                 });
             }
+            
+            // Update UI button
+            this.updateButtonStyle(true);
             
             // Show visual feedback
             this.showToggleEffect(true);
@@ -330,18 +359,43 @@ export class MagicStaff {
                 this.staff.children.forEach(child => {
                     if (child.material && child.material.emissive) {
                         child.material.emissive.set(0x112244);
-                        if (child.material.emissiveIntensity) {
+                        if (child.material.emissiveIntensity !== undefined) {
                             child.material.emissiveIntensity = 0.3;
                         }
                     }
                 });
             }
             
+            // Update UI button
+            this.updateButtonStyle(false);
+            
             // Show visual feedback
             this.showToggleEffect(false);
         }
         
         return this.isLightOn;
+    }
+    
+    // Update the style of the toggle button based on light state
+    updateButtonStyle(isOn) {
+        const button = document.getElementById('move-center');
+        if (button) {
+            if (isOn) {
+                // Light on - blue glow
+                button.style.background = 'radial-gradient(circle at 30% 30%, #1a3366, #0d1a33)';
+                button.style.boxShadow = '0 0 0 2px rgba(0, 0, 0, 0.8), 0 4px 0 rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.5), 0 0 15px rgba(51, 102, 255, 0.5)';
+                button.style.borderColor = '#3366aa';
+                button.style.color = '#aaccff';
+                button.style.textShadow = '0 0 10px rgba(51, 102, 255, 0.8)';
+            } else {
+                // Light off - regular button
+                button.style.background = 'radial-gradient(circle at 30% 30%, #222, #111)';
+                button.style.boxShadow = '0 0 0 2px rgba(0, 0, 0, 0.8), 0 4px 0 rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 0, 0, 0.5), 0 0 15px rgba(50, 50, 50, 0.3)';
+                button.style.borderColor = '#444';
+                button.style.color = '#888';
+                button.style.textShadow = 'none';
+            }
+        }
     }
     
     // Show visual effect when toggling the light
