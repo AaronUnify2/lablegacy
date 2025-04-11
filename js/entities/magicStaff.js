@@ -32,7 +32,7 @@ export class MagicStaff {
             
             // Show a message when staff appears
             this.showMessage("Staff materialized");
-        }, 1000); // 1 second delay
+        }, 6000); // 1 second delay
         
         // Set up event listener for toggling the light
         document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
