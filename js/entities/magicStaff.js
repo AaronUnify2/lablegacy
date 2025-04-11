@@ -1,5 +1,11 @@
 export class MagicStaff {
     constructor(scene, camera) {
+        // Check if scene and camera are valid
+        if (!scene || !camera) {
+            console.error("MagicStaff: Missing scene or camera");
+            return;
+        }
+        
         this.scene = scene;
         this.camera = camera;
         this.staff = null;
@@ -36,8 +42,15 @@ export class MagicStaff {
         // Light state
         this.isLightOn = true;
         
-        // Create and add to scene
-        this.createStaff();
+        // Check if THREE is fully loaded
+        if (typeof THREE === 'undefined') {
+            console.error("MagicStaff: THREE is not defined yet");
+            // Wait for THREE to load
+            setTimeout(() => this.createStaff(), 500);
+        } else {
+            // Create and add to scene
+            this.createStaff();
+        }
         
         // Event listeners
         document.addEventListener('keydown', (e) => {
@@ -48,123 +61,135 @@ export class MagicStaff {
     }
     
     createStaff() {
-        // Create the staff group to hold all components
-        this.staff = new THREE.Group();
-        
-        // Create the wooden staff handle
-        const staffGeometry = new THREE.CylinderGeometry(
-            this.staffThickness,              // top radius
-            this.staffThickness * 1.2,        // bottom radius (slightly thicker)
-            this.staffLength,                 // height
-            8,                                // radial segments
-            3,                                // height segments
-            false                             // open-ended
-        );
-        
-        // Wooden material with natural texture
-        const woodTexture = this.generateWoodTexture();
-        const staffMaterial = new THREE.MeshStandardMaterial({
-            map: woodTexture,
-            roughness: 0.7,
-            metalness: 0.2,
-            color: 0x3d2817  // Dark brown base color
-        });
-        
-        const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
-        
-        // Create the glowing orb at the top of the staff
-        const orbGeometry = new THREE.SphereGeometry(this.orbSize, 16, 16);
-        const orbMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            roughness: 0.1,
-            metalness: 0.3,
-            emissive: 0x3366ff,
-            emissiveIntensity: 2.0,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-        orb.position.y = this.staffLength / 2 + this.orbSize * 0.8;
-        this.orb = orb; // Save reference for later
-        
-        // Create inner orb for extra glow effect
-        const innerOrbGeometry = new THREE.SphereGeometry(this.orbSize * 0.6, 16, 16);
-        const innerOrbMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.7
-        });
-        
-        const innerOrb = new THREE.Mesh(innerOrbGeometry, innerOrbMaterial);
-        innerOrb.position.copy(orb.position);
-        this.innerOrb = innerOrb; // Save reference
-        
-        // Add ethereal glow effect around orb
-        const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.5, 16, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x3366ff,
-            transparent: true,
-            opacity: 0.15,
-            side: THREE.BackSide
-        });
-        
-        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        glowMesh.position.copy(orb.position);
-        this.glowMesh = glowMesh; // Save reference
-        
-        // Position the staff handle and rotate it
-        staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
-        staffMesh.position.y = -this.staffLength / 2; // Center the staff
-        
-        // Add all components to the staff group
-        this.staff.add(staffMesh);
-        this.staff.add(orb);
-        this.staff.add(innerOrb);
-        this.staff.add(glowMesh);
-        
-        // Create spotlight for forward beam
-        this.spotLight = new THREE.SpotLight(
-            this.beamColor,
-            this.beamIntensity,
-            this.beamDistance,
-            this.beamAngle,
-            0.8, // Penumbra - makes the beam edge softer
-            1.0  // Decay - quadratic
-        );
-        
-        // Position spotlight at orb
-        this.spotLight.position.copy(orb.position);
-        
-        // Create target for spotlight to aim forward
-        this.spotLightTarget = new THREE.Object3D();
-        this.spotLightTarget.position.set(0, 0, -1); // Forward direction
-        this.staff.add(this.spotLightTarget);
-        this.spotLight.target = this.spotLightTarget;
-        
-        // Add spotlight to staff
-        this.staff.add(this.spotLight);
-        
-        // Create point light for surrounding pool of light
-        this.pointLight = new THREE.PointLight(
-            this.poolColor,
-            this.poolIntensity,
-            this.poolDistance,
-            1.5 // Light decay (quadratic)
-        );
-        
-        // Position point light at player position (will be updated)
-        this.pointLight.position.set(0, 0, 0);
-        this.staff.add(this.pointLight);
-        
-        // Add the staff to the scene
-        this.scene.add(this.staff);
-        
-        // Store original positions for animation
-        this.originalPosition = this.positionOffset.clone();
-        
-        // Start the animation
-        this.setupAnimations();
+        try {
+            // Check if THREE is defined
+            if (typeof THREE === 'undefined') {
+                console.error("MagicStaff: THREE is not defined");
+                return;
+            }
+            
+            // Create the staff group to hold all components
+            this.staff = new THREE.Group();
+            
+            // Create the wooden staff handle
+            const staffGeometry = new THREE.CylinderGeometry(
+                this.staffThickness,              // top radius
+                this.staffThickness * 1.2,        // bottom radius (slightly thicker)
+                this.staffLength,                 // height
+                8,                                // radial segments
+                3,                                // height segments
+                false                             // open-ended
+            );
+            
+            // Wooden material with natural texture
+            const woodTexture = this.generateWoodTexture();
+            const staffMaterial = new THREE.MeshStandardMaterial({
+                map: woodTexture,
+                roughness: 0.7,
+                metalness: 0.2,
+                color: 0x3d2817  // Dark brown base color
+            });
+            
+            const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
+            
+            // Create the glowing orb at the top of the staff
+            const orbGeometry = new THREE.SphereGeometry(this.orbSize, 16, 16);
+            const orbMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.1,
+                metalness: 0.3,
+                emissive: 0x3366ff,
+                emissiveIntensity: 2.0,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+            orb.position.y = this.staffLength / 2 + this.orbSize * 0.8;
+            this.orb = orb; // Save reference for later
+            
+            // Create inner orb for extra glow effect
+            const innerOrbGeometry = new THREE.SphereGeometry(this.orbSize * 0.6, 16, 16);
+            const innerOrbMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const innerOrb = new THREE.Mesh(innerOrbGeometry, innerOrbMaterial);
+            innerOrb.position.copy(orb.position);
+            this.innerOrb = innerOrb; // Save reference
+            
+            // Add ethereal glow effect around orb
+            const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.5, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x3366ff,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.BackSide
+            });
+            
+            const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+            glowMesh.position.copy(orb.position);
+            this.glowMesh = glowMesh; // Save reference
+            
+            // Position the staff handle and rotate it
+            staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
+            staffMesh.position.y = -this.staffLength / 2; // Center the staff
+            
+            // Add all components to the staff group
+            this.staff.add(staffMesh);
+            this.staff.add(orb);
+            this.staff.add(innerOrb);
+            this.staff.add(glowMesh);
+            
+            // Create spotlight for forward beam (with reduced intensity to start)
+            this.spotLight = new THREE.SpotLight(
+                this.beamColor,
+                this.beamIntensity * 0.8,  // Slightly reduced initial intensity
+                this.beamDistance,
+                this.beamAngle,
+                0.8, // Penumbra - makes the beam edge softer
+                1.0  // Decay - quadratic
+            );
+            
+            // Position spotlight at orb
+            this.spotLight.position.copy(orb.position);
+            
+            // Create target for spotlight to aim forward
+            this.spotLightTarget = new THREE.Object3D();
+            this.spotLightTarget.position.set(0, 0, -5); // Forward direction, more distant
+            this.staff.add(this.spotLightTarget);
+            this.spotLight.target = this.spotLightTarget;
+            
+            // Add spotlight to staff
+            this.staff.add(this.spotLight);
+            
+            // Create point light for surrounding pool of light (with reduced intensity)
+            this.pointLight = new THREE.PointLight(
+                this.poolColor,
+                this.poolIntensity * 0.7,  // Slightly reduced intensity
+                this.poolDistance,
+                1.5 // Light decay (quadratic)
+            );
+            
+            // Position point light at player position (will be updated)
+            this.pointLight.position.set(0, 0, 0);
+            this.staff.add(this.pointLight);
+            
+            // Add the staff to the scene
+            this.scene.add(this.staff);
+            
+            // Store original positions for animation
+            this.originalPosition = this.positionOffset.clone();
+            
+            // Start the animation
+            this.setupAnimations();
+            
+            console.log("MagicStaff: Successfully created staff");
+        } catch (error) {
+            console.error("MagicStaff: Error creating staff", error);
+        }
     }
     
     generateWoodTexture() {
@@ -260,118 +285,134 @@ export class MagicStaff {
     }
     
     update(time) {
-        if (!this.staff || !this.camera) return;
-        
-        // Get the camera's world position and direction
-        const cameraPosition = this.camera.position.clone();
-        const cameraQuaternion = this.camera.quaternion.clone();
-        
-        // Create an offset vector
-        const offset = this.positionOffset.clone();
-        
-        // Add subtle bobbing and swaying motion based on time
-        offset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
-        offset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
-        
-        // Apply the offset in camera's local space
-        offset.applyQuaternion(cameraQuaternion);
-        
-        // Position the staff relative to the camera
-        this.staff.position.copy(cameraPosition).add(offset);
-        
-        // Position the pool light at player position
-        this.pointLight.position.copy(cameraPosition);
-        
-        // Make the staff face the same direction as the camera
-        this.staff.quaternion.copy(cameraQuaternion);
-        
-        // Add a tilt to the staff
-        const tiltQuaternion = new THREE.Quaternion();
-        tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.25);
-        this.staff.quaternion.multiply(tiltQuaternion);
-        
-        // Animate the light intensity slightly
-        if (this.isLightOn) {
-            // Animate beam light
-            if (this.spotLight) {
-                this.spotLight.intensity = this.beamIntensity * (0.9 + 0.2 * Math.sin(time * 3));
-            }
+        try {
+            if (!this.staff || !this.camera) return;
             
-            // Animate pool light
+            // Get the camera's world position and direction
+            const cameraPosition = this.camera.position.clone();
+            const cameraQuaternion = this.camera.quaternion.clone();
+            
+            // Create an offset vector
+            const offset = this.positionOffset.clone();
+            
+            // Add subtle bobbing and swaying motion based on time
+            offset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
+            offset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
+            
+            // Apply the offset in camera's local space
+            offset.applyQuaternion(cameraQuaternion);
+            
+            // Position the staff relative to the camera
+            this.staff.position.copy(cameraPosition).add(offset);
+            
+            // Update the pool light position (detached from staff position)
             if (this.pointLight) {
-                this.pointLight.intensity = this.poolIntensity * (0.9 + 0.1 * Math.sin(time * 4));
+                // Position the pool light at player position, but slightly lower
+                const lightPos = cameraPosition.clone();
+                lightPos.y -= 0.5; // Lower than camera to light up the floor better
+                this.pointLight.position.copy(lightPos);
             }
             
-            // Animate orb glow
-            if (this.orb && this.orb.material) {
-                this.orb.material.emissiveIntensity = 2.0 * (0.9 + 0.2 * Math.sin(time * 3));
+            // Make the staff face the same direction as the camera
+            this.staff.quaternion.copy(cameraQuaternion);
+            
+            // Add a tilt to the staff
+            const tiltQuaternion = new THREE.Quaternion();
+            tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.25);
+            this.staff.quaternion.multiply(tiltQuaternion);
+            
+            // Animate the light intensity slightly - but less dramatically
+            if (this.isLightOn) {
+                // Animate beam light with subtle flicker
+                if (this.spotLight) {
+                    this.spotLight.intensity = this.beamIntensity * (0.95 + 0.1 * Math.sin(time * 3));
+                }
+                
+                // Animate pool light with even more subtle flicker
+                if (this.pointLight) {
+                    this.pointLight.intensity = this.poolIntensity * (0.95 + 0.05 * Math.sin(time * 4));
+                }
+                
+                // Animate orb glow
+                if (this.orb && this.orb.material) {
+                    this.orb.material.emissiveIntensity = 2.0 * (0.95 + 0.1 * Math.sin(time * 3));
+                }
             }
+        } catch (error) {
+            console.error("MagicStaff: Error in update", error);
         }
     }
     
     // Toggle light on/off
     toggleLight() {
-        this.isLightOn = !this.isLightOn;
-        
-        if (this.isLightOn) {
-            // Turn on the beam light
-            if (this.spotLight) {
-                this.spotLight.intensity = this.beamIntensity;
+        try {
+            this.isLightOn = !this.isLightOn;
+            
+            if (this.isLightOn) {
+                // Turn on the beam light
+                if (this.spotLight) {
+                    this.spotLight.intensity = this.beamIntensity;
+                    this.spotLight.distance = this.beamDistance;
+                }
+                
+                // Set pool light to full range
+                if (this.pointLight) {
+                    this.pointLight.distance = this.poolDistance;
+                    this.pointLight.intensity = this.poolIntensity;
+                }
+                
+                // Make orb glow brightly
+                if (this.orb && this.orb.material) {
+                    this.orb.material.emissive.set(0x3366ff);
+                    this.orb.material.emissiveIntensity = 2.0;
+                }
+                
+                if (this.innerOrb && this.innerOrb.material) {
+                    this.innerOrb.material.opacity = 0.7;
+                }
+                
+                if (this.glowMesh && this.glowMesh.material) {
+                    this.glowMesh.material.opacity = 0.15;
+                }
+                
+                // Show visual feedback
+                this.showToggleEffect(true);
+            } else {
+                // Turn off the beam light
+                if (this.spotLight) {
+                    this.spotLight.intensity = 0;
+                }
+                
+                // Reduce pool light to minimum
+                if (this.pointLight) {
+                    this.pointLight.distance = this.poolDistanceOff;
+                    this.pointLight.intensity = this.poolIntensity * 0.3;
+                }
+                
+                // Make orb dim
+                if (this.orb && this.orb.material) {
+                    this.orb.material.emissive.set(0x112244);
+                    this.orb.material.emissiveIntensity = 0.5;
+                }
+                
+                if (this.innerOrb && this.innerOrb.material) {
+                    this.innerOrb.material.opacity = 0.3;
+                }
+                
+                if (this.glowMesh && this.glowMesh.material) {
+                    this.glowMesh.material.opacity = 0.05;
+                }
+                
+                // Show visual feedback
+                this.showToggleEffect(false);
             }
             
-            // Set pool light to full range
-            if (this.pointLight) {
-                this.pointLight.distance = this.poolDistance;
-                this.pointLight.intensity = this.poolIntensity;
-            }
-            
-            // Make orb glow brightly
-            if (this.orb && this.orb.material) {
-                this.orb.material.emissive.set(0x3366ff);
-                this.orb.material.emissiveIntensity = 2.0;
-            }
-            
-            if (this.innerOrb && this.innerOrb.material) {
-                this.innerOrb.material.opacity = 0.7;
-            }
-            
-            if (this.glowMesh && this.glowMesh.material) {
-                this.glowMesh.material.opacity = 0.15;
-            }
-            
-            // Show visual feedback
-            this.showToggleEffect(true);
-        } else {
-            // Turn off the beam light
-            if (this.spotLight) {
-                this.spotLight.intensity = 0;
-            }
-            
-            // Reduce pool light to minimum
-            if (this.pointLight) {
-                this.pointLight.distance = this.poolDistanceOff;
-                this.pointLight.intensity = this.poolIntensity * 0.3;
-            }
-            
-            // Make orb dim
-            if (this.orb && this.orb.material) {
-                this.orb.material.emissive.set(0x112244);
-                this.orb.material.emissiveIntensity = 0.5;
-            }
-            
-            if (this.innerOrb && this.innerOrb.material) {
-                this.innerOrb.material.opacity = 0.3;
-            }
-            
-            if (this.glowMesh && this.glowMesh.material) {
-                this.glowMesh.material.opacity = 0.05;
-            }
-            
-            // Show visual feedback
-            this.showToggleEffect(false);
+            console.log(`MagicStaff: Light toggled ${this.isLightOn ? 'ON' : 'OFF'}`);
+            return this.isLightOn;
+        } catch (error) {
+            console.error("MagicStaff: Error toggling light", error);
+            return this.isLightOn;
         }
-        
-        return this.isLightOn;
     }
     
     // Show visual effect when toggling the light
