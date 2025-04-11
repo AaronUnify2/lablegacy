@@ -3,6 +3,7 @@ export class Enemy {
         this.scene = scene;
         this.position = position.clone();
         this.state = 'idle'; // Changed to 'idle' from 'dead' to make enemies active
+        this.collisionManager = collisionManager; // Store reference to collision manager
         
         // Add patrol properties
         this.patrolRadius = 3; // Radius of patrol circle in world units
@@ -10,6 +11,11 @@ export class Enemy {
         this.patrolAngle = 0; // Current angle in the patrol circle
         this.patrolCenter = position.clone(); // Center of patrol circle
         this.patrolActive = true; // Flag to enable/disable patrol
+        
+        // Collision properties
+        this.collisionRadius = 0.5; // Enemy collision radius
+        this.collisionEnabled = true; // Flag to enable/disable collision
+        this.lastValidPosition = position.clone(); // Store last valid position
         
         // Create a simple mesh for the enemy
         this.createMesh();
@@ -72,10 +78,8 @@ export class Enemy {
             return;
         }
         
-        // Add simple debug to monitor updates
-        if (Math.random() < 0.01) { // Only log occasionally to prevent console spam
-            console.log("Enemy update at position:", this.group.position);
-        }
+        // Store current position as potentially valid position before movement
+        this.lastValidPosition.copy(this.group.position);
         
         // Patrol in a circle if active
         if (this.patrolActive) {
@@ -86,9 +90,46 @@ export class Enemy {
             const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
             const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
             
-            // Update group position (keeping y the same)
-            this.group.position.x = newX;
-            this.group.position.z = newZ;
+            // Create a potential new position
+            const newPosition = new THREE.Vector3(
+                newX,
+                this.group.position.y,
+                newZ
+            );
+            
+            // Check for collisions before moving
+            if (this.collisionEnabled && this.collisionManager) {
+                const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
+                
+                if (collision.collides) {
+                    // Skip moving to this position
+                    if (Math.random() < 0.1) { // Log occasionally to avoid spam
+                        console.log("Enemy collision detected, skipping movement");
+                    }
+                    
+                    // Option 1: Simply skip moving this frame
+                    // Option 2: Modify the patrol angle to try a different direction
+                    this.patrolAngle += Math.PI / 4; // Add 45 degrees to try a different direction
+                    
+                    // Return without updating position
+                    return;
+                }
+                
+                // Also check for ground
+                const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
+                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
+                
+                if (!groundHit) {
+                    // No ground beneath, skip moving
+                    if (Math.random() < 0.1) {
+                        console.log("No ground beneath enemy, skipping movement");
+                    }
+                    return;
+                }
+            }
+            
+            // No collision, update position
+            this.group.position.copy(newPosition);
             
             // Make the enemy face the direction of movement
             const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
@@ -102,5 +143,31 @@ export class Enemy {
         
         // Rotate the body slightly to show it's active even if not moving
         this.bodyMesh.rotation.y += deltaTime * 1.0;
+    }
+    
+    // Reset position if stuck or in an invalid location
+    resetToLastValidPosition() {
+        if (this.lastValidPosition) {
+            this.group.position.copy(this.lastValidPosition);
+            console.log("Enemy reset to last valid position");
+        }
+    }
+    
+    // Change patrol radius or speed
+    setPatrolParameters(radius, speed) {
+        if (radius !== undefined) {
+            this.patrolRadius = radius;
+        }
+        
+        if (speed !== undefined) {
+            this.patrolSpeed = speed;
+        }
+    }
+    
+    // Set a new patrol center
+    setPatrolCenter(newCenter) {
+        if (newCenter) {
+            this.patrolCenter.copy(newCenter);
+        }
     }
 }
