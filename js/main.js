@@ -3,6 +3,8 @@ import { InputManager } from './engine/input.js';
 import { DungeonGenerator } from './systems/dungeonGenerator.js';
 import { CollisionManager } from './engine/collision.js';
 import { MagicStaff } from './entities/magicStaff.js';
+import { EnemyManager } from './systems/enemyManager.js';
+import { WeaponSystem } from './systems/weaponSystem.js';
 
 class Game {
     constructor() {
@@ -35,7 +37,15 @@ class Game {
             runningSpeed: 8.0, // Running speed in meters per second
             isRunning: false, // Whether the player is currently running
             canInteract: true, // Whether the player can interact with objects
-            inventory: [] // Player's inventory
+            inventory: [], // Player's inventory
+            health: 100,
+            maxHealth: 100,
+            camera: this.renderer.camera, // Reference to camera for enemies
+            
+            // Damage function for the player
+            damage: (amount) => {
+                this.playerTakeDamage(amount);
+            }
         };
         
         // Fall safety values
@@ -48,6 +58,7 @@ class Game {
         this.init = this.init.bind(this);
         this.checkForGround = this.checkForGround.bind(this);
         this.findSafeSpawnPosition = this.findSafeSpawnPosition.bind(this);
+        this.playerTakeDamage = this.playerTakeDamage.bind(this);
     }
     
     async init() {
@@ -81,11 +92,20 @@ class Game {
             // Create magic staff AFTER confirming the player is in a safe position
             this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
             
+            // Create enemy manager
+            this.enemyManager = new EnemyManager(this.renderer.scene, this.collisionManager, this.player);
+            
+            // Create weapon system
+            this.weaponSystem = new WeaponSystem(this.renderer.scene, this.player, this.enemyManager);
+            
             // Add atmospheric sound
             this.setupAudio();
             
             // Set first-person mode controls
             this.setupFirstPersonMode();
+            
+            // Create health display
+            this.createHealthDisplay();
             
             // Start regular ground checks to prevent falling through terrain
             this.enableFallSafety();
@@ -107,6 +127,204 @@ class Game {
         } catch (error) {
             console.error('Error initializing game:', error);
         }
+    }
+    
+    createHealthDisplay() {
+        // Create a health display container
+        this.healthDisplay = document.createElement('div');
+        this.healthDisplay.id = 'health-display';
+        this.healthDisplay.style.position = 'absolute';
+        this.healthDisplay.style.bottom = '20px';
+        this.healthDisplay.style.left = '20px';
+        this.healthDisplay.style.display = 'flex';
+        this.healthDisplay.style.alignItems = 'center';
+        this.healthDisplay.style.zIndex = '10';
+        
+        // Create the health bar background
+        this.healthBar = document.createElement('div');
+        this.healthBar.style.width = '200px';
+        this.healthBar.style.height = '15px';
+        this.healthBar.style.background = 'rgba(0, 0, 0, 0.5)';
+        this.healthBar.style.borderRadius = '3px';
+        this.healthBar.style.overflow = 'hidden';
+        this.healthBar.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
+        
+        // Create the health bar fill
+        this.healthBarFill = document.createElement('div');
+        this.healthBarFill.style.width = '100%';
+        this.healthBarFill.style.height = '100%';
+        this.healthBarFill.style.background = 'linear-gradient(to right, #ff3333, #ff6666)';
+        this.healthBarFill.style.transition = 'width 0.3s ease';
+        
+        // Add health bar fill to health bar
+        this.healthBar.appendChild(this.healthBarFill);
+        
+        // Create health text
+        this.healthText = document.createElement('div');
+        this.healthText.style.marginLeft = '10px';
+        this.healthText.style.color = '#fff';
+        this.healthText.style.textShadow = '0 0 3px rgba(0, 0, 0, 0.8)';
+        this.healthText.style.fontFamily = 'Cinzel, serif';
+        this.healthText.textContent = '100/100';
+        
+        // Add health bar and text to health display
+        this.healthDisplay.appendChild(this.healthBar);
+        this.healthDisplay.appendChild(this.healthText);
+        
+        // Add health display to game container
+        document.getElementById('game-container').appendChild(this.healthDisplay);
+        
+        // Update health display
+        this.updateHealthDisplay();
+    }
+    
+    updateHealthDisplay() {
+        // Update health bar fill width
+        const healthPercent = (this.player.health / this.player.maxHealth) * 100;
+        this.healthBarFill.style.width = `${healthPercent}%`;
+        
+        // Update health text
+        this.healthText.textContent = `${Math.ceil(this.player.health)}/${this.player.maxHealth}`;
+        
+        // Change color based on health
+        if (healthPercent < 25) {
+            this.healthBarFill.style.background = 'linear-gradient(to right, #ff0000, #ff3333)';
+        } else if (healthPercent < 50) {
+            this.healthBarFill.style.background = 'linear-gradient(to right, #ff3300, #ff6633)';
+        } else {
+            this.healthBarFill.style.background = 'linear-gradient(to right, #ff3333, #ff6666)';
+        }
+        
+        // Pulse effect when health is low
+        if (healthPercent < 25) {
+            this.healthBar.style.animation = 'pulse 1s infinite alternate';
+        } else {
+            this.healthBar.style.animation = 'none';
+        }
+    }
+    
+    playerTakeDamage(amount) {
+        // Reduce player health
+        this.player.health = Math.max(0, this.player.health - amount);
+        
+        // Update health display
+        this.updateHealthDisplay();
+        
+        // Visual damage effect
+        this.showDamageEffect();
+        
+        // Play damage sound
+        this.playDamageSound();
+        
+        // Check if player is dead
+        if (this.player.health <= 0) {
+            this.playerDeath();
+        }
+        
+        console.log(`Player took ${amount} damage. Health: ${this.player.health}/${this.player.maxHealth}`);
+    }
+    
+    showDamageEffect() {
+        // Create a red flash overlay
+        const overlay = document.createElement('div');
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '9';
+        overlay.style.opacity = '0.8';
+        overlay.style.transition = 'opacity 0.5s ease';
+        
+        // Add to DOM
+        document.getElementById('game-container').appendChild(overlay);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                if (overlay.parentNode) {
+                    overlay.parentNode.removeChild(overlay);
+                }
+            }, 500);
+        }, 100);
+    }
+    
+    playDamageSound() {
+        // Create and play a damage sound
+        const damageSound = new Audio();
+        damageSound.src = 'sounds/player_damage.mp3'; // Add this sound file
+        damageSound.volume = 0.3;
+        damageSound.play().catch(error => {
+            console.log('Audio playback failed:', error);
+        });
+    }
+    
+    playerDeath() {
+        // Handle player death
+        console.log('Player died!');
+        
+        // Stop the game
+        this.isRunning = false;
+        
+        // Show death screen
+        this.showDeathScreen();
+    }
+    
+    showDeathScreen() {
+        // Create death screen
+        const deathScreen = document.createElement('div');
+        deathScreen.id = 'death-screen';
+        deathScreen.style.position = 'absolute';
+        deathScreen.style.top = '0';
+        deathScreen.style.left = '0';
+        deathScreen.style.width = '100%';
+        deathScreen.style.height = '100%';
+        deathScreen.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        deathScreen.style.display = 'flex';
+        deathScreen.style.flexDirection = 'column';
+        deathScreen.style.justifyContent = 'center';
+        deathScreen.style.alignItems = 'center';
+        deathScreen.style.zIndex = '1000';
+        deathScreen.style.opacity = '0';
+        deathScreen.style.transition = 'opacity 2s ease';
+        
+        // Death message
+        const deathMessage = document.createElement('h1');
+        deathMessage.textContent = 'You have perished in the labyrinth...';
+        deathMessage.style.color = '#ff3333';
+        deathMessage.style.fontFamily = 'Cinzel, serif';
+        deathMessage.style.fontSize = '3rem';
+        deathMessage.style.marginBottom = '2rem';
+        deathMessage.style.textShadow = '0 0 10px #ff0000';
+        deathScreen.appendChild(deathMessage);
+        
+        // Retry button
+        const retryButton = document.createElement('button');
+        retryButton.textContent = 'Try Again';
+        retryButton.style.backgroundColor = '#333';
+        retryButton.style.color = '#fff';
+        retryButton.style.border = '2px solid #ff3333';
+        retryButton.style.padding = '1rem 2rem';
+        retryButton.style.fontSize = '1.5rem';
+        retryButton.style.fontFamily = 'Cinzel, serif';
+        retryButton.style.cursor = 'pointer';
+        retryButton.style.margin = '1rem';
+        retryButton.style.borderRadius = '5px';
+        retryButton.addEventListener('click', () => {
+            window.location.reload();
+        });
+        deathScreen.appendChild(retryButton);
+        
+        // Add to DOM
+        document.getElementById('game-container').appendChild(deathScreen);
+        
+        // Fade in
+        setTimeout(() => {
+            deathScreen.style.opacity = '1';
+        }, 100);
     }
     
     // Find a safe position to spawn the player
@@ -276,6 +494,13 @@ class Game {
             }
         });
         
+        // Add attack key (left mouse button)
+        document.addEventListener('mousedown', (event) => {
+            if (event.button === 0 && this.weaponSystem) { // Left mouse button
+                this.weaponSystem.staffAttack();
+            }
+        });
+        
         // Ensure the camera stays at eye level
         this.renderer.camera.position.y = this.player.eyeLevel;
     }
@@ -441,7 +666,9 @@ class Game {
         this.sounds = {
             footsteps: new Audio('sounds/footsteps_stone.mp3'), // You'll need to add this file
             torchFlicker: new Audio('sounds/torch_flicker.mp3'), // You'll need to add this file
-            staffHum: new Audio('sounds/staff_hum.mp3') // New sound for the magic staff
+            staffHum: new Audio('sounds/staff_hum.mp3'), // New sound for the magic staff
+            enemyAlert: new Audio('sounds/enemy_alert.mp3'), // Sound for when enemies detect player
+            staffAttack: new Audio('sounds/staff_attack.mp3') // Sound for staff attack
         };
         
         // Prepare the footstep sound
@@ -476,6 +703,16 @@ class Game {
         // Update input and movement with collision detection
         this.input.update(deltaTime, this.collisionManager);
         
+        // Update enemy manager
+        if (this.enemyManager) {
+            this.enemyManager.update(deltaTime, this.renderer.camera);
+        }
+        
+        // Update weapon system
+        if (this.weaponSystem) {
+            this.weaponSystem.update(deltaTime);
+        }
+        
         // Update audio based on movement
         this.updateAudio(deltaTime);
         
@@ -490,6 +727,12 @@ class Game {
         // If we're falling too quickly or go below the world bounds, reset
         if (pos.y < -20 || this.input.velocity.y < -30) {
             this.resetToLastValidPosition();
+        }
+        
+        // Gradually heal player over time (very slow)
+        if (this.player.health < this.player.maxHealth) {
+            this.player.health = Math.min(this.player.maxHealth, this.player.health + 0.5 * deltaTime);
+            this.updateHealthDisplay();
         }
         
         // Render the scene with time parameter for effects
