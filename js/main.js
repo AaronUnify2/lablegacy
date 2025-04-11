@@ -38,9 +38,16 @@ class Game {
             inventory: [] // Player's inventory
         };
         
+        // Fall safety values
+        this.fallSafetyEnabled = true;
+        this.lastValidPosition = null;
+        this.groundCheckInterval = null;
+        
         // Bind methods
         this.update = this.update.bind(this);
         this.init = this.init.bind(this);
+        this.checkForGround = this.checkForGround.bind(this);
+        this.findSafeSpawnPosition = this.findSafeSpawnPosition.bind(this);
     }
     
     async init() {
@@ -64,28 +71,14 @@ class Game {
                 }
             }
             
-            // Start the player in a safe position above the first room
-            const firstRoom = dungeon.rooms[0];
-            this.renderer.camera.position.set(
-                firstRoom.x + firstRoom.width / 2,
-                this.player.eyeLevel + 1, // Position camera at eye level plus a safety margin
-                firstRoom.y + firstRoom.height / 2
-            );
+            // Instead of directly setting position, find a safe spawn point
+            const safePosition = this.findSafeSpawnPosition(dungeon.rooms);
+            this.renderer.camera.position.copy(safePosition);
             
-            // Make sure we have valid collisions before proceeding
-            const checkPosition = this.renderer.camera.position.clone();
-            checkPosition.y -= this.player.height / 2 + 0.1; // Check below feet
+            // Store this as a valid position in case we need to reset
+            this.lastValidPosition = safePosition.clone();
             
-            const groundCheck = this.collisionManager.checkCollision(checkPosition, 0.5);
-            console.log('Initial ground check:', groundCheck);
-            
-            if (!groundCheck.collides) {
-                // If no ground is detected, force the player to a safe height
-                console.log('No ground detected, adjusting height...');
-                this.renderer.camera.position.y = this.player.eyeLevel + 2;
-            }
-            
-            // Create magic staff AFTER we've confirmed the player is in a safe position
+            // Create magic staff AFTER confirming the player is in a safe position
             this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
             
             // Add atmospheric sound
@@ -93,6 +86,9 @@ class Game {
             
             // Set first-person mode controls
             this.setupFirstPersonMode();
+            
+            // Start regular ground checks to prevent falling through terrain
+            this.enableFallSafety();
             
             // Hide loading screen with slight delay for dramatic effect
             setTimeout(() => {
@@ -110,6 +106,141 @@ class Game {
             
         } catch (error) {
             console.error('Error initializing game:', error);
+        }
+    }
+    
+    // Find a safe position to spawn the player
+    findSafeSpawnPosition(rooms) {
+        // Start with the first room as a fallback
+        const firstRoom = rooms[0];
+        const position = new THREE.Vector3(
+            firstRoom.x + firstRoom.width / 2,
+            this.player.eyeLevel, 
+            firstRoom.y + firstRoom.height / 2
+        );
+        
+        // Try multiple potential spawn points to find one with solid ground
+        const potentialSpawns = [
+            // Center of first room
+            {
+                x: firstRoom.x + firstRoom.width / 2,
+                y: this.player.eyeLevel,
+                z: firstRoom.y + firstRoom.height / 2
+            },
+            // Quarter into the first room
+            {
+                x: firstRoom.x + firstRoom.width / 4,
+                y: this.player.eyeLevel,
+                z: firstRoom.y + firstRoom.height / 4
+            },
+            // Three quarters into the first room
+            {
+                x: firstRoom.x + (firstRoom.width * 3) / 4,
+                y: this.player.eyeLevel,
+                z: firstRoom.y + (firstRoom.height * 3) / 4
+            }
+        ];
+        
+        // Add centers of other rooms as potential spawns
+        for (let i = 1; i < Math.min(rooms.length, 5); i++) {
+            const room = rooms[i];
+            potentialSpawns.push({
+                x: room.x + room.width / 2,
+                y: this.player.eyeLevel,
+                z: room.y + room.height / 2
+            });
+        }
+        
+        // Try each potential spawn position
+        for (const spawn of potentialSpawns) {
+            const testPosition = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
+            
+            // Check if there's ground below this position
+            const hasGround = this.checkForGround(testPosition);
+            
+            if (hasGround) {
+                console.log('Found safe spawn position:', testPosition);
+                return testPosition;
+            }
+        }
+        
+        // If all else fails, add a significant height buffer to avoid falling
+        position.y = this.player.eyeLevel + 5;
+        console.log('Using fallback spawn with height buffer:', position);
+        return position;
+    }
+    
+    // Check if there's ground below a position
+    checkForGround(position) {
+        // Create a ray pointing downward from the position
+        const checkPosition = position.clone();
+        checkPosition.y -= 0.1; // Start slightly below position to avoid self-collision
+        
+        // Check within a safe range (player height + a bit more)
+        const range = this.player.height + 2;
+        
+        // Find any floor beneath this position
+        const floorRaycast = this.collisionManager.findFloorBelow(checkPosition, range);
+        
+        if (floorRaycast && floorRaycast.collider) {
+            // If found a floor, calculate proper height and return true
+            const floorY = floorRaycast.point.y;
+            position.y = floorY + this.player.eyeLevel;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Enable fall safety system
+    enableFallSafety() {
+        this.fallSafetyEnabled = true;
+        
+        // Set up regular ground checks
+        this.groundCheckInterval = setInterval(() => {
+            if (!this.isRunning) return;
+            
+            // Get current position
+            const currentPosition = this.renderer.camera.position.clone();
+            
+            // If falling too quickly or below the world bounds, reset position
+            if (currentPosition.y < -20 || this.input.velocity.y < -30) {
+                console.log('Fall detected! Resetting to last valid position.');
+                this.resetToLastValidPosition();
+                return;
+            }
+            
+            // Check if we're on solid ground
+            const isGrounded = this.input.isGrounded;
+            
+            // If we're grounded, remember this as a safe position
+            if (isGrounded) {
+                this.lastValidPosition = currentPosition.clone();
+            }
+        }, 500); // Check every half second
+    }
+    
+    // Disable fall safety system
+    disableFallSafety() {
+        this.fallSafetyEnabled = false;
+        
+        if (this.groundCheckInterval) {
+            clearInterval(this.groundCheckInterval);
+            this.groundCheckInterval = null;
+        }
+    }
+    
+    // Reset player to last valid position
+    resetToLastValidPosition() {
+        if (this.lastValidPosition) {
+            // Reset position
+            this.renderer.camera.position.copy(this.lastValidPosition);
+            
+            // Reset velocity to prevent continued falling
+            this.input.velocity.set(0, 0, 0);
+            
+            // Show a message to the player
+            this.showMessage('You were caught by a mysterious force...');
         }
     }
     
@@ -350,6 +481,16 @@ class Game {
         
         // Update any curse effects
         this.updateCurseEffects(currentTime, deltaTime);
+        
+        // If we're grounded, remember this as a valid position
+        if (this.input.isGrounded && this.fallSafetyEnabled) {
+            this.lastValidPosition = this.renderer.camera.position.clone();
+        }
+        
+        // If we're falling too quickly or go below the world bounds, reset
+        if (pos.y < -20 || this.input.velocity.y < -30) {
+            this.resetToLastValidPosition();
+        }
         
         // Render the scene with time parameter for effects
         this.renderer.render(currentTime);
