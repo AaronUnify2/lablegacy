@@ -95,7 +95,9 @@ export class CollisionManager {
                         return {
                             collides: true,
                             collider: collider,
-                            isEnemy: true
+                            isEnemy: true,
+                            enemyCenter: cylinderCenter,
+                            horizontalDistance: horizontalDistance
                         };
                     }
                 }
@@ -136,32 +138,56 @@ export class CollisionManager {
         if (collision.collides) {
             // Special handling for enemy collisions
             if (collision.isEnemy) {
-                // For enemy collisions, just push the player back
-                // Calculate direction from enemy to player
-                const enemyCenter = new THREE.Vector3(
-                    (collision.collider.minX + collision.collider.maxX) / 2,
-                    (collision.collider.minY + collision.collider.maxY) / 2,
-                    (collision.collider.minZ + collision.collider.maxZ) / 2
+                // For enemy collisions, push the player back horizontally only
+                // Calculate direction from enemy to player (horizontal only)
+                const enemyCenter = collision.enemyCenter;
+                
+                // Create a horizontal push direction (ignore Y to prevent pushing through floor)
+                const pushDirection = new THREE.Vector3(
+                    position.x - enemyCenter.x,
+                    0,  // Important: No vertical component
+                    position.z - enemyCenter.z
                 );
                 
-                // Get direction away from enemy
-                const pushDirection = new THREE.Vector3()
-                    .subVectors(position, enemyCenter)
-                    .normalize();
+                // Normalize the direction vector
+                if (pushDirection.lengthSq() === 0) {
+                    // If directly on top of the enemy, push in a random direction
+                    pushDirection.x = Math.random() - 0.5;
+                    pushDirection.z = Math.random() - 0.5;
+                }
+                pushDirection.normalize();
                 
                 // Create a position that's pushed away from the enemy
                 // Use a stronger push to ensure the player doesn't get stuck
-                const pushDistance = radius + 0.6; // Extra 0.1 units to avoid getting stuck
-                const resolvedPosition = new THREE.Vector3()
-                    .addVectors(enemyCenter, pushDirection.multiplyScalar(pushDistance));
+                const pushDistance = radius + 0.7; // Extra margin to avoid getting stuck
+                const resolvedPosition = new THREE.Vector3();
                 
-                // Keep the Y coordinate from the original position
-                resolvedPosition.y = position.y;
+                // Calculate the push position - only X and Z components
+                resolvedPosition.x = enemyCenter.x + pushDirection.x * pushDistance;
+                resolvedPosition.y = position.y; // Keep the Y coordinate from original position
+                resolvedPosition.z = enemyCenter.z + pushDirection.z * pushDistance;
                 
                 // Check if the resolved position would cause another collision
-                if (this.checkCollision(resolvedPosition, radius).collides) {
-                    // If it would, fall back to the previous position
-                    return previousPosition;
+                const secondaryCollision = this.checkCollision(resolvedPosition, radius);
+                if (secondaryCollision.collides) {
+                    if (secondaryCollision.isEnemy) {
+                        // If hitting another enemy, try an alternative direction
+                        pushDirection.x = -pushDirection.x;
+                        pushDirection.z = -pushDirection.z;
+                        
+                        resolvedPosition.x = enemyCenter.x + pushDirection.x * pushDistance;
+                        resolvedPosition.z = enemyCenter.z + pushDirection.z * pushDistance;
+                        
+                        // Check one more time
+                        if (this.checkCollision(resolvedPosition, radius).collides) {
+                            // If still colliding, use the previous position as fallback
+                            return previousPosition;
+                        }
+                    } else {
+                        // If we hit a wall or other environment object
+                        // Just use the previous position as fallback
+                        return previousPosition;
+                    }
                 }
                 
                 return resolvedPosition;
