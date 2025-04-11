@@ -386,18 +386,37 @@ canvas {
 
     /* Add these styles to your styles.css file */
 
-/* Light toggle button special styling */
+
+
+
+
+
+
+/* Add these styles to your styles.css file */
+
+/* Light toggle button special styling - default state (off) */
 #move-center {
-    background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
-    border-color: #557799 !important;
-    color: #aaccff;
+    background: radial-gradient(circle at 30% 30%, #222, #111) !important;
+    border-color: #444 !important;
+    color: #888;
     font-size: 24px !important;
-    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                 0 4px 0 rgba(0, 0, 0, 0.8),
                 inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(51, 102, 255, 0.4) !important;
-    animation: pulse-light 3s infinite alternate;
+                0 0 15px rgba(50, 50, 50, 0.3) !important;
+}
+
+/* Light toggle button when light is on */
+#move-center.light-on {
+    background: radial-gradient(circle at 30% 30%, #1a3366, #0d1a33) !important;
+    border-color: #3366aa !important;
+    color: #aaccff;
+    text-shadow: 0 0 10px rgba(51, 102, 255, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(51, 102, 255, 0.5) !important;
+    animation: pulse-blue-light 3s infinite alternate;
 }
 
 #move-center.active {
@@ -408,7 +427,7 @@ canvas {
                 0 0 20px rgba(100, 150, 255, 0.7) !important;
 }
 
-@keyframes pulse-light {
+@keyframes pulse-blue-light {
     0% {
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 4px 0 rgba(0, 0, 0, 0.8),
@@ -427,32 +446,4 @@ canvas {
                     inset 0 0 10px rgba(0, 0, 0, 0.5),
                     0 0 8px rgba(51, 102, 255, 0.4);
     }
-}
-
-/* Light toggle feedback message styling */
-.light-toggle-message {
-    position: absolute;
-    bottom: 10%;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    font-size: 1.2rem;
-    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-    height: 100%;
-    background: linear-gradient(
-        to bottom,
-        transparent 50%,
-        rgba(0, 0, 0, 0.1) 50%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0.1;
-    mix-blend-mode: overlay;
 }
