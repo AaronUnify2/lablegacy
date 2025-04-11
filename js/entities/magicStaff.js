@@ -32,7 +32,7 @@ export class MagicStaff {
             
             // Show a message when staff appears
             this.showMessage("Staff materialized");
-        }, 6000); // 1 second delay
+        }, 1000); // 1 second delay
         
         // Set up event listener for toggling the light
         document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
@@ -70,6 +70,13 @@ export class MagicStaff {
         
         const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
         
+        // Properly position and rotate the staff
+        staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
+        staffMesh.position.y = -this.staffLength / 2; // Center the staff
+        
+        // Create a separate orb group to position it correctly
+        const orbGroup = new THREE.Group();
+        
         // Create a decorative top wrap near the orb
         const topWrapGeometry = new THREE.CylinderGeometry(
             this.staffThickness * 1.5,
@@ -103,8 +110,10 @@ export class MagicStaff {
             opacity: 0.9
         });
         
+        // Position the orb correctly at the top of the staff
+        const orbPosition = new THREE.Vector3(0, this.staffLength / 2 + this.orbSize * 0.8, 0);
         const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-        orb.position.y = this.staffLength / 2 + this.orbSize * 0.8;
+        orb.position.copy(orbPosition);
         
         // Add a point light at the orb position (ambient pool light)
         this.light = new THREE.PointLight(
@@ -113,7 +122,7 @@ export class MagicStaff {
             this.lightDistance,
             1.5 // Light decay (quadratic)
         );
-        this.light.position.copy(orb.position);
+        this.light.position.copy(orbPosition);
         
         // Add a spotlight at the orb position (directional beam)
         this.spotlight = new THREE.SpotLight(
@@ -124,11 +133,11 @@ export class MagicStaff {
             0.5, // penumbra - soft edge
             1.0 // decay
         );
-        this.spotlight.position.copy(orb.position);
+        this.spotlight.position.copy(orbPosition);
         
         // Create a spotlight target
         this.spotlightTarget = new THREE.Object3D();
-        this.spotlightTarget.position.set(0, 0, -1); // Forward direction
+        this.spotlightTarget.position.set(0, 0, -2); // Forward direction, 2 units away
         this.staff.add(this.spotlightTarget);
         this.spotlight.target = this.spotlightTarget;
         
@@ -141,7 +150,7 @@ export class MagicStaff {
         });
         
         const innerOrb = new THREE.Mesh(innerOrbGeometry, innerOrbMaterial);
-        innerOrb.position.copy(orb.position);
+        innerOrb.position.copy(orbPosition);
         
         // Add ethereal glow effect
         const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.5, 16, 16);
@@ -153,11 +162,7 @@ export class MagicStaff {
         });
         
         const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        glowMesh.position.copy(orb.position);
-        
-        // Position the staff handle and rotate it
-        staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
-        staffMesh.position.y = -this.staffLength / 2; // Center the staff
+        glowMesh.position.copy(orbPosition);
         
         // Add all components to the staff group
         this.staff.add(staffMesh);
@@ -167,6 +172,11 @@ export class MagicStaff {
         this.staff.add(glowMesh);
         this.staff.add(this.light);
         this.staff.add(this.spotlight);
+        
+        // Store references to the visual components for later updates
+        this.orbMesh = orb;
+        this.innerOrbMesh = innerOrb;
+        this.glowMeshEffect = glowMesh;
         
         // Add the staff to the scene
         this.scene.add(this.staff);
@@ -326,8 +336,9 @@ export class MagicStaff {
         }
     }
     
-    // Toggle light on/off
     toggleLight() {
+        if (!this.staff) return false; // Don't toggle if staff hasn't been created yet
+        
         this.isLightOn = !this.isLightOn;
         
         if (this.isLightOn) {
@@ -343,15 +354,17 @@ export class MagicStaff {
             }
             
             // Make orb glow
-            if (this.staff) {
-                this.staff.children.forEach(child => {
-                    if (child.material && child.material.emissive) {
-                        child.material.emissive.set(0x3366ff);
-                        if (child.material.emissiveIntensity) {
-                            child.material.emissiveIntensity = 2.0;
-                        }
-                    }
-                });
+            if (this.orbMesh && this.orbMesh.material) {
+                this.orbMesh.material.emissive.set(0x3366ff);
+                this.orbMesh.material.emissiveIntensity = 2.0;
+            }
+            
+            if (this.innerOrbMesh && this.innerOrbMesh.material) {
+                this.innerOrbMesh.material.opacity = 0.7;
+            }
+            
+            if (this.glowMeshEffect && this.glowMeshEffect.material) {
+                this.glowMeshEffect.material.opacity = 0.15;
             }
             
             // Show visual feedback
@@ -372,15 +385,17 @@ export class MagicStaff {
             }
             
             // Make orb dim
-            if (this.staff) {
-                this.staff.children.forEach(child => {
-                    if (child.material && child.material.emissive) {
-                        child.material.emissive.set(0x112244);
-                        if (child.material.emissiveIntensity) {
-                            child.material.emissiveIntensity = 0.3;
-                        }
-                    }
-                });
+            if (this.orbMesh && this.orbMesh.material) {
+                this.orbMesh.material.emissive.set(0x112244);
+                this.orbMesh.material.emissiveIntensity = 0.3;
+            }
+            
+            if (this.innerOrbMesh && this.innerOrbMesh.material) {
+                this.innerOrbMesh.material.opacity = 0.3;
+            }
+            
+            if (this.glowMeshEffect && this.glowMeshEffect.material) {
+                this.glowMeshEffect.material.opacity = 0.05;
             }
             
             // Show visual feedback
