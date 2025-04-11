@@ -21,6 +21,7 @@ export class EnemyManager {
         
         // Collision settings
         this.enableCollisions = true; // Master toggle for enemy collisions
+        this.enemyColliders = []; // Array to store enemy collider indices
         
         // Safety check interval - periodically check if enemies are in valid positions
         this.safetyCheckInterval = 5; // Check every 5 seconds
@@ -45,6 +46,9 @@ export class EnemyManager {
                 
                 // Update enemy
                 enemy.update(validDeltaTime, camera);
+                
+                // Update enemy collider position in the collision manager
+                this.updateEnemyCollider(i);
             }
         }
         
@@ -53,6 +57,18 @@ export class EnemyManager {
         if (this.timeSinceLastCheck >= this.safetyCheckInterval) {
             this.performSafetyChecks();
             this.timeSinceLastCheck = 0;
+        }
+    }
+    
+    // Update the collider for an enemy
+    updateEnemyCollider(index) {
+        const enemy = this.enemies[index];
+        if (!enemy || !enemy.group) return;
+        
+        // Enemy collider index might be different from the enemy index
+        const colliderIndex = this.enemyColliders[index];
+        if (colliderIndex !== undefined && this.collisionManager) {
+            this.collisionManager.updateCollider(colliderIndex);
         }
     }
     
@@ -65,13 +81,19 @@ export class EnemyManager {
             
             // Check if enemy is in a valid position
             if (this.collisionManager) {
-                // Check if enemy is stuck in a collision
+                // Check if enemy is stuck in a collision (with environment, not other enemies)
                 const collision = this.collisionManager.checkCollision(
                     enemy.group.position, 
                     enemy.collisionRadius
                 );
                 
-                if (collision.collides) {
+                // Ignore collisions with enemies themselves by checking object type
+                const collidesWithEnvironment = 
+                    collision.collides && 
+                    collision.collider && 
+                    !this.isEnemyCollider(collision.collider.object);
+                
+                if (collidesWithEnvironment) {
                     if (this.debug) console.log(`Enemy ${i} is stuck in collision, resetting position`);
                     enemy.resetToLastValidPosition();
                 }
@@ -90,6 +112,16 @@ export class EnemyManager {
                 }
             }
         }
+    }
+    
+    // Helper to check if a collider belongs to an enemy
+    isEnemyCollider(object) {
+        for (const enemy of this.enemies) {
+            if (enemy && enemy.group && (object === enemy.group || object.parent === enemy.group)) {
+                return true;
+            }
+        }
+        return false;
     }
     
     spawnTestEnemies() {
@@ -135,7 +167,10 @@ export class EnemyManager {
         
         // Create enemy
         const enemy = new Enemy(this.scene, testPosition, this.collisionManager, this.player);
-        this.enemies.push(enemy);
+        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
+        
+        // Add enemy to collision system
+        this.addEnemyToCollisionSystem(enemy, enemyIndex);
         
         // Show some visual effect
         this.showSimpleSpawnEffect(testPosition);
@@ -183,7 +218,10 @@ export class EnemyManager {
         enemy.patrolRadius = 5; // Larger patrol radius
         enemy.patrolSpeed = 0.7; // Faster patrol speed
         
-        this.enemies.push(enemy);
+        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
+        
+        // Add enemy to collision system
+        this.addEnemyToCollisionSystem(enemy, enemyIndex);
         
         // Show some visual effect
         this.showSimpleSpawnEffect(spawnPos);
@@ -228,7 +266,10 @@ export class EnemyManager {
             enemy.patrolSpeed = patrolSpeed;
         }
         
-        this.enemies.push(enemy);
+        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
+        
+        // Add enemy to collision system
+        this.addEnemyToCollisionSystem(enemy, enemyIndex);
         
         // Show some visual effect
         this.showSimpleSpawnEffect(spawnPos);
@@ -236,6 +277,24 @@ export class EnemyManager {
         if (this.debug) console.log(`Spawned enemy at custom position (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
         
         return enemy; // Return the enemy for further configuration
+    }
+    
+    // Add an enemy to the collision system
+    addEnemyToCollisionSystem(enemy, enemyIndex) {
+        if (!this.collisionManager || !enemy || !enemy.group) return;
+        
+        // Create a box for this enemy's body
+        const colliderIndex = this.collisionManager.addCollider(enemy.group, 'cylinder');
+        
+        // Store the collider index
+        this.enemyColliders[enemyIndex] = colliderIndex;
+        
+        // Tag the collider as an enemy for special handling
+        if (this.collisionManager.colliders[colliderIndex]) {
+            this.collisionManager.colliders[colliderIndex].isEnemy = true;
+        }
+        
+        return colliderIndex;
     }
     
     showSimpleSpawnEffect(position) {
@@ -335,12 +394,26 @@ export class EnemyManager {
     
     // Clear all enemies
     clear() {
+        // Remove colliders from collision system first
+        if (this.collisionManager) {
+            for (let i = 0; i < this.enemyColliders.length; i++) {
+                const colliderIndex = this.enemyColliders[i];
+                if (colliderIndex !== undefined) {
+                    this.collisionManager.removeCollider(colliderIndex);
+                }
+            }
+        }
+        
+        // Clear collider indices
+        this.enemyColliders = [];
+        
         // Remove all enemies from the scene
         for (const enemy of this.enemies) {
             if (enemy && enemy.group) {
                 this.scene.remove(enemy.group);
             }
         }
+        
         this.enemies = [];
         if (this.debug) console.log("Cleared all enemies");
     }
