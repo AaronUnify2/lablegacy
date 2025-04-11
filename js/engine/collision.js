@@ -19,7 +19,9 @@ export class CollisionManager {
             minY: box.min.y,
             maxY: box.max.y,
             minZ: box.min.z,
-            maxZ: box.max.z
+            maxZ: box.max.z,
+            // Add flag to identify enemy colliders
+            isEnemy: object.userData ? object.userData.isEnemy : false
         };
         
         this.colliders.push(collider);
@@ -52,31 +54,78 @@ export class CollisionManager {
         return false;
     }
     
-    checkCollision(position, radius = 0.5) {
+    // Check collision with option to ignore enemy colliders
+    checkCollision(position, radius = 0.5, ignoreEnemies = false) {
         // Simple sphere-box collision check
         for (const collider of this.colliders) {
-            // Expand the box by the radius of the player's collision sphere
-            const expandedMinX = collider.minX - radius;
-            const expandedMaxX = collider.maxX + radius;
-            const expandedMinY = collider.minY - radius;
-            const expandedMaxY = collider.maxY + radius;
-            const expandedMinZ = collider.minZ - radius;
-            const expandedMaxZ = collider.maxZ + radius;
+            // Skip enemy colliders if specified
+            if (ignoreEnemies && collider.isEnemy) {
+                continue;
+            }
             
-            // Check if position is inside the expanded box
-            if (position.x >= expandedMinX && position.x <= expandedMaxX &&
-                position.y >= expandedMinY && position.y <= expandedMaxY &&
-                position.z >= expandedMinZ && position.z <= expandedMaxZ) {
-                return {
-                    collides: true,
-                    collider: collider
-                };
+            // Special handling for cylinder-type colliders (enemies)
+            if (collider.type === 'cylinder' && collider.isEnemy) {
+                // For enemy cylinders, use cylinder-cylinder collision
+                // Get the center of the enemy cylinder
+                const cylinderCenter = new THREE.Vector3(
+                    (collider.minX + collider.maxX) / 2,
+                    (collider.minY + collider.maxY) / 2,
+                    (collider.minZ + collider.maxZ) / 2
+                );
+                
+                // Calculate horizontal distance (ignoring Y axis)
+                const dx = position.x - cylinderCenter.x;
+                const dz = position.z - cylinderCenter.z;
+                const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+                
+                // Calculate cylinder radii - assuming enemy radius is 0.5
+                const enemyRadius = 0.5;
+                
+                // If horizontal distance is less than sum of radii, we have a collision
+                if (horizontalDistance < (radius + enemyRadius)) {
+                    // Vertical check - player height is ~2.0 units, enemy height is ~1.8 units
+                    // Only register collision if vertical positions overlap
+                    const playerBottom = position.y - radius;
+                    const playerTop = position.y + radius;
+                    const enemyBottom = collider.minY;
+                    const enemyTop = collider.maxY;
+                    
+                    // Check for vertical overlap
+                    if (!(playerBottom > enemyTop || playerTop < enemyBottom)) {
+                        return {
+                            collides: true,
+                            collider: collider,
+                            isEnemy: true
+                        };
+                    }
+                }
+            } else {
+                // Regular box collision check for environment
+                // Expand the box by the radius of the player's collision sphere
+                const expandedMinX = collider.minX - radius;
+                const expandedMaxX = collider.maxX + radius;
+                const expandedMinY = collider.minY - radius;
+                const expandedMaxY = collider.maxY + radius;
+                const expandedMinZ = collider.minZ - radius;
+                const expandedMaxZ = collider.maxZ + radius;
+                
+                // Check if position is inside the expanded box
+                if (position.x >= expandedMinX && position.x <= expandedMaxX &&
+                    position.y >= expandedMinY && position.y <= expandedMaxY &&
+                    position.z >= expandedMinZ && position.z <= expandedMaxZ) {
+                    return {
+                        collides: true,
+                        collider: collider,
+                        isEnemy: false
+                    };
+                }
             }
         }
         
         return {
             collides: false,
-            collider: null
+            collider: null,
+            isEnemy: false
         };
     }
     
@@ -85,6 +134,39 @@ export class CollisionManager {
         const collision = this.checkCollision(position, radius);
         
         if (collision.collides) {
+            // Special handling for enemy collisions
+            if (collision.isEnemy) {
+                // For enemy collisions, just push the player back
+                // Calculate direction from enemy to player
+                const enemyCenter = new THREE.Vector3(
+                    (collision.collider.minX + collision.collider.maxX) / 2,
+                    (collision.collider.minY + collision.collider.maxY) / 2,
+                    (collision.collider.minZ + collision.collider.maxZ) / 2
+                );
+                
+                // Get direction away from enemy
+                const pushDirection = new THREE.Vector3()
+                    .subVectors(position, enemyCenter)
+                    .normalize();
+                
+                // Create a position that's pushed away from the enemy
+                // Use a stronger push to ensure the player doesn't get stuck
+                const pushDistance = radius + 0.6; // Extra 0.1 units to avoid getting stuck
+                const resolvedPosition = new THREE.Vector3()
+                    .addVectors(enemyCenter, pushDirection.multiplyScalar(pushDistance));
+                
+                // Keep the Y coordinate from the original position
+                resolvedPosition.y = position.y;
+                
+                // Check if the resolved position would cause another collision
+                if (this.checkCollision(resolvedPosition, radius).collides) {
+                    // If it would, fall back to the previous position
+                    return previousPosition;
+                }
+                
+                return resolvedPosition;
+            }
+            
             // Calculate penetration depth along each axis
             const collider = collision.collider;
             
