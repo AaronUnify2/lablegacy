@@ -2,6 +2,7 @@ import { Renderer } from './engine/renderer.js';
 import { InputManager } from './engine/input.js';
 import { DungeonGenerator } from './systems/dungeonGenerator.js';
 import { CollisionManager } from './engine/collision.js';
+import { MagicStaff } from './entities/magicStaff.js';
 
 class Game {
     constructor() {
@@ -23,6 +24,18 @@ class Game {
             curseLevel: 0, // Increases as player progresses
             hasKey: false,
             curseEffects: []
+        };
+        
+        // Player properties
+        this.player = {
+            magicStaff: null,
+            height: 2.0, // Player height in meters
+            eyeLevel: 1.7, // Eye level height in meters (for camera)
+            walkingSpeed: 5.0, // Walking speed in meters per second
+            runningSpeed: 8.0, // Running speed in meters per second
+            isRunning: false, // Whether the player is currently running
+            canInteract: true, // Whether the player can interact with objects
+            inventory: [] // Player's inventory
         };
         
         // Bind methods
@@ -54,12 +67,18 @@ class Game {
         const firstRoom = dungeon.rooms[0];
         this.renderer.camera.position.set(
             firstRoom.x + firstRoom.width / 2,
-            2, // Start slightly above the floor
+            this.player.eyeLevel, // Position camera at eye level
             firstRoom.y + firstRoom.height / 2
         );
         
+        // Create magic staff (illumination source)
+        this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
+        
         // Add atmospheric sound
         this.setupAudio();
+        
+        // Set first-person mode controls
+        this.setupFirstPersonMode();
         
         // Hide loading screen with slight delay for dramatic effect
         setTimeout(() => {
@@ -76,6 +95,155 @@ class Game {
         }, 3000); // Show lore text for 3 seconds
     }
     
+    setupFirstPersonMode() {
+        // Adjust camera properties for first-person
+        this.renderer.camera.fov = 75; // Wider FOV for better immersion
+        this.renderer.camera.near = 0.1; // Closer near plane
+        this.renderer.camera.updateProjectionMatrix();
+        
+        // Set input manager to use first-person settings
+        this.input.moveSpeed = this.player.walkingSpeed;
+        this.input.playerHeight = this.player.height;
+        
+        // Add running capability
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'ShiftLeft') {
+                this.player.isRunning = true;
+                this.input.moveSpeed = this.player.runningSpeed;
+            }
+        });
+        
+        document.addEventListener('keyup', (event) => {
+            if (event.code === 'ShiftLeft') {
+                this.player.isRunning = false;
+                this.input.moveSpeed = this.player.walkingSpeed;
+            }
+        });
+        
+        // Add interaction key (E)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'KeyE' && this.player.canInteract) {
+                this.tryInteract();
+            }
+        });
+        
+        // Ensure the camera stays at eye level
+        this.renderer.camera.position.y = this.player.eyeLevel;
+    }
+    
+    tryInteract() {
+        // Cast a ray forward to find interactive objects
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.renderer.camera.quaternion);
+        const origin = this.renderer.camera.position.clone();
+        
+        // Maximum interaction distance
+        const interactionRange = 2.5;
+        
+        // Raycast against objects
+        const hit = this.collisionManager.raycast(origin, forward, interactionRange);
+        
+        if (hit) {
+            console.log('Interacting with object:', hit.collider.object);
+            
+            // Check if it's the key
+            if (hit.collider.object.userData && hit.collider.object.userData.isKey) {
+                this.collectKey(hit.collider.object);
+            }
+            
+            // Check if it's a door
+            if (hit.collider.object.userData && hit.collider.object.userData.isDoor) {
+                this.interactWithDoor(hit.collider.object);
+            }
+        }
+    }
+    
+    collectKey(keyObject) {
+        console.log('Collected key!');
+        this.gameState.hasKey = true;
+        
+        // Add key to inventory
+        this.player.inventory.push('key');
+        
+        // Remove key from scene
+        this.renderer.scene.remove(keyObject);
+        
+        // Remove key collider
+        const colliderIndex = this.collisionManager.colliders.findIndex(c => c.object === keyObject);
+        if (colliderIndex !== -1) {
+            this.collisionManager.removeCollider(colliderIndex);
+        }
+        
+        // Show message to player
+        this.showMessage('You found an ancient key!');
+    }
+    
+    interactWithDoor(doorObject) {
+        if (this.gameState.hasKey) {
+            console.log('Unlocking door!');
+            // Implement door animation/opening logic here
+            
+            // Remove door from scene or replace with open door model
+            this.renderer.scene.remove(doorObject);
+            
+            // Remove door collider
+            const colliderIndex = this.collisionManager.colliders.findIndex(c => c.object === doorObject);
+            if (colliderIndex !== -1) {
+                this.collisionManager.removeCollider(colliderIndex);
+            }
+            
+            // Show message to player
+            this.showMessage('The door unlocks and opens...');
+        } else {
+            // Show message to player
+            this.showMessage('This door appears to be locked. You need a key.');
+        }
+    }
+    
+    showMessage(text) {
+        // Create or get message container
+        let messageContainer = document.getElementById('message-container');
+        if (!messageContainer) {
+            messageContainer = document.createElement('div');
+            messageContainer.id = 'message-container';
+            messageContainer.style.position = 'absolute';
+            messageContainer.style.bottom = '20%';
+            messageContainer.style.left = '0';
+            messageContainer.style.width = '100%';
+            messageContainer.style.textAlign = 'center';
+            messageContainer.style.color = 'white';
+            messageContainer.style.fontFamily = 'Cinzel, serif';
+            messageContainer.style.fontSize = '1.5rem';
+            messageContainer.style.textShadow = '0 0 5px rgba(0, 0, 0, 0.7)';
+            messageContainer.style.zIndex = '100';
+            messageContainer.style.pointerEvents = 'none';
+            document.getElementById('game-container').appendChild(messageContainer);
+        }
+        
+        // Create message element
+        const message = document.createElement('div');
+        message.textContent = text;
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.5s ease-in, transform 0.5s ease-out';
+        message.style.transform = 'translateY(20px)';
+        message.style.padding = '10px';
+        messageContainer.appendChild(message);
+        
+        // Animate message in
+        setTimeout(() => {
+            message.style.opacity = '1';
+            message.style.transform = 'translateY(0)';
+        }, 100);
+        
+        // Remove message after delay
+        setTimeout(() => {
+            message.style.opacity = '0';
+            message.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                messageContainer.removeChild(message);
+            }, 500);
+        }, 4000);
+    }
+    
     showLoreText() {
         const loadingContent = document.querySelector('.loading-content');
         
@@ -86,6 +254,7 @@ class Game {
             <p>The ancient structure...</p>
             <p>Now consumed by darkness.</p>
             <p>You must discover the machine's purpose before the curse consumes you too.</p>
+            <p>Your magical staff will light the way, but beware what lurks in the shadows...</p>
         `;
         
         // Insert after the title but before the spinner
@@ -122,12 +291,20 @@ class Game {
         // Additional sound effects
         this.sounds = {
             footsteps: new Audio('sounds/footsteps_stone.mp3'), // You'll need to add this file
-            torchFlicker: new Audio('sounds/torch_flicker.mp3') // You'll need to add this file
+            torchFlicker: new Audio('sounds/torch_flicker.mp3'), // You'll need to add this file
+            staffHum: new Audio('sounds/staff_hum.mp3') // New sound for the magic staff
         };
         
         // Prepare the footstep sound
         this.sounds.footsteps.loop = true;
         this.sounds.footsteps.volume = 0;
+        
+        // Prepare the staff humming sound
+        if (this.sounds.staffHum) {
+            this.sounds.staffHum.loop = true;
+            this.sounds.staffHum.volume = 0.2;
+            this.sounds.staffHum.play().catch(() => {});
+        }
     }
     
     update(currentTime) {
@@ -170,7 +347,13 @@ class Game {
         
         if (isMoving) {
             // Gradually increase footstep volume
-            this.sounds.footsteps.volume = Math.min(0.3, this.sounds.footsteps.volume + deltaTime * 2);
+            const targetVolume = this.player.isRunning ? 0.4 : 0.3;
+            const rampSpeed = this.player.isRunning ? 3 : 2;
+            
+            this.sounds.footsteps.volume = Math.min(targetVolume, this.sounds.footsteps.volume + deltaTime * rampSpeed);
+            
+            // Adjust footstep playback rate based on running/walking
+            this.sounds.footsteps.playbackRate = this.player.isRunning ? 1.5 : 1.0;
             
             if (this.sounds.footsteps.paused) {
                 this.sounds.footsteps.play().catch(() => {});
@@ -211,6 +394,15 @@ class Game {
             
             this.renderer.scene.fog.density = baseFog + 
                 Math.sin(currentTime * 0.001 * pulseSpeed) * pulseMagnitude;
+        }
+        
+        // Adjust staff light based on curse level
+        if (this.player.magicStaff) {
+            // As curse increases, staff light may flicker or dim
+            const curseEffect = Math.max(0, 1 - (this.gameState.curseLevel * 0.1));
+            const flickerIntensity = Math.sin(currentTime * 0.002) * (this.gameState.curseLevel * 0.1);
+            
+            this.player.magicStaff.setLightIntensity(2.5 * curseEffect + flickerIntensity);
         }
     }
 }
