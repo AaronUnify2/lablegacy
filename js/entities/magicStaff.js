@@ -20,8 +20,22 @@ export class MagicStaff {
         this.bobSpeed = 2;
         this.swaySpeed = 1.5;
         
+        // Light state
+        this.isLightOn = true;
+        this.savedLightIntensity = this.lightIntensity;
+        
         // Create and add to scene
         this.createStaff();
+        
+        // Set up event listener for toggling the light
+        document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
+        
+        // Also allow keyboard 'L' key to toggle light
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyL') {
+                this.toggleLight();
+            }
+        });
     }
     
     createStaff() {
@@ -268,7 +282,7 @@ export class MagicStaff {
     // Adjust light intensity
     setLightIntensity(intensity) {
         this.lightIntensity = intensity;
-        if (this.light) {
+        if (this.light && this.isLightOn) {
             this.light.intensity = intensity;
         }
     }
@@ -278,5 +292,93 @@ export class MagicStaff {
         if (this.staff) {
             this.staff.visible = visible;
         }
+    }
+    
+    // Toggle light on/off
+    toggleLight() {
+        this.isLightOn = !this.isLightOn;
+        
+        if (this.isLightOn) {
+            // Turn light on
+            if (this.light) {
+                this.light.intensity = this.savedLightIntensity;
+            }
+            
+            // Make orb glow
+            if (this.staff) {
+                this.staff.children.forEach(child => {
+                    if (child.material && child.material.emissive) {
+                        child.material.emissive.set(0x3366ff);
+                        if (child.material.emissiveIntensity) {
+                            child.material.emissiveIntensity = 2.0;
+                        }
+                    }
+                });
+            }
+            
+            // Show visual feedback
+            this.showToggleEffect(true);
+        } else {
+            // Save current intensity
+            if (this.light) {
+                this.savedLightIntensity = this.light.intensity;
+                this.light.intensity = 0;
+            }
+            
+            // Make orb dim
+            if (this.staff) {
+                this.staff.children.forEach(child => {
+                    if (child.material && child.material.emissive) {
+                        child.material.emissive.set(0x112244);
+                        if (child.material.emissiveIntensity) {
+                            child.material.emissiveIntensity = 0.3;
+                        }
+                    }
+                });
+            }
+            
+            // Show visual feedback
+            this.showToggleEffect(false);
+        }
+        
+        return this.isLightOn;
+    }
+    
+    // Show visual effect when toggling the light
+    showToggleEffect(isOn) {
+        // Create a message element
+        const message = document.createElement('div');
+        message.textContent = isOn ? "Staff light activated" : "Staff light deactivated";
+        message.style.position = 'absolute';
+        message.style.bottom = '10%';
+        message.style.left = '0';
+        message.style.width = '100%';
+        message.style.textAlign = 'center';
+        message.style.color = isOn ? '#aaccff' : '#667788';
+        message.style.fontFamily = 'Cinzel, serif';
+        message.style.fontSize = '1.2rem';
+        message.style.textShadow = isOn ? 
+            '0 0 10px rgba(51, 102, 255, 0.7)' : 
+            '0 0 5px rgba(0, 0, 0, 0.7)';
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.5s ease';
+        message.style.zIndex = '1000';
+        message.style.pointerEvents = 'none';
+        
+        // Add to document
+        document.body.appendChild(message);
+        
+        // Fade in
+        setTimeout(() => {
+            message.style.opacity = '1';
+        }, 10);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            message.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(message);
+            }, 500);
+        }, 2000);
     }
 }
