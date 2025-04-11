@@ -34,8 +34,20 @@ export class Enemy {
         // Add to scene
         this.scene.add(this.group);
         
-        // Add collision for the enemy
-        this.colliderIndex = this.collisionManager.addCollider(this.bodyMesh);
+        // Add collision for the enemy - use hitbox mesh if it exists
+        try {
+            this.colliderIndex = this.collisionManager.addCollider(this.hitboxMesh || this.bodyMesh);
+            console.log("Added enemy collider with index:", this.colliderIndex);
+        } catch (error) {
+            console.error("Failed to add enemy collider:", error);
+            // Try to recover by using bodyMesh directly
+            try {
+                this.colliderIndex = this.collisionManager.addCollider(this.bodyMesh);
+                console.log("Recovery: Added body mesh collider with index:", this.colliderIndex);
+            } catch (innerError) {
+                console.error("Complete collider failure:", innerError);
+            }
+        }
     }
     
     createMesh() {
@@ -66,8 +78,35 @@ export class Enemy {
         this.bodyMesh.receiveShadow = true;
         this.bodyMesh.position.y = this.height / 2; // Center vertically
         
+        // Make sure THREE is defined in the global scope
+        if (typeof THREE === 'undefined') {
+            console.error("THREE is not defined in the global scope!");
+            // Try to get it from window
+            if (window.THREE) {
+                console.log("Found THREE on window object, using that instead");
+                const THREE = window.THREE;
+            }
+        }
+        
+        // Create a collision box for the enemy
+        const hitboxGeometry = new THREE.BoxGeometry(
+            this.radius * 2, 
+            this.height,
+            this.radius * 2
+        );
+        const hitboxMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.0, // Invisible
+            wireframe: true
+        });
+        
+        this.hitboxMesh = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
+        this.hitboxMesh.position.y = this.height / 2; // Center vertically
+        
         // Add to group
         this.group.add(this.bodyMesh);
+        this.group.add(this.hitboxMesh);
         
         // Create the head
         const headGeometry = new THREE.SphereGeometry(this.radius * 0.8, 8, 8);
@@ -94,6 +133,9 @@ export class Enemy {
         
         // Position the entire group
         this.group.position.copy(this.position);
+        
+        // Debug collider
+        console.log("Created enemy mesh with position:", this.position);
     }
     
     createEyes() {
