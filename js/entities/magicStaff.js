@@ -6,9 +6,9 @@ export class MagicStaff {
         this.orb = null; // Separate orb group
         this.light = null;
         this.spotlight = null; // Spotlight for forward beam
-        this.lightIntensity = 2.5;
+        this.lightIntensity = 10;
         this.lightColor = 0x3366ff; // Blue-white light
-        this.lightDistance = 3; // 3m radius
+        this.lightDistance = 10; // 3m radius
         this.staffLength = 1.2; // Length of the staff
         this.staffThickness = 0.025; // Thickness of the staff
         this.orbSize = 0.08; // Size of the glowing orb
@@ -119,7 +119,7 @@ export class MagicStaff {
             roughness: 0.1,
             metalness: 0.3,
             emissive: 0x3366ff,
-            emissiveIntensity: 2.0,
+            emissiveIntensity: 8.0,
             transparent: true,
             opacity: 0.9
         });
@@ -139,7 +139,7 @@ export class MagicStaff {
         this.spotlight = new THREE.SpotLight(
             this.lightColor,
             this.lightIntensity,  
-            10, // 10m beam distance
+            25, // 10m beam distance
             Math.PI / 6, // 30 degrees spread
             0.5, // penumbra - soft edge
             1.0 // decay
