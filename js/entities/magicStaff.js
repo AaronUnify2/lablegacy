@@ -3,8 +3,9 @@ export class MagicStaff {
         this.scene = scene;
         this.camera = camera;
         this.staff = null;
+        this.orb = null; // Separate orb group
         this.light = null;
-        this.spotlight = null; // New spotlight for forward beam
+        this.spotlight = null; // Spotlight for forward beam
         this.lightIntensity = 2.5;
         this.lightColor = 0x3366ff; // Blue-white light
         this.lightDistance = 3; // 3m radius
@@ -14,6 +15,9 @@ export class MagicStaff {
         
         // Staff position offset relative to camera
         this.positionOffset = new THREE.Vector3(0.3, -0.4, -0.6);
+        
+        // Orb position offset relative to camera (slightly forward and up from staff)
+        this.orbOffset = new THREE.Vector3(0.3, -0.2, -0.5);
         
         // Staff animation variables
         this.bobAmount = 0.02;
@@ -25,14 +29,9 @@ export class MagicStaff {
         this.isLightOn = true;
         this.savedLightIntensity = this.lightIntensity;
         
-        // Delay staff creation to prevent physics issues
-        setTimeout(() => {
-            // Create and add to scene
-            this.createStaff();
-            
-            // Show a message when staff appears
-            this.showMessage("Staff materialized");
-        }, 1000); // 1 second delay
+        // Create and add to scene
+        this.createStaff();
+        this.createOrb(); // Create orb separately
         
         // Set up event listener for toggling the light
         document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
@@ -46,7 +45,7 @@ export class MagicStaff {
     }
     
     createStaff() {
-        // Create the staff group to hold all staff components
+        // Create the staff group to hold staff components
         this.staff = new THREE.Group();
         
         // Create the wooden staff handle
@@ -70,13 +69,6 @@ export class MagicStaff {
         
         const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
         
-        // Properly position and rotate the staff
-        staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
-        staffMesh.position.y = -this.staffLength / 2; // Center the staff
-        
-        // Create a separate orb group to position it correctly
-        const orbGroup = new THREE.Group();
-        
         // Create a decorative top wrap near the orb
         const topWrapGeometry = new THREE.CylinderGeometry(
             this.staffThickness * 1.5,
@@ -98,7 +90,29 @@ export class MagicStaff {
         const topWrap = new THREE.Mesh(topWrapGeometry, wrapMaterial);
         topWrap.position.y = this.staffLength * 0.4;
         
-        // Create a glowing orb at the top of the staff
+        // Position the staff handle and rotate it
+        staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
+        staffMesh.position.y = -this.staffLength / 2; // Center the staff
+        
+        // Add components to the staff group
+        this.staff.add(staffMesh);
+        this.staff.add(topWrap);
+        
+        // Add the staff to the scene
+        this.scene.add(this.staff);
+        
+        // Store original positions for animation
+        this.originalPosition = this.positionOffset.clone();
+        
+        // Start the animation
+        this.setupAnimations();
+    }
+    
+    createOrb() {
+        // Create a separate orb group
+        this.orb = new THREE.Group();
+        
+        // Create a glowing orb 
         const orbGeometry = new THREE.SphereGeometry(this.orbSize, 16, 16);
         const orbMaterial = new THREE.MeshStandardMaterial({
             color: 0xffffff,
@@ -110,10 +124,8 @@ export class MagicStaff {
             opacity: 0.9
         });
         
-        // Position the orb correctly at the top of the staff
-        const orbPosition = new THREE.Vector3(0, this.staffLength / 2 + this.orbSize * 0.8, 0);
-        const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-        orb.position.copy(orbPosition);
+        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
+        this.orbMesh = orbMesh; // Store reference for toggling
         
         // Add a point light at the orb position (ambient pool light)
         this.light = new THREE.PointLight(
@@ -122,7 +134,6 @@ export class MagicStaff {
             this.lightDistance,
             1.5 // Light decay (quadratic)
         );
-        this.light.position.copy(orbPosition);
         
         // Add a spotlight at the orb position (directional beam)
         this.spotlight = new THREE.SpotLight(
@@ -133,12 +144,11 @@ export class MagicStaff {
             0.5, // penumbra - soft edge
             1.0 // decay
         );
-        this.spotlight.position.copy(orbPosition);
         
         // Create a spotlight target
         this.spotlightTarget = new THREE.Object3D();
-        this.spotlightTarget.position.set(0, 0, -2); // Forward direction, 2 units away
-        this.staff.add(this.spotlightTarget);
+        this.spotlightTarget.position.set(0, 0, -1); // Forward direction
+        this.orb.add(this.spotlightTarget);
         this.spotlight.target = this.spotlightTarget;
         
         // Create a smaller inner orb for extra glow effect
@@ -150,7 +160,7 @@ export class MagicStaff {
         });
         
         const innerOrb = new THREE.Mesh(innerOrbGeometry, innerOrbMaterial);
-        innerOrb.position.copy(orbPosition);
+        this.innerOrb = innerOrb; // Store reference for toggling
         
         // Add ethereal glow effect
         const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.5, 16, 16);
@@ -162,30 +172,17 @@ export class MagicStaff {
         });
         
         const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        glowMesh.position.copy(orbPosition);
+        this.glowMesh = glowMesh; // Store reference for toggling
         
-        // Add all components to the staff group
-        this.staff.add(staffMesh);
-        this.staff.add(topWrap);
-        this.staff.add(orb);
-        this.staff.add(innerOrb);
-        this.staff.add(glowMesh);
-        this.staff.add(this.light);
-        this.staff.add(this.spotlight);
+        // Add all components to the orb group
+        this.orb.add(orbMesh);
+        this.orb.add(innerOrb);
+        this.orb.add(glowMesh);
+        this.orb.add(this.light);
+        this.orb.add(this.spotlight);
         
-        // Store references to the visual components for later updates
-        this.orbMesh = orb;
-        this.innerOrbMesh = innerOrb;
-        this.glowMeshEffect = glowMesh;
-        
-        // Add the staff to the scene
-        this.scene.add(this.staff);
-        
-        // Store original positions for animation
-        this.originalPosition = this.positionOffset.clone();
-        
-        // Start the animation
-        this.setupAnimations();
+        // Add the orb to the scene
+        this.scene.add(this.orb);
     }
     
     generateWoodTexture() {
@@ -281,40 +278,68 @@ export class MagicStaff {
     }
     
     update(time) {
-        if (!this.staff || !this.camera) return;
+        if (!this.camera) return;
         
         // Get the camera's world position and direction
         const cameraPosition = this.camera.position.clone();
         const cameraQuaternion = this.camera.quaternion.clone();
         
-        // Create an offset vector
-        const offset = this.positionOffset.clone();
-        
-        // Add subtle bobbing and swaying motion based on time
-        offset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
-        offset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
-        
-        // Apply the offset in camera's local space
-        offset.applyQuaternion(cameraQuaternion);
-        
-        // Position the staff relative to the camera
-        this.staff.position.copy(cameraPosition).add(offset);
-        
-        // Make the staff face the same direction as the camera
-        this.staff.quaternion.copy(cameraQuaternion);
-        
-        // Add a tilt to the staff
-        const tiltQuaternion = new THREE.Quaternion();
-        tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.25);
-        this.staff.quaternion.multiply(tiltQuaternion);
-        
-        // Animate the light intensity slightly
-        if (this.light && this.isLightOn) {
-            this.light.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+        // Update staff position if it exists
+        if (this.staff) {
+            // Create an offset vector for staff
+            const staffOffset = this.positionOffset.clone();
+            
+            // Add subtle bobbing and swaying motion based on time
+            staffOffset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
+            staffOffset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
+            
+            // Apply the offset in camera's local space
+            staffOffset.applyQuaternion(cameraQuaternion);
+            
+            // Position the staff relative to the camera
+            this.staff.position.copy(cameraPosition).add(staffOffset);
+            
+            // Make the staff face the same direction as the camera
+            this.staff.quaternion.copy(cameraQuaternion);
+            
+            // Add a tilt to the staff
+            const tiltQuaternion = new THREE.Quaternion();
+            tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.25);
+            this.staff.quaternion.multiply(tiltQuaternion);
         }
         
-        if (this.spotlight && this.isLightOn) {
-            this.spotlight.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+        // Update orb position if it exists
+        if (this.orb) {
+            // Create an offset vector for orb
+            const orbOffset = this.orbOffset.clone();
+            
+            // Add subtle bobbing and swaying motion based on time
+            orbOffset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
+            orbOffset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
+            
+            // Apply the offset in camera's local space
+            orbOffset.applyQuaternion(cameraQuaternion);
+            
+            // Position the orb relative to the camera
+            this.orb.position.copy(cameraPosition).add(orbOffset);
+            
+            // Make the orb face the same direction as the camera
+            this.orb.quaternion.copy(cameraQuaternion);
+            
+            // Animate the light intensity slightly
+            if (this.light && this.isLightOn) {
+                this.light.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+            }
+            
+            if (this.spotlight && this.isLightOn) {
+                this.spotlight.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+            }
+            
+            // Animate orb glow
+            if (this.orbMesh && this.orbMesh.material && this.orbMesh.material.emissiveIntensity) {
+                const baseIntensity = this.isLightOn ? 2.0 : 0.5;
+                this.orbMesh.material.emissiveIntensity = baseIntensity * (0.9 + 0.2 * Math.sin(time * 2.7));
+            }
         }
     }
     
@@ -329,16 +354,18 @@ export class MagicStaff {
         }
     }
     
-    // Show or hide the staff
+    // Show or hide the staff and orb
     setVisible(visible) {
         if (this.staff) {
             this.staff.visible = visible;
         }
+        if (this.orb) {
+            this.orb.visible = visible;
+        }
     }
     
+    // Toggle light on/off
     toggleLight() {
-        if (!this.staff) return false; // Don't toggle if staff hasn't been created yet
-        
         this.isLightOn = !this.isLightOn;
         
         if (this.isLightOn) {
@@ -353,18 +380,18 @@ export class MagicStaff {
                 this.spotlight.intensity = this.savedLightIntensity;
             }
             
-            // Make orb glow
+            // Make orb glow brightly
             if (this.orbMesh && this.orbMesh.material) {
                 this.orbMesh.material.emissive.set(0x3366ff);
                 this.orbMesh.material.emissiveIntensity = 2.0;
             }
             
-            if (this.innerOrbMesh && this.innerOrbMesh.material) {
-                this.innerOrbMesh.material.opacity = 0.7;
+            if (this.innerOrb && this.innerOrb.material) {
+                this.innerOrb.material.opacity = 0.7;
             }
             
-            if (this.glowMeshEffect && this.glowMeshEffect.material) {
-                this.glowMeshEffect.material.opacity = 0.15;
+            if (this.glowMesh && this.glowMesh.material) {
+                this.glowMesh.material.opacity = 0.15;
             }
             
             // Show visual feedback
@@ -387,15 +414,15 @@ export class MagicStaff {
             // Make orb dim
             if (this.orbMesh && this.orbMesh.material) {
                 this.orbMesh.material.emissive.set(0x112244);
-                this.orbMesh.material.emissiveIntensity = 0.3;
+                this.orbMesh.material.emissiveIntensity = 0.5;
             }
             
-            if (this.innerOrbMesh && this.innerOrbMesh.material) {
-                this.innerOrbMesh.material.opacity = 0.3;
+            if (this.innerOrb && this.innerOrb.material) {
+                this.innerOrb.material.opacity = 0.3;
             }
             
-            if (this.glowMeshEffect && this.glowMeshEffect.material) {
-                this.glowMeshEffect.material.opacity = 0.05;
+            if (this.glowMesh && this.glowMesh.material) {
+                this.glowMesh.material.opacity = 0.05;
             }
             
             // Show visual feedback
@@ -405,20 +432,20 @@ export class MagicStaff {
         return this.isLightOn;
     }
     
-    // Show any message to the player
-    showMessage(text, color = '#aaccff', glow = true) {
+    // Show visual effect when toggling the light
+    showToggleEffect(isOn) {
         // Create a message element
         const message = document.createElement('div');
-        message.textContent = text;
+        message.textContent = isOn ? "Staff light activated" : "Staff light deactivated";
         message.style.position = 'absolute';
         message.style.bottom = '10%';
         message.style.left = '0';
         message.style.width = '100%';
         message.style.textAlign = 'center';
-        message.style.color = color;
+        message.style.color = isOn ? '#aaccff' : '#667788';
         message.style.fontFamily = 'Cinzel, serif';
         message.style.fontSize = '1.2rem';
-        message.style.textShadow = glow ? 
+        message.style.textShadow = isOn ? 
             '0 0 10px rgba(51, 102, 255, 0.7)' : 
             '0 0 5px rgba(0, 0, 0, 0.7)';
         message.style.opacity = '0';
@@ -441,12 +468,5 @@ export class MagicStaff {
                 document.body.removeChild(message);
             }, 500);
         }, 2000);
-    }
-    
-    // Show visual effect when toggling the light
-    showToggleEffect(isOn) {
-        const text = isOn ? "Staff light activated" : "Staff light deactivated";
-        const color = isOn ? '#aaccff' : '#667788';
-        this.showMessage(text, color, isOn);
     }
 }
