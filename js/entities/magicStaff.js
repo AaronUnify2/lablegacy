@@ -6,12 +6,12 @@ export class MagicStaff {
         this.orb = null; // Separate orb group
         this.light = null;
         this.spotlight = null; // Spotlight for forward beam
-        this.lightIntensity = 10;
+        this.lightIntensity = 2.5; // Keep the original intensity for reference
         this.lightColor = 0x3366ff; // Blue-white light
-        this.lightDistance = 10; // 3m radius
+        this.lightDistance = 3; // Base 3m radius
         this.staffLength = 1.2; // Length of the staff
         this.staffThickness = 0.025; // Thickness of the staff
-        this.orbSize = 0.08; // Size of the glowing orb
+        this.orbSize = 0.1; // Size of the glowing orb (increased from 0.08)
         
         // Staff position offset relative to camera
         this.positionOffset = new THREE.Vector3(0.3, -0.4, -0.6);
@@ -84,7 +84,7 @@ export class MagicStaff {
             roughness: 0.3,
             metalness: 0.8,
             emissive: 0x1a3366,
-            emissiveIntensity: 0.3
+            emissiveIntensity: 0.8 // Increased from 0.3 for brighter glow
         });
         
         const topWrap = new THREE.Mesh(topWrapGeometry, wrapMaterial);
@@ -119,9 +119,9 @@ export class MagicStaff {
             roughness: 0.1,
             metalness: 0.3,
             emissive: 0x3366ff,
-            emissiveIntensity: 8.0,
+            emissiveIntensity: 6.0, // Increased from 2.0 for much brighter glow
             transparent: true,
-            opacity: 0.9
+            opacity: 0.95 // Increased from 0.9 for more visibility
         });
         
         const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
@@ -130,19 +130,19 @@ export class MagicStaff {
         // Add a point light at the orb position (ambient pool light)
         this.light = new THREE.PointLight(
             this.lightColor,
-            this.lightIntensity,
-            this.lightDistance,
-            1.5 // Light decay (quadratic)
+            this.lightIntensity * 2, // Doubled intensity
+            this.lightDistance * 1.5, // Increased distance by 50%
+            1.2 // Light decay (reduced from 1.5 for less rapid falloff)
         );
         
         // Add a spotlight at the orb position (directional beam)
         this.spotlight = new THREE.SpotLight(
             this.lightColor,
-            this.lightIntensity,  
-            25, // 10m beam distance
-            Math.PI / 6, // 30 degrees spread
-            0.5, // penumbra - soft edge
-            1.0 // decay
+            this.lightIntensity * 2.5, // 2.5x brighter
+            20, // Doubled from 10m to 20m beam distance
+            Math.PI / 8, // Narrower angle (was Math.PI/6) for more focused beam
+            0.7, // Increased penumbra for slightly softer edge
+            0.8 // Reduced decay for less falloff at distance
         );
         
         // Create a spotlight target
@@ -156,18 +156,18 @@ export class MagicStaff {
         const innerOrbMaterial = new THREE.MeshBasicMaterial({
             color: 0xffffff,
             transparent: true,
-            opacity: 0.7
+            opacity: 0.9 // Increased from 0.7
         });
         
         const innerOrb = new THREE.Mesh(innerOrbGeometry, innerOrbMaterial);
         this.innerOrb = innerOrb; // Store reference for toggling
         
         // Add ethereal glow effect
-        const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.5, 16, 16);
+        const glowGeometry = new THREE.SphereGeometry(this.orbSize * 1.8, 16, 16); // Increased multiplier from 1.5
         const glowMaterial = new THREE.MeshBasicMaterial({
             color: 0x3366ff,
             transparent: true,
-            opacity: 0.15,
+            opacity: 0.35, // Increased from 0.15
             side: THREE.BackSide
         });
         
@@ -328,16 +328,16 @@ export class MagicStaff {
             
             // Animate the light intensity slightly
             if (this.light && this.isLightOn) {
-                this.light.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+                this.light.intensity = (this.lightIntensity * 2) * (0.9 + 0.2 * Math.sin(time * 3));
             }
             
             if (this.spotlight && this.isLightOn) {
-                this.spotlight.intensity = this.lightIntensity * (0.9 + 0.2 * Math.sin(time * 3));
+                this.spotlight.intensity = (this.lightIntensity * 2.5) * (0.9 + 0.2 * Math.sin(time * 3));
             }
             
             // Animate orb glow
             if (this.orbMesh && this.orbMesh.material && this.orbMesh.material.emissiveIntensity) {
-                const baseIntensity = this.isLightOn ? 2.0 : 0.5;
+                const baseIntensity = this.isLightOn ? 6.0 : 1.0; // Increased from 2.0/0.5
                 this.orbMesh.material.emissiveIntensity = baseIntensity * (0.9 + 0.2 * Math.sin(time * 2.7));
             }
         }
@@ -347,10 +347,10 @@ export class MagicStaff {
     setLightIntensity(intensity) {
         this.lightIntensity = intensity;
         if (this.light && this.isLightOn) {
-            this.light.intensity = intensity;
+            this.light.intensity = intensity * 2; // Double the intensity
         }
         if (this.spotlight && this.isLightOn) {
-            this.spotlight.intensity = intensity;
+            this.spotlight.intensity = intensity * 2.5; // 2.5x the intensity
         }
     }
     
@@ -371,27 +371,27 @@ export class MagicStaff {
         if (this.isLightOn) {
             // Turn point light on (3m pool)
             if (this.light) {
-                this.light.intensity = this.savedLightIntensity;
-                this.light.distance = 3; // 3m when on
+                this.light.intensity = this.savedLightIntensity * 2; // Double the intensity
+                this.light.distance = this.lightDistance * 1.5; // 4.5m when on
             }
             
             // Turn spotlight on
             if (this.spotlight) {
-                this.spotlight.intensity = this.savedLightIntensity;
+                this.spotlight.intensity = this.savedLightIntensity * 2.5; // 2.5x the intensity
             }
             
             // Make orb glow brightly
             if (this.orbMesh && this.orbMesh.material) {
                 this.orbMesh.material.emissive.set(0x3366ff);
-                this.orbMesh.material.emissiveIntensity = 2.0;
+                this.orbMesh.material.emissiveIntensity = 6.0; // Increased from 2.0
             }
             
             if (this.innerOrb && this.innerOrb.material) {
-                this.innerOrb.material.opacity = 0.7;
+                this.innerOrb.material.opacity = 0.9; // Increased from 0.7
             }
             
             if (this.glowMesh && this.glowMesh.material) {
-                this.glowMesh.material.opacity = 0.15;
+                this.glowMesh.material.opacity = 0.35; // Increased from 0.15
             }
             
             // Show visual feedback
@@ -407,22 +407,22 @@ export class MagicStaff {
             
             // Keep point light on but dimmer and shorter range (1m pool)
             if (this.light) {
-                this.light.intensity = 0.4;
-                this.light.distance = 1; // 1m when off
+                this.light.intensity = 1.0; // Increased from 0.4
+                this.light.distance = 2; // Increased from 1m when off
             }
             
             // Make orb dim
             if (this.orbMesh && this.orbMesh.material) {
                 this.orbMesh.material.emissive.set(0x112244);
-                this.orbMesh.material.emissiveIntensity = 0.5;
+                this.orbMesh.material.emissiveIntensity = 1.0; // Increased from 0.5
             }
             
             if (this.innerOrb && this.innerOrb.material) {
-                this.innerOrb.material.opacity = 0.3;
+                this.innerOrb.material.opacity = 0.4; // Increased from 0.3
             }
             
             if (this.glowMesh && this.glowMesh.material) {
-                this.glowMesh.material.opacity = 0.05;
+                this.glowMesh.material.opacity = 0.1; // Increased from 0.05
             }
             
             // Show visual feedback
