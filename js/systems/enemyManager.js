@@ -101,7 +101,7 @@ export class EnemyManager {
                 // Check if enemy is floating (no ground beneath)
                 const groundCheck = new THREE.Vector3(
                     enemy.group.position.x,
-                    enemy.group.position.y - 1,
+                    enemy.group.position.y - 0.1, // Check just below the enemy
                     enemy.group.position.z
                 );
                 
@@ -109,6 +109,17 @@ export class EnemyManager {
                 if (!groundHit) {
                     if (this.debug) console.log(`Enemy ${i} is floating, resetting position`);
                     enemy.resetToLastValidPosition();
+                } else {
+                    // If ground exists but enemy is slightly above it, snap to ground
+                    const heightDifference = groundHit.point.y - enemy.group.position.y;
+                    if (Math.abs(heightDifference) > 0.1) { // If more than 0.1 units off the ground
+                        enemy.group.position.y = groundHit.point.y;
+                        
+                        // Update last valid position
+                        enemy.lastValidPosition.copy(enemy.group.position);
+                        
+                        if (this.debug) console.log(`Enemy ${i} adjusted to ground level`);
+                    }
                 }
             }
         }
@@ -134,22 +145,26 @@ export class EnemyManager {
         // Spawn a few more enemies around the map
         setTimeout(() => {
             // Try to spawn in different locations
-            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 1, 10), 4, 0.4);
-            this.spawnEnemyAtPosition(new THREE.Vector3(10, 1, -10), 6, 0.3);
+            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 0, 10), 4, 0.4);
+            this.spawnEnemyAtPosition(new THREE.Vector3(10, 0, -10), 6, 0.3);
         }, 5000);
     }
     
     forceSpawnTestEnemy() {
         if (this.debug) console.log("Attempting to spawn test enemy...");
         
-        // Try to spawn at a fixed position relative to origin
-        const testPosition = new THREE.Vector3(10, 1, 0); // 10 units to the right of origin
+        // Try to spawn at a fixed position relative to origin - use Y=0 to ensure it's on ground
+        const testPosition = new THREE.Vector3(10, 0, 0); // 10 units to the right of origin
         
         // Try to find floor beneath
         if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(testPosition, 10);
+            const floorHit = this.collisionManager.findFloorBelow(
+                new THREE.Vector3(testPosition.x, testPosition.y + 5, testPosition.z), // Start high above
+                10
+            );
+            
             if (floorHit && floorHit.point) {
-                testPosition.y = floorHit.point.y + 0.9; // Just above floor
+                testPosition.y = floorHit.point.y; // Exactly on floor
                 if (this.debug) console.log("Found floor at y:", floorHit.point.y);
             }
         }
@@ -187,16 +202,23 @@ export class EnemyManager {
         // Spawn position a bit off from player
         const spawnPos = new THREE.Vector3(
             playerPos.x + 8, // 8 units to the right
-            playerPos.y, // Same height as player
+            0, // Start at ground level - will be adjusted
             playerPos.z + 8  // 8 units in front
         );
         
         // Try to find floor beneath
         if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            const floorHit = this.collisionManager.findFloorBelow(
+                new THREE.Vector3(spawnPos.x, playerPos.y + 2, spawnPos.z), // Start from player height
+                10
+            );
+            
             if (floorHit && floorHit.point) {
-                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
+                spawnPos.y = floorHit.point.y; // Exactly on floor
                 if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            } else {
+                // If no floor found, use player y position as fallback
+                spawnPos.y = playerPos.y - 1.7; // Approximate player feet position
             }
         }
         
@@ -236,9 +258,13 @@ export class EnemyManager {
         
         // Try to find floor beneath
         if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            const floorHit = this.collisionManager.findFloorBelow(
+                new THREE.Vector3(spawnPos.x, spawnPos.y + 5, spawnPos.z), // Start high above
+                10
+            );
+            
             if (floorHit && floorHit.point) {
-                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
+                spawnPos.y = floorHit.point.y; // Exactly on floor
                 if (this.debug) console.log("Found floor at y:", floorHit.point.y);
             }
         }
@@ -292,6 +318,10 @@ export class EnemyManager {
         // Tag the collider as an enemy for special handling
         if (this.collisionManager.colliders[colliderIndex]) {
             this.collisionManager.colliders[colliderIndex].isEnemy = true;
+            
+            // Add userData tag to the object
+            enemy.group.userData = enemy.group.userData || {};
+            enemy.group.userData.isEnemy = true;
         }
         
         return colliderIndex;
