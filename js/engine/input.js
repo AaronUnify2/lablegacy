@@ -432,8 +432,8 @@ export class InputManager {
         // Store the previous position for collision resolution
         const previousPosition = this.camera.position.clone();
         
-        // Apply gravity to velocity
-        this.velocity.y -= this.gravityForce * deltaTime;
+        // Apply gravity to velocity with a limit to prevent excessive speeds when falling
+        this.velocity.y = Math.max(this.velocity.y - this.gravityForce * deltaTime, -25); // Cap falling speed
         
         // Get direction vectors from camera orientation (normalized)
         const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
@@ -476,15 +476,64 @@ export class InputManager {
         // Handle jumping
         this.jumpCooldown -= deltaTime;
         
-        // Check ground collision for jump and gravity
-        const groundCheckPos = this.camera.position.clone();
-        groundCheckPos.y -= this.playerHeight / 2 + 0.1; // Check slightly below our feet
+        // Initialize ground check flag
+        let wasGroundedBefore = this.isGrounded;
+        this.isGrounded = false;
         
-        const groundCollision = collisionManager.checkCollision(groundCheckPos, 0.5);
-        this.isGrounded = groundCollision.collides;
+        // Perform multiple ground checks for more reliable detection
+        const groundCheckRadius = 0.45; // Slightly smaller than player radius for better fit
         
-        // Allow jumping only when grounded and cooldown is ready
+        // Check multiple points around the player's feet to ensure we don't miss the ground
+        const groundCheckPoints = [
+            // Center point
+            new THREE.Vector3(
+                this.camera.position.x,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z
+            ),
+            // Forward point
+            new THREE.Vector3(
+                this.camera.position.x + forward.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z + forward.z * groundCheckRadius * 0.8
+            ),
+            // Backward point
+            new THREE.Vector3(
+                this.camera.position.x - forward.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z - forward.z * groundCheckRadius * 0.8
+            ),
+            // Right point
+            new THREE.Vector3(
+                this.camera.position.x + right.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z + right.z * groundCheckRadius * 0.8
+            ),
+            // Left point
+            new THREE.Vector3(
+                this.camera.position.x - right.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z - right.z * groundCheckRadius * 0.8
+            )
+        ];
+        
+        // Check all points for ground contact
+        for (const checkPos of groundCheckPoints) {
+            const groundCollision = collisionManager.checkCollision(checkPos, groundCheckRadius);
+            if (groundCollision.collides) {
+                this.isGrounded = true;
+                break;
+            }
+        }
+        
+        // Handle ground collision state change
         if (this.isGrounded) {
+            // If we've just landed, play landing sound or effect here
+            if (!wasGroundedBefore && this.velocity.y < -4) {
+                // Heavy landing effect could go here
+                // For example: this.playLandingSound(Math.abs(this.velocity.y));
+            }
+            
             // Reset vertical velocity when on the ground to prevent buildup
             this.velocity.y = Math.max(this.velocity.y, 0);
             
@@ -508,7 +557,7 @@ export class InputManager {
         // Handle collisions with walls
         if (collisionManager) {
             // Smaller player radius for easier navigation
-            const playerRadius = 0.5;
+            const playerRadius = 0.45; // Reduced from 0.5 for better fit in tight spaces
             
             // Try horizontal movement first (X and Z)
             const horizontalPosition = previousPosition.clone();
@@ -577,6 +626,24 @@ export class InputManager {
                 const floorHeight = feetCollision.collider.box.max.y + this.playerHeight / 2;
                 if (floorHeight > verticalPosition.y) {
                     verticalPosition.y = floorHeight + 0.1; // Small gap to prevent stuck
+                }
+            }
+            
+            // Do an additional raycast check directly down to accurately find floor height
+            // This helps prevent "walking on air" bugs
+            if (this.isGrounded) {
+                const rayOrigin = this.camera.position.clone();
+                rayOrigin.y -= this.playerHeight / 2 - 0.1;  // Just above feet level
+                
+                const floorHit = collisionManager.findFloorBelow(rayOrigin, 1.0);
+                if (floorHit) {
+                    // Position precisely above the hit point
+                    const exactFloorHeight = floorHit.point.y + this.playerHeight / 2;
+                    // Only adjust if we're slightly floating above the ground
+                    if (exactFloorHeight > verticalPosition.y && 
+                        exactFloorHeight - verticalPosition.y < 0.5) {
+                        verticalPosition.y = exactFloorHeight;
+                    }
                 }
             }
             
