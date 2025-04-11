@@ -31,6 +31,10 @@ export class InputManager {
         this.touchEnabled = false;
         this.buttons = {};
         
+        // Button sizing
+        this.originalButtonSizes = {};
+        this.hasAdjustedButtons = false;
+        
         // Initialize event listeners
         this.initKeyboardControls();
         this.initMouseControls();
@@ -205,19 +209,50 @@ export class InputManager {
         const screenWidth = window.innerWidth;
         const containerWidth = document.getElementById('touch-controls').offsetWidth;
         
+        // Get all buttons
+        const buttons = document.querySelectorAll('.control-button');
+        
+        // Store original sizes on first call
+        if (!this.hasAdjustedButtons) {
+            buttons.forEach(button => {
+                const id = button.id;
+                this.originalButtonSizes[id] = {
+                    width: parseInt(getComputedStyle(button).width),
+                    fontSize: parseInt(getComputedStyle(button).fontSize)
+                };
+            });
+            this.hasAdjustedButtons = true;
+        }
+        
         // Check if buttons might overflow
         if (containerWidth > screenWidth * 0.95) {
-            const buttons = document.querySelectorAll('.control-button');
             const screenRatio = Math.min(1, (screenWidth * 0.95) / containerWidth);
             
             buttons.forEach(button => {
-                // Dynamically adjust button size based on screen width
-                const newSize = Math.floor(parseInt(getComputedStyle(button).width) * screenRatio);
-                button.style.width = newSize + 'px';
-                button.style.height = newSize + 'px';
-                
-                // Adjust font size as well
-                button.style.fontSize = Math.max(14, Math.floor(newSize * 0.4)) + 'px';
+                const id = button.id;
+                if (this.originalButtonSizes[id]) {
+                    // Calculate from original size, not current size
+                    const originalWidth = this.originalButtonSizes[id].width;
+                    const originalFontSize = this.originalButtonSizes[id].fontSize;
+                    
+                    const newSize = Math.floor(originalWidth * screenRatio);
+                    button.style.width = newSize + 'px';
+                    button.style.height = newSize + 'px';
+                    
+                    // Adjust font size based on original size
+                    button.style.fontSize = 
+                        Math.max(14, Math.floor(originalFontSize * screenRatio)) + 'px';
+                }
+            });
+        } else {
+            // Reset to original sizes if there's enough screen space
+            buttons.forEach(button => {
+                const id = button.id;
+                if (this.originalButtonSizes[id]) {
+                    button.style.width = this.originalButtonSizes[id].width + 'px';
+                    button.style.height = this.originalButtonSizes[id].width + 'px';
+                    button.style.fontSize = this.originalButtonSizes[id].fontSize + 'px';
+                }
             });
         }
     }
