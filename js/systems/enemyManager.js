@@ -16,9 +16,6 @@ export class EnemyManager {
             max: 20
         };
         
-        // Enemy spawn timing
-        this.timeSinceLastSpawn = 0;
-        
         // Debug flag - set to true to get console logs about spawning
         this.debug = true;
         
@@ -31,24 +28,10 @@ export class EnemyManager {
     }
     
     update(deltaTime, camera) {
-        // Update spawn timer and try to spawn new enemies
-        this.timeSinceLastSpawn += deltaTime;
-        
-        // Try to spawn new enemies if we haven't reached the maximum
-        if (this.enemies.length < this.maxEnemies && this.timeSinceLastSpawn >= 5) {
-            this.trySpawnEnemyAroundPlayer();
-            this.timeSinceLastSpawn = 0;
-        }
-        
         // Update all enemies
         for (let i = 0; i < this.enemies.length; i++) {
             const enemy = this.enemies[i];
             enemy.update(deltaTime, camera);
-        }
-        
-        // Debug info occasionally
-        if (this.debug && Math.random() < 0.01) {
-            console.log(`Active enemies: ${this.enemies.length}/${this.maxEnemies}`);
         }
     }
     
@@ -81,83 +64,6 @@ export class EnemyManager {
         }, 2000);
     }
     
-    trySpawnEnemyAroundPlayer() {
-        if (this.debug) console.log("Attempting to spawn enemy around player...");
-        
-        // Get a random position around the player
-        const spawnPosition = this.findSpawnPosition();
-        
-        if (!spawnPosition) {
-            if (this.debug) console.log("Failed to find valid spawn position");
-            return false;
-        }
-        
-        // Create enemy
-        const enemy = new Enemy(this.scene, spawnPosition, this.collisionManager, this.player);
-        this.enemies.push(enemy);
-        
-        // Show spawn effect
-        this.showSimpleSpawnEffect(spawnPosition);
-        
-        if (this.debug) console.log(`Spawned enemy at (${spawnPosition.x.toFixed(1)}, ${spawnPosition.y.toFixed(1)}, ${spawnPosition.z.toFixed(1)})`);
-        return true;
-    }
-    
-    findSpawnPosition() {
-        // Try multiple positions to find a valid spawn point
-        const maxAttempts = 10;
-        
-        for (let i = 0; i < maxAttempts; i++) {
-            // Get a random direction from the player
-            const angle = Math.random() * Math.PI * 2;
-            const distance = this.spawnDistance.min + 
-                Math.random() * (this.spawnDistance.max - this.spawnDistance.min);
-            
-            // Calculate spawn position
-            const playerPos = this.player.camera.position;
-            const spawnX = playerPos.x + Math.cos(angle) * distance;
-            const spawnZ = playerPos.z + Math.sin(angle) * distance;
-            
-            // Start from above ground to find a valid Y position
-            const testPosition = new THREE.Vector3(spawnX, playerPos.y + 10, spawnZ);
-            
-            // Find floor beneath this position
-            if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-                try {
-                    const hit = this.collisionManager.findFloorBelow(testPosition, 20);
-                    
-                    if (hit && hit.point) {
-                        // Found a floor, set Y position slightly above it
-                        testPosition.y = hit.point.y + 0.1;
-                        
-                        // Check if this position is clear (no collision)
-                        const collisionTest = this.collisionManager.checkCollision(testPosition, 1);
-                        
-                        if (!collisionTest.collides) {
-                            // Found a valid position
-                            return testPosition;
-                        }
-                    }
-                } catch (error) {
-                    console.warn("Error finding spawn position:", error);
-                }
-            } else {
-                // If we don't have a working floor detection, just use a fixed Y position
-                testPosition.y = playerPos.y;
-                return testPosition;
-            }
-        }
-        
-        // If we get here, we couldn't find a valid position
-        // As a fallback, just use player position with an offset
-        const playerPos = this.player.camera.position;
-        return new THREE.Vector3(
-            playerPos.x + (Math.random() * 10 - 5),
-            playerPos.y,
-            playerPos.z + (Math.random() * 10 - 5)
-        );
-    }
-    
     spawnEnemyNearPlayer() {
         if (this.debug) console.log("Attempting to spawn enemy near player...");
         
@@ -171,13 +77,9 @@ export class EnemyManager {
         
         // Try to find floor beneath
         if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            try {
-                const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
-                if (floorHit && floorHit.point) {
-                    spawnPos.y = floorHit.point.y + 0.1; // Just above floor
-                }
-            } catch (error) {
-                console.warn("Error finding floor below:", error);
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 0.1; // Just above floor
             }
         }
         
@@ -188,7 +90,7 @@ export class EnemyManager {
         // Show some visual effect
         this.showSimpleSpawnEffect(spawnPos);
         
-        if (this.debug) console.log(`Spawned enemy near player at (${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+        if (this.debug) console.log(`Spawned enemy near player at (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
     }
     
     showSimpleSpawnEffect(position) {
