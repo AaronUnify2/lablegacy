@@ -49,50 +49,68 @@ class Game {
         // Update loading screen with lore
         this.showLoreText();
         
-        // Generate a test dungeon
-        const dungeon = this.dungeonGenerator.generateFloor(1);
-        
-        // Add the dungeon to the scene
-        this.renderer.scene.add(dungeon.mesh);
-        
-        // Register dungeon colliders
-        if (dungeon.mesh.colliderMeshes) {
-            console.log(`Registering ${dungeon.mesh.colliderMeshes.length} colliders...`);
-            for (const mesh of dungeon.mesh.colliderMeshes) {
-                this.collisionManager.addCollider(mesh);
+        try {
+            // Generate a test dungeon
+            const dungeon = await this.dungeonGenerator.generateFloor(1);
+            
+            // Add the dungeon to the scene
+            this.renderer.scene.add(dungeon.mesh);
+            
+            // Register dungeon colliders
+            if (dungeon.mesh.colliderMeshes) {
+                console.log(`Registering ${dungeon.mesh.colliderMeshes.length} colliders...`);
+                for (const mesh of dungeon.mesh.colliderMeshes) {
+                    this.collisionManager.addCollider(mesh);
+                }
             }
-        }
-        
-        // Start the player in a safe position above the first room
-        const firstRoom = dungeon.rooms[0];
-        this.renderer.camera.position.set(
-            firstRoom.x + firstRoom.width / 2,
-            this.player.eyeLevel, // Position camera at eye level
-            firstRoom.y + firstRoom.height / 2
-        );
-        
-        // Create magic staff (illumination source)
-        this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
-        
-        // Add atmospheric sound
-        this.setupAudio();
-        
-        // Set first-person mode controls
-        this.setupFirstPersonMode();
-        
-        // Hide loading screen with slight delay for dramatic effect
-        setTimeout(() => {
-            this.loadingScreen.classList.add('fade-out');
+            
+            // Start the player in a safe position above the first room
+            const firstRoom = dungeon.rooms[0];
+            this.renderer.camera.position.set(
+                firstRoom.x + firstRoom.width / 2,
+                this.player.eyeLevel + 1, // Position camera at eye level plus a safety margin
+                firstRoom.y + firstRoom.height / 2
+            );
+            
+            // Make sure we have valid collisions before proceeding
+            const checkPosition = this.renderer.camera.position.clone();
+            checkPosition.y -= this.player.height / 2 + 0.1; // Check below feet
+            
+            const groundCheck = this.collisionManager.checkCollision(checkPosition, 0.5);
+            console.log('Initial ground check:', groundCheck);
+            
+            if (!groundCheck.collides) {
+                // If no ground is detected, force the player to a safe height
+                console.log('No ground detected, adjusting height...');
+                this.renderer.camera.position.y = this.player.eyeLevel + 2;
+            }
+            
+            // Create magic staff AFTER we've confirmed the player is in a safe position
+            this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
+            
+            // Add atmospheric sound
+            this.setupAudio();
+            
+            // Set first-person mode controls
+            this.setupFirstPersonMode();
+            
+            // Hide loading screen with slight delay for dramatic effect
             setTimeout(() => {
-                this.loadingScreen.style.display = 'none';
-                
-                // Start the game loop
-                this.isRunning = true;
-                requestAnimationFrame(this.update);
-                
-                console.log('Game initialized!');
-            }, 1000);
-        }, 3000); // Show lore text for 3 seconds
+                this.loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    this.loadingScreen.style.display = 'none';
+                    
+                    // Start the game loop
+                    this.isRunning = true;
+                    requestAnimationFrame(this.update);
+                    
+                    console.log('Game initialized!');
+                }, 1000);
+            }, 3000); // Show lore text for 3 seconds
+            
+        } catch (error) {
+            console.error('Error initializing game:', error);
+        }
     }
     
     setupFirstPersonMode() {
