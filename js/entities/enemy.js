@@ -4,6 +4,7 @@ export class Enemy {
         this.position = position.clone();
         this.state = 'idle'; // Changed to 'idle' from 'dead' to make enemies active
         this.collisionManager = collisionManager; // Store reference to collision manager
+        this.player = player;
         
         // Add patrol properties
         this.patrolRadius = 3; // Radius of patrol circle in world units
@@ -49,6 +50,10 @@ export class Enemy {
         this.bodyMesh.receiveShadow = true;
         this.bodyMesh.position.y = 1.8 / 2; // Center vertically
         
+        // Save body dimensions for collision detection
+        this.bodyWidth = 1.0; // Diameter
+        this.bodyHeight = 1.8;
+        
         // Add body to group
         this.group.add(this.bodyMesh);
         
@@ -70,6 +75,27 @@ export class Enemy {
         
         // Position the entire group
         this.group.position.copy(this.position);
+        
+        // Add an invisible collision cylinder for debug visualization (optional)
+        if (false) { // Set to true to see collision cylinder
+            const collisionGeometry = new THREE.CylinderGeometry(
+                this.collisionRadius,
+                this.collisionRadius,
+                this.bodyHeight,
+                8
+            );
+            
+            const collisionMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.3,
+                wireframe: true
+            });
+            
+            this.collisionMesh = new THREE.Mesh(collisionGeometry, collisionMaterial);
+            this.collisionMesh.position.y = this.bodyHeight / 2;
+            this.group.add(this.collisionMesh);
+        }
     }
     
     update(deltaTime, camera) {
@@ -101,14 +127,16 @@ export class Enemy {
             if (this.collisionEnabled && this.collisionManager) {
                 const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
                 
-                if (collision.collides) {
+                // Only consider environmental collisions, not other enemies
+                const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
+                
+                if (isEnvironmentCollision) {
                     // Skip moving to this position
                     if (Math.random() < 0.1) { // Log occasionally to avoid spam
-                        console.log("Enemy collision detected, skipping movement");
+                        console.log("Enemy collision detected, changing direction");
                     }
                     
-                    // Option 1: Simply skip moving this frame
-                    // Option 2: Modify the patrol angle to try a different direction
+                    // Modify the patrol angle to try a different direction
                     this.patrolAngle += Math.PI / 4; // Add 45 degrees to try a different direction
                     
                     // Return without updating position
@@ -143,6 +171,71 @@ export class Enemy {
         
         // Rotate the body slightly to show it's active even if not moving
         this.bodyMesh.rotation.y += deltaTime * 1.0;
+        
+        // Check if player is near and rotate to face them
+        this.checkPlayerProximity();
+    }
+    
+    // Check if player is nearby and rotate to face them if they are
+    checkPlayerProximity() {
+        if (!this.player || !this.player.camera) return;
+        
+        // Get player position
+        const playerPos = this.player.camera.position;
+        
+        // Calculate distance to player
+        const distanceToPlayer = this.group.position.distanceTo(playerPos);
+        
+        // If player is within awareness range
+        const awarenessRange = 5; // Units
+        
+        if (distanceToPlayer < awarenessRange) {
+            // Create a vector pointing toward the player
+            const directionToPlayer = new THREE.Vector3()
+                .subVectors(playerPos, this.group.position)
+                .normalize();
+            
+            // Only consider horizontal direction (ignore y component)
+            directionToPlayer.y = 0;
+            
+            // Only proceed if we have a valid direction
+            if (directionToPlayer.lengthSq() > 0) {
+                // Create a point to look at
+                const lookTarget = new THREE.Vector3()
+                    .addVectors(this.group.position, directionToPlayer);
+                
+                // Gradually rotate toward player
+                // This creates a more natural following effect
+                const currentRotation = new THREE.Quaternion().copy(this.group.quaternion);
+                const targetRotation = new THREE.Quaternion();
+                
+                // Create a temporary object to get the target rotation
+                const tempObj = new THREE.Object3D();
+                tempObj.position.copy(this.group.position);
+                tempObj.lookAt(lookTarget);
+                targetRotation.copy(tempObj.quaternion);
+                
+                // Smoothly interpolate between current and target rotation
+                const rotationSpeed = 0.05; // Adjust for faster/slower turning
+                this.group.quaternion.slerp(targetRotation, rotationSpeed);
+                
+                // Make eyes glow brighter when player is spotted
+                if (this.leftEye && this.leftEye.material) {
+                    this.leftEye.material.color.set(0xffff44);
+                }
+                if (this.rightEye && this.rightEye.material) {
+                    this.rightEye.material.color.set(0xffff44);
+                }
+            }
+        } else {
+            // Reset eye color when player is not in range
+            if (this.leftEye && this.leftEye.material) {
+                this.leftEye.material.color.set(0xffff00);
+            }
+            if (this.rightEye && this.rightEye.material) {
+                this.rightEye.material.color.set(0xffff00);
+            }
+        }
     }
     
     // Reset position if stuck or in an invalid location
