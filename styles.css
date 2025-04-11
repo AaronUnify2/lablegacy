@@ -294,7 +294,7 @@ canvas {
                     inset 0 0 8px rgba(0, 0, 0, 0.5);
     }
     
-    .    jump-button {
+    .jump-button {
         font-size: 14px !important;
     }
     
@@ -382,11 +382,92 @@ canvas {
     top: 0;
     left: 0;
     width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        to bottom,
+        transparent 50%,
+        rgba(0, 0, 0, 0.1) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0.1;
+    mix-blend-mode: overlay;
+}
 
+/* Health Display */
+#health-display {
+    display: flex;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
 
-    /* Add these styles to your styles.css file */
+#health-display:hover {
+    transform: scale(1.05);
+}
 
-/* Light toggle button special styling */
+/* Pulse animation for low health */
+@keyframes pulse {
+    0% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
+    50% { opacity: 1; box-shadow: 0 0 15px rgba(255, 0, 0, 0.8); }
+    100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
+}
+
+/* Death Screen */
+#death-screen {
+    background: radial-gradient(circle at center, rgba(50, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%);
+}
+
+#death-screen button {
+    transition: all 0.3s ease;
+}
+
+#death-screen button:hover {
+    background-color: #500;
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+/* Enemy styles */
+.enemy-health-bar {
+    transition: opacity 0.3s ease;
+}
+
+/* Staff attack effect */
+.attack-effect {
+    pointer-events: none;
+}
+
+/* Damage flash effect */
+.damage-flash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 0, 0, 0.3);
+    pointer-events: none;
+    z-index: 9;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.damage-flash.active {
+    opacity: 0.8;
+    animation: damageFlash 0.5s forwards;
+}
+
+@keyframes damageFlash {
+    0% { opacity: 0.8; }
+    100% { opacity: 0; }
+}
+
+/* Enemy spawn effect */
+.spawn-effect {
+    pointer-events: none;
+}
+
+/* Light toggle button styling */
 #move-center {
     background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
     border-color: #557799 !important;
@@ -427,32 +508,4 @@ canvas {
                     inset 0 0 10px rgba(0, 0, 0, 0.5),
                     0 0 8px rgba(51, 102, 255, 0.4);
     }
-}
-
-/* Light toggle feedback message styling */
-.light-toggle-message {
-    position: absolute;
-    bottom: 10%;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    font-size: 1.2rem;
-    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-    height: 100%;
-    background: linear-gradient(
-        to bottom,
-        transparent 50%,
-        rgba(0, 0, 0, 0.1) 50%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0.1;
-    mix-blend-mode: overlay;
 }
