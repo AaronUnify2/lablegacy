@@ -382,6 +382,68 @@ canvas {
     top: 0;
     left: 0;
     width: 100%;
+
+
+    /* Add these styles to your styles.css file */
+
+/* Light toggle button special styling */
+#move-center {
+    background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
+    border-color: #557799 !important;
+    color: #aaccff;
+    font-size: 24px !important;
+    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(51, 102, 255, 0.4) !important;
+    animation: pulse-light 3s infinite alternate;
+}
+
+#move-center.active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 1px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.7),
+                0 0 20px rgba(100, 150, 255, 0.7) !important;
+}
+
+@keyframes pulse-light {
+    0% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(51, 102, 255, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 15px rgba(51, 102, 255, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(51, 102, 255, 0.4);
+    }
+}
+
+/* Light toggle feedback message styling */
+.light-toggle-message {
+    position: absolute;
+    bottom: 10%;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 1.2rem;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
     height: 100%;
     background: linear-gradient(
         to bottom,
