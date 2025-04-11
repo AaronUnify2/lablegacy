@@ -3,13 +3,6 @@ export class Enemy {
         this.scene = scene;
         this.position = position.clone();
         this.state = 'idle'; // Only need this for manager to check if 'dead'
-        this.player = player;
-        this.collisionManager = collisionManager;
-        
-        // Add basic movement properties
-        this.moveSpeed = 2; // Units per second
-        this.detectionRange = 15; // Distance at which enemy detects player
-        this.velocity = new THREE.Vector3();
         
         // Create a simple mesh for the enemy
         this.createMesh();
@@ -67,4 +60,7 @@ export class Enemy {
     }
     
     update(deltaTime, camera) {
+        // Most minimal update possible - just rotate slowly to show it's working
+        this.group.rotation.y += deltaTime * 0.5;
     }
+}
