@@ -1,57 +1,46 @@
 import { Enemy } from '../entities/enemy.js';
 
 export class EnemyManager {
-    constructor(scene, collisionManager, player, centralRoom) {
+    constructor(scene, collisionManager, player) {
         this.scene = scene;
         this.collisionManager = collisionManager;
         this.player = player;
-        this.centralRoom = centralRoom;
         
         // List of all enemies
         this.enemies = [];
         
-        // Spawn initial batch of enemies
-        this.spawnInitialEnemies();
-    }
-    
-    spawnInitialEnemies() {
-        const enemyCount = 20;
+        // Enemy spawn settings
+        this.maxEnemies = 5; // Maximum number of enemies at once
+        this.spawnDistance = {
+            min: 10, // Minimum spawn distance from player
+            max: 30  // Maximum spawn distance from player
+        };
         
-        // Use the central room's dimensions for spawning
-        const roomCenterX = this.centralRoom.x + this.centralRoom.width / 2;
-        const roomCenterZ = this.centralRoom.y + this.centralRoom.height / 2;
+        // Enemy spawn timing
+        this.timeSinceLastSpawn = 0;
+        this.spawnCooldown = 5; // Reduced from 15 to 5 seconds between spawn attempts
         
-        console.log("Spawning initial enemies in central room");
+        // Force initial spawn after a short delay to give the scene time to load
+        setTimeout(() => {
+            this.forceSpawnEnemy();
+        }, 3000); // 3 seconds after creation
         
-        for (let i = 0; i < enemyCount; i++) {
-            // Random offset within the room
-            const offsetX = (Math.random() - 0.5) * this.centralRoom.width * 0.8;
-            const offsetZ = (Math.random() - 0.5) * this.centralRoom.height * 0.8;
-            
-            const spawnPosition = new THREE.Vector3(
-                roomCenterX + offsetX, 
-                1, // Slightly above ground
-                roomCenterZ + offsetZ
-            );
-            
-            try {
-                const enemy = new Enemy(
-                    this.scene, 
-                    spawnPosition, 
-                    this.collisionManager, 
-                    this.player
-                );
-                this.enemies.push(enemy);
-            } catch (error) {
-                console.error("Failed to spawn enemy:", error);
-            }
-        }
-        
-        console.log(`Spawned ${this.enemies.length} enemies`);
+        console.log("Enemy Manager initialized");
     }
     
     update(deltaTime, camera) {
-        // Update all existing enemies
+        // Update spawn timer
+        this.timeSinceLastSpawn += deltaTime;
+        
+        // Debug info occasionally
+        if (Math.random() < 0.01) {
+            console.log("Enemy count:", this.enemies.length, "Time since last spawn:", this.timeSinceLastSpawn.toFixed(1));
+        }
+        
+        // Spawn new enemies if needed
+        this.trySpawnEnemy(deltaTime);
+        
+        // Update all enemies
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const enemy = this.enemies[i];
             
@@ -65,6 +54,60 @@ export class EnemyManager {
         }
     }
     
+    forceSpawnEnemy() {
+        console.log("Forcing enemy spawn...");
+        
+        // Find a valid spawn position
+        const spawnPosition = this.findSpawnPosition();
+        if (!spawnPosition) {
+            console.log("Force spawn failed: No valid position found");
+            return;
+        }
+        
+        // Create a new enemy
+        const enemy = new Enemy(this.scene, spawnPosition, this.collisionManager, this.player);
+        this.enemies.push(enemy);
+        
+        // Show spawn effect
+        this.showSpawnEffect(spawnPosition);
+        
+        console.log(`Force-spawned enemy at (${spawnPosition.x.toFixed(2)}, ${spawnPosition.y.toFixed(2)}, ${spawnPosition.z.toFixed(2)})`);
+    }
+    
+    trySpawnEnemy(deltaTime) {
+        // Don't spawn if we've reached max enemies
+        if (this.enemies.length >= this.maxEnemies) {
+            return;
+        }
+        
+        // Check if we should attempt to spawn
+        if (this.timeSinceLastSpawn < this.spawnCooldown) {
+            return;
+        }
+        
+        console.log("Attempting to spawn enemy...");
+        
+        // Reset timer regardless of success
+        this.timeSinceLastSpawn = 0;
+        
+        // Find a valid spawn position
+        const spawnPosition = this.findSpawnPosition();
+        if (!spawnPosition) {
+            // If no valid position found, try again soon but not immediately
+            this.timeSinceLastSpawn = this.spawnCooldown * 0.8;
+            console.log("Spawn failed: No valid position found");
+            return;
+        }
+        
+        // Create a new enemy
+        const enemy = new Enemy(this.scene, spawnPosition, this.collisionManager, this.player);
+        this.enemies.push(enemy);
+        
+        // Show spawn effect
+        this.showSpawnEffect(spawnPosition);
+        
+        console.log(`Spawned enemy at (${spawnPosition.x.toFixed(2)}, ${spawnPosition.y.toFixed(2)}, ${spawnPosition.z.toFixed(2)})`);
+    }
     
     trySpawnEnemy(deltaTime) {
         // Don't spawn if we've reached max enemies
