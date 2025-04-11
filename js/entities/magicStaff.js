@@ -25,8 +25,14 @@ export class MagicStaff {
         this.isLightOn = true;
         this.savedLightIntensity = this.lightIntensity;
         
-        // Create and add to scene
-        this.createStaff();
+        // Delay staff creation to prevent physics issues
+        setTimeout(() => {
+            // Create and add to scene
+            this.createStaff();
+            
+            // Show a message when staff appears
+            this.showMessage("Staff materialized");
+        }, 1000); // 1 second delay
         
         // Set up event listener for toggling the light
         document.addEventListener('toggle-staff-light', this.toggleLight.bind(this));
@@ -384,20 +390,20 @@ export class MagicStaff {
         return this.isLightOn;
     }
     
-    // Show visual effect when toggling the light
-    showToggleEffect(isOn) {
+    // Show any message to the player
+    showMessage(text, color = '#aaccff', glow = true) {
         // Create a message element
         const message = document.createElement('div');
-        message.textContent = isOn ? "Staff light activated" : "Staff light deactivated";
+        message.textContent = text;
         message.style.position = 'absolute';
         message.style.bottom = '10%';
         message.style.left = '0';
         message.style.width = '100%';
         message.style.textAlign = 'center';
-        message.style.color = isOn ? '#aaccff' : '#667788';
+        message.style.color = color;
         message.style.fontFamily = 'Cinzel, serif';
         message.style.fontSize = '1.2rem';
-        message.style.textShadow = isOn ? 
+        message.style.textShadow = glow ? 
             '0 0 10px rgba(51, 102, 255, 0.7)' : 
             '0 0 5px rgba(0, 0, 0, 0.7)';
         message.style.opacity = '0';
@@ -420,5 +426,12 @@ export class MagicStaff {
                 document.body.removeChild(message);
             }, 500);
         }, 2000);
+    }
+    
+    // Show visual effect when toggling the light
+    showToggleEffect(isOn) {
+        const text = isOn ? "Staff light activated" : "Staff light deactivated";
+        const color = isOn ? '#aaccff' : '#667788';
+        this.showMessage(text, color, isOn);
     }
 }
