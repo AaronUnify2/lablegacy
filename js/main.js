@@ -128,14 +128,6 @@ class Game {
             console.error('Error initializing game:', error);
         }
     }
-
-// Inside the init method of the Game class
-this.enemyManager = new EnemyManager(
-    this.renderer.scene, 
-    this.collisionManager, 
-    this.player, 
-    dungeon.rooms[0] // Assuming the first room is the central room
-);
     
     createHealthDisplay() {
         // Create a health display container
