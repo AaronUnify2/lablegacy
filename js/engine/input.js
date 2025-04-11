@@ -229,6 +229,18 @@ export class InputManager {
         this.setupButtonTouch('move-left', () => this.moveLeft = true, () => this.moveLeft = false);
         this.setupButtonTouch('move-right', () => this.moveRight = true, () => this.moveRight = false);
         
+        // Center button for toggling light
+        this.setupButtonTouch('move-center', 
+            () => {
+                // Dispatch a custom event that the game can listen for
+                const event = new CustomEvent('toggle-staff-light');
+                document.dispatchEvent(event);
+            }, 
+            null,
+            false,
+            true // Single press (don't repeat)
+        );
+        
         // Diagonal movement buttons
         this.setupButtonTouch('move-up-left', 
             () => { this.moveForward = true; this.moveLeft = true; }, 
@@ -280,17 +292,30 @@ export class InputManager {
         }
     }
     
-    setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false) {
+    setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
         const button = this.buttons[buttonId];
         if (!button) return;
         
         let pressInterval;
+        let buttonPressed = false; // Track if button has been pressed (for single press)
         
         // Handle touch/mouse events
         const startPress = (e) => {
             if (e) e.preventDefault(); // Prevent default behavior
+            
+            // For single press buttons, only trigger once per press
+            if (singlePress && buttonPressed) return;
+            
             button.classList.add('active');
-            if (pressCallback) pressCallback();
+            
+            if (pressCallback) {
+                pressCallback();
+                
+                // For single press, mark as pressed after callback
+                if (singlePress) {
+                    buttonPressed = true;
+                }
+            }
             
             if (continuousPress) {
                 // For continuous actions like camera rotation, run the callback repeatedly
@@ -303,6 +328,12 @@ export class InputManager {
         const endPress = (e) => {
             if (e) e.preventDefault(); // Prevent default behavior
             button.classList.remove('active');
+            
+            // Reset button pressed state
+            if (singlePress) {
+                buttonPressed = false;
+            }
+            
             if (releaseCallback) releaseCallback();
             
             if (pressInterval) {
