@@ -8,9 +8,17 @@ export class WeaponSystem {
         this.currentWeapon = null;
         this.attackCooldown = 0;
         
+        // Add crosshair properties
+        this.targetingRange = 30; // How far to check for targets (raycasting distance)
+        this.currentTarget = null; // Currently targeted enemy
+        
+        // Create crosshair element
+        this.createCrosshair();
+        
         // Bind methods
         this.update = this.update.bind(this);
         this.staffAttack = this.staffAttack.bind(this);
+        this.updateCrosshair = this.updateCrosshair.bind(this);
     }
     
     update(deltaTime) {
@@ -18,6 +26,110 @@ export class WeaponSystem {
         if (this.attackCooldown > 0) {
             this.attackCooldown -= deltaTime;
         }
+        
+        // Update the crosshair targeting
+        this.updateCrosshair();
+    }
+    
+    // Create crosshair DOM element
+    createCrosshair() {
+        // Create main crosshair container
+        this.crosshair = document.createElement('div');
+        this.crosshair.className = 'crosshair';
+        
+        // Create circle part
+        const circle = document.createElement('div');
+        circle.className = 'crosshair-circle';
+        this.crosshair.appendChild(circle);
+        
+        // Create center dot
+        const dot = document.createElement('div');
+        dot.className = 'crosshair-dot';
+        this.crosshair.appendChild(dot);
+        
+        // Add to game container
+        document.getElementById('game-container').appendChild(this.crosshair);
+    }
+    
+    // Update crosshair target status
+    updateCrosshair() {
+        if (!this.player || !this.player.camera) return;
+        
+        // Get camera direction
+        const cameraDirection = new THREE.Vector3(0, 0, -1);
+        cameraDirection.applyQuaternion(this.player.camera.quaternion);
+        
+        // Create raycaster
+        const raycaster = new THREE.Raycaster();
+        raycaster.set(this.player.camera.position, cameraDirection);
+        
+        // Check if we're targeting an enemy
+        this.currentTarget = this.checkTargetInCrosshair(raycaster);
+        
+        // Update crosshair appearance
+        if (this.currentTarget) {
+            this.crosshair.classList.add('target-acquired');
+        } else {
+            this.crosshair.classList.remove('target-acquired');
+        }
+    }
+    
+    // Check if there's a target in the crosshair
+    checkTargetInCrosshair(raycaster) {
+        // If we don't have enemies, return null
+        if (!this.enemyManager || !this.enemyManager.enemies) return null;
+        
+        // Create array of meshes to check
+        const targetableMeshes = [];
+        
+        // Add enemy meshes to the check
+        for (const enemy of this.enemyManager.enemies) {
+            if (enemy && enemy.group && enemy.state !== 'dead') {
+                // Add the main enemy body
+                if (enemy.bodyMesh) {
+                    targetableMeshes.push(enemy.bodyMesh);
+                    enemy.bodyMesh.userData.enemyIndex = this.enemyManager.enemies.indexOf(enemy);
+                }
+                
+                // Add other enemy parts if they exist
+                if (enemy.leftEye) {
+                    targetableMeshes.push(enemy.leftEye);
+                    enemy.leftEye.userData.enemyIndex = this.enemyManager.enemies.indexOf(enemy);
+                }
+                
+                if (enemy.rightEye) {
+                    targetableMeshes.push(enemy.rightEye);
+                    enemy.rightEye.userData.enemyIndex = this.enemyManager.enemies.indexOf(enemy);
+                }
+            }
+        }
+        
+        // If no targetable meshes, return null
+        if (targetableMeshes.length === 0) return null;
+        
+        // Check for intersections
+        const intersects = raycaster.intersectObjects(targetableMeshes, false);
+        
+        // If we hit something
+        if (intersects.length > 0) {
+            const hit = intersects[0];
+            
+            // Get the distance to the target
+            const distance = hit.distance;
+            
+            // Calculate attack range based on current weapon
+            const attackRange = 15; // Base range
+            
+            // Get enemy index from userData
+            const enemyIndex = hit.object.userData.enemyIndex;
+            
+            // Check if this is a valid enemy and within range
+            if (enemyIndex !== undefined && distance <= attackRange) {
+                return this.enemyManager.enemies[enemyIndex];
+            }
+        }
+        
+        return null;
     }
     
     staffAttack() {
@@ -29,38 +141,60 @@ export class WeaponSystem {
         
         // Get staff position and forward direction
         const staffPosition = new THREE.Vector3();
-        this.player.magicStaff.orb.getWorldPosition(staffPosition);
+        if (this.player.magicStaff && this.player.magicStaff.orb) {
+            this.player.magicStaff.orb.getWorldPosition(staffPosition);
+        } else {
+            // Fallback to camera position if staff is not available
+            staffPosition.copy(this.player.camera.position);
+        }
         
         // Get camera forward direction
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyQuaternion(this.player.camera.quaternion);
         
         // Attack parameters
-        const attackRange = 5;
+        const attackRange = 15;
         const attackRadius = 2;
         const attackDamage = 25;
         
-        // Create attack endpoint
-        const attackEnd = staffPosition.clone().addScaledVector(forward, attackRange);
+        // Create attack endpoint based on targeting
+        let attackEnd, hitEnemy = false;
         
-        // Find any enemies in range and damage them
-        const hitCount = this.enemyManager.damageEnemiesInRadius(attackEnd, attackRadius, attackDamage);
+        // First priority: use targeted enemy if available
+        if (this.currentTarget) {
+            // Get position of targeted enemy
+            attackEnd = this.currentTarget.group.position.clone();
+            
+            // Apply damage directly to the targeted enemy
+            const killed = this.currentTarget.takeDamage(attackDamage);
+            hitEnemy = true;
+            
+            if (this.enemyManager.debug && killed) {
+                console.log("Enemy was killed by direct hit!");
+            }
+        } else {
+            // Fallback to old behavior: ray in front of player
+            attackEnd = staffPosition.clone().addScaledVector(forward, attackRange);
+            
+            // Check for enemies in radius around endpoint
+            hitEnemy = this.enemyManager.damageEnemiesInRadius(attackEnd, attackRadius, attackDamage) > 0;
+        }
         
         // Visual feedback
-        this.showAttackEffect(staffPosition, attackEnd, attackRadius, hitCount > 0);
+        this.showAttackEffect(staffPosition, attackEnd, attackRadius, hitEnemy);
         
         // Play attack sound
-        this.playAttackSound(hitCount > 0);
+        this.playAttackSound(hitEnemy);
         
         // Perform attack animation on the staff
         this.animateStaffAttack();
         
         // Add a stronger effect for hits
-        if (hitCount > 0) {
+        if (hitEnemy) {
             this.showHitImpactEffect(attackEnd);
         }
         
-        return hitCount > 0;
+        return hitEnemy;
     }
     
     showAttackEffect(start, end, radius, hitTarget) {
