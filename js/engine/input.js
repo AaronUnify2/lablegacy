@@ -514,7 +514,7 @@ export class InputManager {
             this.setupButtonTouch('jump', 
                 () => this.jump = true, 
                 () => this.jump = false
-            );
+            ];
         
         // Check all points for ground contact
         for (const checkPos of groundCheckPoints) {
@@ -686,8 +686,7 @@ export class InputManager {
         } else {
             // No collision manager, simply apply position
             this.camera.position.copy(newPosition);
-        }
-    };
+        };
         }
         
         // Attack button
