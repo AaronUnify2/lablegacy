@@ -2,31 +2,24 @@ export class Enemy {
     constructor(scene, position, collisionManager, player) {
         this.scene = scene;
         this.position = position.clone();
-        this.state = 'idle';
-        this.collisionManager = collisionManager;
+        this.state = 'idle'; // Changed to 'idle' from 'dead' to make enemies active
+        this.collisionManager = collisionManager; // Store reference to collision manager
         this.player = player;
         
         // Add patrol properties
-        this.patrolRadius = 3;
-        this.patrolSpeed = 0.5;
-        this.patrolAngle = 0;
-        this.patrolCenter = position.clone();
-        this.patrolActive = true;
+        this.patrolRadius = 3; // Radius of patrol circle in world units
+        this.patrolSpeed = 0.5; // Speed of patrol movement (slow and steady)
+        this.patrolAngle = 0; // Current angle in the patrol circle
+        this.patrolCenter = position.clone(); // Center of patrol circle
+        this.patrolActive = true; // Flag to enable/disable patrol
         
         // Collision properties
-        this.collisionRadius = 0.5;
-        this.collisionEnabled = true;
-        this.lastValidPosition = position.clone();
-        
-        // Height properties
-        this.bodyHeight = 1.8;
-        this.groundOffset = 0.5;
+        this.collisionRadius = 0.5; // Enemy collision radius
+        this.collisionEnabled = true; // Flag to enable/disable collision
+        this.lastValidPosition = position.clone(); // Store last valid position
         
         // Create a simple mesh for the enemy
         this.createMesh();
-        
-        // Store original Y position - we'll maintain this height
-        this.fixedHeight = position.y;
         
         // Add to scene
         this.scene.add(this.group);
@@ -42,12 +35,12 @@ export class Enemy {
         const bodyGeometry = new THREE.CylinderGeometry(
             0.5, // top radius
             0.5, // bottom radius
-            this.bodyHeight, // height
+            1.8, // height
             8    // radial segments
         );
         
         const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0xff0000,
+            color: 0xff0000, // Bright red for visibility
             emissive: 0x330000,
             emissiveIntensity: 0.3
         });
@@ -55,10 +48,11 @@ export class Enemy {
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
-        this.bodyMesh.position.y = this.bodyHeight / 2;
+        this.bodyMesh.position.y = 1.8 / 2; // Center vertically
         
         // Save body dimensions for collision detection
-        this.bodyWidth = 1.0;
+        this.bodyWidth = 1.0; // Diameter
+        this.bodyHeight = 1.8;
         
         // Add body to group
         this.group.add(this.bodyMesh);
@@ -66,21 +60,42 @@ export class Enemy {
         // Add simple eyes - to check if we can see the enemy
         const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00
+            color: 0xffff00 // Bright yellow eyes
         });
         
         // Left eye
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85, -0.3);
+        this.leftEye.position.set(-0.2, 1.5, -0.3);
         this.group.add(this.leftEye);
         
         // Right eye
         this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.2, this.bodyHeight * 0.85, -0.3);
+        this.rightEye.position.set(0.2, 1.5, -0.3);
         this.group.add(this.rightEye);
         
-        // Position the entire group at the initial position
+        // Position the entire group
         this.group.position.copy(this.position);
+        
+        // Add an invisible collision cylinder for debug visualization (optional)
+        if (false) { // Set to true to see collision cylinder
+            const collisionGeometry = new THREE.CylinderGeometry(
+                this.collisionRadius,
+                this.collisionRadius,
+                this.bodyHeight,
+                8
+            );
+            
+            const collisionMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                transparent: true,
+                opacity: 0.3,
+                wireframe: true
+            });
+            
+            this.collisionMesh = new THREE.Mesh(collisionGeometry, collisionMaterial);
+            this.collisionMesh.position.y = this.bodyHeight / 2;
+            this.group.add(this.collisionMesh);
+        }
     }
     
     update(deltaTime, camera) {
@@ -97,80 +112,60 @@ export class Enemy {
             // Calculate new position on the circle
             this.patrolAngle += this.patrolSpeed * deltaTime;
             
-            // Calculate new x and z positions (keeping y the same)
+            // Calculate new x and z positions
             const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
             const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
             
-            // Create a potential new position - MAINTAIN FIXED Y POSITION
+            // Create a potential new position
             const newPosition = new THREE.Vector3(
                 newX,
-                this.fixedHeight, // Use the fixed height instead of current Y
+                this.group.position.y,
                 newZ
             );
             
             // Check for collisions before moving
-            let shouldMove = true;
-            
             if (this.collisionEnabled && this.collisionManager) {
-                // Check for environment collisions
-                const environmentCollision = this.collisionManager.checkCollision(newPosition, this.collisionRadius, true);
+                const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
                 
-                if (environmentCollision.collides) {
+                // Only consider environmental collisions, not other enemies
+                const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
+                
+                if (isEnvironmentCollision) {
                     // Skip moving to this position
-                    if (Math.random() < 0.1) {
-                        console.log("Enemy collision with environment detected, changing direction");
+                    if (Math.random() < 0.1) { // Log occasionally to avoid spam
+                        console.log("Enemy collision detected, changing direction");
                     }
                     
                     // Modify the patrol angle to try a different direction
-                    this.patrolAngle += Math.PI / 4;
-                    shouldMove = false;
+                    this.patrolAngle += Math.PI / 4; // Add 45 degrees to try a different direction
+                    
+                    // Return without updating position
+                    return;
                 }
                 
-                // Even if no environment collision, check for other enemies
-                if (shouldMove) {
-                    const otherEnemies = this.getOtherEnemies();
-                    for (const otherEnemy of otherEnemies) {
-                        // Calculate distance to other enemy (ignoring Y)
-                        const dx = newPosition.x - otherEnemy.group.position.x;
-                        const dz = newPosition.z - otherEnemy.group.position.z;
-                        const distanceSquared = dx * dx + dz * dz;
-                        
-                        // Minimum distance is sum of both collision radii plus a small buffer
-                        const minDistance = this.collisionRadius + otherEnemy.collisionRadius + 0.1;
-                        const minDistanceSquared = minDistance * minDistance;
-                        
-                        if (distanceSquared < minDistanceSquared) {
-                            if (Math.random() < 0.1) {
-                                console.log("Enemy collision with another enemy detected, adjusting");
-                            }
-                            
-                            // Calculate angle to other enemy
-                            const angleToOtherEnemy = Math.atan2(dz, dx);
-                            
-                            // Set patrol angle to move away from the other enemy
-                            // Add a random offset to avoid both enemies trying the same direction
-                            const randomOffset = (Math.random() - 0.5) * Math.PI / 4;
-                            this.patrolAngle = angleToOtherEnemy + Math.PI + randomOffset;
-                            
-                            shouldMove = false;
-                            break;
-                        }
+                // Also check for ground
+                const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
+                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
+                
+                if (!groundHit) {
+                    // No ground beneath, skip moving
+                    if (Math.random() < 0.1) {
+                        console.log("No ground beneath enemy, skipping movement");
                     }
+                    return;
                 }
             }
             
             // No collision, update position
-            if (shouldMove) {
-                this.group.position.copy(newPosition);
-                
-                // Make the enemy face the direction of movement
-                const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
-                
-                // Only set lookAt if forward is a valid direction
-                if (forward.lengthSq() > 0) {
-                    const lookAtPoint = new THREE.Vector3().addVectors(this.group.position, forward);
-                    this.group.lookAt(lookAtPoint);
-                }
+            this.group.position.copy(newPosition);
+            
+            // Make the enemy face the direction of movement
+            const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
+            
+            // Only set lookAt if forward is a valid direction
+            if (forward.lengthSq() > 0) {
+                const lookAtPoint = new THREE.Vector3().addVectors(this.group.position, forward);
+                this.group.lookAt(lookAtPoint);
             }
         }
         
@@ -179,15 +174,6 @@ export class Enemy {
         
         // Check if player is near and rotate to face them
         this.checkPlayerProximity();
-    }
-    
-    // Get other enemies (needs to be implemented by EnemyManager)
-    getOtherEnemies() {
-        // This will be replaced with actual implementation via EnemyManager
-        if (window.enemyManager) {
-            return window.enemyManager.getOtherEnemies(this);
-        }
-        return [];
     }
     
     // Check if player is nearby and rotate to face them if they are
@@ -255,9 +241,7 @@ export class Enemy {
     // Reset position if stuck or in an invalid location
     resetToLastValidPosition() {
         if (this.lastValidPosition) {
-            // Maintain our fixed height when resetting
             this.group.position.copy(this.lastValidPosition);
-            this.group.position.y = this.fixedHeight;
             console.log("Enemy reset to last valid position");
         }
     }
