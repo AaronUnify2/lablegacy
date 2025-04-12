@@ -760,26 +760,7 @@ class Game {
         }
     }
     
-    updateCurseEffects(currentTime, deltaTime) {
-        // Subtle camera shake based on curse level
-        if (this.gameState.curseLevel > 0) {
-            const intensity = this.gameState.curseLevel * 0.0005;
-            const shakeX = (Math.random() - 0.5) * intensity;
-            const shakeY = (Math.random() - 0.5) * intensity;
-            
-            this.renderer.camera.position.x += shakeX;
-            this.renderer.camera.position.y += shakeY;
-        }
-        
-        // Pulse the fog density
-        if (this.renderer.scene.fog) {
-            const baseFog = 0.03;
-            const pulseMagnitude = 0.01;
-            const pulseSpeed = 0.5;
-            
-            this.renderer.scene.fog.density = baseFog + 
-                Math.sin(currentTime * 0.001 * pulseSpeed) * pulseMagnitude;
-        }
+    
         
         updateCurseEffects(currentTime, deltaTime) {
         // Subtle camera shake based on curse level
