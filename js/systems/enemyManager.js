@@ -19,6 +19,9 @@ export class EnemyManager {
         this.enableCollisions = true; // Master toggle for enemy collisions
         this.enemyColliders = []; // Array to store enemy collider indices
         
+        // Make the enemy manager globally available for enemies to find each other
+        window.enemyManager = this;
+        
         // Force spawn test enemies after a short delay
         if (this.debug) console.log("Enemy Manager initialized - will spawn test enemies in a few seconds");
         
@@ -45,6 +48,11 @@ export class EnemyManager {
         }
     }
     
+    // Get all enemies except the specified one
+    getOtherEnemies(excludeEnemy) {
+        return this.enemies.filter(enemy => enemy !== excludeEnemy);
+    }
+    
     // Update the collider for an enemy
     updateEnemyCollider(index) {
         const enemy = this.enemies[index];
@@ -68,17 +76,23 @@ export class EnemyManager {
     }
     
     spawnTestEnemies() {
-        // Spawn first test enemy immediately
-        setTimeout(() => this.forceSpawnTestEnemy(), 1000);
+        // Wait a bit longer before spawning to ensure the scene is ready
+        setTimeout(() => this.forceSpawnTestEnemy(), 1500);
         
-        // Spawn second enemy with a delay
+        // Spawn second enemy with a delay - use a different patrol radius for variety
         setTimeout(() => this.spawnEnemyNearPlayer(), 3000);
         
         // Spawn a few more enemies around the map
         setTimeout(() => {
-            // Try to spawn in different locations
+            // Try to spawn in different locations with varied patrol settings
             this.spawnEnemyAtPosition(new THREE.Vector3(-10, 0.9, 10), 4, 0.4);
             this.spawnEnemyAtPosition(new THREE.Vector3(10, 0.9, -10), 6, 0.3);
+            
+            // Add more enemies with varied speeds to see the avoidance in action
+            setTimeout(() => {
+                this.spawnEnemyAtPosition(new THREE.Vector3(8, 0.9, 8), 5, 0.6);
+                this.spawnEnemyAtPosition(new THREE.Vector3(-8, 0.9, -8), 3, 0.3);
+            }, 2000);
         }, 5000);
     }
     
@@ -97,6 +111,27 @@ export class EnemyManager {
                 testPosition.x += 2;
                 testPosition.z += 2;
             }
+        }
+        
+        // Check for proximity to other enemies to prevent spawn conflicts
+        if (this.enemies.length > 0) {
+            let tooClose = false;
+            do {
+                tooClose = false;
+                for (const enemy of this.enemies) {
+                    const dx = testPosition.x - enemy.group.position.x;
+                    const dz = testPosition.z - enemy.group.position.z;
+                    const distSq = dx * dx + dz * dz;
+                    
+                    // If too close to another enemy, adjust position
+                    if (distSq < 2 * 2) { // Minimum 2 units apart
+                        tooClose = true;
+                        testPosition.x += (Math.random() - 0.5) * 4;
+                        testPosition.z += (Math.random() - 0.5) * 4;
+                        break;
+                    }
+                }
+            } while (tooClose);
         }
         
         // Create enemy
@@ -136,6 +171,27 @@ export class EnemyManager {
             }
         }
         
+        // Check for proximity to other enemies to prevent spawn conflicts
+        if (this.enemies.length > 0) {
+            let tooClose = false;
+            do {
+                tooClose = false;
+                for (const enemy of this.enemies) {
+                    const dx = spawnPos.x - enemy.group.position.x;
+                    const dz = spawnPos.z - enemy.group.position.z;
+                    const distSq = dx * dx + dz * dz;
+                    
+                    // If too close to another enemy, adjust position
+                    if (distSq < 2 * 2) { // Minimum 2 units apart
+                        tooClose = true;
+                        spawnPos.x += (Math.random() - 0.5) * 4;
+                        spawnPos.z += (Math.random() - 0.5) * 4;
+                        break;
+                    }
+                }
+            } while (tooClose);
+        }
+        
         // Create enemy
         const enemy = new Enemy(this.scene, spawnPos, this.collisionManager, this.player);
         
@@ -168,6 +224,33 @@ export class EnemyManager {
                 spawnPos.x += 2;
                 spawnPos.z += 2;
             }
+        }
+        
+        // Check for proximity to other enemies to prevent spawn conflicts
+        if (this.enemies.length > 0) {
+            let tooClose = false;
+            let attempts = 0;
+            const maxAttempts = 5;
+            
+            do {
+                tooClose = false;
+                for (const enemy of this.enemies) {
+                    const dx = spawnPos.x - enemy.group.position.x;
+                    const dz = spawnPos.z - enemy.group.position.z;
+                    const distSq = dx * dx + dz * dz;
+                    
+                    // If too close to another enemy, adjust position
+                    if (distSq < 2 * 2) { // Minimum 2 units apart
+                        tooClose = true;
+                        spawnPos.x += (Math.random() - 0.5) * 4;
+                        spawnPos.z += (Math.random() - 0.5) * 4;
+                        break;
+                    }
+                }
+                
+                attempts++;
+                if (attempts >= maxAttempts) break;
+            } while (tooClose);
         }
         
         // Create enemy
