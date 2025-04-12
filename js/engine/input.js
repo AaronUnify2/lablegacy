@@ -850,4 +850,4 @@ export class InputManager {
             this.camera.position.copy(newPosition);
         }
     }
-        }
+}
