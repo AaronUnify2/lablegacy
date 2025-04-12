@@ -598,182 +598,7 @@ export class InputManager {
             this.setupButtonTouch('jump', 
                 () => this.jump = true, 
                 () => this.jump = false
-            )
-        ];
-        
-        // Check all points for ground contact
-        for (const checkPos of groundCheckPoints) {
-            // When checking for ground, ignore enemy collisions
-            const groundCollision = collisionManager.checkCollision(checkPos, groundCheckRadius, true);
-            if (groundCollision.collides) {
-                this.isGrounded = true;
-                break;
-            }
-        }
-        
-        // Handle ground collision state change
-        if (this.isGrounded) {
-            // If we've just landed, play landing sound or effect here
-            if (!wasGroundedBefore && this.velocity.y < -4) {
-                // Heavy landing effect could go here
-                // For example: this.playLandingSound(Math.abs(this.velocity.y));
-            }
-            
-            // Reset vertical velocity when on the ground to prevent buildup
-            this.velocity.y = Math.max(this.velocity.y, 0);
-            
-            // Process jump input
-            if (this.jump && this.jumpCooldown <= 0) {
-                this.velocity.y = this.jumpForce;
-                this.jumpCooldown = 0.3; // Prevent jump spamming
-                this.isGrounded = false;
-            }
-        }
-        
-        // Apply velocity to position
-        const newPosition = this.camera.position.clone().add(
-            new THREE.Vector3(
-                this.velocity.x,
-                this.velocity.y * deltaTime, // Scale vertical movement by delta time
-                this.velocity.z
-            )
-        );
-        
-        // Handle collisions with walls and enemies
-        if (collisionManager) {
-            // Smaller player radius for easier navigation
-            const playerRadius = 0.45; // Reduced from 0.5 for better fit in tight spaces
-            
-            // Try horizontal movement first (X and Z)
-            const horizontalPosition = previousPosition.clone();
-            horizontalPosition.x = newPosition.x;
-            horizontalPosition.z = newPosition.z;
-            
-            // Check for collisions during horizontal movement, don't ignore enemies here
-            const horizontalCollision = collisionManager.checkCollision(horizontalPosition, playerRadius, false);
-            
-            if (horizontalCollision.collides) {
-                // If we hit an enemy, use special resolution
-                if (horizontalCollision.isEnemy) {
-                    // Get resolved position from the collision manager
-                    const resolvedPosition = collisionManager.resolveCollision(horizontalPosition, previousPosition, playerRadius);
-                    this.camera.position.x = resolvedPosition.x;
-                    this.camera.position.z = resolvedPosition.z;
-                } else {
-                    // Handle wall sliding by trying X and Z separately
-                    const xOnlyPosition = previousPosition.clone();
-                    xOnlyPosition.x = newPosition.x;
-                    
-                    const zOnlyPosition = previousPosition.clone();
-                    zOnlyPosition.z = newPosition.z;
-                    
-                    // Try X movement
-                    if (!collisionManager.checkCollision(xOnlyPosition, playerRadius).collides) {
-                        this.camera.position.x = xOnlyPosition.x;
-                    }
-                    
-                    // Try Z movement
-                    if (!collisionManager.checkCollision(zOnlyPosition, playerRadius).collides) {
-                        this.camera.position.z = zOnlyPosition.z;
-                    }
-                }
-            } else {
-                // No horizontal collision, apply full horizontal movement
-                this.camera.position.x = horizontalPosition.x;
-                this.camera.position.z = horizontalPosition.z;
-            }
-            
-            // Now handle vertical movement (Y) with collisions
-            const verticalPosition = this.camera.position.clone();
-            verticalPosition.y = newPosition.y;
-            
-            // Check for head collision (ceiling)
-            const headPosition = verticalPosition.clone();
-            headPosition.y += this.playerHeight / 2; // Check at head level
-            
-            const headCollision = collisionManager.checkCollision(headPosition, playerRadius);
-            
-            if (headCollision.collides) {
-                // Hit our head on the ceiling
-                this.velocity.y = Math.min(0, this.velocity.y); // Stop upward velocity
-                
-                // Position camera just below the ceiling collision
-                const ceilingHeight = headCollision.collider.box.min.y - this.playerHeight / 2;
-                if (ceilingHeight < verticalPosition.y) {
-                    verticalPosition.y = ceilingHeight - 0.1; // Small gap to prevent stuck
-                }
-            }
-            
-            // Check for feet collision (floor)
-            const feetPosition = verticalPosition.clone();
-            feetPosition.y -= this.playerHeight / 2; // Check at feet level
-            
-            // Use a smaller radius for floor checks to prevent getting stuck on edges
-            const feetCheckRadius = playerRadius * 0.9;
-            
-            // Ignore enemy collisions for floor checks to prevent false positives
-            const feetCollision = collisionManager.checkCollision(feetPosition, feetCheckRadius, true);
-            
-            if (feetCollision.collides) {
-                // We're standing on ground
-                this.isGrounded = true;
-                this.velocity.y = Math.max(0, this.velocity.y); // Stop downward velocity
-                
-                // Position camera just above the floor collision
-                const floorHeight = feetCollision.collider.box.max.y + this.playerHeight / 2;
-                if (floorHeight > verticalPosition.y) {
-                    verticalPosition.y = floorHeight + 0.1; // Small gap to prevent stuck
-                }
-            }
-            
-            // Do an additional raycast check directly down to accurately find floor height
-            // This helps prevent "walking on air" bugs
-            if (this.isGrounded) {
-                const rayOrigin = this.camera.position.clone();
-                rayOrigin.y -= this.playerHeight / 2 - 0.1;  // Just above feet level
-                
-                const floorHit = collisionManager.findFloorBelow(rayOrigin, 1.0);
-                if (floorHit) {
-                    // Position precisely above the hit point
-                    const exactFloorHeight = floorHit.point.y + this.playerHeight / 2;
-                    // Only adjust if we're slightly floating above the ground
-                    if (exactFloorHeight > verticalPosition.y && 
-                        exactFloorHeight - verticalPosition.y < 0.5) {
-                        verticalPosition.y = exactFloorHeight;
-                    }
-                }
-            }
-            
-            // Check for enemy collisions at the new vertical position
-            const bodyPosition = verticalPosition.clone();
-            const bodyCollision = collisionManager.checkCollision(bodyPosition, playerRadius, false);
-            
-            if (bodyCollision.collides && bodyCollision.isEnemy) {
-                // Use the collision manager to resolve the collision
-                const resolvedPosition = collisionManager.resolveCollision(bodyPosition, previousPosition, playerRadius);
-                
-                // Apply the resolved position, but preserve our calculated Y if it's better
-                // This prevents enemy collisions from pushing player through floor
-                if (resolvedPosition.y >= previousPosition.y) {
-                    verticalPosition.y = resolvedPosition.y;
-                }
-            }
-            
-            // Apply vertical position
-            this.camera.position.y = verticalPosition.y;
-            
-            // Final check - if we've somehow ended up in an enemy, push away horizontally
-            const finalCollision = collisionManager.checkCollision(this.camera.position, playerRadius);
-            if (finalCollision.collides && finalCollision.isEnemy) {
-                const resolvedFinal = collisionManager.resolveCollision(this.camera.position, previousPosition, playerRadius);
-                this.camera.position.copy(resolvedFinal);
-            }
-        } else {
-            // No collision manager, simply apply position
-            this.camera.position.copy(newPosition);
-        }
-    }
-};
+            );
         }
         
         // Attack button
@@ -981,4 +806,186 @@ export class InputManager {
             new THREE.Vector3(
                 this.camera.position.x + right.x * groundCheckRadius * 0.8,
                 this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z + right.z * groundCheckRadius * 0
+                this.camera.position.z + right.z * groundCheckRadius * 0.8
+            ),
+            // Left point
+            new THREE.Vector3(
+                this.camera.position.x - right.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z - right.z * groundCheckRadius * 0.8
+            )
+        ];
+        
+        // Check all points for ground contact
+        for (const checkPos of groundCheckPoints) {
+            // When checking for ground, ignore enemy collisions
+            const groundCollision = collisionManager.checkCollision(checkPos, groundCheckRadius, true);
+            if (groundCollision.collides) {
+                this.isGrounded = true;
+                break;
+            }
+        }
+        
+        // Handle ground collision state change
+        if (this.isGrounded) {
+            // If we've just landed, play landing sound or effect here
+            if (!wasGroundedBefore && this.velocity.y < -4) {
+                // Heavy landing effect could go here
+                // For example: this.playLandingSound(Math.abs(this.velocity.y));
+            }
+            
+            // Reset vertical velocity when on the ground to prevent buildup
+            this.velocity.y = Math.max(this.velocity.y, 0);
+            
+            // Process jump input
+            if (this.jump && this.jumpCooldown <= 0) {
+                this.velocity.y = this.jumpForce;
+                this.jumpCooldown = 0.3; // Prevent jump spamming
+                this.isGrounded = false;
+            }
+        }
+        
+        // Apply velocity to position
+        const newPosition = this.camera.position.clone().add(
+            new THREE.Vector3(
+                this.velocity.x,
+                this.velocity.y * deltaTime, // Scale vertical movement by delta time
+                this.velocity.z
+            )
+        );
+        
+        // Handle collisions with walls and enemies
+        if (collisionManager) {
+            // Smaller player radius for easier navigation
+            const playerRadius = 0.45; // Reduced from 0.5 for better fit in tight spaces
+            
+            // Try horizontal movement first (X and Z)
+            const horizontalPosition = previousPosition.clone();
+            horizontalPosition.x = newPosition.x;
+            horizontalPosition.z = newPosition.z;
+            
+            // Check for collisions during horizontal movement, don't ignore enemies here
+            const horizontalCollision = collisionManager.checkCollision(horizontalPosition, playerRadius, false);
+            
+            if (horizontalCollision.collides) {
+                // If we hit an enemy, use special resolution
+                if (horizontalCollision.isEnemy) {
+                    // Get resolved position from the collision manager
+                    const resolvedPosition = collisionManager.resolveCollision(horizontalPosition, previousPosition, playerRadius);
+                    this.camera.position.x = resolvedPosition.x;
+                    this.camera.position.z = resolvedPosition.z;
+                } else {
+                    // Handle wall sliding by trying X and Z separately
+                    const xOnlyPosition = previousPosition.clone();
+                    xOnlyPosition.x = newPosition.x;
+                    
+                    const zOnlyPosition = previousPosition.clone();
+                    zOnlyPosition.z = newPosition.z;
+                    
+                    // Try X movement
+                    if (!collisionManager.checkCollision(xOnlyPosition, playerRadius).collides) {
+                        this.camera.position.x = xOnlyPosition.x;
+                    }
+                    
+                    // Try Z movement
+                    if (!collisionManager.checkCollision(zOnlyPosition, playerRadius).collides) {
+                        this.camera.position.z = zOnlyPosition.z;
+                    }
+                }
+            } else {
+                // No horizontal collision, apply full horizontal movement
+                this.camera.position.x = horizontalPosition.x;
+                this.camera.position.z = horizontalPosition.z;
+            }
+            
+            // Now handle vertical movement (Y) with collisions
+            const verticalPosition = this.camera.position.clone();
+            verticalPosition.y = newPosition.y;
+            
+            // Check for head collision (ceiling)
+            const headPosition = verticalPosition.clone();
+            headPosition.y += this.playerHeight / 2; // Check at head level
+            
+            const headCollision = collisionManager.checkCollision(headPosition, playerRadius);
+            
+            if (headCollision.collides) {
+                // Hit our head on the ceiling
+                this.velocity.y = Math.min(0, this.velocity.y); // Stop upward velocity
+                
+                // Position camera just below the ceiling collision
+                const ceilingHeight = headCollision.collider.box.min.y - this.playerHeight / 2;
+                if (ceilingHeight < verticalPosition.y) {
+                    verticalPosition.y = ceilingHeight - 0.1; // Small gap to prevent stuck
+                }
+            }
+            
+            // Check for feet collision (floor)
+            const feetPosition = verticalPosition.clone();
+            feetPosition.y -= this.playerHeight / 2; // Check at feet level
+            
+            // Use a smaller radius for floor checks to prevent getting stuck on edges
+            const feetCheckRadius = playerRadius * 0.9;
+            
+            // Ignore enemy collisions for floor checks to prevent false positives
+            const feetCollision = collisionManager.checkCollision(feetPosition, feetCheckRadius, true);
+            
+            if (feetCollision.collides) {
+                // We're standing on ground
+                this.isGrounded = true;
+                this.velocity.y = Math.max(0, this.velocity.y); // Stop downward velocity
+                
+                // Position camera just above the floor collision
+                const floorHeight = feetCollision.collider.box.max.y + this.playerHeight / 2;
+                if (floorHeight > verticalPosition.y) {
+                    verticalPosition.y = floorHeight + 0.1; // Small gap to prevent stuck
+                }
+            }
+            
+            // Do an additional raycast check directly down to accurately find floor height
+            // This helps prevent "walking on air" bugs
+            if (this.isGrounded) {
+                const rayOrigin = this.camera.position.clone();
+                rayOrigin.y -= this.playerHeight / 2 - 0.1;  // Just above feet level
+                
+                const floorHit = collisionManager.findFloorBelow(rayOrigin, 1.0);
+                if (floorHit) {
+                    // Position precisely above the hit point
+                    const exactFloorHeight = floorHit.point.y + this.playerHeight / 2;
+                    // Only adjust if we're slightly floating above the ground
+                    if (exactFloorHeight > verticalPosition.y && 
+                        exactFloorHeight - verticalPosition.y < 0.5) {
+                        verticalPosition.y = exactFloorHeight;
+                    }
+                }
+            }
+            
+            // Check for enemy collisions at the new vertical position
+            const bodyPosition = verticalPosition.clone();
+            const bodyCollision = collisionManager.checkCollision(bodyPosition, playerRadius, false);
+            
+            if (bodyCollision.collides && bodyCollision.isEnemy) {
+                // Use the collision manager to resolve the collision
+                const resolvedPosition = collisionManager.resolveCollision(bodyPosition, previousPosition, playerRadius);
+                
+                // Apply the resolved position, but preserve our calculated Y if it's better
+                // This prevents enemy collisions from pushing player through floor
+                if (resolvedPosition.y >= previousPosition.y) {
+                    verticalPosition.y = resolvedPosition.y;
+                }
+            }
+            
+            // Apply vertical position
+            this.camera.position.y = verticalPosition.y;
+            
+            // Final check - if we've somehow ended up in an enemy, push away horizontally
+            const finalCollision = collisionManager.checkCollision(this.camera.position, playerRadius);
+            if (finalCollision.collides && finalCollision.isEnemy) {
+                const resolvedFinal = collisionManager.resolveCollision(this.camera.position, previousPosition, playerRadius);
+                this.camera.position.copy(resolvedFinal);
+            }
+        } else {
+            // No collision manager, simply apply position
+            this.camera.position.copy(newPosition);
+        }
+    }
+}
