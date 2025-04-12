@@ -529,6 +529,16 @@ class Game {
                 this.weaponSystem.staffAttack();
             }
         });
+
+        // Add this in the setupFirstPersonMode method in main.js, after the existing event listeners
+// (around line 557, near the attack key (left mouse button) event listener)
+
+// Listen for attack button from touch controls
+document.addEventListener('player-attack', () => {
+    if (this.weaponSystem) {
+        this.weaponSystem.staffAttack();
+    }
+});
         
         // Ensure the camera stays at eye level
         this.renderer.camera.position.y = this.player.eyeLevel;
