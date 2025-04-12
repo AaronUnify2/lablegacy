@@ -147,7 +147,7 @@ export class InputManager {
         
         // Define the button layout using a 6x3 grid
         const buttonLayout = [
-            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', ''],
+            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', 'attack'],
             ['move-left', 'move-center', 'move-right', 'camera-left', 'jump', 'camera-right'],
             ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down', '']
         ];
@@ -169,7 +169,8 @@ export class InputManager {
             'jump': 'Jump',
             'zoom-in': '+',
             'zoom-out': '-',
-            'camera-down': '↓'
+            'camera-down': '↓',
+            'attack': 'Atk'
         };
         
         // Create buttons according to layout
@@ -325,6 +326,18 @@ export class InputManager {
                 () => this.jump = false
             );
         }
+        
+        // Attack button
+        this.setupButtonTouch('attack', 
+            () => {
+                // Dispatch a custom event that the game can listen for
+                const event = new CustomEvent('player-attack');
+                document.dispatchEvent(event);
+            }, 
+            null,
+            false,
+            true // Single press (don't repeat)
+        );
     }
     
     setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
