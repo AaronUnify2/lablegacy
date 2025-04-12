@@ -839,3 +839,18 @@ class Game {
             this.player.magicStaff.setLightIntensity(2.5 * curseEffect + flickerIntensity);
         }
     }
+
+
+// Initialize and start the game when the window loads
+let game;
+window.addEventListener('load', () => {
+    game = new Game();
+    game.init();
+});
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    if (game && game.renderer) {
+        game.renderer.resize();
+    }
+});
