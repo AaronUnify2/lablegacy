@@ -840,7 +840,7 @@ class Game {
         }
     }
 
-
+}
 // Initialize and start the game when the window loads
 let game;
 window.addEventListener('load', () => {
