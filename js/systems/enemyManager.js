@@ -11,6 +11,10 @@ export class EnemyManager {
         
         // Enemy spawn settings
         this.maxEnemies = 5;
+        this.spawnDistance = {
+            min: 10,
+            max: 20
+        };
         
         // Debug flag - set to true to get console logs about spawning
         this.debug = true;
@@ -19,8 +23,9 @@ export class EnemyManager {
         this.enableCollisions = true; // Master toggle for enemy collisions
         this.enemyColliders = []; // Array to store enemy collider indices
         
-        // Make the enemy manager globally available for enemies to find each other
-        window.enemyManager = this;
+        // Safety check interval - periodically check if enemies are in valid positions
+        this.safetyCheckInterval = 5; // Check every 5 seconds
+        this.timeSinceLastCheck = 0;
         
         // Force spawn test enemies after a short delay
         if (this.debug) console.log("Enemy Manager initialized - will spawn test enemies in a few seconds");
@@ -46,11 +51,13 @@ export class EnemyManager {
                 this.updateEnemyCollider(i);
             }
         }
-    }
-    
-    // Get all enemies except the specified one
-    getOtherEnemies(excludeEnemy) {
-        return this.enemies.filter(enemy => enemy !== excludeEnemy);
+        
+        // Periodically run safety checks
+        this.timeSinceLastCheck += validDeltaTime;
+        if (this.timeSinceLastCheck >= this.safetyCheckInterval) {
+            this.performSafetyChecks();
+            this.timeSinceLastCheck = 0;
+        }
     }
     
     // Update the collider for an enemy
@@ -65,6 +72,48 @@ export class EnemyManager {
         }
     }
     
+    performSafetyChecks() {
+        if (this.debug) console.log("Performing enemy safety checks...");
+        
+        for (let i = 0; i < this.enemies.length; i++) {
+            const enemy = this.enemies[i];
+            if (!enemy) continue;
+            
+            // Check if enemy is in a valid position
+            if (this.collisionManager) {
+                // Check if enemy is stuck in a collision (with environment, not other enemies)
+                const collision = this.collisionManager.checkCollision(
+                    enemy.group.position, 
+                    enemy.collisionRadius
+                );
+                
+                // Ignore collisions with enemies themselves by checking object type
+                const collidesWithEnvironment = 
+                    collision.collides && 
+                    collision.collider && 
+                    !this.isEnemyCollider(collision.collider.object);
+                
+                if (collidesWithEnvironment) {
+                    if (this.debug) console.log(`Enemy ${i} is stuck in collision, resetting position`);
+                    enemy.resetToLastValidPosition();
+                }
+                
+                // Check if enemy is floating (no ground beneath)
+                const groundCheck = new THREE.Vector3(
+                    enemy.group.position.x,
+                    enemy.group.position.y - 1,
+                    enemy.group.position.z
+                );
+                
+                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 5);
+                if (!groundHit) {
+                    if (this.debug) console.log(`Enemy ${i} is floating, resetting position`);
+                    enemy.resetToLastValidPosition();
+                }
+            }
+        }
+    }
+    
     // Helper to check if a collider belongs to an enemy
     isEnemyCollider(object) {
         for (const enemy of this.enemies) {
@@ -76,31 +125,34 @@ export class EnemyManager {
     }
     
     spawnTestEnemies() {
-        // Wait a bit longer before spawning to ensure the scene is ready
-        setTimeout(() => this.forceSpawnTestEnemy(), 1500);
+        // Spawn first test enemy immediately
+        setTimeout(() => this.forceSpawnTestEnemy(), 1000);
         
-        // Spawn second enemy with a delay - use a different patrol radius for variety
+        // Spawn second enemy with a delay
         setTimeout(() => this.spawnEnemyNearPlayer(), 3000);
         
         // Spawn a few more enemies around the map
         setTimeout(() => {
-            // Try to spawn in different locations with varied patrol settings
-            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 0.9, 10), 4, 0.4);
-            this.spawnEnemyAtPosition(new THREE.Vector3(10, 0.9, -10), 6, 0.3);
-            
-            // Add more enemies with varied speeds to see the avoidance in action
-            setTimeout(() => {
-                this.spawnEnemyAtPosition(new THREE.Vector3(8, 0.9, 8), 5, 0.6);
-                this.spawnEnemyAtPosition(new THREE.Vector3(-8, 0.9, -8), 3, 0.3);
-            }, 2000);
+            // Try to spawn in different locations
+            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 1, 10), 4, 0.4);
+            this.spawnEnemyAtPosition(new THREE.Vector3(10, 1, -10), 6, 0.3);
         }, 5000);
     }
     
     forceSpawnTestEnemy() {
         if (this.debug) console.log("Attempting to spawn test enemy...");
         
-        // Use a fixed height value - this is the key change
-        const testPosition = new THREE.Vector3(10, 0.9, 0);
+        // Try to spawn at a fixed position relative to origin
+        const testPosition = new THREE.Vector3(10, 1, 0); // 10 units to the right of origin
+        
+        // Try to find floor beneath
+        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
+            const floorHit = this.collisionManager.findFloorBelow(testPosition, 10);
+            if (floorHit && floorHit.point) {
+                testPosition.y = floorHit.point.y + 0.9; // Just above floor
+                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            }
+        }
         
         // Check for collision at spawn point
         if (this.collisionManager) {
@@ -111,27 +163,6 @@ export class EnemyManager {
                 testPosition.x += 2;
                 testPosition.z += 2;
             }
-        }
-        
-        // Check for proximity to other enemies to prevent spawn conflicts
-        if (this.enemies.length > 0) {
-            let tooClose = false;
-            do {
-                tooClose = false;
-                for (const enemy of this.enemies) {
-                    const dx = testPosition.x - enemy.group.position.x;
-                    const dz = testPosition.z - enemy.group.position.z;
-                    const distSq = dx * dx + dz * dz;
-                    
-                    // If too close to another enemy, adjust position
-                    if (distSq < 2 * 2) { // Minimum 2 units apart
-                        tooClose = true;
-                        testPosition.x += (Math.random() - 0.5) * 4;
-                        testPosition.z += (Math.random() - 0.5) * 4;
-                        break;
-                    }
-                }
-            } while (tooClose);
         }
         
         // Create enemy
@@ -153,12 +184,21 @@ export class EnemyManager {
         // Get player position
         const playerPos = this.player.camera.position;
         
-        // Spawn position a bit off from player but with FIXED Y HEIGHT
+        // Spawn position a bit off from player
         const spawnPos = new THREE.Vector3(
             playerPos.x + 8, // 8 units to the right
-            0.9, // Use fixed height rather than player height
+            playerPos.y, // Same height as player
             playerPos.z + 8  // 8 units in front
         );
+        
+        // Try to find floor beneath
+        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
+                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            }
+        }
         
         // Check for collision at spawn point
         if (this.collisionManager) {
@@ -169,27 +209,6 @@ export class EnemyManager {
                 spawnPos.x += 2;
                 spawnPos.z += 2;
             }
-        }
-        
-        // Check for proximity to other enemies to prevent spawn conflicts
-        if (this.enemies.length > 0) {
-            let tooClose = false;
-            do {
-                tooClose = false;
-                for (const enemy of this.enemies) {
-                    const dx = spawnPos.x - enemy.group.position.x;
-                    const dz = spawnPos.z - enemy.group.position.z;
-                    const distSq = dx * dx + dz * dz;
-                    
-                    // If too close to another enemy, adjust position
-                    if (distSq < 2 * 2) { // Minimum 2 units apart
-                        tooClose = true;
-                        spawnPos.x += (Math.random() - 0.5) * 4;
-                        spawnPos.z += (Math.random() - 0.5) * 4;
-                        break;
-                    }
-                }
-            } while (tooClose);
         }
         
         // Create enemy
@@ -215,6 +234,15 @@ export class EnemyManager {
         
         const spawnPos = position.clone();
         
+        // Try to find floor beneath
+        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
+                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            }
+        }
+        
         // Check for collision at spawn point
         if (this.collisionManager) {
             const collision = this.collisionManager.checkCollision(spawnPos, 0.5);
@@ -224,33 +252,6 @@ export class EnemyManager {
                 spawnPos.x += 2;
                 spawnPos.z += 2;
             }
-        }
-        
-        // Check for proximity to other enemies to prevent spawn conflicts
-        if (this.enemies.length > 0) {
-            let tooClose = false;
-            let attempts = 0;
-            const maxAttempts = 5;
-            
-            do {
-                tooClose = false;
-                for (const enemy of this.enemies) {
-                    const dx = spawnPos.x - enemy.group.position.x;
-                    const dz = spawnPos.z - enemy.group.position.z;
-                    const distSq = dx * dx + dz * dz;
-                    
-                    // If too close to another enemy, adjust position
-                    if (distSq < 2 * 2) { // Minimum 2 units apart
-                        tooClose = true;
-                        spawnPos.x += (Math.random() - 0.5) * 4;
-                        spawnPos.z += (Math.random() - 0.5) * 4;
-                        break;
-                    }
-                }
-                
-                attempts++;
-                if (attempts >= maxAttempts) break;
-            } while (tooClose);
         }
         
         // Create enemy
@@ -291,10 +292,6 @@ export class EnemyManager {
         // Tag the collider as an enemy for special handling
         if (this.collisionManager.colliders[colliderIndex]) {
             this.collisionManager.colliders[colliderIndex].isEnemy = true;
-            
-            // Add userData tag to the object
-            enemy.group.userData = enemy.group.userData || {};
-            enemy.group.userData.isEnemy = true;
         }
         
         return colliderIndex;
