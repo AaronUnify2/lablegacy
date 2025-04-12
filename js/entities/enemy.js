@@ -20,7 +20,7 @@ export class Enemy {
         
         // Height properties
         this.bodyHeight = 1.8;
-        this.groundOffset = 0.5; // Increased offset to prevent sticking in ground
+        this.groundOffset = 0.5;
         
         // Create a simple mesh for the enemy
         this.createMesh();
@@ -109,36 +109,68 @@ export class Enemy {
             );
             
             // Check for collisions before moving
+            let shouldMove = true;
+            
             if (this.collisionEnabled && this.collisionManager) {
-                const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
+                // Check for environment collisions
+                const environmentCollision = this.collisionManager.checkCollision(newPosition, this.collisionRadius, true);
                 
-                // Only consider environmental collisions, not other enemies
-                const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
-                
-                if (isEnvironmentCollision) {
+                if (environmentCollision.collides) {
                     // Skip moving to this position
                     if (Math.random() < 0.1) {
-                        console.log("Enemy collision detected, changing direction");
+                        console.log("Enemy collision with environment detected, changing direction");
                     }
                     
                     // Modify the patrol angle to try a different direction
                     this.patrolAngle += Math.PI / 4;
-                    
-                    // Return without updating position
-                    return;
+                    shouldMove = false;
+                }
+                
+                // Even if no environment collision, check for other enemies
+                if (shouldMove) {
+                    const otherEnemies = this.getOtherEnemies();
+                    for (const otherEnemy of otherEnemies) {
+                        // Calculate distance to other enemy (ignoring Y)
+                        const dx = newPosition.x - otherEnemy.group.position.x;
+                        const dz = newPosition.z - otherEnemy.group.position.z;
+                        const distanceSquared = dx * dx + dz * dz;
+                        
+                        // Minimum distance is sum of both collision radii plus a small buffer
+                        const minDistance = this.collisionRadius + otherEnemy.collisionRadius + 0.1;
+                        const minDistanceSquared = minDistance * minDistance;
+                        
+                        if (distanceSquared < minDistanceSquared) {
+                            if (Math.random() < 0.1) {
+                                console.log("Enemy collision with another enemy detected, adjusting");
+                            }
+                            
+                            // Calculate angle to other enemy
+                            const angleToOtherEnemy = Math.atan2(dz, dx);
+                            
+                            // Set patrol angle to move away from the other enemy
+                            // Add a random offset to avoid both enemies trying the same direction
+                            const randomOffset = (Math.random() - 0.5) * Math.PI / 4;
+                            this.patrolAngle = angleToOtherEnemy + Math.PI + randomOffset;
+                            
+                            shouldMove = false;
+                            break;
+                        }
+                    }
                 }
             }
             
             // No collision, update position
-            this.group.position.copy(newPosition);
-            
-            // Make the enemy face the direction of movement
-            const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
-            
-            // Only set lookAt if forward is a valid direction
-            if (forward.lengthSq() > 0) {
-                const lookAtPoint = new THREE.Vector3().addVectors(this.group.position, forward);
-                this.group.lookAt(lookAtPoint);
+            if (shouldMove) {
+                this.group.position.copy(newPosition);
+                
+                // Make the enemy face the direction of movement
+                const forward = new THREE.Vector3(-Math.sin(this.patrolAngle), 0, Math.cos(this.patrolAngle));
+                
+                // Only set lookAt if forward is a valid direction
+                if (forward.lengthSq() > 0) {
+                    const lookAtPoint = new THREE.Vector3().addVectors(this.group.position, forward);
+                    this.group.lookAt(lookAtPoint);
+                }
             }
         }
         
@@ -147,6 +179,15 @@ export class Enemy {
         
         // Check if player is near and rotate to face them
         this.checkPlayerProximity();
+    }
+    
+    // Get other enemies (needs to be implemented by EnemyManager)
+    getOtherEnemies() {
+        // This will be replaced with actual implementation via EnemyManager
+        if (window.enemyManager) {
+            return window.enemyManager.getOtherEnemies(this);
+        }
+        return [];
     }
     
     // Check if player is nearby and rotate to face them if they are
