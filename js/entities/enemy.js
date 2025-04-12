@@ -792,3 +792,226 @@ export class Enemy {
             const scale = 1 + progress;
             attackMesh.scale.set(scale, 1, scale);
             attackMesh.material.opacity = 0.6 * (1 - progress);
+            
+            // Move forward slightly
+            const newPosition = this.group.position.clone()
+                .addScaledVector(directionToPlayer, 1.0 + progress * 0.5);
+            newPosition.y = attackPosition.y;
+            attackMesh.position.copy(newPosition);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateAttack);
+            } else {
+                // Remove the attack mesh
+                this.scene.remove(attackMesh);
+                attackMesh.geometry.dispose();
+                attackMesh.material.dispose();
+            }
+        };
+        
+        animateAttack();
+        
+        // Try to play attack sound
+        this.playAttackSound();
+    }
+    
+    // Play an attack sound
+    playAttackSound() {
+        try {
+            const attackSound = new Audio('sounds/enemy_attack.mp3');
+            attackSound.volume = 0.3;
+            attackSound.play().catch(err => console.log('Could not play attack sound', err));
+        } catch (e) {
+            console.log('Error playing attack sound', e);
+        }
+    }
+    
+    // Move with collision prevention
+    moveWithCollisionCheck(newPosition) {
+        if (!this.collisionEnabled || !this.collisionManager) {
+            // If collision is disabled, just move
+            this.group.position.copy(newPosition);
+            return true;
+        }
+        
+        // Check for environmental collisions
+        const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
+            
+        // Only consider environmental collisions, not other enemies
+        const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
+            
+        if (isEnvironmentCollision) {
+            // Skip moving to this position
+            if (Math.random() < 0.05) { // Log occasionally to avoid spam
+                console.log("Enemy collision detected, can't move to new position");
+            }
+            return false;
+        }
+            
+        // Also check for ground
+        const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
+        const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
+            
+        if (!groundHit) {
+            // No ground beneath, skip moving
+            if (Math.random() < 0.05) {
+                console.log("No ground beneath enemy, can't move to new position");
+            }
+            return false;
+        }
+            
+        // No collision, update position
+        this.group.position.copy(newPosition);
+        return true;
+    }
+    
+    // Smoothly rotate to face a target
+    smoothLookAt(target, speed) {
+        // Create a quaternion for current rotation
+        const currentRotation = new THREE.Quaternion().copy(this.group.quaternion);
+        
+        // Create a quaternion for target rotation
+        const targetRotation = new THREE.Quaternion();
+        
+        // Create a temporary object to get the target rotation
+        const tempObj = new THREE.Object3D();
+        tempObj.position.copy(this.group.position);
+        tempObj.lookAt(target);
+        targetRotation.copy(tempObj.quaternion);
+        
+        // Smoothly interpolate between current and target rotation
+        this.group.quaternion.slerp(targetRotation, speed);
+        
+        // Normalize to prevent accumulation errors
+        this.group.quaternion.normalize();
+    }
+    
+    // Update eye appearance based on state and player distance
+    updateEyeAppearance(distanceToPlayer) {
+        // Base color for eyes
+        let eyeColor;
+        let intensity = 0;
+        
+        // Set color based on state
+        switch(this.state) {
+            case this.states.CHASE:
+                eyeColor = 0xff0000; // Red when chasing
+                intensity = 1.0;
+                break;
+                
+            case this.states.PATROL:
+                eyeColor = 0xffff00; // Yellow during patrol
+                intensity = 0.7;
+                break;
+                
+            case this.states.RETURN:
+                eyeColor = 0xff8800; // Orange when returning
+                intensity = 0.8;
+                break;
+                
+            case this.states.IDLE:
+                eyeColor = 0x88ff88; // Green when idle
+                intensity = 0.5;
+                break;
+                
+            case this.states.ATTACK:
+                eyeColor = 0xff0000; // Bright red when attacking
+                intensity = 1.5;
+                break;
+                
+            case this.states.DAMAGED:
+                eyeColor = 0xffffff; // White when damaged
+                intensity = 1.2;
+                break;
+                
+            case this.states.DEAD:
+                eyeColor = 0x333333; // Dark gray when dead
+                intensity = 0.2;
+                break;
+        }
+        
+        // If player is close, increase intensity
+        if (distanceToPlayer < this.detectionRange * 1.5) {
+            intensity = Math.min(1.0, intensity + (1.0 - distanceToPlayer / this.detectionRange) * 0.5);
+        }
+        
+        // Update eye materials
+        if (this.leftEye && this.leftEye.material) {
+            this.leftEye.material.color.set(eyeColor);
+            this.leftEye.material.emissiveIntensity = intensity;
+        }
+        
+        if (this.rightEye && this.rightEye.material) {
+            this.rightEye.material.color.set(eyeColor);
+            this.rightEye.material.emissiveIntensity = intensity;
+        }
+    }
+    
+    // Play effect when detecting player
+    playDetectionEffect() {
+        // Make eyes flash brightly
+        if (this.leftEye && this.leftEye.material) {
+            const originalColor = this.leftEye.material.color.clone();
+            this.leftEye.material.color.set(0xff0000);
+            
+            // Reset after a short delay
+            setTimeout(() => {
+                if (this.leftEye && this.leftEye.material) {
+                    this.leftEye.material.color.copy(originalColor);
+                }
+            }, 200);
+        }
+        
+        if (this.rightEye && this.rightEye.material) {
+            const originalColor = this.rightEye.material.color.clone();
+            this.rightEye.material.color.set(0xff0000);
+            
+            // Reset after a short delay
+            setTimeout(() => {
+                if (this.rightEye && this.rightEye.material) {
+                    this.rightEye.material.color.copy(originalColor);
+                }
+            }, 200);
+        }
+        
+        // Play alert sound (if available)
+        if (this.scene && typeof Audio !== 'undefined') {
+            try {
+                const alertSound = new Audio('sounds/enemy_alert.mp3');
+                alertSound.volume = 0.3;
+                alertSound.play().catch(err => console.log('Could not play alert sound', err));
+            } catch (e) {
+                console.log('Error playing sound', e);
+            }
+        }
+    }
+    
+    // Reset position if stuck or in an invalid location
+    resetToLastValidPosition() {
+        if (this.lastValidPosition) {
+            this.group.position.copy(this.lastValidPosition);
+            console.log("Enemy reset to last valid position");
+        }
+    }
+    
+    // Change patrol radius or speed
+    setPatrolParameters(radius, speed) {
+        if (radius !== undefined) {
+            this.patrolRadius = radius;
+        }
+        
+        if (speed !== undefined) {
+            this.moveSpeed.patrol = speed;
+            if (this.state !== this.states.CHASE) {
+                this.patrolSpeed = speed;
+            }
+        }
+    }
+    
+    // Set a new patrol center
+    setPatrolCenter(newCenter) {
+        if (newCenter) {
+            this.patrolCenter.copy(newCenter);
+        }
+    }
+}
