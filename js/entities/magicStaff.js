@@ -436,9 +436,9 @@ export class MagicStaff {
     showToggleEffect(isOn) {
         
         // Create a message element
-        /*
+        
         const message = document.createElement('div');
-        message.textContent = isOn ? "Staff light activated" : "Staff light deactivated";
+        message.textContent = isOn ? " " : " ";
         message.style.position = 'absolute';
         message.style.bottom = '10%';
         message.style.left = '0';
@@ -471,5 +471,5 @@ export class MagicStaff {
             }, 500);
         }, 2000);
     }
-    */
+    
 }
