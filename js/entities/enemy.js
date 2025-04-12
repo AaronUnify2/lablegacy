@@ -2,31 +2,31 @@ export class Enemy {
     constructor(scene, position, collisionManager, player) {
         this.scene = scene;
         this.position = position.clone();
-        this.state = 'idle'; // Changed to 'idle' from 'dead' to make enemies active
-        this.collisionManager = collisionManager; // Store reference to collision manager
+        this.state = 'idle';
+        this.collisionManager = collisionManager;
         this.player = player;
         
         // Add patrol properties
-        this.patrolRadius = 3; // Radius of patrol circle in world units
-        this.patrolSpeed = 0.5; // Speed of patrol movement (slow and steady)
-        this.patrolAngle = 0; // Current angle in the patrol circle
-        this.patrolCenter = position.clone(); // Center of patrol circle
-        this.patrolActive = true; // Flag to enable/disable patrol
+        this.patrolRadius = 3;
+        this.patrolSpeed = 0.5;
+        this.patrolAngle = 0;
+        this.patrolCenter = position.clone();
+        this.patrolActive = true;
         
         // Collision properties
-        this.collisionRadius = 0.5; // Enemy collision radius
-        this.collisionEnabled = true; // Flag to enable/disable collision
-        this.lastValidPosition = position.clone(); // Store last valid position
+        this.collisionRadius = 0.5;
+        this.collisionEnabled = true;
+        this.lastValidPosition = position.clone();
         
         // Height properties
-        this.bodyHeight = 1.8; // Height of the enemy body
-        this.groundOffset = 0.1; // Small offset from ground to prevent z-fighting and getting stuck
+        this.bodyHeight = 1.8;
+        this.groundOffset = 0.5; // Increased offset to prevent sticking in ground
         
         // Create a simple mesh for the enemy
         this.createMesh();
         
-        // Ensure enemy is placed above ground with a proper offset
-        this.ensureProperGroundPlacement();
+        // Store original Y position - we'll maintain this height
+        this.fixedHeight = position.y;
         
         // Add to scene
         this.scene.add(this.group);
@@ -47,7 +47,7 @@ export class Enemy {
         );
         
         const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0xff0000, // Bright red for visibility
+            color: 0xff0000,
             emissive: 0x330000,
             emissiveIntensity: 0.3
         });
@@ -55,11 +55,10 @@ export class Enemy {
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
-        // Position the mesh so its bottom is at groundOffset of the group
-        this.bodyMesh.position.y = this.bodyHeight / 2 + this.groundOffset;
+        this.bodyMesh.position.y = this.bodyHeight / 2;
         
         // Save body dimensions for collision detection
-        this.bodyWidth = 1.0; // Diameter
+        this.bodyWidth = 1.0;
         
         // Add body to group
         this.group.add(this.bodyMesh);
@@ -67,111 +66,21 @@ export class Enemy {
         // Add simple eyes - to check if we can see the enemy
         const eyeGeometry = new THREE.SphereGeometry(0.1, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0xffff00 // Bright yellow eyes
+            color: 0xffff00
         });
         
-        // Left eye - position relative to body height
+        // Left eye
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85 + this.groundOffset, -0.3);
+        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85, -0.3);
         this.group.add(this.leftEye);
         
-        // Right eye - position relative to body height
+        // Right eye
         this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.2, this.bodyHeight * 0.85 + this.groundOffset, -0.3);
+        this.rightEye.position.set(0.2, this.bodyHeight * 0.85, -0.3);
         this.group.add(this.rightEye);
         
         // Position the entire group at the initial position
         this.group.position.copy(this.position);
-    }
-    
-    // Ensure enemy is properly placed with respect to the ground
-    ensureProperGroundPlacement() {
-        if (!this.collisionManager) {
-            console.warn("No collision manager available for ground placement");
-            return;
-        }
-        
-        // Start with a ray cast from current position + safety height
-        const rayStart = new THREE.Vector3(
-            this.group.position.x,
-            this.group.position.y + 5, // Start well above current position
-            this.group.position.z
-        );
-        
-        // Cast ray downward to find the floor
-        const floorHit = this.collisionManager.findFloorBelow(rayStart, 10);
-        
-        if (floorHit && floorHit.point) {
-            // Position exactly on the ground with the small offset
-            this.group.position.y = floorHit.point.y;
-            
-            // Store this as a valid position
-            this.lastValidPosition.copy(this.group.position);
-            this.patrolCenter.y = floorHit.point.y;
-            
-            console.log("Enemy placed at ground level Y:", floorHit.point.y);
-        } else {
-            // No ground found - log warning and try to adjust
-            console.warn("Could not find floor beneath enemy, using default position");
-            
-            // Try to find a reasonable height for the enemy
-            // If player is available, use player's height as reference
-            if (this.player && this.player.camera) {
-                // Use player foot position as a reference
-                const playerFootY = this.player.camera.position.y - 1.5;
-                this.group.position.y = playerFootY;
-                this.lastValidPosition.copy(this.group.position);
-                this.patrolCenter.y = playerFootY;
-            }
-        }
-        
-        // Final check to ensure we're not stuck in geometry
-        this.adjustIfStuckInGround();
-    }
-    
-    // Check if enemy is stuck in ground and adjust if needed
-    adjustIfStuckInGround() {
-        if (!this.collisionManager) return;
-        
-        // Check if current position creates a collision
-        const collision = this.collisionManager.checkCollision(
-            this.group.position,
-            this.collisionRadius
-        );
-        
-        if (collision.collides && !collision.isEnemy) {
-            console.log("Enemy is stuck in geometry, adjusting position");
-            
-            // Try raising the enemy up by small increments until we're free
-            let attempts = 0;
-            let stepSize = 0.2; // 0.2 units per step
-            let maxAttempts = 10; // Don't try more than 10 times
-            
-            while (attempts < maxAttempts) {
-                // Raise the position
-                this.group.position.y += stepSize;
-                
-                // Check if we're still colliding
-                const newCheck = this.collisionManager.checkCollision(
-                    this.group.position,
-                    this.collisionRadius
-                );
-                
-                if (!newCheck.collides || newCheck.isEnemy) {
-                    // We're free, update valid position
-                    this.lastValidPosition.copy(this.group.position);
-                    this.patrolCenter.y = this.group.position.y;
-                    console.log("Enemy adjusted to Y:", this.group.position.y);
-                    break;
-                }
-                
-                attempts++;
-            }
-            
-            if (attempts >= maxAttempts) {
-                console.warn("Could not find valid position for enemy after multiple attempts");
-            }
-        }
     }
     
     update(deltaTime, camera) {
@@ -192,10 +101,10 @@ export class Enemy {
             const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
             const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
             
-            // Create a potential new position - maintaining current Y value
+            // Create a potential new position - MAINTAIN FIXED Y POSITION
             const newPosition = new THREE.Vector3(
                 newX,
-                this.group.position.y,
+                this.fixedHeight, // Use the fixed height instead of current Y
                 newZ
             );
             
@@ -208,42 +117,15 @@ export class Enemy {
                 
                 if (isEnvironmentCollision) {
                     // Skip moving to this position
-                    if (Math.random() < 0.1) { // Log occasionally to avoid spam
+                    if (Math.random() < 0.1) {
                         console.log("Enemy collision detected, changing direction");
                     }
                     
                     // Modify the patrol angle to try a different direction
-                    this.patrolAngle += Math.PI / 4; // Add 45 degrees to try a different direction
+                    this.patrolAngle += Math.PI / 4;
                     
                     // Return without updating position
                     return;
-                }
-                
-                // Also check for ground
-                const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 0.1, newPosition.z);
-                const groundHit = this.collisionManager.findFloorBelow(groundCheck, 1);
-                
-                if (!groundHit) {
-                    // No ground beneath, skip moving
-                    if (Math.random() < 0.1) {
-                        console.log("No ground beneath enemy, skipping movement");
-                    }
-                    return;
-                }
-                
-                // Check for small height differences in the floor
-                if (groundHit && groundHit.point) {
-                    // Only adjust height for small changes (ramps, small steps)
-                    const heightDifference = Math.abs(groundHit.point.y - this.group.position.y);
-                    const maxStepHeight = 0.3; // Maximum step height enemy can handle
-                    
-                    if (heightDifference <= maxStepHeight) {
-                        // Adjust to match ground height
-                        newPosition.y = groundHit.point.y;
-                    } else if (heightDifference > maxStepHeight) {
-                        // Too big of a step, don't move in this direction
-                        return;
-                    }
                 }
             }
             
@@ -332,7 +214,9 @@ export class Enemy {
     // Reset position if stuck or in an invalid location
     resetToLastValidPosition() {
         if (this.lastValidPosition) {
+            // Maintain our fixed height when resetting
             this.group.position.copy(this.lastValidPosition);
+            this.group.position.y = this.fixedHeight;
             console.log("Enemy reset to last valid position");
         }
     }
