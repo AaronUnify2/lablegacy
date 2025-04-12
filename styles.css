@@ -1,4 +1,4 @@
-* {
+{
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -286,6 +286,52 @@ canvas {
                 0 4px 0 rgba(0, 0, 0, 0.8),
                 inset 0 0 10px rgba(0, 0, 0, 0.5),
                 0 0 15px rgba(50, 255, 100, 0.3) !important;
+}
+
+/* Add this to styles.css in the appropriate section (e.g., after the jump button styles) */
+
+/* Attack button - purple fire theme */
+#attack {
+    background: radial-gradient(circle at 30% 30%, #330033, #220022) !important;
+    border-color: #aa33aa !important;
+    color: #ffaaff;
+    font-size: 18px !important;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 170, 255, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(255, 100, 255, 0.4) !important;
+    animation: pulse-attack 2s infinite alternate;
+}
+
+#attack.active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 1px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.7),
+                0 0 20px rgba(255, 100, 255, 0.7) !important;
+}
+
+@keyframes pulse-attack {
+    0% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(255, 100, 255, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 15px rgba(255, 100, 255, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(255, 100, 255, 0.4);
+    }
 }
 
 /* Active state for buttons - glowing effect */
