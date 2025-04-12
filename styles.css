@@ -743,3 +743,102 @@ canvas {
 .joystick-base:active .joystick-handle {
     animation: none;
 }
+
+
+/* Add this to your styles.css file */
+
+/* Swipe indicator - only shown when swipe is active */
+.swipe-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 10px rgba(51, 102, 255, 0.3);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 15;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.swipe-indicator::after {
+    content: "";
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(51, 102, 255, 0.5), rgba(100, 150, 255, 0.8));
+    box-shadow: 0 0 8px rgba(51, 102, 255, 0.6);
+}
+
+.swipe-indicator.active {
+    opacity: 0.7;
+}
+
+/* Instructions message for first-time users */
+.swipe-instructions {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(51, 102, 255, 0.5);
+    border-radius: 8px;
+    padding: 12px 20px;
+    color: white;
+    font-family: 'Cinzel', serif;
+    text-align: center;
+    max-width: 80%;
+    box-shadow: 0 0 15px rgba(0, 0, 30, 0.8);
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.swipe-instructions.show {
+    opacity: 1;
+    animation: fadeInstructions 5s forwards;
+}
+
+@keyframes fadeInstructions {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Highlight touch area - helps users know where to swipe */
+.touch-area-highlight {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 70%; /* Only cover the top portion of the screen, leaving controls free */
+    background: linear-gradient(to bottom, 
+                rgba(51, 102, 255, 0.05) 0%,
+                rgba(51, 102, 255, 0.02) 70%,
+                rgba(51, 102, 255, 0) 100%);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.touch-area-highlight.show {
+    opacity: 1;
+    animation: pulseHighlight 2s ease-in-out 2, fadeOut 1s ease-in-out 4s forwards;
+}
+
+@keyframes pulseHighlight {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.3; }
+}
+
+@keyframes fadeOut {
+    0% { opacity: 0.1; }
+    100% { opacity: 0; }
+}
