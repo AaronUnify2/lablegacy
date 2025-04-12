@@ -371,7 +371,7 @@ class Game {
         return position;
     }
     
-    // Check if there's ground below a position - Updated to return a boolean
+    // Check if there's ground below a position
     checkForGround(position) {
         // Create a ray pointing downward from the position
         const checkPosition = position.clone();
@@ -406,7 +406,7 @@ class Game {
             
             // If falling too quickly or below the world bounds, reset position
             if (currentPosition.y < -20 || this.input.velocity.y < -30) {
-                console.log('Fall detected! Applying damage and resetting to last valid position.');
+                console.log('Fall detected! Resetting to last valid position.');
                 this.resetToLastValidPosition();
                 return;
             }
@@ -431,64 +431,18 @@ class Game {
         }
     }
     
-    // Reset player to last valid position - Updated to include damage
+    // Reset player to last valid position
     resetToLastValidPosition() {
         if (this.lastValidPosition) {
-            // Apply fall damage (50 points)
-            this.playerTakeDamage(50);
-            
-            // Show a more severe message
-            this.showMessage('You fell through the world and took damage!');
-            
-            // Create a flash effect for the fall
-            this.showFallEffect();
-            
             // Reset position
             this.renderer.camera.position.copy(this.lastValidPosition);
             
             // Reset velocity to prevent continued falling
             this.input.velocity.set(0, 0, 0);
+            
+            // Show a message to the player
+            this.showMessage('You were caught by a mysterious force...');
         }
-    }
-    
-    // Add a new method for the fall effect
-    showFallEffect() {
-        // Create a stronger flash effect than the damage effect
-        const overlay = document.createElement('div');
-        overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.left = '0';
-        overlay.style.width = '100%';
-        overlay.style.height = '100%';
-        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; // Black flash for falling
-        overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '9';
-        overlay.style.opacity = '1';
-        overlay.style.transition = 'opacity 1.0s ease'; // Slower fade for dramatic effect
-        
-        // Add to DOM
-        document.getElementById('game-container').appendChild(overlay);
-        
-        // Play fall sound
-        try {
-            const fallSound = new Audio('sounds/player_fall.mp3');
-            fallSound.volume = 0.5;
-            fallSound.play().catch(error => {
-                console.log('Audio playback failed:', error);
-            });
-        } catch (e) {
-            console.log('Error playing fall sound', e);
-        }
-        
-        // Fade out and remove
-        setTimeout(() => {
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                if (overlay.parentNode) {
-                    overlay.parentNode.removeChild(overlay);
-                }
-            }, 1000);
-        }, 200);
     }
     
     setupFirstPersonMode() {
@@ -755,7 +709,6 @@ class Game {
         
         // If we're falling too quickly or go below the world bounds, reset
         if (pos.y < -20 || this.input.velocity.y < -30) {
-            console.log("Fall detected! Applying damage and resetting position.");
             this.resetToLastValidPosition();
         }
         
@@ -809,7 +762,7 @@ class Game {
     
     
         
-    updateCurseEffects(currentTime, deltaTime) {
+        updateCurseEffects(currentTime, deltaTime) {
         // Subtle camera shake based on curse level
         if (this.gameState.curseLevel > 0) {
             const intensity = this.gameState.curseLevel * 0.0005;
@@ -839,7 +792,7 @@ class Game {
             this.player.magicStaff.setLightIntensity(2.5 * curseEffect + flickerIntensity);
         }
     }
-
+}
 
 // Initialize and start the game when the window loads
 let game;
