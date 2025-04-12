@@ -14,7 +14,7 @@ export class Enemy {
         this.patrolActive = true; // Flag to enable/disable patrol
         
         // Collision properties
-        this.collisionRadius = 0.5; // Enemy collision radius
+        this.collisionRadius = 0.8; // Increased from 0.5 to 0.8 for stronger collision
         this.collisionEnabled = true; // Flag to enable/disable collision
         this.lastValidPosition = position.clone(); // Store last valid position
         
@@ -77,11 +77,12 @@ export class Enemy {
         this.group.position.copy(this.position);
         
         // Add an invisible collision cylinder for debug visualization (optional)
-        if (false) { // Set to true to see collision cylinder
+        const DEBUG_COLLISION_VISUALIZATION = false; // Set to true to see collision cylinder
+        if (DEBUG_COLLISION_VISUALIZATION) {
             const collisionGeometry = new THREE.CylinderGeometry(
                 this.collisionRadius,
                 this.collisionRadius,
-                this.bodyHeight,
+                this.bodyHeight + 0.3, // Add some extra height to collision
                 8
             );
             
