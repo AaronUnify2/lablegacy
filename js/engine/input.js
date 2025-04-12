@@ -34,7 +34,7 @@ export class InputManager {
         this.jumpCooldown = 0; // Cooldown timer for jumping
         
         // Camera controls
-        this.lookSpeed = 0.1;
+        this.lookSpeed = 0.05;
         this.moveSpeed = 10;
         
         // Mouse state
@@ -58,7 +58,7 @@ export class InputManager {
             lastX: 0,
             lastY: 0,
             touchId: null,
-            sensitivity: 0.08 // Adjust this to control swipe sensitivity
+            sensitivity: 0.04 // Adjust this to control swipe sensitivity
         };
         
         // Initialize event listeners
