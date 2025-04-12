@@ -11,10 +11,6 @@ export class EnemyManager {
         
         // Enemy spawn settings
         this.maxEnemies = 5;
-        this.spawnDistance = {
-            min: 10,
-            max: 20
-        };
         
         // Debug flag - set to true to get console logs about spawning
         this.debug = true;
@@ -22,10 +18,6 @@ export class EnemyManager {
         // Collision settings
         this.enableCollisions = true; // Master toggle for enemy collisions
         this.enemyColliders = []; // Array to store enemy collider indices
-        
-        // Safety check interval - periodically check if enemies are in valid positions
-        this.safetyCheckInterval = 5; // Check every 5 seconds
-        this.timeSinceLastCheck = 0;
         
         // Force spawn test enemies after a short delay
         if (this.debug) console.log("Enemy Manager initialized - will spawn test enemies in a few seconds");
@@ -51,13 +43,6 @@ export class EnemyManager {
                 this.updateEnemyCollider(i);
             }
         }
-        
-        // Periodically run safety checks
-        this.timeSinceLastCheck += validDeltaTime;
-        if (this.timeSinceLastCheck >= this.safetyCheckInterval) {
-            this.performSafetyChecks();
-            this.timeSinceLastCheck = 0;
-        }
     }
     
     // Update the collider for an enemy
@@ -69,128 +54,6 @@ export class EnemyManager {
         const colliderIndex = this.enemyColliders[index];
         if (colliderIndex !== undefined && this.collisionManager) {
             this.collisionManager.updateCollider(colliderIndex);
-        }
-    }
-    
-    performSafetyChecks() {
-        if (this.debug) console.log("Performing enemy safety checks...");
-        
-        for (let i = 0; i < this.enemies.length; i++) {
-            const enemy = this.enemies[i];
-            if (!enemy) continue;
-            
-            // Check if enemy is in a valid position
-            if (this.collisionManager) {
-                // Check if enemy is stuck in a collision (with environment, not other enemies)
-                const collision = this.collisionManager.checkCollision(
-                    enemy.group.position, 
-                    enemy.collisionRadius
-                );
-                
-                // Ignore collisions with enemies themselves by checking object type
-                const collidesWithEnvironment = 
-                    collision.collides && 
-                    collision.collider && 
-                    !this.isEnemyCollider(collision.collider.object);
-                
-                if (collidesWithEnvironment) {
-                    if (this.debug) console.log(`Enemy ${i} is stuck in collision, trying to adjust`);
-                    // First try to adjust vertically
-                    this.tryAdjustEnemyHeight(enemy);
-                    
-                    // If still colliding, reset to last valid position
-                    const stillColliding = this.collisionManager.checkCollision(
-                        enemy.group.position, 
-                        enemy.collisionRadius
-                    ).collides;
-                    
-                    if (stillColliding) {
-                        enemy.resetToLastValidPosition();
-                    }
-                }
-                
-                // Check if enemy is floating or needs ground adjustment
-                this.checkAndAdjustToGround(enemy);
-            }
-        }
-    }
-    
-    // Try to adjust enemy height if stuck
-    tryAdjustEnemyHeight(enemy) {
-        if (!enemy || !this.collisionManager) return;
-        
-        // Try raising the enemy up by increments
-        let attempts = 0;
-        const stepSize = 0.1;
-        const maxSteps = 5;
-        
-        while (attempts < maxSteps) {
-            // Raise position
-            enemy.group.position.y += stepSize;
-            
-            // Check if still colliding
-            const stillColliding = this.collisionManager.checkCollision(
-                enemy.group.position,
-                enemy.collisionRadius
-            ).collides;
-            
-            if (!stillColliding) {
-                // Found valid position
-                enemy.lastValidPosition.copy(enemy.group.position);
-                if (this.debug) console.log(`Adjusted enemy to Y: ${enemy.group.position.y}`);
-                return true;
-            }
-            
-            attempts++;
-        }
-        
-        return false;
-    }
-    
-    // Check and adjust enemy to ground if needed
-    checkAndAdjustToGround(enemy) {
-        if (!enemy || !this.collisionManager) return;
-        
-        // Get position slightly below enemy feet
-        const groundCheckPosition = enemy.group.position.clone();
-        groundCheckPosition.y -= 0.2; // Check slightly below
-        
-        // Check for ground
-        const groundHit = this.collisionManager.findFloorBelow(groundCheckPosition, 2);
-        
-        if (!groundHit || !groundHit.point) {
-            // No ground beneath, try to find ground below
-            const highCheck = enemy.group.position.clone();
-            highCheck.y += 5; // Start high above
-            
-            const floorBelow = this.collisionManager.findFloorBelow(highCheck, 10);
-            if (floorBelow && floorBelow.point) {
-                // Found floor, place enemy on it
-                enemy.group.position.y = floorBelow.point.y;
-                enemy.lastValidPosition.copy(enemy.group.position);
-                if (this.debug) console.log(`Enemy adjusted to floor at Y: ${floorBelow.point.y}`);
-            } else {
-                // No floor found, try to use a fallback height
-                if (this.player && this.player.camera) {
-                    const playerFootY = this.player.camera.position.y - 1.5;
-                    enemy.group.position.y = playerFootY;
-                    enemy.lastValidPosition.copy(enemy.group.position);
-                    if (this.debug) console.log(`Enemy adjusted to player-based Y: ${playerFootY}`);
-                }
-            }
-        } else {
-            // Found ground, check if we need to adjust
-            const currentY = enemy.group.position.y;
-            const groundY = groundHit.point.y;
-            const difference = Math.abs(currentY - groundY);
-            
-            // If enemy is floating more than a small amount, adjust to ground
-            const floatThreshold = 0.2;
-            if (difference > floatThreshold && currentY > groundY) {
-                enemy.group.position.y = groundY;
-                enemy.lastValidPosition.copy(enemy.group.position);
-                if (this.debug) console.log(`Enemy adjusted from floating, now at Y: ${groundY}`);
-            }
         }
     }
     
@@ -214,22 +77,16 @@ export class EnemyManager {
         // Spawn a few more enemies around the map
         setTimeout(() => {
             // Try to spawn in different locations
-            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 1.5, 10), 4, 0.4);
-            this.spawnEnemyAtPosition(new THREE.Vector3(10, 1.5, -10), 6, 0.3);
+            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 0.9, 10), 4, 0.4);
+            this.spawnEnemyAtPosition(new THREE.Vector3(10, 0.9, -10), 6, 0.3);
         }, 5000);
     }
     
     forceSpawnTestEnemy() {
         if (this.debug) console.log("Attempting to spawn test enemy...");
         
-        // Start position slightly above ground - enemy handles finding floor
-        let testPosition = new THREE.Vector3(10, 1.5, 0); // Default position
-        
-        // Try to find player Y position if available as a reference
-        if (this.player && this.player.camera) {
-            // Use player's height as reference for more reliable spawning
-            testPosition.y = this.player.camera.position.y - 1.1; // Bit below player eye level
-        }
+        // Use a fixed height value - this is the key change
+        const testPosition = new THREE.Vector3(10, 0.9, 0);
         
         // Check for collision at spawn point
         if (this.collisionManager) {
@@ -261,10 +118,10 @@ export class EnemyManager {
         // Get player position
         const playerPos = this.player.camera.position;
         
-        // Spawn position a bit off from player
+        // Spawn position a bit off from player but with FIXED Y HEIGHT
         const spawnPos = new THREE.Vector3(
             playerPos.x + 8, // 8 units to the right
-            playerPos.y - 1.1, // Just below player eye level
+            0.9, // Use fixed height rather than player height
             playerPos.z + 8  // 8 units in front
         );
         
@@ -400,8 +257,7 @@ export class EnemyManager {
                 }
                 if (effect.geometry) {
                     effect.geometry.dispose();
-
-}
+                }
             }
         };
         
@@ -482,4 +338,3 @@ export class EnemyManager {
         if (this.debug) console.log("Cleared all enemies");
     }
 }
-                
