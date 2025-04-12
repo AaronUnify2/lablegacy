@@ -12,18 +12,8 @@ export class Enemy {
             CHASE: 'chase',
             RETURN: 'return',
             IDLE: 'idle',
-            ATTACK: 'attack', // Add attack state
-            DAMAGED: 'damaged', // New state when taking damage
-            DEAD: 'dead' // New state for dead enemies
+            ATTACK: 'attack' // Add attack state
         };
-        
-        // Health properties
-        this.health = 100;
-        this.maxHealth = 100;
-        this.isInvulnerable = false;
-        this.invulnerabilityTime = 0.5; // Time in seconds enemy is invulnerable after taking damage
-        this.invulnerabilityTimer = 0;
-        this.damageTintTime = 0;
         
         // AI Configuration
         this.detectionRange = 8; // Distance at which enemy detects player
@@ -64,14 +54,19 @@ export class Enemy {
         this.attackDuration = 0.5; // Duration of attack animation in seconds
         this.isAttacking = false; // Flag to track if currently attacking
         
+        // Health and damage properties
+        this.health = 100; // Max health for enemies
+        this.maxHealth = 100; // Store max health
+        this.isDamaged = false; // Flag for visual damage effect
+        this.damageFlashTime = 0; // Timer for the damage flash effect
+        this.isInvulnerable = false; // Invulnerability flag after taking damage
+        this.invulnerabilityTime = 0; // Timer for invulnerability period
+        
         // Create a simple mesh for the enemy
         this.createMesh();
         
         // Add to scene
         this.scene.add(this.group);
-        
-        // Create a health bar for the enemy
-        this.createHealthBar();
         
         console.log("Enemy created at position:", this.position);
     }
@@ -98,10 +93,6 @@ export class Enemy {
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
         this.bodyMesh.position.y = 1.8 / 2; // Center vertically
-        
-        // Store original material color for damage flashing
-        this.originalBodyColor = bodyMaterial.color.clone();
-        this.originalEmissiveIntensity = bodyMaterial.emissiveIntensity;
         
         // Save body dimensions for collision detection
         this.bodyWidth = 1.0; // Diameter
@@ -152,49 +143,9 @@ export class Enemy {
         }
     }
     
-    createHealthBar() {
-        // Create a simple health bar that follows the enemy
-        const healthBarWidth = 1;
-        const healthBarHeight = 0.1;
-        
-        // Container for the health bar
-        this.healthBarGroup = new THREE.Group();
-        this.healthBarGroup.position.set(0, 2.2, 0); // Position above the enemy
-        this.group.add(this.healthBarGroup);
-        
-        // Health bar background
-        const backgroundGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
-        const backgroundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x333333,
-            transparent: true,
-            opacity: 0.6
-        });
-        
-        this.healthBarBackground = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-        this.healthBarGroup.add(this.healthBarBackground);
-        
-        // Health bar foreground (the actual health indicator)
-        const foregroundGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
-        const foregroundMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff3333,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        this.healthBarForeground = new THREE.Mesh(foregroundGeometry, foregroundMaterial);
-        this.healthBarForeground.position.z = 0.01; // Slightly in front of background
-        this.healthBarGroup.add(this.healthBarForeground);
-        
-        // Make health bar always face the camera
-        this.healthBarGroup.lookAt(0, 0, 0); // Will be updated in update method
-        
-        // Hide health bar initially, show when damaged
-        this.healthBarGroup.visible = false;
-    }
-    
     update(deltaTime, camera) {
         // Skip updates if enemy is inactive or deltaTime is invalid
-        if (this.state === this.states.DEAD || !deltaTime || deltaTime > 1) {
+        if (this.state === 'dead' || !deltaTime || deltaTime > 1) {
             return;
         }
         
@@ -207,41 +158,53 @@ export class Enemy {
             this.stateCooldown -= deltaTime;
         }
         
-        // Update invulnerability timer
-        if (this.invulnerabilityTimer > 0) {
-            this.invulnerabilityTimer -= deltaTime;
-            if (this.invulnerabilityTimer <= 0) {
-                this.isInvulnerable = false;
-                
-                // Reset damage tint if not in damaged state
-                if (this.state !== this.states.DAMAGED && this.bodyMesh && this.bodyMesh.material) {
-                    this.bodyMesh.material.color.copy(this.originalBodyColor);
-                    this.bodyMesh.material.emissiveIntensity = this.originalEmissiveIntensity;
-                }
-            }
-        }
-        
-        // Update damage tint time
-        if (this.damageTintTime > 0) {
-            this.damageTintTime -= deltaTime;
-            if (this.damageTintTime <= 0 && this.bodyMesh && this.bodyMesh.material) {
-                this.bodyMesh.material.color.copy(this.originalBodyColor);
-                this.bodyMesh.material.emissiveIntensity = this.originalEmissiveIntensity;
-                
-                // If in damaged state, return to previous state
-                if (this.state === this.states.DAMAGED) {
-                    this.changeState(this.states.CHASE);
-                }
-            }
-        }
-        
         // Decrease attack cooldown
         if (this.attackCooldown > 0) {
             this.attackCooldown -= deltaTime;
         }
         
-        // Update health bar
-        this.updateHealthBar(camera);
+        // Update damage flash effect
+        if (this.isDamaged) {
+            this.damageFlashTime -= deltaTime;
+            
+            // Flash the enemy red
+            if (this.bodyMesh && this.bodyMesh.material) {
+                this.bodyMesh.material.emissive = new THREE.Color(0xff0000);
+                this.bodyMesh.material.emissiveIntensity = Math.max(0, this.damageFlashTime * 5);
+            }
+            
+            if (this.damageFlashTime <= 0) {
+                this.isDamaged = false;
+                // Reset emissive properties
+                if (this.bodyMesh && this.bodyMesh.material) {
+                    this.bodyMesh.material.emissive = new THREE.Color(0x330000);
+                    this.bodyMesh.material.emissiveIntensity = 0.3; // Reset to original value
+                }
+            }
+        }
+        
+        // Update invulnerability timer
+        if (this.isInvulnerable) {
+            this.invulnerabilityTime -= deltaTime;
+            
+            // Make the enemy flash by toggling visibility
+            if (this.bodyMesh) {
+                this.bodyMesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+            }
+            
+            if (this.invulnerabilityTime <= 0) {
+                this.isInvulnerable = false;
+                // Ensure visibility is restored
+                if (this.bodyMesh) {
+                    this.bodyMesh.visible = true;
+                }
+            }
+        }
+        
+        // Skip the rest of the update if enemy is dead
+        if (this.state === 'dead') {
+            return;
+        }
         
         // Check player proximity to determine state transitions
         this.checkPlayerProximity();
@@ -267,245 +230,10 @@ export class Enemy {
             case this.states.ATTACK:
                 this.executeAttackBehavior(deltaTime);
                 break;
-                
-            case this.states.DAMAGED:
-                this.executeDamagedBehavior(deltaTime);
-                break;
         }
         
         // Rotate the body slightly to show it's active even if not moving
         this.bodyMesh.rotation.y += deltaTime * 1.0;
-    }
-    
-    updateHealthBar(camera) {
-        // Make health bar always face the camera
-        if (camera && this.healthBarGroup) {
-            this.healthBarGroup.lookAt(camera.position);
-        }
-        
-        // Update health bar width based on current health percentage
-        if (this.healthBarForeground) {
-            const healthPercent = this.health / this.maxHealth;
-            this.healthBarForeground.scale.x = Math.max(0.001, healthPercent);
-            
-            // Center the health bar
-            this.healthBarForeground.position.x = (healthPercent - 1) * 0.5;
-            
-            // Change color based on health percentage
-            if (this.healthBarForeground.material) {
-                if (healthPercent < 0.3) {
-                    this.healthBarForeground.material.color.set(0xff0000); // Red when low health
-                } else if (healthPercent < 0.6) {
-                    this.healthBarForeground.material.color.set(0xffaa00); // Orange when medium health
-                } else {
-                    this.healthBarForeground.material.color.set(0xff3333); // Default red color
-                }
-            }
-            
-            // Show health bar for a few seconds when damaged or when health is low
-            const lowHealth = this.health < this.maxHealth * 0.5;
-            if (this.damageTintTime > 0 || lowHealth) {
-                this.healthBarGroup.visible = true;
-            } else {
-                // Hide health bar when not needed
-                this.healthBarGroup.visible = false;
-            }
-        }
-    }
-    
-    // New method to handle taking damage
-    takeDamage(amount) {
-        // Check if enemy can take damage
-        if (this.isInvulnerable || this.state === this.states.DEAD) {
-            return false;
-        }
-        
-        // Apply damage
-        this.health = Math.max(0, this.health - amount);
-        
-        // Set invulnerability timer
-        this.isInvulnerable = true;
-        this.invulnerabilityTimer = this.invulnerabilityTime;
-        
-        // Visual feedback - damage tint
-        this.showDamageTint();
-        
-        // Play damage sound
-        this.playDamageSound();
-        
-        // Show health bar
-        if (this.healthBarGroup) {
-            this.healthBarGroup.visible = true;
-        }
-        
-        // Check if enemy is dead
-        if (this.health <= 0) {
-            this.die();
-            return true;
-        }
-        
-        // Enter damaged state temporarily if not already attacking
-        if (this.state !== this.states.ATTACK) {
-            this.changeState(this.states.DAMAGED);
-        }
-        
-        return true;
-    }
-    
-    // Show damage tint effect
-    showDamageTint() {
-        if (this.bodyMesh && this.bodyMesh.material) {
-            // Turn body bright white-red
-            this.bodyMesh.material.color.set(0xffffff);
-            this.bodyMesh.material.emissiveIntensity = 1.0;
-            
-            // Reset tint after a short delay
-            this.damageTintTime = 0.3; // 300ms
-        }
-    }
-    
-    // Play damage sound effect
-    playDamageSound() {
-        try {
-            const damageSound = new Audio('sounds/enemy_damage.mp3');
-            damageSound.volume = 0.3;
-            damageSound.play().catch(err => console.log('Could not play damage sound', err));
-        } catch (e) {
-            console.log('Error playing damage sound', e);
-        }
-    }
-    
-    // Handle death
-    die() {
-        console.log("Enemy killed!");
-        
-        // Change state to dead
-        this.state = this.states.DEAD;
-        
-        // Make body fall over
-        this.playDeathAnimation();
-        
-        // Disable collision
-        this.collisionEnabled = false;
-        
-        // Hide health bar
-        if (this.healthBarGroup) {
-            this.healthBarGroup.visible = false;
-        }
-        
-        // Remove from scene after a delay
-        setTimeout(() => {
-            if (this.scene && this.group) {
-                this.scene.remove(this.group);
-            }
-        }, 3000); // Remove after 3 seconds
-    }
-    
-    // Play death animation
-    playDeathAnimation() {
-        if (!this.bodyMesh) return;
-        
-        // Change material to indicate death
-        if (this.bodyMesh.material) {
-            this.bodyMesh.material.color.set(0x333333); // Gray color
-            this.bodyMesh.material.emissive.set(0x000000); // No glow
-            this.bodyMesh.material.emissiveIntensity = 0;
-            this.bodyMesh.material.transparent = true;
-            this.bodyMesh.material.opacity = 0.8;
-        }
-        
-        // Make eyes dim
-        if (this.leftEye && this.leftEye.material) {
-            this.leftEye.material.color.set(0x333333);
-        }
-        
-        if (this.rightEye && this.rightEye.material) {
-            this.rightEye.material.color.set(0x333333);
-        }
-        
-        // Topple over animation
-        const fallDirection = new THREE.Vector3(
-            Math.random() - 0.5,
-            0,
-            Math.random() - 0.5
-        ).normalize();
-        
-        // Create animation
-        const startRotation = this.group.quaternion.clone();
-        const fallRotation = new THREE.Quaternion();
-        const fallAxis = new THREE.Vector3(-fallDirection.z, 0, fallDirection.x).normalize();
-        fallRotation.setFromAxisAngle(fallAxis, Math.PI / 2); // 90 degrees
-        
-        // Animate falling and fading
-        const duration = 1000; // 1 second
-        const startTime = performance.now();
-        
-        const animate = () => {
-            const now = performance.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Interpolate rotation
-            this.group.quaternion.slerpQuaternions(
-                startRotation,
-                fallRotation,
-                progress
-            );
-            
-            // Sink into the ground slightly
-            this.group.position.y = Math.max(0, this.lastValidPosition.y - progress * 0.5);
-            
-            // Fade out slightly
-            if (this.bodyMesh && this.bodyMesh.material) {
-                this.bodyMesh.material.opacity = 0.8 - progress * 0.3;
-            }
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            }
-        };
-        
-        animate();
-        
-        // Play death sound
-        this.playDeathSound();
-    }
-    
-    // Play death sound
-    playDeathSound() {
-        try {
-            const deathSound = new Audio('sounds/enemy_death.mp3');
-            deathSound.volume = 0.4;
-            deathSound.play().catch(err => console.log('Could not play death sound', err));
-        } catch (e) {
-            console.log('Error playing death sound', e);
-        }
-    }
-    
-    // New behavior for damaged state
-    executeDamagedBehavior(deltaTime) {
-        // Briefly stop and face the player
-        if (this.player && this.player.camera) {
-            // Get direction to player
-            const directionToPlayer = new THREE.Vector3()
-                .subVectors(this.player.camera.position, this.group.position)
-                .normalize();
-                
-            // Make the enemy face the player
-            directionToPlayer.y = 0; // Keep rotation on horizontal plane
-            if (directionToPlayer.lengthSq() > 0) {
-                const lookTarget = new THREE.Vector3()
-                    .addVectors(this.group.position, directionToPlayer);
-                    
-                // Use faster turning when damaged
-                this.smoothLookAt(lookTarget, this.turnSpeed.chase * 2);
-            }
-        }
-        
-        // Return to chase state after a short delay or when damage tint ends
-        if (this.stateTime > 0.5) {
-            this.changeState(this.states.CHASE);
-        }
     }
     
     // State transition handler - checks proximity to player and changes state
@@ -535,7 +263,6 @@ export class Enemy {
             case this.states.PATROL:
             case this.states.IDLE:
             case this.states.RETURN:
-            case this.states.DAMAGED: // Can detect player while damaged
                 // If player is within detection range, transition to chase
                 if (distanceToPlayer < this.detectionRange) {
                     this.changeState(this.states.CHASE);
@@ -745,6 +472,92 @@ export class Enemy {
         }, this.attackDuration * 1000);
     }
     
+    // Take damage from player attacks
+    takeDamage(amount) {
+        // If enemy is invulnerable or already dead, ignore damage
+        if (this.isInvulnerable || this.state === 'dead') {
+            return false;
+        }
+        
+        // Apply damage
+        this.health = Math.max(0, this.health - amount);
+        
+        // Visual damage effect
+        this.isDamaged = true;
+        this.damageFlashTime = 0.2; // Flash duration in seconds
+        
+        // Make enemy briefly invulnerable to prevent multi-hits
+        this.isInvulnerable = true;
+        this.invulnerabilityTime = 0.5; // Invulnerability duration in seconds
+        
+        console.log(`Enemy took ${amount} damage, health: ${this.health}/${this.maxHealth}`);
+        
+        // Check for death
+        if (this.health <= 0) {
+            this.die();
+            return true; // Enemy died
+        }
+        
+        return false; // Enemy still alive
+    }
+    
+    // Handle enemy death
+    die() {
+        if (this.state === 'dead') return; // Already dead
+        
+        console.log("Enemy died!");
+        this.state = 'dead';
+        
+        // Simple death animation - shrink and fade out
+        const startScale = this.group.scale.clone();
+        const startPosition = this.group.position.clone();
+        
+        const duration = 1.0; // Death animation duration in seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Scale down
+            const scale = 1 - progress * 0.8;
+            this.group.scale.set(scale, scale * 0.5, scale); // Flatten as it shrinks
+            
+            // Sink into ground
+            this.group.position.y = startPosition.y - progress * 1.0;
+            
+            // Fade materials
+            if (this.bodyMesh && this.bodyMesh.material) {
+                this.bodyMesh.material.opacity = 1 - progress;
+                this.bodyMesh.material.transparent = true;
+            }
+            
+            if (this.leftEye && this.leftEye.material) {
+                this.leftEye.material.opacity = 1 - progress;
+                this.leftEye.material.transparent = true;
+            }
+            
+            if (this.rightEye && this.rightEye.material) {
+                this.rightEye.material.opacity = 1 - progress;
+                this.rightEye.material.transparent = true;
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // After death animation completes, remove from scene
+                // Don't actually remove - just make invisible to avoid Three.js issues
+                this.group.visible = false;
+                
+                // Disable collisions for this enemy
+                this.collisionEnabled = false;
+            }
+        };
+        
+        animate();
+    }
+    
     // Create a visual effect for the attack
     createAttackEffect() {
         if (!this.scene) return;
@@ -917,16 +730,6 @@ export class Enemy {
             case this.states.ATTACK:
                 eyeColor = 0xff0000; // Bright red when attacking
                 intensity = 1.5;
-                break;
-                
-            case this.states.DAMAGED:
-                eyeColor = 0xffffff; // White when damaged
-                intensity = 1.2;
-                break;
-                
-            case this.states.DEAD:
-                eyeColor = 0x333333; // Dark gray when dead
-                intensity = 0.2;
                 break;
         }
         
