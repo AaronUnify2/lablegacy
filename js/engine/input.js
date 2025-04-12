@@ -10,6 +10,21 @@ export class InputManager {
         this.moveRight = false;
         this.jump = false;
         
+        // Joystick state
+        this.joystick = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            currentX: 0,
+            currentY: 0,
+            deltaX: 0,
+            deltaY: 0,
+            angle: 0,
+            distance: 0,
+            maxDistance: 40, // Maximum distance the joystick can move
+            movementVector: new THREE.Vector2(0, 0)
+        };
+        
         // Physics properties
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.gravityForce = 25; // Strength of gravity
@@ -145,30 +160,41 @@ export class InputManager {
         gridContainer.className = 'control-grid';
         touchControls.appendChild(gridContainer);
         
-        // Define the button layout using a 6x3 grid
+        // Create the joystick container (replaces the left d-pad)
+        const joystickContainer = document.createElement('div');
+        joystickContainer.id = 'joystick-container';
+        joystickContainer.className = 'joystick-container';
+        
+        // Create the joystick base (static circle)
+        const joystickBase = document.createElement('div');
+        joystickBase.id = 'joystick-base';
+        joystickBase.className = 'joystick-base';
+        
+        // Create the joystick handle (movable part)
+        const joystickHandle = document.createElement('div');
+        joystickHandle.id = 'joystick-handle';
+        joystickHandle.className = 'joystick-handle';
+        
+        // Assemble the joystick
+        joystickBase.appendChild(joystickHandle);
+        joystickContainer.appendChild(joystickBase);
+        touchControls.appendChild(joystickContainer);
+        
+        // Define the button layout using a 6x3 grid - without the left d-pad buttons
         const buttonLayout = [
-            ['move-up-left', 'move-up', 'move-up-right', 'zoom-in', 'camera-up', 'attack'],
-            ['move-left', 'move-center', 'move-right', 'camera-left', 'jump', 'camera-right'],
-            ['move-down-left', 'move-down', 'move-down-right', 'zoom-out', 'camera-down', '']
+            ['', '', '', 'toggle-light', 'camera-up', 'attack'],
+            ['', '', '', 'camera-left', 'jump', 'camera-right'],
+            ['', '', '', 'zoom-out', 'camera-down', '']
         ];
         
         // Define button icons
         const buttonIcons = {
-            'move-up-left': '↖',
-            'move-up': '↑',
-            'move-up-right': '↗',
-            'move-left': '←',
-            'move-center': '',
-            'move-right': '→',
-            'move-down-left': '↙',
-            'move-down': '↓',
-            'move-down-right': '↘',
             'camera-up': '↑',
             'camera-left': '←',
             'camera-right': '→',
             'jump': 'Jump',
-            'zoom-in': '+',
             'zoom-out': '-',
+            'toggle-light': 'L',
             'camera-down': '↓',
             'attack': 'Atk'
         };
@@ -201,9 +227,143 @@ export class InputManager {
             }
         }
         
+        // Set up joystick event handlers
+        this.setupJoystickControls();
+        
         // Adjust layout based on screen size
         this.adjustButtonSizes();
         window.addEventListener('resize', this.adjustButtonSizes.bind(this));
+    }
+    
+    // Add a new method to set up joystick controls
+    setupJoystickControls() {
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickHandle = document.getElementById('joystick-handle');
+        
+        if (!joystickBase || !joystickHandle) return;
+        
+        // Function to handle joystick movement
+        const handleJoystickMove = (clientX, clientY) => {
+            if (!this.joystick.active) return;
+            
+            // Get joystick base position and size
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Calculate the distance from center
+            const deltaX = clientX - centerX;
+            const deltaY = clientY - centerY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const angle = Math.atan2(deltaY, deltaX);
+            
+            // Limit the joystick movement to maxDistance
+            const limitedDistance = Math.min(distance, this.joystick.maxDistance);
+            
+            // Calculate the joystick handle position
+            const moveX = Math.cos(angle) * limitedDistance;
+            const moveY = Math.sin(angle) * limitedDistance;
+            
+            // Position the joystick handle
+            joystickHandle.style.transform = `translate(${moveX}px, ${moveY}px)`;
+            
+            // Update joystick state
+            this.joystick.deltaX = deltaX;
+            this.joystick.deltaY = deltaY;
+            this.joystick.angle = angle;
+            this.joystick.distance = limitedDistance;
+            
+            // Calculate movement vector (normalized)
+            const normalizedDistance = limitedDistance / this.joystick.maxDistance;
+            this.joystick.movementVector.x = Math.cos(angle) * normalizedDistance;
+            this.joystick.movementVector.y = Math.sin(angle) * normalizedDistance;
+            
+            // Convert joystick position to movement direction
+            this.updateMovementFromJoystick();
+        };
+        
+        // Function to reset joystick
+        const resetJoystick = () => {
+            this.joystick.active = false;
+            joystickHandle.style.transform = 'translate(0px, 0px)';
+            this.joystick.movementVector.set(0, 0);
+            this.resetMovement();
+        };
+        
+        // Touch Events
+        joystickBase.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.joystick.active = true;
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (!this.joystick.active) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
+        });
+        
+        document.addEventListener('touchend', () => {
+            resetJoystick();
+        });
+        
+        document.addEventListener('touchcancel', () => {
+            resetJoystick();
+        });
+        
+        // Mouse Events (for testing on desktop)
+        joystickBase.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            this.joystick.active = true;
+            handleJoystickMove(e.clientX, e.clientY);
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!this.joystick.active) return;
+            handleJoystickMove(e.clientX, e.clientY);
+        });
+        
+        document.addEventListener('mouseup', () => {
+            resetJoystick();
+        });
+    }
+    
+    // Convert joystick input to movement direction
+    updateMovementFromJoystick() {
+        // Reset movement states
+        this.moveForward = false;
+        this.moveBackward = false;
+        this.moveLeft = false;
+        this.moveRight = false;
+        
+        const deadzone = 0.2; // Minimum movement threshold
+        
+        // Calculate movement based on joystick vector
+        if (Math.abs(this.joystick.movementVector.y) > deadzone) {
+            if (this.joystick.movementVector.y < 0) {
+                this.moveForward = true;
+            } else {
+                this.moveBackward = true;
+            }
+        }
+        
+        if (Math.abs(this.joystick.movementVector.x) > deadzone) {
+            if (this.joystick.movementVector.x > 0) {
+                this.moveRight = true;
+            } else {
+                this.moveLeft = true;
+            }
+        }
+    }
+    
+    // Reset all movement states
+    resetMovement() {
+        this.moveForward = false;
+        this.moveBackward = false;
+        this.moveLeft = false;
+        this.moveRight = false;
     }
     
     adjustButtonSizes() {
@@ -259,14 +419,8 @@ export class InputManager {
     }
     
     setupButtonEventListeners() {
-        // Movement buttons
-        this.setupButtonTouch('move-up', () => this.moveForward = true, () => this.moveForward = false);
-        this.setupButtonTouch('move-down', () => this.moveBackward = true, () => this.moveBackward = false);
-        this.setupButtonTouch('move-left', () => this.moveLeft = true, () => this.moveLeft = false);
-        this.setupButtonTouch('move-right', () => this.moveRight = true, () => this.moveRight = false);
-        
-        // Center button for toggling light
-        this.setupButtonTouch('move-center', 
+        // Light toggle button
+        this.setupButtonTouch('toggle-light', 
             () => {
                 // Dispatch a custom event that the game can listen for
                 const event = new CustomEvent('toggle-staff-light');
@@ -275,24 +429,6 @@ export class InputManager {
             null,
             false,
             true // Single press (don't repeat)
-        );
-        
-        // Diagonal movement buttons
-        this.setupButtonTouch('move-up-left', 
-            () => { this.moveForward = true; this.moveLeft = true; }, 
-            () => { this.moveForward = false; this.moveLeft = false; }
-        );
-        this.setupButtonTouch('move-up-right', 
-            () => { this.moveForward = true; this.moveRight = true; }, 
-            () => { this.moveForward = false; this.moveRight = false; }
-        );
-        this.setupButtonTouch('move-down-left', 
-            () => { this.moveBackward = true; this.moveLeft = true; }, 
-            () => { this.moveBackward = false; this.moveLeft = false; }
-        );
-        this.setupButtonTouch('move-down-right', 
-            () => { this.moveBackward = true; this.moveRight = true; }, 
-            () => { this.moveBackward = false; this.moveRight = false; }
         );
         
         // Camera rotation buttons
@@ -463,23 +599,35 @@ export class InputManager {
         // Calculate horizontal movement vector based on input
         const movementVector = new THREE.Vector3(0, 0, 0);
         
-        if (this.moveForward) {
-            movementVector.add(forward);
-        }
-        if (this.moveBackward) {
-            movementVector.add(forward.clone().multiplyScalar(-1));
-        }
-        if (this.moveRight) {
-            movementVector.add(right);
-        }
-        if (this.moveLeft) {
-            movementVector.add(right.clone().multiplyScalar(-1));
-        }
-        
-        // Normalize the horizontal movement vector if it's not zero
-        if (movementVector.lengthSq() > 0) {
-            movementVector.normalize();
-            movementVector.multiplyScalar(speedPerFrame);
+        if (this.joystick.active && this.joystick.movementVector.lengthSq() > 0) {
+            // Use analog joystick input for smoother control
+            // The Y axis of the joystick is inverted (up is negative in screen coordinates)
+            movementVector.add(forward.clone().multiplyScalar(-this.joystick.movementVector.y));
+            movementVector.add(right.clone().multiplyScalar(this.joystick.movementVector.x));
+            
+            // Apply movement proportional to joystick displacement
+            const magnitude = Math.min(1, this.joystick.movementVector.length());
+            movementVector.normalize().multiplyScalar(speedPerFrame * magnitude);
+        } else {
+            // Fallback to keyboard controls
+            if (this.moveForward) {
+                movementVector.add(forward);
+            }
+            if (this.moveBackward) {
+                movementVector.add(forward.clone().multiplyScalar(-1));
+            }
+            if (this.moveRight) {
+                movementVector.add(right);
+            }
+            if (this.moveLeft) {
+                movementVector.add(right.clone().multiplyScalar(-1));
+            }
+            
+            // Normalize the horizontal movement vector if it's not zero
+            if (movementVector.lengthSq() > 0) {
+                movementVector.normalize();
+                movementVector.multiplyScalar(speedPerFrame);
+            }
         }
         
         // Apply horizontal movement to velocity with some smoothing
@@ -702,4 +850,4 @@ export class InputManager {
             this.camera.position.copy(newPosition);
         }
     }
-}
+        }
