@@ -52,34 +52,11 @@ export class EnemyManager {
             }
         }
         
-        // Clean up dead enemies
-        this.cleanupDeadEnemies();
-        
         // Periodically run safety checks
         this.timeSinceLastCheck += validDeltaTime;
         if (this.timeSinceLastCheck >= this.safetyCheckInterval) {
             this.performSafetyChecks();
             this.timeSinceLastCheck = 0;
-        }
-    }
-    
-    // Clean up dead enemies that have been marked for removal
-    cleanupDeadEnemies() {
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const enemy = this.enemies[i];
-            if (enemy && enemy.state === enemy.states.DEAD && !enemy.group.parent) {
-                // Remove collider
-                const colliderIndex = this.enemyColliders[i];
-                if (colliderIndex !== undefined && this.collisionManager) {
-                    this.collisionManager.removeCollider(colliderIndex);
-                }
-                
-                // Remove from arrays
-                this.enemies.splice(i, 1);
-                this.enemyColliders.splice(i, 1);
-                
-                if (this.debug) console.log("Cleaned up dead enemy");
-            }
         }
     }
     
@@ -100,7 +77,7 @@ export class EnemyManager {
         
         for (let i = 0; i < this.enemies.length; i++) {
             const enemy = this.enemies[i];
-            if (!enemy || enemy.state === enemy.states.DEAD) continue;
+            if (!enemy) continue;
             
             // Check if enemy is in a valid position
             if (this.collisionManager) {
@@ -373,7 +350,7 @@ export class EnemyManager {
         
         for (let i = 0; i < this.enemies.length; i++) {
             const enemy = this.enemies[i];
-            if (enemy && enemy.state !== enemy.states.DEAD) {
+            if (enemy && enemy.state !== 'dead') {
                 // Calculate distance to enemy
                 const distance = position.distanceTo(enemy.group.position);
                 
@@ -382,14 +359,12 @@ export class EnemyManager {
                     if (this.debug) console.log(`Enemy hit! Distance: ${distance.toFixed(2)}`);
                     
                     // Apply damage to the enemy
-                    const wasKilled = enemy.takeDamage(damage);
-                    
-                    if (wasKilled) {
-                        // Award points or trigger other game events when enemy is killed
-                        if (this.debug) console.log("Enemy killed by attack!");
-                    }
-                    
+                    const killed = enemy.takeDamage(damage);
                     hitCount++;
+                    
+                    if (killed && this.debug) {
+                        console.log("Enemy was killed by this hit!");
+                    }
                 }
             }
         }
@@ -432,44 +407,5 @@ export class EnemyManager {
         
         this.enemies = [];
         if (this.debug) console.log("Cleared all enemies");
-    }
-    
-    // Get count of active (non-dead) enemies
-    getActiveEnemyCount() {
-        return this.enemies.filter(enemy => 
-            enemy && enemy.state !== enemy.states.DEAD
-        ).length;
-    }
-    
-    // Spawn additional enemies if below minimum count
-    spawnAdditionalEnemiesIfNeeded(minCount = 3) {
-        const activeCount = this.getActiveEnemyCount();
-        
-        if (activeCount < minCount) {
-            const countToSpawn = minCount - activeCount;
-            
-            if (this.debug) console.log(`Spawning ${countToSpawn} additional enemies to maintain minimum count`);
-            
-            // Spawn at random positions away from player
-            for (let i = 0; i < countToSpawn; i++) {
-                // Generate a random position based on player position
-                const playerPos = this.player.camera.position;
-                const angle = Math.random() * Math.PI * 2;
-                const distance = this.spawnDistance.min + Math.random() * 
-                    (this.spawnDistance.max - this.spawnDistance.min);
-                
-                const spawnPos = new THREE.Vector3(
-                    playerPos.x + Math.cos(angle) * distance,
-                    playerPos.y,
-                    playerPos.z + Math.sin(angle) * distance
-                );
-                
-                // Spawn the enemy with random patrol settings
-                const patrolRadius = 3 + Math.random() * 4;
-                const patrolSpeed = 0.3 + Math.random() * 0.5;
-                
-                this.spawnEnemyAtPosition(spawnPos, patrolRadius, patrolSpeed);
-            }
-        }
     }
 }
