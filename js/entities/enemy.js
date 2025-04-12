@@ -20,13 +20,13 @@ export class Enemy {
         
         // Height properties
         this.bodyHeight = 1.8; // Height of the enemy body
-        this.groundOffset = 0; // Offset from the ground (will be set to 0)
+        this.groundOffset = 0.1; // Small offset from ground to prevent z-fighting and getting stuck
         
         // Create a simple mesh for the enemy
         this.createMesh();
         
-        // Ensure enemy is placed on the ground
-        this.ensureOnGround();
+        // Ensure enemy is placed above ground with a proper offset
+        this.ensureProperGroundPlacement();
         
         // Add to scene
         this.scene.add(this.group);
@@ -55,8 +55,8 @@ export class Enemy {
         this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
-        // Position the mesh so its bottom is at y=0 of the group
-        this.bodyMesh.position.y = this.bodyHeight / 2;
+        // Position the mesh so its bottom is at groundOffset of the group
+        this.bodyMesh.position.y = this.bodyHeight / 2 + this.groundOffset;
         
         // Save body dimensions for collision detection
         this.bodyWidth = 1.0; // Diameter
@@ -72,42 +72,105 @@ export class Enemy {
         
         // Left eye - position relative to body height
         this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85, -0.3);
+        this.leftEye.position.set(-0.2, this.bodyHeight * 0.85 + this.groundOffset, -0.3);
         this.group.add(this.leftEye);
         
         // Right eye - position relative to body height
         this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.2, this.bodyHeight * 0.85, -0.3);
+        this.rightEye.position.set(0.2, this.bodyHeight * 0.85 + this.groundOffset, -0.3);
         this.group.add(this.rightEye);
         
         // Position the entire group at the initial position
         this.group.position.copy(this.position);
     }
     
-    // Make sure enemy is properly placed on the ground
-    ensureOnGround() {
-        if (!this.collisionManager) return;
+    // Ensure enemy is properly placed with respect to the ground
+    ensureProperGroundPlacement() {
+        if (!this.collisionManager) {
+            console.warn("No collision manager available for ground placement");
+            return;
+        }
         
-        // Create a ray starting from slightly above current position
+        // Start with a ray cast from current position + safety height
         const rayStart = new THREE.Vector3(
             this.group.position.x,
-            this.group.position.y + 2, // Start above current position to avoid self-intersection
+            this.group.position.y + 5, // Start well above current position
             this.group.position.z
         );
         
-        // Cast ray downward
+        // Cast ray downward to find the floor
         const floorHit = this.collisionManager.findFloorBelow(rayStart, 10);
         
         if (floorHit && floorHit.point) {
-            // Position exactly on the ground (no offset)
+            // Position exactly on the ground with the small offset
             this.group.position.y = floorHit.point.y;
+            
             // Store this as a valid position
             this.lastValidPosition.copy(this.group.position);
             this.patrolCenter.y = floorHit.point.y;
             
-            console.log("Enemy placed on ground at Y:", floorHit.point.y);
+            console.log("Enemy placed at ground level Y:", floorHit.point.y);
         } else {
-            console.warn("Could not find floor beneath enemy!");
+            // No ground found - log warning and try to adjust
+            console.warn("Could not find floor beneath enemy, using default position");
+            
+            // Try to find a reasonable height for the enemy
+            // If player is available, use player's height as reference
+            if (this.player && this.player.camera) {
+                // Use player foot position as a reference
+                const playerFootY = this.player.camera.position.y - 1.5;
+                this.group.position.y = playerFootY;
+                this.lastValidPosition.copy(this.group.position);
+                this.patrolCenter.y = playerFootY;
+            }
+        }
+        
+        // Final check to ensure we're not stuck in geometry
+        this.adjustIfStuckInGround();
+    }
+    
+    // Check if enemy is stuck in ground and adjust if needed
+    adjustIfStuckInGround() {
+        if (!this.collisionManager) return;
+        
+        // Check if current position creates a collision
+        const collision = this.collisionManager.checkCollision(
+            this.group.position,
+            this.collisionRadius
+        );
+        
+        if (collision.collides && !collision.isEnemy) {
+            console.log("Enemy is stuck in geometry, adjusting position");
+            
+            // Try raising the enemy up by small increments until we're free
+            let attempts = 0;
+            let stepSize = 0.2; // 0.2 units per step
+            let maxAttempts = 10; // Don't try more than 10 times
+            
+            while (attempts < maxAttempts) {
+                // Raise the position
+                this.group.position.y += stepSize;
+                
+                // Check if we're still colliding
+                const newCheck = this.collisionManager.checkCollision(
+                    this.group.position,
+                    this.collisionRadius
+                );
+                
+                if (!newCheck.collides || newCheck.isEnemy) {
+                    // We're free, update valid position
+                    this.lastValidPosition.copy(this.group.position);
+                    this.patrolCenter.y = this.group.position.y;
+                    console.log("Enemy adjusted to Y:", this.group.position.y);
+                    break;
+                }
+                
+                attempts++;
+            }
+            
+            if (attempts >= maxAttempts) {
+                console.warn("Could not find valid position for enemy after multiple attempts");
+            }
         }
     }
     
