@@ -22,9 +22,7 @@ export class InputManager {
             angle: 0,
             distance: 0,
             maxDistance: 40, // Maximum distance the joystick can move
-            movementVector: new THREE.Vector2(0, 0),
-            elementId: null, // Store the ID of the element that started the joystick movement
-            touchId: null // Store the touch identifier for multi-touch support
+            movementVector: new THREE.Vector2(0, 0)
         };
         
         // Physics properties
@@ -51,6 +49,17 @@ export class InputManager {
         // Button sizing
         this.originalButtonSizes = {};
         this.hasAdjustedButtons = false;
+        
+        // Swipe camera controls - new properties
+        this.cameraSwipe = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            lastX: 0,
+            lastY: 0,
+            touchId: null,
+            sensitivity: 0.08 // Adjust this to control swipe sensitivity
+        };
         
         // Initialize event listeners
         this.initKeyboardControls();
@@ -149,6 +158,133 @@ export class InputManager {
         
         // Add event listeners for button touches
         this.setupButtonEventListeners();
+        
+        // Add swipe camera controls - new section
+        this.initSwipeCameraControls();
+    }
+    
+    // New method for swipe camera controls
+    initSwipeCameraControls() {
+        // Get the game container for swipe controls
+        const gameContainer = document.getElementById('game-container');
+        
+        // Get the controls area to determine the swipe area
+        const touchControls = document.getElementById('touch-controls');
+        
+        // Handle touch start
+        gameContainer.addEventListener('touchstart', (e) => {
+            // Skip if we already have an active swipe or if the touch is in the controls area
+            if (this.cameraSwipe.active || this.isTouchInControlsArea(e.touches[0], touchControls)) {
+                return;
+            }
+            
+            // Skip joystick touches
+            const joystickBase = document.getElementById('joystick-base');
+            if (joystickBase && this.isTouchOverElement(e.touches[0], joystickBase)) {
+                return;
+            }
+            
+            // Start camera swipe
+            const touch = e.touches[0];
+            this.cameraSwipe.active = true;
+            this.cameraSwipe.touchId = touch.identifier;
+            this.cameraSwipe.startX = touch.clientX;
+            this.cameraSwipe.startY = touch.clientY;
+            this.cameraSwipe.lastX = touch.clientX;
+            this.cameraSwipe.lastY = touch.clientY;
+            
+            // Prevent default behavior to avoid scrolling
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Handle touch move
+        gameContainer.addEventListener('touchmove', (e) => {
+            // Skip if we don't have an active swipe
+            if (!this.cameraSwipe.active) return;
+            
+            // Find our touch
+            let ourTouch = null;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === this.cameraSwipe.touchId) {
+                    ourTouch = e.touches[i];
+                    break;
+                }
+            }
+            
+            // Skip if we couldn't find our touch
+            if (!ourTouch) return;
+            
+            // Calculate the movement
+            const moveX = ourTouch.clientX - this.cameraSwipe.lastX;
+            const moveY = ourTouch.clientY - this.cameraSwipe.lastY;
+            
+            // Update last position
+            this.cameraSwipe.lastX = ourTouch.clientX;
+            this.cameraSwipe.lastY = ourTouch.clientY;
+            
+            // Apply camera rotation
+            this.rotateCamera(-moveX * this.cameraSwipe.sensitivity, -moveY * this.cameraSwipe.sensitivity);
+            
+            // Prevent default behavior to avoid scrolling
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Handle touch end
+        gameContainer.addEventListener('touchend', (e) => {
+            // Find if our touch has ended
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.cameraSwipe.touchId) {
+                    this.cameraSwipe.active = false;
+                    this.cameraSwipe.touchId = null;
+                    break;
+                }
+            }
+        });
+        
+        // Handle touch cancel
+        gameContainer.addEventListener('touchcancel', (e) => {
+            // Find if our touch has been cancelled
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === this.cameraSwipe.touchId) {
+                    this.cameraSwipe.active = false;
+                    this.cameraSwipe.touchId = null;
+                    break;
+                }
+            }
+        });
+    }
+    
+    // Helper to check if touch is over a specific element
+    isTouchOverElement(touch, element) {
+        if (!element) return false;
+        
+        const rect = element.getBoundingClientRect();
+        return (
+            touch.clientX >= rect.left &&
+            touch.clientX <= rect.right &&
+            touch.clientY >= rect.top &&
+            touch.clientY <= rect.bottom
+        );
+    }
+    
+    // Helper to check if touch is in the controls area
+    isTouchInControlsArea(touch, controlsElement) {
+        if (!controlsElement) return false;
+        
+        // Get the controls area bounds
+        const controlsRect = controlsElement.getBoundingClientRect();
+        
+        // Consider controls area to start slightly above the actual element
+        // This gives a larger area for camera swiping
+        const controlsTop = controlsRect.top - 50; // 50px buffer above controls
+        
+        // Check if touch is in controls area
+        return (
+            touch.clientX >= controlsRect.left &&
+            touch.clientX <= controlsRect.right &&
+            touch.clientY >= controlsTop &&
+            touch.clientY <= controlsRect.bottom
+        );
     }
     
     createTouchButtons() {
@@ -245,22 +381,13 @@ export class InputManager {
         if (!joystickBase || !joystickHandle) return;
         
         // Function to handle joystick movement
-        const handleJoystickMove = (clientX, clientY, touchId = null) => {
+        const handleJoystickMove = (clientX, clientY) => {
             if (!this.joystick.active) return;
-            
-            // Check if this is the same touch that started the joystick
-            if (touchId !== null && this.joystick.touchId !== null && touchId !== this.joystick.touchId) {
-                return; // Ignore if it's not the same touch
-            }
             
             // Get joystick base position and size
             const rect = joystickBase.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            
-            // Store current position for later use
-            this.joystick.currentX = clientX;
-            this.joystick.currentY = clientY;
             
             // Calculate the distance from center
             const deltaX = clientX - centerX;
@@ -294,93 +421,50 @@ export class InputManager {
         };
         
         // Function to reset joystick
-        const resetJoystick = (touchId = null) => {
-            // Only reset if this is the same touch that started the joystick
-            if (touchId !== null && this.joystick.touchId !== null && touchId !== this.joystick.touchId) {
-                return; // Don't reset if it's not the same touch
-            }
-            
+        const resetJoystick = () => {
             this.joystick.active = false;
-            this.joystick.touchId = null;
-            this.joystick.elementId = null;
             joystickHandle.style.transform = 'translate(0px, 0px)';
             this.joystick.movementVector.set(0, 0);
             this.resetMovement();
         };
         
-        // Touch Events for Joystick
+        // Touch Events
         joystickBase.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            const touch = e.touches[0];
             this.joystick.active = true;
-            this.joystick.touchId = touch.identifier;
-            this.joystick.elementId = 'joystick-base';
-            this.joystick.startX = touch.clientX;
-            this.joystick.startY = touch.clientY;
-            handleJoystickMove(touch.clientX, touch.clientY, touch.identifier);
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
         });
         
-        // Touch move for joystick - process only the joystick touch
         document.addEventListener('touchmove', (e) => {
             if (!this.joystick.active) return;
-            
-            // Find the touch with the matching identifier
-            for (let i = 0; i < e.touches.length; i++) {
-                const touch = e.touches[i];
-                if (this.joystick.touchId === touch.identifier) {
-                    e.preventDefault(); // Only prevent default for the joystick touch
-                    handleJoystickMove(touch.clientX, touch.clientY, touch.identifier);
-                    break;
-                }
-            }
-        }, { passive: false });
-        
-        // Touch end for joystick - process only the joystick touch
-        document.addEventListener('touchend', (e) => {
-            if (!this.joystick.active) return;
-            
-            // Check if the ended touch is the joystick touch
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const touch = e.changedTouches[i];
-                if (this.joystick.touchId === touch.identifier) {
-                    resetJoystick(touch.identifier);
-                    break;
-                }
-            }
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleJoystickMove(touch.clientX, touch.clientY);
         });
         
-        document.addEventListener('touchcancel', (e) => {
-            if (!this.joystick.active) return;
-            
-            // Check if the cancelled touch is the joystick touch
-            for (let i = 0; i < e.changedTouches.length; i++) {
-                const touch = e.changedTouches[i];
-                if (this.joystick.touchId === touch.identifier) {
-                    resetJoystick(touch.identifier);
-                    break;
-                }
-            }
+        document.addEventListener('touchend', () => {
+            resetJoystick();
         });
         
-        // Mouse Events for joystick (for testing on desktop)
+        document.addEventListener('touchcancel', () => {
+            resetJoystick();
+        });
+        
+        // Mouse Events (for testing on desktop)
         joystickBase.addEventListener('mousedown', (e) => {
             e.preventDefault();
             this.joystick.active = true;
-            this.joystick.elementId = 'joystick-base';
-            this.joystick.startX = e.clientX;
-            this.joystick.startY = e.clientY;
             handleJoystickMove(e.clientX, e.clientY);
         });
         
         document.addEventListener('mousemove', (e) => {
-            if (!this.joystick.active || this.joystick.elementId !== 'joystick-base') return;
+            if (!this.joystick.active) return;
             handleJoystickMove(e.clientX, e.clientY);
         });
         
-        document.addEventListener('mouseup', (e) => {
-            if (this.joystick.active && this.joystick.elementId === 'joystick-base') {
-                resetJoystick();
-            }
+        document.addEventListener('mouseup', () => {
+            resetJoystick();
         });
     }
     
@@ -514,7 +598,8 @@ export class InputManager {
             this.setupButtonTouch('jump', 
                 () => this.jump = true, 
                 () => this.jump = false
-            ];
+            )
+        ];
         
         // Check all points for ground contact
         for (const checkPos of groundCheckPoints) {
@@ -686,7 +771,9 @@ export class InputManager {
         } else {
             // No collision manager, simply apply position
             this.camera.position.copy(newPosition);
-        };
+        }
+    }
+};
         }
         
         // Attack button
@@ -752,95 +839,15 @@ export class InputManager {
             }
         };
         
-        // Touch events with identifier tracking
-        button.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            // Store the button ID and touch ID for tracking
-            if (e.touches.length > 0) {
-                const touch = e.touches[0];
-                if (buttonId.startsWith('camera')) {
-                    // For camera buttons, track which touch is controlling them
-                    button.dataset.touchId = touch.identifier;
-                }
-            }
-            startPress(e);
-        });
-        
-        button.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            // Only end the press if this is the same touch that started it
-            if (buttonId.startsWith('camera')) {
-                const touchId = button.dataset.touchId;
-                let found = false;
-                
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier.toString() === touchId) {
-                        found = true;
-                        break;
-                    }
-                }
-                
-                if (found) {
-                    delete button.dataset.touchId;
-                    endPress(e);
-                }
-            } else {
-                endPress(e);
-            }
-        });
-        
-        button.addEventListener('touchcancel', (e) => {
-            e.preventDefault();
-            // Similar to touchend, only end if it's the same touch
-            if (buttonId.startsWith('camera')) {
-                const touchId = button.dataset.touchId;
-                let found = false;
-                
-                for (let i = 0; i < e.changedTouches.length; i++) {
-                    if (e.changedTouches[i].identifier.toString() === touchId) {
-                        found = true;
-                        break;
-                    }
-                }
-                
-                if (found) {
-                    delete button.dataset.touchId;
-                    endPress(e);
-                }
-            } else {
-                endPress(e);
-            }
-        });
-        
         // Mouse events
-        button.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            // Store the button ID
-            if (buttonId.startsWith('camera')) {
-                button.dataset.mouseActive = 'true';
-            }
-            startPress(e);
-        });
+        button.addEventListener('mousedown', startPress);
+        button.addEventListener('mouseup', endPress);
+        button.addEventListener('mouseleave', endPress);
         
-        button.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            if (buttonId.startsWith('camera') && button.dataset.mouseActive === 'true') {
-                delete button.dataset.mouseActive;
-                endPress(e);
-            } else if (!buttonId.startsWith('camera')) {
-                endPress(e);
-            }
-        });
-        
-        button.addEventListener('mouseleave', (e) => {
-            e.preventDefault();
-            if (buttonId.startsWith('camera') && button.dataset.mouseActive === 'true') {
-                delete button.dataset.mouseActive;
-                endPress(e);
-            } else if (!buttonId.startsWith('camera')) {
-                endPress(e);
-            }
-        });
+        // Touch events
+        button.addEventListener('touchstart', startPress);
+        button.addEventListener('touchend', endPress);
+        button.addEventListener('touchcancel', endPress);
     }
     
     rotateCamera(deltaX, deltaY) {
@@ -974,11 +981,4 @@ export class InputManager {
             new THREE.Vector3(
                 this.camera.position.x + right.x * groundCheckRadius * 0.8,
                 this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z + right.z * groundCheckRadius * 0.8
-            ),
-            // Left point
-            new THREE.Vector3(
-                this.camera.position.x - right.x * groundCheckRadius * 0.8,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z - right.z * groundCheckRadius * 0.8
-            )
+                this.camera.position.z + right.z * groundCheckRadius * 0
