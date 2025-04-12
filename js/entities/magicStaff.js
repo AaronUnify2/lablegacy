@@ -434,7 +434,9 @@ export class MagicStaff {
     
     // Show visual effect when toggling the light
     showToggleEffect(isOn) {
+        
         // Create a message element
+        /*
         const message = document.createElement('div');
         message.textContent = isOn ? "Staff light activated" : "Staff light deactivated";
         message.style.position = 'absolute';
@@ -469,4 +471,5 @@ export class MagicStaff {
             }, 500);
         }, 2000);
     }
+    */
 }
