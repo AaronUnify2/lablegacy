@@ -11,7 +11,8 @@ export class Enemy {
             PATROL: 'patrol',
             CHASE: 'chase',
             RETURN: 'return',
-            IDLE: 'idle'
+            IDLE: 'idle',
+            ATTACK: 'attack' // Add attack state
         };
         
         // AI Configuration
@@ -44,6 +45,14 @@ export class Enemy {
         this.collisionRadius = 0.8; // Increased from 0.5 to 0.8 for stronger collision
         this.collisionEnabled = true; // Flag to enable/disable collision
         this.lastValidPosition = position.clone(); // Store last valid position
+        
+        // Attack properties
+        this.attackRange = 1.5; // Distance at which enemy can attack player
+        this.attackCooldown = 0; // Current cooldown timer
+        this.attackCooldownTime = 2; // Time between attacks in seconds
+        this.attackDamage = 15; // Damage per attack
+        this.attackDuration = 0.5; // Duration of attack animation in seconds
+        this.isAttacking = false; // Flag to track if currently attacking
         
         // Create a simple mesh for the enemy
         this.createMesh();
@@ -141,6 +150,11 @@ export class Enemy {
             this.stateCooldown -= deltaTime;
         }
         
+        // Decrease attack cooldown
+        if (this.attackCooldown > 0) {
+            this.attackCooldown -= deltaTime;
+        }
+        
         // Check player proximity to determine state transitions
         this.checkPlayerProximity();
         
@@ -161,6 +175,10 @@ export class Enemy {
             case this.states.IDLE:
                 this.executeIdleBehavior(deltaTime);
                 break;
+                
+            case this.states.ATTACK:
+                this.executeAttackBehavior(deltaTime);
+                break;
         }
         
         // Rotate the body slightly to show it's active even if not moving
@@ -179,6 +197,15 @@ export class Enemy {
         
         // Store the player position for use in chase behavior
         this.lastKnownPlayerPos.copy(playerPos);
+        
+        // Check for attack range if in chase state
+        if (distanceToPlayer < this.attackRange && this.attackCooldown <= 0) {
+            // Only attack if we're in the chase state
+            if (this.state === this.states.CHASE) {
+                this.changeState(this.states.ATTACK);
+                this.performAttack();
+            }
+        }
         
         // State transitions
         switch(this.state) {
@@ -323,6 +350,158 @@ export class Enemy {
         }
     }
     
+    // Attack state behavior
+    executeAttackBehavior(deltaTime) {
+        // During attack, keep facing the player but don't move
+        if (this.player && this.player.camera) {
+            // Get direction to player
+            const directionToPlayer = new THREE.Vector3()
+                .subVectors(this.player.camera.position, this.group.position)
+                .normalize();
+            
+            // Make the enemy face the player
+            directionToPlayer.y = 0; // Keep rotation on horizontal plane
+            if (directionToPlayer.lengthSq() > 0) {
+                const lookTarget = new THREE.Vector3()
+                    .addVectors(this.group.position, directionToPlayer);
+                
+                // Use faster turning during attack
+                this.smoothLookAt(lookTarget, this.turnSpeed.chase * 1.5);
+            }
+        }
+        
+        // The actual attack is handled by the performAttack method
+    }
+    
+    // Perform an attack on the player
+    performAttack() {
+        if (this.isAttacking || !this.player) return; // Don't attack if already attacking
+        
+        this.isAttacking = true;
+        this.attackCooldown = this.attackCooldownTime;
+        
+        // Visual feedback - make eyes flash brighter during attack
+        if (this.leftEye && this.leftEye.material) {
+            this.leftEye.material.emissiveIntensity = 2.0;
+        }
+        if (this.rightEye && this.rightEye.material) {
+            this.rightEye.material.emissiveIntensity = 2.0;
+        }
+        
+        // Create attack effect
+        this.createAttackEffect();
+        
+        // Deal damage to player after a short delay (matching the animation)
+        setTimeout(() => {
+            // Check if still in range before applying damage
+            if (this.player && this.player.camera) {
+                const currentDistanceToPlayer = this.group.position.distanceTo(this.player.camera.position);
+                if (currentDistanceToPlayer <= this.attackRange) {
+                    console.log(`Enemy hit player for ${this.attackDamage} damage!`);
+                    // Call the player's damage function
+                    if (this.player.damage) {
+                        this.player.damage(this.attackDamage);
+                    }
+                }
+            }
+            
+            // Reset attack state
+            this.isAttacking = false;
+            
+            // Reset eye glow
+            if (this.leftEye && this.leftEye.material) {
+                this.leftEye.material.emissiveIntensity = 1.0;
+            }
+            if (this.rightEye && this.rightEye.material) {
+                this.rightEye.material.emissiveIntensity = 1.0;
+            }
+            
+            // Return to chase state after attack
+            this.changeState(this.states.CHASE);
+        }, this.attackDuration * 1000);
+    }
+    
+    // Create a visual effect for the attack
+    createAttackEffect() {
+        if (!this.scene) return;
+        
+        // Get direction to player
+        const directionToPlayer = new THREE.Vector3()
+            .subVectors(this.lastKnownPlayerPos, this.group.position)
+            .normalize();
+        
+        // Adjust to be horizontal only
+        directionToPlayer.y = 0;
+        directionToPlayer.normalize();
+        
+        // Create a cone geometry pointing in the attack direction
+        const attackGeometry = new THREE.ConeGeometry(0.5, 1.5, 8);
+        const attackMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.6
+        });
+        
+        const attackMesh = new THREE.Mesh(attackGeometry, attackMaterial);
+        
+        // Position the cone in front of the enemy
+        const attackPosition = this.group.position.clone().addScaledVector(directionToPlayer, 1.0);
+        attackPosition.y += 0.9; // Position at eye level
+        attackMesh.position.copy(attackPosition);
+        
+        // Rotate cone to point toward player
+        attackMesh.lookAt(this.lastKnownPlayerPos);
+        attackMesh.rotateX(Math.PI / 2); // Adjust rotation to point forward
+        
+        this.scene.add(attackMesh);
+        
+        // Animate the attack effect
+        const duration = this.attackDuration * 1000;
+        const startTime = performance.now();
+        
+        const animateAttack = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Expand and fade out
+            const scale = 1 + progress;
+            attackMesh.scale.set(scale, 1, scale);
+            attackMesh.material.opacity = 0.6 * (1 - progress);
+            
+            // Move forward slightly
+            const newPosition = this.group.position.clone()
+                .addScaledVector(directionToPlayer, 1.0 + progress * 0.5);
+            newPosition.y = attackPosition.y;
+            attackMesh.position.copy(newPosition);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateAttack);
+            } else {
+                // Remove the attack mesh
+                this.scene.remove(attackMesh);
+                attackMesh.geometry.dispose();
+                attackMesh.material.dispose();
+            }
+        };
+        
+        animateAttack();
+        
+        // Try to play attack sound
+        this.playAttackSound();
+    }
+    
+    // Play an attack sound
+    playAttackSound() {
+        try {
+            const attackSound = new Audio('sounds/enemy_attack.mp3');
+            attackSound.volume = 0.3;
+            attackSound.play().catch(err => console.log('Could not play attack sound', err));
+        } catch (e) {
+            console.log('Error playing attack sound', e);
+        }
+    }
+    
     // Move with collision prevention
     moveWithCollisionCheck(newPosition) {
         if (!this.collisionEnabled || !this.collisionManager) {
@@ -409,6 +588,11 @@ export class Enemy {
             case this.states.IDLE:
                 eyeColor = 0x88ff88; // Green when idle
                 intensity = 0.5;
+                break;
+                
+            case this.states.ATTACK:
+                eyeColor = 0xff0000; // Bright red when attacking
+                intensity = 1.5;
                 break;
         }
         
