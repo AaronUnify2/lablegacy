@@ -138,7 +138,6 @@ export class CollisionManager {
         if (collision.collides) {
             // Special handling for enemy collisions
             if (collision.isEnemy) {
-                // For enemy collisions, we want a stronger pushback effect
                 // Calculate direction from enemy to player
                 const enemyCenter = new THREE.Vector3(
                     (collision.collider.minX + collision.collider.maxX) / 2,
@@ -175,13 +174,55 @@ export class CollisionManager {
                     }
                 }
                 
-                // Check if the resolved position would cause another collision
-                if (this.checkCollision(resolvedPosition, radius).collides) {
-                    // If it would, fall back to the previous position
-                    return previousPosition;
+                // NEW: Incremental collision checking to prevent going through walls
+                // We'll test the new position in smaller steps to ensure we don't clip through walls
+                const steps = 5; // Number of steps for testing
+                let validPosition = previousPosition.clone();
+                
+                for (let i = 1; i <= steps; i++) {
+                    // Interpolate between previous position and resolved position
+                    const testPosition = new THREE.Vector3().lerpVectors(
+                        previousPosition,
+                        resolvedPosition,
+                        i / steps
+                    );
+                    
+                    // Check if this intermediate position collides with environment
+                    // Important: We pass true to ignoreEnemies - we only care about walls here
+                    const envCollision = this.checkCollision(testPosition, radius, true);
+                    
+                    if (!envCollision.collides) {
+                        // This position is valid, update our best valid position
+                        validPosition.copy(testPosition);
+                    } else {
+                        // We hit a wall, stop here and use the last valid position
+                        console.log("Would clip through wall - using last valid position");
+                        break;
+                    }
                 }
                 
-                return resolvedPosition;
+                // NEW: Final safety check - ensure we're not too close to any wall
+                const wallSafetyDistance = radius * 1.1; // Slightly larger than player radius
+                const directions = [
+                    new THREE.Vector3(1, 0, 0),   // +X
+                    new THREE.Vector3(-1, 0, 0),  // -X
+                    new THREE.Vector3(0, 0, 1),   // +Z
+                    new THREE.Vector3(0, 0, -1),  // -Z
+                ];
+                
+                // Check in multiple directions to ensure we're not too close to any wall
+                for (const dir of directions) {
+                    const checkPoint = validPosition.clone().addScaledVector(dir, wallSafetyDistance);
+                    const wallCheck = this.checkCollision(checkPoint, 0.1, true);
+                    
+                    if (wallCheck.collides) {
+                        // We're too close to a wall in this direction, adjust position
+                        const adjustment = dir.clone().multiplyScalar(-0.2); // Move away from wall slightly
+                        validPosition.add(adjustment);
+                    }
+                }
+                
+                return validPosition;
             }
             
             // Calculate penetration depth along each axis
