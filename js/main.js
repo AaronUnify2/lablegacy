@@ -434,11 +434,11 @@ class Game {
     // Reset player to last valid position - Updated to include damage
     resetToLastValidPosition() {
         if (this.lastValidPosition) {
-            // Apply fall damage (50 points)
-            this.playerTakeDamage(50);
+            // Apply fall damage (20 points)
+            this.playerTakeDamage(20);
             
             // Show a more severe message
-            this.showMessage('You fell through the world and took damage!');
+            this.showMessage(' ');
             
             // Create a flash effect for the fall
             this.showFallEffect();
