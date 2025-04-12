@@ -128,53 +128,26 @@ class Game {
             console.error('Error initializing game:', error);
         }
     }
-
-
-
-
-
-
     
     createHealthDisplay() {
         // Create a health display container
         this.healthDisplay = document.createElement('div');
-    this.healthDisplay.id = 'health-display';
-      this.healthDisplay.style.position = 'absolute';
-        this.healthDisplay.style.bottom = '20px';
-        this.healthDisplay.style.left = '20px';
-        this.healthDisplay.style.display = 'flex';
-        this.healthDisplay.style.alignItems = 'center';
-        this.healthDisplay.style.zIndex = '10';
+        this.healthDisplay.id = 'health-display';
         
         // Create the health bar background
-  this.healthBar = document.createElement('div');
-    this.healthBar.id = 'health-bar';
-     this.healthBar.style.width = '200px';
-        this.healthBar.style.height = '15px';
-        this.healthBar.style.background = 'rgba(0, 0, 0, 0.5)';
-        this.healthBar.style.borderRadius = '3px';
-        this.healthBar.style.overflow = 'hidden';
-        this.healthBar.style.boxShadow = '0 0 5px rgba(0, 0, 0, 0.5)';
+        this.healthBar = document.createElement('div');
+        this.healthBar.id = 'health-bar';
         
         // Create the health bar fill
         this.healthBarFill = document.createElement('div');
-    this.healthBarFill.id = 'health-bar-fill';
-        this.healthBarFill.style.width = '100%';
-        this.healthBarFill.style.height = '100%';
-        this.healthBarFill.style.background = 'linear-gradient(to right, #ff3333, #ff6666)';
-        this.healthBarFill.style.transition = 'width 0.3s ease';
+        this.healthBarFill.id = 'health-bar-fill';
         
         // Add health bar fill to health bar
         this.healthBar.appendChild(this.healthBarFill);
         
         // Create health text
         this.healthText = document.createElement('div');
-    this.healthText.id = 'health-text';
-    this.healthText.textContent = '100/100';
-     this.healthText.style.marginLeft = '10px';
-        this.healthText.style.color = '#fff';
-        this.healthText.style.textShadow = '0 0 3px rgba(0, 0, 0, 0.8)';
-        this.healthText.style.fontFamily = 'Cinzel, serif';
+        this.healthText.id = 'health-text';
         this.healthText.textContent = '100/100';
         
         // Add health bar and text to health display
@@ -788,6 +761,27 @@ class Game {
     }
     
     updateCurseEffects(currentTime, deltaTime) {
+        // Subtle camera shake based on curse level
+        if (this.gameState.curseLevel > 0) {
+            const intensity = this.gameState.curseLevel * 0.0005;
+            const shakeX = (Math.random() - 0.5) * intensity;
+            const shakeY = (Math.random() - 0.5) * intensity;
+            
+            this.renderer.camera.position.x += shakeX;
+            this.renderer.camera.position.y += shakeY;
+        }
+        
+        // Pulse the fog density
+        if (this.renderer.scene.fog) {
+            const baseFog = 0.03;
+            const pulseMagnitude = 0.01;
+            const pulseSpeed = 0.5;
+            
+            this.renderer.scene.fog.density = baseFog + 
+                Math.sin(currentTime * 0.001 * pulseSpeed) * pulseMagnitude;
+        }
+        
+        updateCurseEffects(currentTime, deltaTime) {
         // Subtle camera shake based on curse level
         if (this.gameState.curseLevel > 0) {
             const intensity = this.gameState.curseLevel * 0.0005;
