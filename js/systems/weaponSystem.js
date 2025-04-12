@@ -7,18 +7,6 @@ export class WeaponSystem {
         // Weapon state
         this.currentWeapon = null;
         this.attackCooldown = 0;
-        this.isAttacking = false;
-        
-        // Staff attack properties
-        this.staffAttackRange = 5;
-        this.staffAttackRadius = 2;
-        this.staffAttackDamage = 25;
-        this.staffAttackCooldown = 0.8; // 800ms between attacks
-        
-        // For combo attacks
-        this.comboCount = 0;
-        this.comboResetTimer = 0;
-        this.comboTimeWindow = 1.5; // 1.5 seconds to continue combo
         
         // Bind methods
         this.update = this.update.bind(this);
@@ -29,55 +17,15 @@ export class WeaponSystem {
         // Update cooldowns
         if (this.attackCooldown > 0) {
             this.attackCooldown -= deltaTime;
-            if (this.attackCooldown < 0) {
-                this.attackCooldown = 0;
-            }
-        }
-        
-        // Update combo timer
-        if (this.comboCount > 0) {
-            this.comboResetTimer -= deltaTime;
-            if (this.comboResetTimer <= 0) {
-                // Reset combo if player hasn't attacked again within the window
-                this.comboCount = 0;
-            }
         }
     }
     
     staffAttack() {
         // Check if attack is on cooldown
-        if (this.attackCooldown > 0 || this.isAttacking) return false;
+        if (this.attackCooldown > 0) return false;
         
-        // Set cooldown and attack state
-        this.attackCooldown = this.staffAttackCooldown;
-        this.isAttacking = true;
-        
-        // Increment combo counter and reset timer
-        this.comboCount++;
-        this.comboResetTimer = this.comboTimeWindow;
-        
-        // Adjust attack properties based on combo
-        let attackDamage = this.staffAttackDamage;
-        let attackRadius = this.staffAttackRadius;
-        let attackColor = 0x3366ff; // Default blue
-        
-        // Enhanced attack based on combo count
-        if (this.comboCount >= 3) {
-            // Strong attack (3rd+ hit in combo)
-            attackDamage *= 1.5;
-            attackRadius *= 1.2;
-            attackColor = 0xff3300; // Orange-red for powerful combo
-            
-            // Reset combo after a powerful hit
-            if (this.comboCount >= 4) {
-                this.comboCount = 0;
-            }
-        } else if (this.comboCount === 2) {
-            // Medium attack (2nd hit in combo)
-            attackDamage *= 1.2;
-            attackRadius *= 1.1;
-            attackColor = 0x66aaff; // Brighter blue for combo
-        }
+        // Set cooldown
+        this.attackCooldown = 0.8; // 800ms between attacks
         
         // Get staff position and forward direction
         const staffPosition = new THREE.Vector3();
@@ -87,30 +35,35 @@ export class WeaponSystem {
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyQuaternion(this.player.camera.quaternion);
         
+        // Attack parameters
+        const attackRange = 5;
+        const attackRadius = 2;
+        const attackDamage = 25;
+        
         // Create attack endpoint
-        const attackEnd = staffPosition.clone().addScaledVector(forward, this.staffAttackRange);
+        const attackEnd = staffPosition.clone().addScaledVector(forward, attackRange);
         
         // Find any enemies in range and damage them
         const hitCount = this.enemyManager.damageEnemiesInRadius(attackEnd, attackRadius, attackDamage);
         
         // Visual feedback
-        this.showAttackEffect(staffPosition, attackEnd, attackRadius, hitCount > 0, attackColor);
+        this.showAttackEffect(staffPosition, attackEnd, attackRadius, hitCount > 0);
         
         // Play attack sound
-        this.playAttackSound(hitCount > 0, this.comboCount);
+        this.playAttackSound(hitCount > 0);
         
         // Perform attack animation on the staff
-        this.animateStaffAttack(this.comboCount);
+        this.animateStaffAttack();
         
-        // Reset attack state after a short delay
-        setTimeout(() => {
-            this.isAttacking = false;
-        }, 300);
+        // Add a stronger effect for hits
+        if (hitCount > 0) {
+            this.showHitImpactEffect(attackEnd);
+        }
         
         return hitCount > 0;
     }
     
-    showAttackEffect(start, end, radius, hitTarget, color = 0x3366ff) {
+    showAttackEffect(start, end, radius, hitTarget) {
         // Create a beam effect for the attack
         const beamGeometry = new THREE.CylinderGeometry(0.05, 0.2, start.distanceTo(end), 8, 1, false);
         
@@ -119,7 +72,7 @@ export class WeaponSystem {
         
         // Create material with glow
         const beamMaterial = new THREE.MeshBasicMaterial({
-            color: hitTarget ? color : 0x3366ff,
+            color: hitTarget ? 0xff3300 : 0x3366ff,
             transparent: true,
             opacity: 0.7
         });
@@ -142,7 +95,7 @@ export class WeaponSystem {
         
         // If we hit something, add impact effect
         if (hitTarget) {
-            this.createImpactEffect(end, radius, color);
+            this.createImpactEffect(end, radius);
         }
         
         // Animate the beam
@@ -169,19 +122,17 @@ export class WeaponSystem {
             } else {
                 // Remove after animation completes
                 this.scene.remove(beam);
-                beam.geometry.dispose();
-                beam.material.dispose();
             }
         };
         
         animate();
     }
     
-    createImpactEffect(position, radius, color = 0xff6600) {
+    createImpactEffect(position, radius) {
         // Create impact sphere
         const impactGeometry = new THREE.SphereGeometry(radius * 0.5, 16, 16);
         const impactMaterial = new THREE.MeshBasicMaterial({
-            color: color,
+            color: 0xff6600,
             transparent: true,
             opacity: 0.5,
             wireframe: true
@@ -193,7 +144,7 @@ export class WeaponSystem {
         this.scene.add(impact);
         
         // Add a point light for the impact flash
-        const impactLight = new THREE.PointLight(color, 3, radius * 2);
+        const impactLight = new THREE.PointLight(0xff6600, 3, radius * 2);
         impactLight.position.copy(position);
         this.scene.add(impactLight);
         
@@ -221,32 +172,107 @@ export class WeaponSystem {
                 // Remove after animation completes
                 this.scene.remove(impact);
                 this.scene.remove(impactLight);
-                impact.geometry.dispose();
-                impact.material.dispose();
             }
         };
         
         animate();
     }
     
-    playAttackSound(hitTarget, comboCount = 0) {
-        // Create attack sound based on combo count and hit
-        let soundFile = 'sounds/staff_attack_miss.mp3';
+    // Add this new method for stronger hit effects
+    showHitImpactEffect(position) {
+        // Create a stronger impact effect when hitting enemies
+        const particles = [];
+        const particleCount = 15; // Number of particles to create
         
-        if (hitTarget) {
-            if (comboCount >= 3) {
-                soundFile = 'sounds/staff_attack_hit_strong.mp3';
-            } else if (comboCount === 2) {
-                soundFile = 'sounds/staff_attack_hit_medium.mp3';
-            } else {
-                soundFile = 'sounds/staff_attack_hit.mp3';
-            }
+        // Create particle geometry and material
+        for (let i = 0; i < particleCount; i++) {
+            const size = Math.random() * 0.2 + 0.1;
+            const geometry = new THREE.SphereGeometry(size, 8, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: new THREE.Color(Math.random() < 0.7 ? 0xff6600 : 0xffcc00),
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            
+            // Position at impact point
+            particle.position.copy(position);
+            
+            // Add random velocity
+            particle.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 5,
+                Math.random() * 3 + 1,
+                (Math.random() - 0.5) * 5
+            );
+            
+            // Add to scene
+            this.scene.add(particle);
+            particles.push(particle);
         }
         
-        // Create and play sound
+        // Create a flash light at impact point
+        const flashLight = new THREE.PointLight(0xff6600, 5, 4);
+        flashLight.position.copy(position);
+        this.scene.add(flashLight);
+        
+        // Animate particles and light
+        const duration = 0.8; // seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Update each particle
+            particles.forEach(particle => {
+                // Apply velocity with simulated gravity
+                particle.position.x += particle.velocity.x * 0.016; // assume ~60fps
+                particle.position.y += particle.velocity.y * 0.016;
+                particle.position.z += particle.velocity.z * 0.016;
+                
+                // Apply gravity effect
+                particle.velocity.y -= 9.8 * 0.016;
+                
+                // Fade out
+                if (particle.material) {
+                    particle.material.opacity = 0.8 * (1 - progress);
+                }
+                
+                // Slow down particles over time (air resistance)
+                particle.velocity.multiplyScalar(0.98);
+            });
+            
+            // Fade out light
+            if (flashLight) {
+                flashLight.intensity = 5 * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up
+                particles.forEach(particle => {
+                    this.scene.remove(particle);
+                    if (particle.geometry) particle.geometry.dispose();
+                    if (particle.material) particle.material.dispose();
+                });
+                
+                this.scene.remove(flashLight);
+            }
+        };
+        
+        animate();
+    }
+    
+    playAttackSound(hitTarget) {
+        // Create attack sound
         const attackSound = new Audio();
-        attackSound.src = soundFile;
-        attackSound.volume = hitTarget ? 0.4 : 0.2;
+        attackSound.src = hitTarget ? 
+            'sounds/staff_attack_hit.mp3' : // Sound for hitting target
+            'sounds/staff_attack_miss.mp3'; // Sound for missing
+        attackSound.volume = 0.3;
         
         // Play attack sound
         attackSound.play().catch(error => {
@@ -254,230 +280,43 @@ export class WeaponSystem {
         });
     }
     
-    animateStaffAttack(comboCount = 0) {
+    animateStaffAttack() {
         // Don't animate if staff doesn't exist
         if (!this.player.magicStaff) return;
         
         // Get original position and rotation
         const originalOrbPosition = this.player.magicStaff.orbOffset.clone();
         
-        // Different animations based on combo count
-        if (comboCount >= 3) {
-            // Big spin attack for 3+ combo
-            this.animateSpinAttack(originalOrbPosition);
-        } else if (comboCount === 2) {
-            // Side swipe for 2nd combo
-            this.animateSideSwipe(originalOrbPosition);
-        } else {
-            // Basic forward thrust for 1st hit
-            this.animateForwardThrust(originalOrbPosition);
-        }
-    }
-    
-    // Basic forward thrust animation
-    animateForwardThrust(originalOrbPosition) {
-        // Create a forward vector based on camera
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(this.player.camera.quaternion);
-        
-        // Move the orb forward slightly
-        this.player.magicStaff.orbOffset.copy(originalOrbPosition);
-        this.player.magicStaff.orbOffset.addScaledVector(forward, 0.3);
-        
-        // Increase staff glow
-        if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-            this.player.magicStaff.orbMesh.material.emissiveIntensity *= 2;
-        }
-        
-        // Return to original position after delay
-        setTimeout(() => {
-            // Reset position over time
-            const duration = 300; // 300ms
-            const startTime = performance.now();
+        // Forward thrust animation for the staff orb
+        const thrust = () => {
+            // Create a forward vector based on camera
+            const forward = new THREE.Vector3(0, 0, -1);
+            forward.applyQuaternion(this.player.camera.quaternion);
             
-            const resetAnimation = () => {
-                const now = performance.now();
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                
-                // Interpolate back to original position
-                this.player.magicStaff.orbOffset.lerpVectors(
-                    this.player.magicStaff.orbOffset, 
-                    originalOrbPosition, 
-                    progress
-                );
-                
-                // Reset glow
-                if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-                    const originalIntensity = this.player.magicStaff.isLightOn ? 6.0 : 1.0;
-                    this.player.magicStaff.orbMesh.material.emissiveIntensity = 
-                        originalIntensity * 2 * (1 - progress) + originalIntensity * progress;
-                }
-                
-                if (progress < 1) {
-                    requestAnimationFrame(resetAnimation);
-                } else {
-                    // Ensure we're exactly at the original position at the end
-                    this.player.magicStaff.orbOffset.copy(originalOrbPosition);
-                }
-            };
+            // Move the orb forward slightly
+            this.player.magicStaff.orbOffset.copy(originalOrbPosition);
+            this.player.magicStaff.orbOffset.addScaledVector(forward, 0.3);
             
-            resetAnimation();
-        }, 100);
-    }
-    
-    // Side swipe animation for 2nd combo hit
-    animateSideSwipe(originalOrbPosition) {
-        // Get camera directions
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(this.player.camera.quaternion);
-        
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyQuaternion(this.player.camera.quaternion);
-        
-        // Start position - slightly to the left
-        this.player.magicStaff.orbOffset.copy(originalOrbPosition);
-        this.player.magicStaff.orbOffset.addScaledVector(right, -0.3);
-        
-        // Increase staff glow with blue tint
-        if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-            this.player.magicStaff.orbMesh.material.emissiveIntensity *= 2.5;
-            this.player.magicStaff.orbMesh.material.emissive.set(0x66aaff);
-        }
-        
-        // Animate the swipe
-        const duration = 300; // 300ms
-        const startTime = performance.now();
-        
-        const swipeAnimation = () => {
-            const now = performance.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Move from left to right
-            const swipeOffset = originalOrbPosition.clone();
-            swipeOffset.addScaledVector(right, -0.3 + progress * 0.6); // -0.3 to +0.3
-            
-            // Add a slight forward push at the middle of the swing
-            const forwardPush = Math.sin(progress * Math.PI) * 0.2;
-            swipeOffset.addScaledVector(forward, forwardPush);
-            
-            // Update position
-            this.player.magicStaff.orbOffset.copy(swipeOffset);
-            
-            if (progress < 1) {
-                requestAnimationFrame(swipeAnimation);
-            } else {
-                // Return to original position after swipe
-                setTimeout(() => {
-                    const resetDuration = 200;
-                    const resetStart = performance.now();
-                    
-                    const resetAnimation = () => {
-                        const now = performance.now();
-                        const elapsed = now - resetStart;
-                        const progress = Math.min(elapsed / resetDuration, 1);
-                        
-                        // Interpolate back to original position
-                        this.player.magicStaff.orbOffset.lerpVectors(
-                            this.player.magicStaff.orbOffset,
-                            originalOrbPosition,
-                            progress
-                        );
-                        
-                        // Reset glow
-                        if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-                            const originalIntensity = this.player.magicStaff.isLightOn ? 6.0 : 1.0;
-                            this.player.magicStaff.orbMesh.material.emissiveIntensity = 
-                                originalIntensity * 2.5 * (1 - progress) + originalIntensity * progress;
-                                
-                            // Reset emissive color
-                            const originalColor = new THREE.Color(0x3366ff);
-                            const currentColor = this.player.magicStaff.orbMesh.material.emissive;
-                            currentColor.lerp(originalColor, progress);
-                        }
-                        
-                        if (progress < 1) {
-                            requestAnimationFrame(resetAnimation);
-                        } else {
-                            // Ensure we're exactly at the original position at the end
-                            this.player.magicStaff.orbOffset.copy(originalOrbPosition);
-                            
-                            // Reset emissive color completely
-                            if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-                                this.player.magicStaff.orbMesh.material.emissive.set(0x3366ff);
-                            }
-                        }
-                    };
-                    
-                    resetAnimation();
-                }, 50);
+            // Increase staff glow
+            if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
+                this.player.magicStaff.orbMesh.material.emissiveIntensity *= 2;
             }
-        };
-        
-        swipeAnimation();
-    }
-    
-    // Spin attack animation for 3+ combo
-    animateSpinAttack(originalOrbPosition) {
-        // Create a forward vector based on camera
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyQuaternion(this.player.camera.quaternion);
-        
-        const right = new THREE.Vector3(1, 0, 0);
-        right.applyQuaternion(this.player.camera.quaternion);
-        
-        // Super-charge the orb
-        if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-            this.player.magicStaff.orbMesh.material.emissiveIntensity *= 3;
-            this.player.magicStaff.orbMesh.material.emissive.set(0xff3300); // Orange-red
-        }
-        
-        // Start the spin animation
-        const spinDuration = 500; // 500ms
-        const startTime = performance.now();
-        const spinRadius = 0.5; // Radius of the spin circle
-        
-        const spinAnimation = () => {
-            const now = performance.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / spinDuration, 1);
             
-            // Calculate position on a circle
-            const angle = progress * Math.PI * 2; // Full 360 degree spin
-            const spinOffset = originalOrbPosition.clone();
-            
-            // Add circular motion
-            spinOffset.addScaledVector(right, Math.cos(angle) * spinRadius);
-            spinOffset.addScaledVector(forward, Math.sin(angle) * spinRadius * 0.5); // Elliptical path
-            
-            // Add some height variation
-            spinOffset.y += Math.sin(angle * 2) * 0.2;
-            
-            // Update position
-            this.player.magicStaff.orbOffset.copy(spinOffset);
-            
-            if (progress < 1) {
-                requestAnimationFrame(spinAnimation);
-            } else {
-                // Return to original position with a flourish
-                const finishDuration = 300;
-                const finishStart = performance.now();
+            // Return to original position after delay
+            setTimeout(() => {
+                // Reset position over time
+                const duration = 300; // 300ms
+                const startTime = performance.now();
                 
-                const finishAnimation = () => {
+                const resetAnimation = () => {
                     const now = performance.now();
-                    const elapsed = now - finishStart;
-                    const progress = Math.min(elapsed / finishDuration, 1);
+                    const elapsed = now - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
                     
-                    // Add a small bounce effect
-                    const bounce = Math.sin(progress * Math.PI) * 0.2;
-                    const finishOffset = originalOrbPosition.clone();
-                    finishOffset.addScaledVector(forward, bounce);
-                    
-                    // Update position
+                    // Interpolate back to original position
                     this.player.magicStaff.orbOffset.lerpVectors(
-                        this.player.magicStaff.orbOffset,
-                        finishOffset,
+                        this.player.magicStaff.orbOffset, 
+                        originalOrbPosition, 
                         progress
                     );
                     
@@ -485,32 +324,22 @@ export class WeaponSystem {
                     if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
                         const originalIntensity = this.player.magicStaff.isLightOn ? 6.0 : 1.0;
                         this.player.magicStaff.orbMesh.material.emissiveIntensity = 
-                            originalIntensity * 3 * (1 - progress) + originalIntensity * progress;
-                            
-                        // Reset emissive color
-                        const originalColor = new THREE.Color(0x3366ff);
-                        const currentColor = this.player.magicStaff.orbMesh.material.emissive;
-                        currentColor.lerp(originalColor, progress);
+                            originalIntensity * 2 * (1 - progress) + originalIntensity * progress;
                     }
                     
                     if (progress < 1) {
-                        requestAnimationFrame(finishAnimation);
+                        requestAnimationFrame(resetAnimation);
                     } else {
-                        // Final reset to original position
-                        setTimeout(() => {
-                            this.player.magicStaff.orbOffset.copy(originalOrbPosition);
-                            
-                            // Reset emissive color completely
-                            if (this.player.magicStaff.orbMesh && this.player.magicStaff.orbMesh.material) {
-                                this.player.magicStaff.orbMesh.material.emissive.set(0x3366ff);
-                            }
-                        }, 50);
+                        // Ensure we're exactly at the original position at the end
+                        this.player.magicStaff.orbOffset.copy(originalOrbPosition);
                     }
                 };
                 
-                finishAnimation();
-            }
+                resetAnimation();
+            }, 100);
         };
         
-        spinAnimation();
+        // Start the animation
+        thrust();
     }
+}
