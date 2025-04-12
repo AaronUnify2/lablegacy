@@ -12,8 +12,18 @@ export class Enemy {
             CHASE: 'chase',
             RETURN: 'return',
             IDLE: 'idle',
-            ATTACK: 'attack' // Add attack state
+            ATTACK: 'attack', // Add attack state
+            DAMAGED: 'damaged', // New state when taking damage
+            DEAD: 'dead' // New state for dead enemies
         };
+        
+        // Health properties
+        this.health = 100;
+        this.maxHealth = 100;
+        this.isInvulnerable = false;
+        this.invulnerabilityTime = 0.5; // Time in seconds enemy is invulnerable after taking damage
+        this.invulnerabilityTimer = 0;
+        this.damageTintTime = 0;
         
         // AI Configuration
         this.detectionRange = 8; // Distance at which enemy detects player
@@ -60,6 +70,9 @@ export class Enemy {
         // Add to scene
         this.scene.add(this.group);
         
+        // Create a health bar for the enemy
+        this.createHealthBar();
+        
         console.log("Enemy created at position:", this.position);
     }
     
@@ -85,6 +98,10 @@ export class Enemy {
         this.bodyMesh.castShadow = true;
         this.bodyMesh.receiveShadow = true;
         this.bodyMesh.position.y = 1.8 / 2; // Center vertically
+        
+        // Store original material color for damage flashing
+        this.originalBodyColor = bodyMaterial.color.clone();
+        this.originalEmissiveIntensity = bodyMaterial.emissiveIntensity;
         
         // Save body dimensions for collision detection
         this.bodyWidth = 1.0; // Diameter
@@ -135,9 +152,49 @@ export class Enemy {
         }
     }
     
+    createHealthBar() {
+        // Create a simple health bar that follows the enemy
+        const healthBarWidth = 1;
+        const healthBarHeight = 0.1;
+        
+        // Container for the health bar
+        this.healthBarGroup = new THREE.Group();
+        this.healthBarGroup.position.set(0, 2.2, 0); // Position above the enemy
+        this.group.add(this.healthBarGroup);
+        
+        // Health bar background
+        const backgroundGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+        const backgroundMaterial = new THREE.MeshBasicMaterial({
+            color: 0x333333,
+            transparent: true,
+            opacity: 0.6
+        });
+        
+        this.healthBarBackground = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+        this.healthBarGroup.add(this.healthBarBackground);
+        
+        // Health bar foreground (the actual health indicator)
+        const foregroundGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+        const foregroundMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        this.healthBarForeground = new THREE.Mesh(foregroundGeometry, foregroundMaterial);
+        this.healthBarForeground.position.z = 0.01; // Slightly in front of background
+        this.healthBarGroup.add(this.healthBarForeground);
+        
+        // Make health bar always face the camera
+        this.healthBarGroup.lookAt(0, 0, 0); // Will be updated in update method
+        
+        // Hide health bar initially, show when damaged
+        this.healthBarGroup.visible = false;
+    }
+    
     update(deltaTime, camera) {
         // Skip updates if enemy is inactive or deltaTime is invalid
-        if (this.state === 'dead' || !deltaTime || deltaTime > 1) {
+        if (this.state === this.states.DEAD || !deltaTime || deltaTime > 1) {
             return;
         }
         
@@ -150,10 +207,41 @@ export class Enemy {
             this.stateCooldown -= deltaTime;
         }
         
+        // Update invulnerability timer
+        if (this.invulnerabilityTimer > 0) {
+            this.invulnerabilityTimer -= deltaTime;
+            if (this.invulnerabilityTimer <= 0) {
+                this.isInvulnerable = false;
+                
+                // Reset damage tint if not in damaged state
+                if (this.state !== this.states.DAMAGED && this.bodyMesh && this.bodyMesh.material) {
+                    this.bodyMesh.material.color.copy(this.originalBodyColor);
+                    this.bodyMesh.material.emissiveIntensity = this.originalEmissiveIntensity;
+                }
+            }
+        }
+        
+        // Update damage tint time
+        if (this.damageTintTime > 0) {
+            this.damageTintTime -= deltaTime;
+            if (this.damageTintTime <= 0 && this.bodyMesh && this.bodyMesh.material) {
+                this.bodyMesh.material.color.copy(this.originalBodyColor);
+                this.bodyMesh.material.emissiveIntensity = this.originalEmissiveIntensity;
+                
+                // If in damaged state, return to previous state
+                if (this.state === this.states.DAMAGED) {
+                    this.changeState(this.states.CHASE);
+                }
+            }
+        }
+        
         // Decrease attack cooldown
         if (this.attackCooldown > 0) {
             this.attackCooldown -= deltaTime;
         }
+        
+        // Update health bar
+        this.updateHealthBar(camera);
         
         // Check player proximity to determine state transitions
         this.checkPlayerProximity();
@@ -179,10 +267,245 @@ export class Enemy {
             case this.states.ATTACK:
                 this.executeAttackBehavior(deltaTime);
                 break;
+                
+            case this.states.DAMAGED:
+                this.executeDamagedBehavior(deltaTime);
+                break;
         }
         
         // Rotate the body slightly to show it's active even if not moving
         this.bodyMesh.rotation.y += deltaTime * 1.0;
+    }
+    
+    updateHealthBar(camera) {
+        // Make health bar always face the camera
+        if (camera && this.healthBarGroup) {
+            this.healthBarGroup.lookAt(camera.position);
+        }
+        
+        // Update health bar width based on current health percentage
+        if (this.healthBarForeground) {
+            const healthPercent = this.health / this.maxHealth;
+            this.healthBarForeground.scale.x = Math.max(0.001, healthPercent);
+            
+            // Center the health bar
+            this.healthBarForeground.position.x = (healthPercent - 1) * 0.5;
+            
+            // Change color based on health percentage
+            if (this.healthBarForeground.material) {
+                if (healthPercent < 0.3) {
+                    this.healthBarForeground.material.color.set(0xff0000); // Red when low health
+                } else if (healthPercent < 0.6) {
+                    this.healthBarForeground.material.color.set(0xffaa00); // Orange when medium health
+                } else {
+                    this.healthBarForeground.material.color.set(0xff3333); // Default red color
+                }
+            }
+            
+            // Show health bar for a few seconds when damaged or when health is low
+            const lowHealth = this.health < this.maxHealth * 0.5;
+            if (this.damageTintTime > 0 || lowHealth) {
+                this.healthBarGroup.visible = true;
+            } else {
+                // Hide health bar when not needed
+                this.healthBarGroup.visible = false;
+            }
+        }
+    }
+    
+    // New method to handle taking damage
+    takeDamage(amount) {
+        // Check if enemy can take damage
+        if (this.isInvulnerable || this.state === this.states.DEAD) {
+            return false;
+        }
+        
+        // Apply damage
+        this.health = Math.max(0, this.health - amount);
+        
+        // Set invulnerability timer
+        this.isInvulnerable = true;
+        this.invulnerabilityTimer = this.invulnerabilityTime;
+        
+        // Visual feedback - damage tint
+        this.showDamageTint();
+        
+        // Play damage sound
+        this.playDamageSound();
+        
+        // Show health bar
+        if (this.healthBarGroup) {
+            this.healthBarGroup.visible = true;
+        }
+        
+        // Check if enemy is dead
+        if (this.health <= 0) {
+            this.die();
+            return true;
+        }
+        
+        // Enter damaged state temporarily if not already attacking
+        if (this.state !== this.states.ATTACK) {
+            this.changeState(this.states.DAMAGED);
+        }
+        
+        return true;
+    }
+    
+    // Show damage tint effect
+    showDamageTint() {
+        if (this.bodyMesh && this.bodyMesh.material) {
+            // Turn body bright white-red
+            this.bodyMesh.material.color.set(0xffffff);
+            this.bodyMesh.material.emissiveIntensity = 1.0;
+            
+            // Reset tint after a short delay
+            this.damageTintTime = 0.3; // 300ms
+        }
+    }
+    
+    // Play damage sound effect
+    playDamageSound() {
+        try {
+            const damageSound = new Audio('sounds/enemy_damage.mp3');
+            damageSound.volume = 0.3;
+            damageSound.play().catch(err => console.log('Could not play damage sound', err));
+        } catch (e) {
+            console.log('Error playing damage sound', e);
+        }
+    }
+    
+    // Handle death
+    die() {
+        console.log("Enemy killed!");
+        
+        // Change state to dead
+        this.state = this.states.DEAD;
+        
+        // Make body fall over
+        this.playDeathAnimation();
+        
+        // Disable collision
+        this.collisionEnabled = false;
+        
+        // Hide health bar
+        if (this.healthBarGroup) {
+            this.healthBarGroup.visible = false;
+        }
+        
+        // Remove from scene after a delay
+        setTimeout(() => {
+            if (this.scene && this.group) {
+                this.scene.remove(this.group);
+            }
+        }, 3000); // Remove after 3 seconds
+    }
+    
+    // Play death animation
+    playDeathAnimation() {
+        if (!this.bodyMesh) return;
+        
+        // Change material to indicate death
+        if (this.bodyMesh.material) {
+            this.bodyMesh.material.color.set(0x333333); // Gray color
+            this.bodyMesh.material.emissive.set(0x000000); // No glow
+            this.bodyMesh.material.emissiveIntensity = 0;
+            this.bodyMesh.material.transparent = true;
+            this.bodyMesh.material.opacity = 0.8;
+        }
+        
+        // Make eyes dim
+        if (this.leftEye && this.leftEye.material) {
+            this.leftEye.material.color.set(0x333333);
+        }
+        
+        if (this.rightEye && this.rightEye.material) {
+            this.rightEye.material.color.set(0x333333);
+        }
+        
+        // Topple over animation
+        const fallDirection = new THREE.Vector3(
+            Math.random() - 0.5,
+            0,
+            Math.random() - 0.5
+        ).normalize();
+        
+        // Create animation
+        const startRotation = this.group.quaternion.clone();
+        const fallRotation = new THREE.Quaternion();
+        const fallAxis = new THREE.Vector3(-fallDirection.z, 0, fallDirection.x).normalize();
+        fallRotation.setFromAxisAngle(fallAxis, Math.PI / 2); // 90 degrees
+        
+        // Animate falling and fading
+        const duration = 1000; // 1 second
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Interpolate rotation
+            this.group.quaternion.slerpQuaternions(
+                startRotation,
+                fallRotation,
+                progress
+            );
+            
+            // Sink into the ground slightly
+            this.group.position.y = Math.max(0, this.lastValidPosition.y - progress * 0.5);
+            
+            // Fade out slightly
+            if (this.bodyMesh && this.bodyMesh.material) {
+                this.bodyMesh.material.opacity = 0.8 - progress * 0.3;
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        };
+        
+        animate();
+        
+        // Play death sound
+        this.playDeathSound();
+    }
+    
+    // Play death sound
+    playDeathSound() {
+        try {
+            const deathSound = new Audio('sounds/enemy_death.mp3');
+            deathSound.volume = 0.4;
+            deathSound.play().catch(err => console.log('Could not play death sound', err));
+        } catch (e) {
+            console.log('Error playing death sound', e);
+        }
+    }
+    
+    // New behavior for damaged state
+    executeDamagedBehavior(deltaTime) {
+        // Briefly stop and face the player
+        if (this.player && this.player.camera) {
+            // Get direction to player
+            const directionToPlayer = new THREE.Vector3()
+                .subVectors(this.player.camera.position, this.group.position)
+                .normalize();
+                
+            // Make the enemy face the player
+            directionToPlayer.y = 0; // Keep rotation on horizontal plane
+            if (directionToPlayer.lengthSq() > 0) {
+                const lookTarget = new THREE.Vector3()
+                    .addVectors(this.group.position, directionToPlayer);
+                    
+                // Use faster turning when damaged
+                this.smoothLookAt(lookTarget, this.turnSpeed.chase * 2);
+            }
+        }
+        
+        // Return to chase state after a short delay or when damage tint ends
+        if (this.stateTime > 0.5) {
+            this.changeState(this.states.CHASE);
+        }
     }
     
     // State transition handler - checks proximity to player and changes state
@@ -212,6 +535,7 @@ export class Enemy {
             case this.states.PATROL:
             case this.states.IDLE:
             case this.states.RETURN:
+            case this.states.DAMAGED: // Can detect player while damaged
                 // If player is within detection range, transition to chase
                 if (distanceToPlayer < this.detectionRange) {
                     this.changeState(this.states.CHASE);
@@ -468,216 +792,3 @@ export class Enemy {
             const scale = 1 + progress;
             attackMesh.scale.set(scale, 1, scale);
             attackMesh.material.opacity = 0.6 * (1 - progress);
-            
-            // Move forward slightly
-            const newPosition = this.group.position.clone()
-                .addScaledVector(directionToPlayer, 1.0 + progress * 0.5);
-            newPosition.y = attackPosition.y;
-            attackMesh.position.copy(newPosition);
-            
-            if (progress < 1) {
-                requestAnimationFrame(animateAttack);
-            } else {
-                // Remove the attack mesh
-                this.scene.remove(attackMesh);
-                attackMesh.geometry.dispose();
-                attackMesh.material.dispose();
-            }
-        };
-        
-        animateAttack();
-        
-        // Try to play attack sound
-        this.playAttackSound();
-    }
-    
-    // Play an attack sound
-    playAttackSound() {
-        try {
-            const attackSound = new Audio('sounds/enemy_attack.mp3');
-            attackSound.volume = 0.3;
-            attackSound.play().catch(err => console.log('Could not play attack sound', err));
-        } catch (e) {
-            console.log('Error playing attack sound', e);
-        }
-    }
-    
-    // Move with collision prevention
-    moveWithCollisionCheck(newPosition) {
-        if (!this.collisionEnabled || !this.collisionManager) {
-            // If collision is disabled, just move
-            this.group.position.copy(newPosition);
-            return true;
-        }
-        
-        // Check for environmental collisions
-        const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
-            
-        // Only consider environmental collisions, not other enemies
-        const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
-            
-        if (isEnvironmentCollision) {
-            // Skip moving to this position
-            if (Math.random() < 0.05) { // Log occasionally to avoid spam
-                console.log("Enemy collision detected, can't move to new position");
-            }
-            return false;
-        }
-            
-        // Also check for ground
-        const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
-        const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
-            
-        if (!groundHit) {
-            // No ground beneath, skip moving
-            if (Math.random() < 0.05) {
-                console.log("No ground beneath enemy, can't move to new position");
-            }
-            return false;
-        }
-            
-        // No collision, update position
-        this.group.position.copy(newPosition);
-        return true;
-    }
-    
-    // Smoothly rotate to face a target
-    smoothLookAt(target, speed) {
-        // Create a quaternion for current rotation
-        const currentRotation = new THREE.Quaternion().copy(this.group.quaternion);
-        
-        // Create a quaternion for target rotation
-        const targetRotation = new THREE.Quaternion();
-        
-        // Create a temporary object to get the target rotation
-        const tempObj = new THREE.Object3D();
-        tempObj.position.copy(this.group.position);
-        tempObj.lookAt(target);
-        targetRotation.copy(tempObj.quaternion);
-        
-        // Smoothly interpolate between current and target rotation
-        this.group.quaternion.slerp(targetRotation, speed);
-        
-        // Normalize to prevent accumulation errors
-        this.group.quaternion.normalize();
-    }
-    
-    // Update eye appearance based on state and player distance
-    updateEyeAppearance(distanceToPlayer) {
-        // Base color for eyes
-        let eyeColor;
-        let intensity = 0;
-        
-        // Set color based on state
-        switch(this.state) {
-            case this.states.CHASE:
-                eyeColor = 0xff0000; // Red when chasing
-                intensity = 1.0;
-                break;
-                
-            case this.states.PATROL:
-                eyeColor = 0xffff00; // Yellow during patrol
-                intensity = 0.7;
-                break;
-                
-            case this.states.RETURN:
-                eyeColor = 0xff8800; // Orange when returning
-                intensity = 0.8;
-                break;
-                
-            case this.states.IDLE:
-                eyeColor = 0x88ff88; // Green when idle
-                intensity = 0.5;
-                break;
-                
-            case this.states.ATTACK:
-                eyeColor = 0xff0000; // Bright red when attacking
-                intensity = 1.5;
-                break;
-        }
-        
-        // If player is close, increase intensity
-        if (distanceToPlayer < this.detectionRange * 1.5) {
-            intensity = Math.min(1.0, intensity + (1.0 - distanceToPlayer / this.detectionRange) * 0.5);
-        }
-        
-        // Update eye materials
-        if (this.leftEye && this.leftEye.material) {
-            this.leftEye.material.color.set(eyeColor);
-            this.leftEye.material.emissiveIntensity = intensity;
-        }
-        
-        if (this.rightEye && this.rightEye.material) {
-            this.rightEye.material.color.set(eyeColor);
-            this.rightEye.material.emissiveIntensity = intensity;
-        }
-    }
-    
-    // Play effect when detecting player
-    playDetectionEffect() {
-        // Make eyes flash brightly
-        if (this.leftEye && this.leftEye.material) {
-            const originalColor = this.leftEye.material.color.clone();
-            this.leftEye.material.color.set(0xff0000);
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.leftEye && this.leftEye.material) {
-                    this.leftEye.material.color.copy(originalColor);
-                }
-            }, 200);
-        }
-        
-        if (this.rightEye && this.rightEye.material) {
-            const originalColor = this.rightEye.material.color.clone();
-            this.rightEye.material.color.set(0xff0000);
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.rightEye && this.rightEye.material) {
-                    this.rightEye.material.color.copy(originalColor);
-                }
-            }, 200);
-        }
-        
-        // Play alert sound (if available)
-        if (this.scene && typeof Audio !== 'undefined') {
-            try {
-                const alertSound = new Audio('sounds/enemy_alert.mp3');
-                alertSound.volume = 0.3;
-                alertSound.play().catch(err => console.log('Could not play alert sound', err));
-            } catch (e) {
-                console.log('Error playing sound', e);
-            }
-        }
-    }
-    
-    // Reset position if stuck or in an invalid location
-    resetToLastValidPosition() {
-        if (this.lastValidPosition) {
-            this.group.position.copy(this.lastValidPosition);
-            console.log("Enemy reset to last valid position");
-        }
-    }
-    
-    // Change patrol radius or speed
-    setPatrolParameters(radius, speed) {
-        if (radius !== undefined) {
-            this.patrolRadius = radius;
-        }
-        
-        if (speed !== undefined) {
-            this.moveSpeed.patrol = speed;
-            if (this.state !== this.states.CHASE) {
-                this.patrolSpeed = speed;
-            }
-        }
-    }
-    
-    // Set a new patrol center
-    setPatrolCenter(newCenter) {
-        if (newCenter) {
-            this.patrolCenter.copy(newCenter);
-        }
-    }
-}
