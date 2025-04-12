@@ -128,12 +128,18 @@ class Game {
             console.error('Error initializing game:', error);
         }
     }
+
+
+
+
+
+
     
     createHealthDisplay() {
         // Create a health display container
         this.healthDisplay = document.createElement('div');
-        this.healthDisplay.id = 'health-display';
-        this.healthDisplay.style.position = 'absolute';
+    this.healthDisplay.id = 'health-display';
+      this.healthDisplay.style.position = 'absolute';
         this.healthDisplay.style.bottom = '20px';
         this.healthDisplay.style.left = '20px';
         this.healthDisplay.style.display = 'flex';
@@ -141,8 +147,9 @@ class Game {
         this.healthDisplay.style.zIndex = '10';
         
         // Create the health bar background
-        this.healthBar = document.createElement('div');
-        this.healthBar.style.width = '200px';
+  this.healthBar = document.createElement('div');
+    this.healthBar.id = 'health-bar';
+     this.healthBar.style.width = '200px';
         this.healthBar.style.height = '15px';
         this.healthBar.style.background = 'rgba(0, 0, 0, 0.5)';
         this.healthBar.style.borderRadius = '3px';
@@ -151,6 +158,7 @@ class Game {
         
         // Create the health bar fill
         this.healthBarFill = document.createElement('div');
+    this.healthBarFill.id = 'health-bar-fill';
         this.healthBarFill.style.width = '100%';
         this.healthBarFill.style.height = '100%';
         this.healthBarFill.style.background = 'linear-gradient(to right, #ff3333, #ff6666)';
@@ -161,7 +169,9 @@ class Game {
         
         // Create health text
         this.healthText = document.createElement('div');
-        this.healthText.style.marginLeft = '10px';
+    this.healthText.id = 'health-text';
+    this.healthText.textContent = '100/100';
+     this.healthText.style.marginLeft = '10px';
         this.healthText.style.color = '#fff';
         this.healthText.style.textShadow = '0 0 3px rgba(0, 0, 0, 0.8)';
         this.healthText.style.fontFamily = 'Cinzel, serif';
