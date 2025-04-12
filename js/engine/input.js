@@ -22,7 +22,9 @@ export class InputManager {
             angle: 0,
             distance: 0,
             maxDistance: 40, // Maximum distance the joystick can move
-            movementVector: new THREE.Vector2(0, 0)
+            movementVector: new THREE.Vector2(0, 0),
+            elementId: null, // Store the ID of the element that started the joystick movement
+            touchId: null // Store the touch identifier for multi-touch support
         };
         
         // Physics properties
@@ -243,13 +245,22 @@ export class InputManager {
         if (!joystickBase || !joystickHandle) return;
         
         // Function to handle joystick movement
-        const handleJoystickMove = (clientX, clientY) => {
+        const handleJoystickMove = (clientX, clientY, touchId = null) => {
             if (!this.joystick.active) return;
+            
+            // Check if this is the same touch that started the joystick
+            if (touchId !== null && this.joystick.touchId !== null && touchId !== this.joystick.touchId) {
+                return; // Ignore if it's not the same touch
+            }
             
             // Get joystick base position and size
             const rect = joystickBase.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
+            
+            // Store current position for later use
+            this.joystick.currentX = clientX;
+            this.joystick.currentY = clientY;
             
             // Calculate the distance from center
             const deltaX = clientX - centerX;
@@ -283,50 +294,93 @@ export class InputManager {
         };
         
         // Function to reset joystick
-        const resetJoystick = () => {
+        const resetJoystick = (touchId = null) => {
+            // Only reset if this is the same touch that started the joystick
+            if (touchId !== null && this.joystick.touchId !== null && touchId !== this.joystick.touchId) {
+                return; // Don't reset if it's not the same touch
+            }
+            
             this.joystick.active = false;
+            this.joystick.touchId = null;
+            this.joystick.elementId = null;
             joystickHandle.style.transform = 'translate(0px, 0px)';
             this.joystick.movementVector.set(0, 0);
             this.resetMovement();
         };
         
-        // Touch Events
+        // Touch Events for Joystick
         joystickBase.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            this.joystick.active = true;
             const touch = e.touches[0];
-            handleJoystickMove(touch.clientX, touch.clientY);
+            this.joystick.active = true;
+            this.joystick.touchId = touch.identifier;
+            this.joystick.elementId = 'joystick-base';
+            this.joystick.startX = touch.clientX;
+            this.joystick.startY = touch.clientY;
+            handleJoystickMove(touch.clientX, touch.clientY, touch.identifier);
         });
         
+        // Touch move for joystick - process only the joystick touch
         document.addEventListener('touchmove', (e) => {
             if (!this.joystick.active) return;
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleJoystickMove(touch.clientX, touch.clientY);
+            
+            // Find the touch with the matching identifier
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+                if (this.joystick.touchId === touch.identifier) {
+                    e.preventDefault(); // Only prevent default for the joystick touch
+                    handleJoystickMove(touch.clientX, touch.clientY, touch.identifier);
+                    break;
+                }
+            }
+        }, { passive: false });
+        
+        // Touch end for joystick - process only the joystick touch
+        document.addEventListener('touchend', (e) => {
+            if (!this.joystick.active) return;
+            
+            // Check if the ended touch is the joystick touch
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (this.joystick.touchId === touch.identifier) {
+                    resetJoystick(touch.identifier);
+                    break;
+                }
+            }
         });
         
-        document.addEventListener('touchend', () => {
-            resetJoystick();
+        document.addEventListener('touchcancel', (e) => {
+            if (!this.joystick.active) return;
+            
+            // Check if the cancelled touch is the joystick touch
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                if (this.joystick.touchId === touch.identifier) {
+                    resetJoystick(touch.identifier);
+                    break;
+                }
+            }
         });
         
-        document.addEventListener('touchcancel', () => {
-            resetJoystick();
-        });
-        
-        // Mouse Events (for testing on desktop)
+        // Mouse Events for joystick (for testing on desktop)
         joystickBase.addEventListener('mousedown', (e) => {
             e.preventDefault();
             this.joystick.active = true;
+            this.joystick.elementId = 'joystick-base';
+            this.joystick.startX = e.clientX;
+            this.joystick.startY = e.clientY;
             handleJoystickMove(e.clientX, e.clientY);
         });
         
         document.addEventListener('mousemove', (e) => {
-            if (!this.joystick.active) return;
+            if (!this.joystick.active || this.joystick.elementId !== 'joystick-base') return;
             handleJoystickMove(e.clientX, e.clientY);
         });
         
-        document.addEventListener('mouseup', () => {
-            resetJoystick();
+        document.addEventListener('mouseup', (e) => {
+            if (this.joystick.active && this.joystick.elementId === 'joystick-base') {
+                resetJoystick();
+            }
         });
     }
     
@@ -461,222 +515,6 @@ export class InputManager {
                 () => this.jump = true, 
                 () => this.jump = false
             );
-        }
-        
-        // Attack button
-        this.setupButtonTouch('attack', 
-            () => {
-                // Dispatch a custom event that the game can listen for
-                const event = new CustomEvent('player-attack');
-                document.dispatchEvent(event);
-            }, 
-            null,
-            false,
-            true // Single press (don't repeat)
-        );
-    }
-    
-    setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
-        const button = this.buttons[buttonId];
-        if (!button) return;
-        
-        let pressInterval;
-        let buttonPressed = false; // Track if button has been pressed (for single press)
-        
-        // Handle touch/mouse events
-        const startPress = (e) => {
-            if (e) e.preventDefault(); // Prevent default behavior
-            
-            // For single press buttons, only trigger once per press
-            if (singlePress && buttonPressed) return;
-            
-            button.classList.add('active');
-            
-            if (pressCallback) {
-                pressCallback();
-                
-                // For single press, mark as pressed after callback
-                if (singlePress) {
-                    buttonPressed = true;
-                }
-            }
-            
-            if (continuousPress) {
-                // For continuous actions like camera rotation, run the callback repeatedly
-                pressInterval = setInterval(() => {
-                    if (pressCallback) pressCallback();
-                }, 16); // roughly 60fps
-            }
-        };
-        
-        const endPress = (e) => {
-            if (e) e.preventDefault(); // Prevent default behavior
-            button.classList.remove('active');
-            
-            // Reset button pressed state
-            if (singlePress) {
-                buttonPressed = false;
-            }
-            
-            if (releaseCallback) releaseCallback();
-            
-            if (pressInterval) {
-                clearInterval(pressInterval);
-                pressInterval = null;
-            }
-        };
-        
-        // Mouse events
-        button.addEventListener('mousedown', startPress);
-        button.addEventListener('mouseup', endPress);
-        button.addEventListener('mouseleave', endPress);
-        
-        // Touch events
-        button.addEventListener('touchstart', startPress);
-        button.addEventListener('touchend', endPress);
-        button.addEventListener('touchcancel', endPress);
-    }
-    
-    rotateCamera(deltaX, deltaY) {
-        // Create a temporary quaternion to handle the rotation
-        const quaternion = new THREE.Quaternion();
-        
-        // Rotate around the world up vector (Y-axis) for left/right rotations
-        if (deltaX !== 0) {
-            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaX);
-            this.camera.quaternion.premultiply(quaternion);
-        }
-        
-        // Get the camera's right vector for up/down rotations
-        if (deltaY !== 0) {
-            const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
-            
-            // Rotate around the camera's right vector for up/down rotations
-            quaternion.setFromAxisAngle(rightVector, deltaY);
-            this.camera.quaternion.premultiply(quaternion);
-            
-            // Constrain up/down rotation to prevent flipping
-            // This is a simple way to limit vertical rotation
-            const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-            const verticalAngle = Math.asin(lookDirection.y);
-            
-            // If we're looking too far up or down, adjust the quaternion
-            const maxAngle = Math.PI * 0.45; // About 80 degrees
-            if (Math.abs(verticalAngle) > maxAngle) {
-                // Reset the vertical component by rotating back
-                const correctionAngle = verticalAngle > 0 ? 
-                    verticalAngle - maxAngle : 
-                    verticalAngle + maxAngle;
-                    
-                quaternion.setFromAxisAngle(rightVector, -correctionAngle);
-                this.camera.quaternion.premultiply(quaternion);
-            }
-        }
-        
-        // Normalize the quaternion to prevent accumulation errors
-        this.camera.quaternion.normalize();
-    }
-    
-    update(deltaTime, collisionManager) {
-        // Store the previous position for collision resolution
-        const previousPosition = this.camera.position.clone();
-        
-        // Apply gravity to velocity with a limit to prevent excessive speeds when falling
-        this.velocity.y = Math.max(this.velocity.y - this.gravityForce * deltaTime, -25); // Cap falling speed
-        
-        // Get direction vectors from camera orientation (normalized)
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
-        forward.y = 0; // Keep movement horizontal on XZ plane
-        forward.normalize(); // Re-normalize after zeroing Y component
-        
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion).normalize();
-        right.y = 0; // Keep movement horizontal
-        right.normalize(); // Re-normalize
-        
-        // Calculate base movement speed with delta time
-        const speedPerFrame = this.moveSpeed * deltaTime;
-        
-        // Calculate horizontal movement vector based on input
-        const movementVector = new THREE.Vector3(0, 0, 0);
-        
-        if (this.joystick.active && this.joystick.movementVector.lengthSq() > 0) {
-            // Use analog joystick input for smoother control
-            // The Y axis of the joystick is inverted (up is negative in screen coordinates)
-            movementVector.add(forward.clone().multiplyScalar(-this.joystick.movementVector.y));
-            movementVector.add(right.clone().multiplyScalar(this.joystick.movementVector.x));
-            
-            // Apply movement proportional to joystick displacement
-            const magnitude = Math.min(1, this.joystick.movementVector.length());
-            movementVector.normalize().multiplyScalar(speedPerFrame * magnitude);
-        } else {
-            // Fallback to keyboard controls
-            if (this.moveForward) {
-                movementVector.add(forward);
-            }
-            if (this.moveBackward) {
-                movementVector.add(forward.clone().multiplyScalar(-1));
-            }
-            if (this.moveRight) {
-                movementVector.add(right);
-            }
-            if (this.moveLeft) {
-                movementVector.add(right.clone().multiplyScalar(-1));
-            }
-            
-            // Normalize the horizontal movement vector if it's not zero
-            if (movementVector.lengthSq() > 0) {
-                movementVector.normalize();
-                movementVector.multiplyScalar(speedPerFrame);
-            }
-        }
-        
-        // Apply horizontal movement to velocity with some smoothing
-        this.velocity.x = movementVector.x;
-        this.velocity.z = movementVector.z;
-        
-        // Handle jumping
-        this.jumpCooldown -= deltaTime;
-        
-        // Initialize ground check flag
-        let wasGroundedBefore = this.isGrounded;
-        this.isGrounded = false;
-        
-        // Perform multiple ground checks for more reliable detection
-        const groundCheckRadius = 0.45; // Slightly smaller than player radius for better fit
-        
-        // Check multiple points around the player's feet to ensure we don't miss the ground
-        const groundCheckPoints = [
-            // Center point
-            new THREE.Vector3(
-                this.camera.position.x,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z
-            ),
-            // Forward point
-            new THREE.Vector3(
-                this.camera.position.x + forward.x * groundCheckRadius * 0.8,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z + forward.z * groundCheckRadius * 0.8
-            ),
-            // Backward point
-            new THREE.Vector3(
-                this.camera.position.x - forward.x * groundCheckRadius * 0.8,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z - forward.z * groundCheckRadius * 0.8
-            ),
-            // Right point
-            new THREE.Vector3(
-                this.camera.position.x + right.x * groundCheckRadius * 0.8,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z + right.z * groundCheckRadius * 0.8
-            ),
-            // Left point
-            new THREE.Vector3(
-                this.camera.position.x - right.x * groundCheckRadius * 0.8,
-                this.camera.position.y - this.playerHeight / 2 - 0.1,
-                this.camera.position.z - right.z * groundCheckRadius * 0.8
-            )
-        ];
         
         // Check all points for ground contact
         for (const checkPos of groundCheckPoints) {
@@ -849,5 +687,299 @@ export class InputManager {
             // No collision manager, simply apply position
             this.camera.position.copy(newPosition);
         }
+    };
+        }
+        
+        // Attack button
+        this.setupButtonTouch('attack', 
+            () => {
+                // Dispatch a custom event that the game can listen for
+                const event = new CustomEvent('player-attack');
+                document.dispatchEvent(event);
+            }, 
+            null,
+            false,
+            true // Single press (don't repeat)
+        );
     }
-}
+    
+    setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
+        const button = this.buttons[buttonId];
+        if (!button) return;
+        
+        let pressInterval;
+        let buttonPressed = false; // Track if button has been pressed (for single press)
+        
+        // Handle touch/mouse events
+        const startPress = (e) => {
+            if (e) e.preventDefault(); // Prevent default behavior
+            
+            // For single press buttons, only trigger once per press
+            if (singlePress && buttonPressed) return;
+            
+            button.classList.add('active');
+            
+            if (pressCallback) {
+                pressCallback();
+                
+                // For single press, mark as pressed after callback
+                if (singlePress) {
+                    buttonPressed = true;
+                }
+            }
+            
+            if (continuousPress) {
+                // For continuous actions like camera rotation, run the callback repeatedly
+                pressInterval = setInterval(() => {
+                    if (pressCallback) pressCallback();
+                }, 16); // roughly 60fps
+            }
+        };
+        
+        const endPress = (e) => {
+            if (e) e.preventDefault(); // Prevent default behavior
+            button.classList.remove('active');
+            
+            // Reset button pressed state
+            if (singlePress) {
+                buttonPressed = false;
+            }
+            
+            if (releaseCallback) releaseCallback();
+            
+            if (pressInterval) {
+                clearInterval(pressInterval);
+                pressInterval = null;
+            }
+        };
+        
+        // Touch events with identifier tracking
+        button.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            // Store the button ID and touch ID for tracking
+            if (e.touches.length > 0) {
+                const touch = e.touches[0];
+                if (buttonId.startsWith('camera')) {
+                    // For camera buttons, track which touch is controlling them
+                    button.dataset.touchId = touch.identifier;
+                }
+            }
+            startPress(e);
+        });
+        
+        button.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            // Only end the press if this is the same touch that started it
+            if (buttonId.startsWith('camera')) {
+                const touchId = button.dataset.touchId;
+                let found = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier.toString() === touchId) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found) {
+                    delete button.dataset.touchId;
+                    endPress(e);
+                }
+            } else {
+                endPress(e);
+            }
+        });
+        
+        button.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            // Similar to touchend, only end if it's the same touch
+            if (buttonId.startsWith('camera')) {
+                const touchId = button.dataset.touchId;
+                let found = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier.toString() === touchId) {
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (found) {
+                    delete button.dataset.touchId;
+                    endPress(e);
+                }
+            } else {
+                endPress(e);
+            }
+        });
+        
+        // Mouse events
+        button.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            // Store the button ID
+            if (buttonId.startsWith('camera')) {
+                button.dataset.mouseActive = 'true';
+            }
+            startPress(e);
+        });
+        
+        button.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            if (buttonId.startsWith('camera') && button.dataset.mouseActive === 'true') {
+                delete button.dataset.mouseActive;
+                endPress(e);
+            } else if (!buttonId.startsWith('camera')) {
+                endPress(e);
+            }
+        });
+        
+        button.addEventListener('mouseleave', (e) => {
+            e.preventDefault();
+            if (buttonId.startsWith('camera') && button.dataset.mouseActive === 'true') {
+                delete button.dataset.mouseActive;
+                endPress(e);
+            } else if (!buttonId.startsWith('camera')) {
+                endPress(e);
+            }
+        });
+    }
+    
+    rotateCamera(deltaX, deltaY) {
+        // Create a temporary quaternion to handle the rotation
+        const quaternion = new THREE.Quaternion();
+        
+        // Rotate around the world up vector (Y-axis) for left/right rotations
+        if (deltaX !== 0) {
+            quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaX);
+            this.camera.quaternion.premultiply(quaternion);
+        }
+        
+        // Get the camera's right vector for up/down rotations
+        if (deltaY !== 0) {
+            const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion);
+            
+            // Rotate around the camera's right vector for up/down rotations
+            quaternion.setFromAxisAngle(rightVector, deltaY);
+            this.camera.quaternion.premultiply(quaternion);
+            
+            // Constrain up/down rotation to prevent flipping
+            // This is a simple way to limit vertical rotation
+            const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+            const verticalAngle = Math.asin(lookDirection.y);
+            
+            // If we're looking too far up or down, adjust the quaternion
+            const maxAngle = Math.PI * 0.45; // About 80 degrees
+            if (Math.abs(verticalAngle) > maxAngle) {
+                // Reset the vertical component by rotating back
+                const correctionAngle = verticalAngle > 0 ? 
+                    verticalAngle - maxAngle : 
+                    verticalAngle + maxAngle;
+                    
+                quaternion.setFromAxisAngle(rightVector, -correctionAngle);
+                this.camera.quaternion.premultiply(quaternion);
+            }
+        }
+        
+        // Normalize the quaternion to prevent accumulation errors
+        this.camera.quaternion.normalize();
+    }
+    
+    update(deltaTime, collisionManager) {
+        // Store the previous position for collision resolution
+        const previousPosition = this.camera.position.clone();
+        
+        // Apply gravity to velocity with a limit to prevent excessive speeds when falling
+        this.velocity.y = Math.max(this.velocity.y - this.gravityForce * deltaTime, -25); // Cap falling speed
+        
+        // Get direction vectors from camera orientation (normalized)
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
+        forward.y = 0; // Keep movement horizontal on XZ plane
+        forward.normalize(); // Re-normalize after zeroing Y component
+        
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.camera.quaternion).normalize();
+        right.y = 0; // Keep movement horizontal
+        right.normalize(); // Re-normalize
+        
+        // Calculate base movement speed with delta time
+        const speedPerFrame = this.moveSpeed * deltaTime;
+        
+        // Calculate horizontal movement vector based on input
+        const movementVector = new THREE.Vector3(0, 0, 0);
+        
+        if (this.joystick.active && this.joystick.movementVector.lengthSq() > 0) {
+            // Use analog joystick input for smoother control
+            // The Y axis of the joystick is inverted (up is negative in screen coordinates)
+            movementVector.add(forward.clone().multiplyScalar(-this.joystick.movementVector.y));
+            movementVector.add(right.clone().multiplyScalar(this.joystick.movementVector.x));
+            
+            // Apply movement proportional to joystick displacement
+            const magnitude = Math.min(1, this.joystick.movementVector.length());
+            movementVector.normalize().multiplyScalar(speedPerFrame * magnitude);
+        } else {
+            // Fallback to keyboard controls
+            if (this.moveForward) {
+                movementVector.add(forward);
+            }
+            if (this.moveBackward) {
+                movementVector.add(forward.clone().multiplyScalar(-1));
+            }
+            if (this.moveRight) {
+                movementVector.add(right);
+            }
+            if (this.moveLeft) {
+                movementVector.add(right.clone().multiplyScalar(-1));
+            }
+            
+            // Normalize the horizontal movement vector if it's not zero
+            if (movementVector.lengthSq() > 0) {
+                movementVector.normalize();
+                movementVector.multiplyScalar(speedPerFrame);
+            }
+        }
+        
+        // Apply horizontal movement to velocity with some smoothing
+        this.velocity.x = movementVector.x;
+        this.velocity.z = movementVector.z;
+        
+        // Handle jumping
+        this.jumpCooldown -= deltaTime;
+        
+        // Initialize ground check flag
+        let wasGroundedBefore = this.isGrounded;
+        this.isGrounded = false;
+        
+        // Perform multiple ground checks for more reliable detection
+        const groundCheckRadius = 0.45; // Slightly smaller than player radius for better fit
+        
+        // Check multiple points around the player's feet to ensure we don't miss the ground
+        const groundCheckPoints = [
+            // Center point
+            new THREE.Vector3(
+                this.camera.position.x,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z
+            ),
+            // Forward point
+            new THREE.Vector3(
+                this.camera.position.x + forward.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z + forward.z * groundCheckRadius * 0.8
+            ),
+            // Backward point
+            new THREE.Vector3(
+                this.camera.position.x - forward.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z - forward.z * groundCheckRadius * 0.8
+            ),
+            // Right point
+            new THREE.Vector3(
+                this.camera.position.x + right.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z + right.z * groundCheckRadius * 0.8
+            ),
+            // Left point
+            new THREE.Vector3(
+                this.camera.position.x - right.x * groundCheckRadius * 0.8,
+                this.camera.position.y - this.playerHeight / 2 - 0.1,
+                this.camera.position.z - right.z * groundCheckRadius * 0.8
+            )
