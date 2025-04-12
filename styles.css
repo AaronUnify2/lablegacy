@@ -599,7 +599,7 @@ canvas {
                     inset 0 0 10px rgba(0, 0, 0, 0.5),
                     0 0 8px rgba(51, 102, 255, 0.4);
     }
-
+}
 /* Crosshair styles */
 .crosshair {
     position: absolute;
