@@ -65,7 +65,7 @@ export class CollisionManager {
             
             // Special handling for cylinder-type colliders (enemies)
             if (collider.type === 'cylinder' && collider.isEnemy) {
-                // For enemy cylinders, use cylinder-cylinder collision
+                // For enemy cylinders, use improved cylinder-cylinder collision
                 // Get the center of the enemy cylinder
                 const cylinderCenter = new THREE.Vector3(
                     (collider.minX + collider.maxX) / 2,
@@ -78,19 +78,21 @@ export class CollisionManager {
                 const dz = position.z - cylinderCenter.z;
                 const horizontalDistance = Math.sqrt(dx * dx + dz * dz);
                 
-                // Calculate cylinder radii - assuming enemy radius is 0.5
-                const enemyRadius = 0.5;
+                // Calculate cylinder radii - using larger enemy radius to prevent player going under
+                const enemyRadius = 0.8; // Increased from 0.5 to 0.8
                 
-                // If horizontal distance is less than sum of radii, we have a collision
+                // If horizontal distance is less than sum of radii, we have a potential collision
                 if (horizontalDistance < (radius + enemyRadius)) {
-                    // Vertical check - player height is ~2.0 units, enemy height is ~1.8 units
-                    // Only register collision if vertical positions overlap
-                    const playerBottom = position.y - radius;
-                    const playerTop = position.y + radius;
-                    const enemyBottom = collider.minY;
-                    const enemyTop = collider.maxY;
+                    // Improved vertical check - use a more restrictive vertical collision area
+                    // Player height is ~2.0 units, enemy height is ~1.8 units
                     
-                    // Check for vertical overlap
+                    // Make vertical collision area larger than the actual models
+                    const playerBottom = position.y - radius * 1.2; // Extend player collision area down
+                    const playerTop = position.y + radius * 1.2; // Extend player collision area up
+                    const enemyBottom = collider.minY - 0.2; // Extend enemy collision area down
+                    const enemyTop = collider.maxY + 0.3; // Extend enemy collision area up more
+                    
+                    // Check for vertical overlap with the extended areas
                     if (!(playerBottom > enemyTop || playerTop < enemyBottom)) {
                         return {
                             collides: true,
@@ -136,7 +138,7 @@ export class CollisionManager {
         if (collision.collides) {
             // Special handling for enemy collisions
             if (collision.isEnemy) {
-                // For enemy collisions, just push the player back
+                // For enemy collisions, we want a stronger pushback effect
                 // Calculate direction from enemy to player
                 const enemyCenter = new THREE.Vector3(
                     (collision.collider.minX + collision.collider.maxX) / 2,
@@ -149,14 +151,29 @@ export class CollisionManager {
                     .subVectors(position, enemyCenter)
                     .normalize();
                 
+                // Keep the y-component very small to prevent vertical pushing
+                pushDirection.y = Math.min(Math.abs(pushDirection.y), 0.1) * Math.sign(pushDirection.y);
+                pushDirection.normalize(); // Re-normalize after adjusting y
+                
                 // Create a position that's pushed away from the enemy
                 // Use a stronger push to ensure the player doesn't get stuck
-                const pushDistance = radius + 0.6; // Extra 0.1 units to avoid getting stuck
+                const pushDistance = radius + 1.0; // Increased from 0.6 to 1.0 for stronger push
                 const resolvedPosition = new THREE.Vector3()
                     .addVectors(enemyCenter, pushDirection.multiplyScalar(pushDistance));
                 
-                // Keep the Y coordinate from the original position
-                resolvedPosition.y = position.y;
+                // Keep the Y coordinate closer to the original position
+                // This is crucial to prevent pushing player through floor or up too high
+                resolvedPosition.y = position.y * 0.9 + previousPosition.y * 0.1;
+                
+                // Add ground check to prevent pushing through floor
+                // If we're too close to the ground, maintain minimum height
+                const groundCheck = this.findFloorBelow(resolvedPosition, 2);
+                if (groundCheck && groundCheck.point) {
+                    const minHeightAboveGround = 1.0; // Minimum height to maintain above ground
+                    if (resolvedPosition.y - groundCheck.point.y < minHeightAboveGround) {
+                        resolvedPosition.y = groundCheck.point.y + minHeightAboveGround;
+                    }
+                }
                 
                 // Check if the resolved position would cause another collision
                 if (this.checkCollision(resolvedPosition, radius).collides) {
