@@ -519,7 +519,8 @@ export class InputManager {
         
         // Check all points for ground contact
         for (const checkPos of groundCheckPoints) {
-            const groundCollision = collisionManager.checkCollision(checkPos, groundCheckRadius);
+            // When checking for ground, ignore enemy collisions
+            const groundCollision = collisionManager.checkCollision(checkPos, groundCheckRadius, true);
             if (groundCollision.collides) {
                 this.isGrounded = true;
                 break;
@@ -554,7 +555,7 @@ export class InputManager {
             )
         );
         
-        // Handle collisions with walls
+        // Handle collisions with walls and enemies
         if (collisionManager) {
             // Smaller player radius for easier navigation
             const playerRadius = 0.45; // Reduced from 0.5 for better fit in tight spaces
@@ -564,25 +565,33 @@ export class InputManager {
             horizontalPosition.x = newPosition.x;
             horizontalPosition.z = newPosition.z;
             
-            // Check horizontal collision
-            const horizontalCollision = collisionManager.checkCollision(horizontalPosition, playerRadius);
+            // Check for collisions during horizontal movement, don't ignore enemies here
+            const horizontalCollision = collisionManager.checkCollision(horizontalPosition, playerRadius, false);
             
             if (horizontalCollision.collides) {
-                // Handle wall sliding by trying X and Z separately
-                const xOnlyPosition = previousPosition.clone();
-                xOnlyPosition.x = newPosition.x;
-                
-                const zOnlyPosition = previousPosition.clone();
-                zOnlyPosition.z = newPosition.z;
-                
-                // Try X movement
-                if (!collisionManager.checkCollision(xOnlyPosition, playerRadius).collides) {
-                    this.camera.position.x = xOnlyPosition.x;
-                }
-                
-                // Try Z movement
-                if (!collisionManager.checkCollision(zOnlyPosition, playerRadius).collides) {
-                    this.camera.position.z = zOnlyPosition.z;
+                // If we hit an enemy, use special resolution
+                if (horizontalCollision.isEnemy) {
+                    // Get resolved position from the collision manager
+                    const resolvedPosition = collisionManager.resolveCollision(horizontalPosition, previousPosition, playerRadius);
+                    this.camera.position.x = resolvedPosition.x;
+                    this.camera.position.z = resolvedPosition.z;
+                } else {
+                    // Handle wall sliding by trying X and Z separately
+                    const xOnlyPosition = previousPosition.clone();
+                    xOnlyPosition.x = newPosition.x;
+                    
+                    const zOnlyPosition = previousPosition.clone();
+                    zOnlyPosition.z = newPosition.z;
+                    
+                    // Try X movement
+                    if (!collisionManager.checkCollision(xOnlyPosition, playerRadius).collides) {
+                        this.camera.position.x = xOnlyPosition.x;
+                    }
+                    
+                    // Try Z movement
+                    if (!collisionManager.checkCollision(zOnlyPosition, playerRadius).collides) {
+                        this.camera.position.z = zOnlyPosition.z;
+                    }
                 }
             } else {
                 // No horizontal collision, apply full horizontal movement
@@ -615,7 +624,11 @@ export class InputManager {
             const feetPosition = verticalPosition.clone();
             feetPosition.y -= this.playerHeight / 2; // Check at feet level
             
-            const feetCollision = collisionManager.checkCollision(feetPosition, playerRadius);
+            // Use a smaller radius for floor checks to prevent getting stuck on edges
+            const feetCheckRadius = playerRadius * 0.9;
+            
+            // Ignore enemy collisions for floor checks to prevent false positives
+            const feetCollision = collisionManager.checkCollision(feetPosition, feetCheckRadius, true);
             
             if (feetCollision.collides) {
                 // We're standing on ground
@@ -647,8 +660,30 @@ export class InputManager {
                 }
             }
             
+            // Check for enemy collisions at the new vertical position
+            const bodyPosition = verticalPosition.clone();
+            const bodyCollision = collisionManager.checkCollision(bodyPosition, playerRadius, false);
+            
+            if (bodyCollision.collides && bodyCollision.isEnemy) {
+                // Use the collision manager to resolve the collision
+                const resolvedPosition = collisionManager.resolveCollision(bodyPosition, previousPosition, playerRadius);
+                
+                // Apply the resolved position, but preserve our calculated Y if it's better
+                // This prevents enemy collisions from pushing player through floor
+                if (resolvedPosition.y >= previousPosition.y) {
+                    verticalPosition.y = resolvedPosition.y;
+                }
+            }
+            
             // Apply vertical position
             this.camera.position.y = verticalPosition.y;
+            
+            // Final check - if we've somehow ended up in an enemy, push away horizontally
+            const finalCollision = collisionManager.checkCollision(this.camera.position, playerRadius);
+            if (finalCollision.collides && finalCollision.isEnemy) {
+                const resolvedFinal = collisionManager.resolveCollision(this.camera.position, previousPosition, playerRadius);
+                this.camera.position.copy(resolvedFinal);
+            }
         } else {
             // No collision manager, simply apply position
             this.camera.position.copy(newPosition);
