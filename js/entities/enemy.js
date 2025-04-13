@@ -721,49 +721,52 @@ export class Enemy {
     }
     
     // Create hit effect when projectile hits something
-    createHitEffect(position) {
-        // Create an explosion effect
-        const particleCount = 20;
-        const particles = [];
+createHitEffect(position) {
+    // Create an explosion effect
+    const particleCount = 20;
+    const particles = [];
+    
+    // Create particle material
+    const particleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xaaff00,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    // Create particles
+    for (let i = 0; i < particleCount; i++) {
+        const size = Math.random() * 0.2 + 0.1;
+        const geometry = new THREE.SphereGeometry(size, 8, 8);
+        const particle = new THREE.Mesh(geometry, particleMaterial.clone());
         
-        // Create particle material
-        const particleMaterial = new THREE.MeshBasicMaterial({
-            color: 0xaaff00,
-            transparent: true,
-            opacity: 0.8
-        });
+        // Position at impact point
+        particle.position.copy(position);
         
-        // Create particles
-        for (let i = 0; i < particleCount; i++) {
-            const size = Math.random() * 0.2 + 0.1;
-            const geometry = new THREE.SphereGeometry(size, 8, 8);
-            const particle = new THREE.Mesh(geometry, particleMaterial.clone());
-            
-            // Position at impact point
-            particle.position.copy(position);
-            
-            // Random velocity in all directions
-            const angle = Math.random() * Math.PI * 2;
-            const upwardBias = Math.random() * 0.5 + 0.2; // Bias upward
-            const speed = Math.random() * 5 + 2;
-            
-            particle.velocity = new THREE.Vector3(
-                Math.cos(angle) * speed,
-                upwardBias * speed,
-                Math.sin(angle) * speed
-            );
-            
-            // Add to scene
-            this.scene.add(particle);
-            particles.push(particle);
-        }
+        // Random velocity in all directions
+        const angle = Math.random() * Math.PI * 2;
+        const upwardBias = Math.random() * 0.5 + 0.2; // Bias upward
+        const speed = Math.random() * 5 + 2;
         
-        // Add a point light for the flash
-        const flashLight = new THREE.PointLight(0xaaff00, 3, 5);
-        flashLight.position.copy(position);
-        this.scene.add(flashLight);
+        particle.velocity = new THREE.Vector3(
+            Math.cos(angle) * speed,
+            upwardBias * speed,
+            Math.sin(angle) * speed
+        );
         
-        // Animate explosion
+        // Add to scene
+        this.scene.add(particle);
+        particles.push(particle);
+    }
+    
+    // Add a point light for the flash
+    const flashLight = new THREE.PointLight(0xaaff00, 3, 5);
+    flashLight.position.copy(position);
+    this.scene.add(flashLight);
+    
+    // Animate explosion
+    const duration = 0.8; // seconds - ADDED THIS LINE
+    const startTime = performance.now(); // ADDED THIS LINE
+    
     const animateExplosion = () => {
         const now = performance.now();
         const elapsed = (now - startTime) / 1000; // to seconds
