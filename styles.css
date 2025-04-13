@@ -9,7 +9,64 @@ body, html {
     height: 100%;
     overflow: hidden;
     touch-action: none;
-    font-family: 'Cinzel', serif; /* Consider including this font */
+    font-family: 'Cinzel', serif;
+    text-align: center;
+    max-width: 80%;
+    box-shadow: 0 0 15px rgba(0, 0, 30, 0.8);
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.swipe-instructions.show {
+    opacity: 1;
+    animation: fadeInstructions 5s forwards;
+}
+
+@keyframes fadeInstructions {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Highlight touch area - helps users know where to swipe */
+.touch-area-highlight {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 70%; /* Only cover the top portion of the screen, leaving controls free */
+    background: linear-gradient(to bottom, 
+                rgba(51, 102, 255, 0.05) 0%,
+                rgba(51, 102, 255, 0.02) 70%,
+                rgba(51, 102, 255, 0) 100%);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.touch-area-highlight.show {
+    opacity: 1;
+    animation: pulseHighlight 2s ease-in-out 2, fadeOut 1s ease-in-out 4s forwards;
+}
+
+@keyframes pulseHighlight {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.3; }
+}
+
+@keyframes fadeOut {
+    0% { opacity: 0.1; }
+    100% { opacity: 0; }
+}
+
+/* Add pulsing effect to joystick handle when not active */
+@keyframes pulse-handle {
+    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
+    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
+    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
+} serif; /* Consider including this font */
     background-color: #000;
 }
 
@@ -197,7 +254,7 @@ canvas {
     100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
 }
 
-/* Touch Controls - Retro Arcade Style with curse theme */
+/* Updated Touch Controls with Better Alignment */
 #touch-controls {
     position: fixed;
     bottom: 10px;
@@ -211,15 +268,58 @@ canvas {
     align-items: flex-end;
 }
 
+/* Joystick container on the left */
+.joystick-container {
+    position: relative;
+    width: 130px;
+    height: 130px;
+    margin-left: 10px;
+    z-index: 1000;
+    pointer-events: none;
+    /* No bottom positioning needed since parent handles it */
+}
+
+.joystick-base {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
+    border: 2px solid rgba(100, 150, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    user-select: none;
+    opacity: 0.9;
+}
+
+.joystick-handle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
+    border: 2px solid rgba(150, 200, 255, 0.6);
+    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
+    transform: translate(0, 0);
+    transition: transform 0.1s ease-out;
+    pointer-events: none;
+    animation: pulse-handle 2s infinite;
+}
+
+/* Right side controls - with precise positioning */
 .control-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-columns: repeat(3, auto);
+    grid-template-rows: repeat(3, auto);
     gap: 6px;
-    width: auto;
     margin-right: 10px;
     align-self: flex-end;
-    height: 130px;
+    justify-content: end;
+    align-items: center;
 }
 
 /* Base button style - Cursed look */
@@ -237,7 +337,7 @@ canvas {
     pointer-events: auto;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
-    margin: 0 auto;
+    margin: 0;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                 0 4px 0 rgba(0, 0, 0, 0.8),
                 inset 0 0 10px rgba(0, 0, 0, 0.5),
@@ -353,10 +453,19 @@ canvas {
 
 /* Improved responsive adjustments */
 @media (max-width: 800px) {
-    .control-grid {
-        grid-template-columns: repeat(6, 1fr);
-        gap: 5px;
+    .joystick-container {
+        width: 110px;
         height: 110px;
+    }
+    
+    .joystick-base {
+        width: 110px;
+        height: 110px;
+    }
+    
+    .joystick-handle {
+        width: 50px;
+        height: 50px;
     }
     
     .control-button {
@@ -375,9 +484,23 @@ canvas {
 }
 
 @media (max-width: 600px) {
+    .joystick-container {
+        width: 110px;
+        height: 110px;
+    }
+    
+    .joystick-base {
+        width: 110px;
+        height: 110px;
+    }
+    
+    .joystick-handle {
+        width: 50px;
+        height: 50px;
+    }
+    
     .control-grid {
         gap: 4px;
-        height: 110px;
     }
     
     .control-button {
@@ -415,9 +538,24 @@ canvas {
         padding: 5px;
     }
     
+    .joystick-container {
+        width: 90px;
+        height: 90px;
+        margin-left: 5px;
+    }
+    
+    .joystick-base {
+        width: 90px;
+        height: 90px;
+    }
+    
+    .joystick-handle {
+        width: 40px;
+        height: 40px;
+    }
+    
     .control-grid {
         gap: 3px;
-        height: 90px;
         margin-right: 5px;
     }
     
@@ -652,49 +790,6 @@ canvas {
     box-shadow: 0 0 2px rgba(255, 0, 0, 0.7);
 }
 
-/* Joystick Styles */
-.joystick-container {
-    position: relative;
-    bottom: 0;
-    left: 0;
-    width: 130px;
-    height: 130px;
-    margin-left: 10px;
-    z-index: 1000;
-    pointer-events: none;
-}
-
-.joystick-base {
-    position: absolute;
-    width: 130px;
-    height: 130px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
-    border: 2px solid rgba(100, 150, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    pointer-events: auto;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-    user-select: none;
-    opacity: 0.9;
-}
-
-.joystick-handle {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
-    border: 2px solid rgba(150, 200, 255, 0.6);
-    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
-    transform: translate(0, 0);
-    transition: transform 0.1s ease-out;
-    pointer-events: none;
-    animation: pulse-handle 2s infinite;
-}
-
 /* Active state for the joystick */
 .joystick-base:active .joystick-handle {
     box-shadow: 0 0 10px rgba(150, 200, 255, 0.9), 0 0 15px rgba(0, 80, 255, 0.8) inset;
@@ -746,61 +841,4 @@ canvas {
     border-radius: 8px;
     padding: 12px 20px;
     color: white;
-    font-family: 'Cinzel', serif;
-    text-align: center;
-    max-width: 80%;
-    box-shadow: 0 0 15px rgba(0, 0, 30, 0.8);
-    pointer-events: none;
-    z-index: 90;
-    opacity: 0;
-    transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-.swipe-instructions.show {
-    opacity: 1;
-    animation: fadeInstructions 5s forwards;
-}
-
-@keyframes fadeInstructions {
-    0%, 70% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-/* Highlight touch area - helps users know where to swipe */
-.touch-area-highlight {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 70%; /* Only cover the top portion of the screen, leaving controls free */
-    background: linear-gradient(to bottom, 
-                rgba(51, 102, 255, 0.05) 0%,
-                rgba(51, 102, 255, 0.02) 70%,
-                rgba(51, 102, 255, 0) 100%);
-    pointer-events: none;
-    z-index: 5;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-
-.touch-area-highlight.show {
-    opacity: 1;
-    animation: pulseHighlight 2s ease-in-out 2, fadeOut 1s ease-in-out 4s forwards;
-}
-
-@keyframes pulseHighlight {
-    0%, 100% { opacity: 0.1; }
-    50% { opacity: 0.3; }
-}
-
-@keyframes fadeOut {
-    0% { opacity: 0.1; }
-    100% { opacity: 0; }
-}
-
-/* Add pulsing effect to joystick handle when not active */
-@keyframes pulse-handle {
-    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
-    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-}
+    font-family: 'Cinzel',
