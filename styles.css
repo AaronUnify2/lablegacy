@@ -1,3 +1,4 @@
+/* Correct body and html styles */
 * {
     margin: 0;
     padding: 0;
@@ -9,9 +10,10 @@ body, html {
     height: 100%;
     overflow: hidden;
     touch-action: none;
-    font-family: 'Cinzel', serif; /* Consider including this font */
+    font-family: 'Cinzel', serif; 
     background-color: #000;
 }
+
 
 @font-face {
     font-family: 'Cinzel';
