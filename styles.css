@@ -199,30 +199,38 @@ canvas {
     100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
 }
 
-/* Touch Controls - Fixed positioning */
+/* Touch Controls - Container styling */
 #touch-controls {
     position: fixed;
     bottom: 0;
     left: 0;
     width: 100%;
     padding: 10px;
-    pointer-events: none;
     z-index: 20;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    pointer-events: none; /* This allows touches to pass through to the game */
+}
+
+/* Controls container to hold both joystick and buttons */
+.controls-container {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 800px; /* Limit width on larger screens */
+    margin: 0 auto;
+    pointer-events: none;
 }
 
 /* Joystick container - positioned on the left side */
 .joystick-container {
     position: relative;
     bottom: 20px;
-    left: 20px;
     width: 130px;
     height: 130px;
     z-index: 1000;
     pointer-events: none;
-    margin-right: auto; /* Push to the left */
 }
 
 /* Control grid - positioned on the right side */
@@ -235,8 +243,7 @@ canvas {
     height: 130px;
     position: relative;
     bottom: 20px;
-    right: 20px;
-    margin-left: auto; /* Push to the right */
+    pointer-events: none;
 }
 
 /* Button positioning within grid */
@@ -378,6 +385,94 @@ canvas {
     filter: brightness(1.2);
 }
 
+/* Joystick base styling */
+.joystick-base {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
+    border: 2px solid rgba(100, 150, 255, 0.4);
+    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    user-select: none;
+}
+
+.joystick-handle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
+    border: 2px solid rgba(150, 200, 255, 0.6);
+    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
+    transform: translate(0, 0);
+    transition: transform 0.1s ease-out;
+    pointer-events: none;
+    animation: pulse-handle 2s infinite;
+}
+
+/* Active state for the joystick */
+.joystick-base:active .joystick-handle {
+    box-shadow: 0 0 10px rgba(150, 200, 255, 0.9), 0 0 15px rgba(0, 80, 255, 0.8) inset;
+    background: radial-gradient(circle at 30% 30%, rgba(100, 150, 255, 0.8), rgba(60, 100, 200, 0.9));
+    animation: none;
+}
+
+/* Add pulsing effect to joystick handle when not active */
+@keyframes pulse-handle {
+    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
+    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
+    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
+}
+
+/* Light toggle button styling */
+#toggle-light {
+    background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
+    border-color: #557799 !important;
+    color: #aaccff;
+    font-size: 24px !important;
+    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(51, 102, 255, 0.4) !important;
+    animation: pulse-light 3s infinite alternate;
+}
+
+#toggle-light.active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 1px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.7),
+                0 0 20px rgba(100, 150, 255, 0.7) !important;
+}
+
+@keyframes pulse-light {
+    0% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(51, 102, 255, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 15px rgba(51, 102, 255, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(51, 102, 255, 0.4);
+    }
+}
+
 /* Improved responsive adjustments */
 @media (max-width: 800px) {
     .control-button {
@@ -397,6 +492,11 @@ canvas {
 
 @media (max-width: 600px) {
     .joystick-container, .control-grid {
+        width: 110px;
+        height: 110px;
+    }
+    
+    .joystick-base {
         width: 110px;
         height: 110px;
     }
@@ -432,7 +532,7 @@ canvas {
 }
 
 @media (max-width: 400px) {
-    #touch-controls {
+    .controls-container {
         padding: 5px;
     }
     
@@ -440,14 +540,22 @@ canvas {
         width: 90px;
         height: 90px;
         bottom: 15px;
-        left: 15px;
+    }
+    
+    .joystick-base {
+        width: 90px;
+        height: 90px;
+    }
+    
+    .joystick-handle {
+        width: 40px;
+        height: 40px;
     }
     
     .control-grid {
         width: 90px;
         height: 90px;
         bottom: 15px;
-        right: 15px;
     }
     
     .control-button {
@@ -593,125 +701,6 @@ canvas {
     pointer-events: none;
 }
 
-/* Light toggle button styling */
-#toggle-light {
-    background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
-    border-color: #557799 !important;
-    color: #aaccff;
-    font-size: 24px !important;
-    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(51, 102, 255, 0.4) !important;
-    animation: pulse-light 3s infinite alternate;
-}
-
-#toggle-light.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(100, 150, 255, 0.7) !important;
-}
-
-@keyframes pulse-light {
-    0% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(51, 102, 255, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 15px rgba(51, 102, 255, 0.6);
-    }
-    100% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(51, 102, 255, 0.4);
-    }
-}
-
-/* Joystick base styling */
-.joystick-base {
-    position: absolute;
-    width: 130px;
-    height: 130px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
-    border: 2px solid rgba(100, 150, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    pointer-events: auto;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-    user-select: none;
-}
-
-.joystick-handle {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
-    border: 2px solid rgba(150, 200, 255, 0.6);
-    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
-    transform: translate(0, 0);
-    transition: transform 0.1s ease-out;
-    pointer-events: none;
-}
-
-/* Active state for the joystick */
-.joystick-base:active .joystick-handle {
-    box-shadow: 0 0 10px rgba(150, 200, 255, 0.9), 0 0 15px rgba(0, 80, 255, 0.8) inset;
-    background: radial-gradient(circle at 30% 30%, rgba(100, 150, 255, 0.8), rgba(60, 100, 200, 0.9));
-}
-
-/* Adjust joystick size for smaller screens */
-@media (max-width: 600px) {
-    .joystick-base {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-handle {
-        width: 50px;
-        height: 50px;
-    }
-}
-
-@media (max-width: 400px) {
-    .joystick-base {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .joystick-handle {
-        width: 40px;
-        height: 40px;
-    }
-}
-
-/* Add pulsing effect to joystick handle when not active */
-@keyframes pulse-handle {
-    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
-    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-}
-
-.joystick-handle {
-    animation: pulse-handle 2s infinite;
-}
-
-.joystick-base:active .joystick-handle {
-    animation: none;
-}
-
 /* Crosshair styles */
 .crosshair {
     position: absolute;
@@ -757,7 +746,6 @@ canvas {
     background-color: rgba(255, 100, 100, 0.9);
     box-shadow: 0 0 2px rgba(255, 0, 0, 0.7);
 }
-
 /* Swipe indicator - only shown when swipe is active */
 .swipe-indicator {
     position: fixed;
