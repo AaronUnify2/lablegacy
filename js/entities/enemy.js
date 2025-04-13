@@ -12,7 +12,8 @@ export class Enemy {
             CHASE: 'chase',
             RETURN: 'return',
             IDLE: 'idle',
-            ATTACK: 'attack' // Add attack state
+            ATTACK: 'attack', // Melee attack state
+            RANGED_ATTACK: 'ranged_attack' // New ranged attack state
         };
         
         // AI Configuration
@@ -53,6 +54,16 @@ export class Enemy {
         this.attackDamage = 15; // Damage per attack
         this.attackDuration = 0.5; // Duration of attack animation in seconds
         this.isAttacking = false; // Flag to track if currently attacking
+        
+        // Ranged attack properties
+        this.rangedAttackRange = 10; // Distance for ranged attack (longer than melee)
+        this.rangedAttackCooldown = 0; // Separate cooldown for ranged attacks
+        this.rangedAttackCooldownTime = 3; // Time between ranged attacks
+        this.rangedAttackDamage = 10; // Damage for ranged attack
+        this.rangedAttackDuration = 1.2; // Duration of ranged attack animation
+        this.isRangedAttacking = false; // Flag to track if currently performing ranged attack
+        this.rangedAttackSpeed = 15; // Speed of the projectile in units per second
+        this.rangedAttackProjectile = null; // Reference to current projectile
         
         // Health and damage properties
         this.health = 100; // Max health for enemies
@@ -158,9 +169,14 @@ export class Enemy {
             this.stateCooldown -= deltaTime;
         }
         
-        // Decrease attack cooldown
+        // Decrease attack cooldowns
         if (this.attackCooldown > 0) {
             this.attackCooldown -= deltaTime;
+        }
+        
+        // Decrease ranged attack cooldown
+        if (this.rangedAttackCooldown > 0) {
+            this.rangedAttackCooldown -= deltaTime;
         }
         
         // Update damage flash effect
@@ -206,6 +222,11 @@ export class Enemy {
             return;
         }
         
+        // Update ranged attack projectile if it exists
+        if (this.rangedAttackProjectile && this.rangedAttackProjectile.active) {
+            this.updateRangedProjectile(deltaTime);
+        }
+        
         // Check player proximity to determine state transitions
         this.checkPlayerProximity();
         
@@ -230,6 +251,10 @@ export class Enemy {
             case this.states.ATTACK:
                 this.executeAttackBehavior(deltaTime);
                 break;
+                
+            case this.states.RANGED_ATTACK:
+                this.executeRangedAttackBehavior(deltaTime);
+                break;
         }
         
         // Rotate the body slightly to show it's active even if not moving
@@ -249,15 +274,6 @@ export class Enemy {
         // Store the player position for use in chase behavior
         this.lastKnownPlayerPos.copy(playerPos);
         
-        // Check for attack range if in chase state
-        if (distanceToPlayer < this.attackRange && this.attackCooldown <= 0) {
-            // Only attack if we're in the chase state
-            if (this.state === this.states.CHASE) {
-                this.changeState(this.states.ATTACK);
-                this.performAttack();
-            }
-        }
-        
         // State transitions
         switch(this.state) {
             case this.states.PATROL:
@@ -271,8 +287,20 @@ export class Enemy {
                 break;
                 
             case this.states.CHASE:
+                // First check for ranged attack
+                if (distanceToPlayer < this.rangedAttackRange && 
+                    distanceToPlayer > this.attackRange && 
+                    this.rangedAttackCooldown <= 0) {
+                    this.changeState(this.states.RANGED_ATTACK);
+                    this.performRangedAttack();
+                }
+                // Then check for melee attack if closer
+                else if (distanceToPlayer < this.attackRange && this.attackCooldown <= 0) {
+                    this.changeState(this.states.ATTACK);
+                    this.performAttack();
+                }
                 // If player is beyond chase range, return to patrol
-                if (distanceToPlayer > this.chaseRange) {
+                else if (distanceToPlayer > this.chaseRange) {
                     this.changeState(this.states.RETURN);
                 }
                 break;
@@ -424,6 +452,29 @@ export class Enemy {
         // The actual attack is handled by the performAttack method
     }
     
+    // Ranged attack state behavior
+    executeRangedAttackBehavior(deltaTime) {
+        // During ranged attack, keep facing the player but don't move
+        if (this.player && this.player.camera) {
+            // Get direction to player
+            const directionToPlayer = new THREE.Vector3()
+                .subVectors(this.player.camera.position, this.group.position)
+                .normalize();
+            
+            // Make the enemy face the player
+            directionToPlayer.y = 0; // Keep rotation on horizontal plane
+            if (directionToPlayer.lengthSq() > 0) {
+                const lookTarget = new THREE.Vector3()
+                    .addVectors(this.group.position, directionToPlayer);
+                
+                // Use faster turning during ranged attack
+                this.smoothLookAt(lookTarget, this.turnSpeed.chase * 1.5);
+            }
+        }
+        
+        // The actual ranged attack is handled by the performRangedAttack method
+    }
+    
     // Perform an attack on the player
     performAttack() {
         if (this.isAttacking || !this.player) return; // Don't attack if already attacking
@@ -472,6 +523,395 @@ export class Enemy {
         }, this.attackDuration * 1000);
     }
     
+    // Perform a ranged attack (spear of light)
+    performRangedAttack() {
+        if (this.isRangedAttacking || !this.player) return; // Don't attack if already attacking
+        
+        this.isRangedAttacking = true;
+        this.rangedAttackCooldown = this.rangedAttackCooldownTime;
+        
+        // Visual feedback - make eyes flash brighter during ranged attack
+        if (this.leftEye && this.leftEye.material) {
+            this.leftEye.material.emissiveIntensity = 2.5;
+        }
+        if (this.rightEye && this.rightEye.material) {
+            this.rightEye.material.emissiveIntensity = 2.5;
+        }
+        
+        // Create "charging" effect before launching projectile
+        this.createRangedAttackChargingEffect();
+        
+        // Launch projectile after a short delay
+        setTimeout(() => {
+            this.launchRangedProjectile();
+            
+            // Reset attack state
+            this.isRangedAttacking = false;
+            
+            // Reset eye glow
+            if (this.leftEye && this.leftEye.material) {
+                this.leftEye.material.emissiveIntensity = 1.0;
+            }
+            if (this.rightEye && this.rightEye.material) {
+                this.rightEye.material.emissiveIntensity = 1.0;
+            }
+            
+            // Return to chase state after attack
+            this.changeState(this.states.CHASE);
+        }, this.rangedAttackDuration * 1000);
+    }
+    
+    // Create charging effect for ranged attack
+    createRangedAttackChargingEffect() {
+        if (!this.scene) return;
+        
+        // Get direction to player
+        const directionToPlayer = new THREE.Vector3()
+            .subVectors(this.lastKnownPlayerPos, this.group.position)
+            .normalize();
+        
+        // Adjust direction to aim at player's eye level
+        directionToPlayer.y = 0.5; // Aim slightly upward
+        directionToPlayer.normalize();
+        
+        // Create a sphere for charging effect
+        const chargeGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+        const chargeMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffaa,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        
+        const chargeSphere = new THREE.Mesh(chargeGeometry, chargeMaterial);
+        
+        // Position the sphere in front of the enemy
+        const chargePosition = this.group.position.clone();
+        chargePosition.y += 1.5; // Position at eye level
+        chargeSphere.position.copy(chargePosition);
+        
+        this.scene.add(chargeSphere);
+        
+        // Create a point light for the charge effect
+        const chargeLight = new THREE.PointLight(0xffffaa, 1, 3);
+        chargeLight.position.copy(chargePosition);
+        this.scene.add(chargeLight);
+        
+        // Animate the charging effect
+        const duration = this.rangedAttackDuration * 1000;
+        const startTime = performance.now();
+        
+        const animateCharge = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Grow and pulse the sphere
+            const size = 0.2 + progress * 0.4 + Math.sin(progress * Math.PI * 6) * 0.1;
+            chargeSphere.scale.set(size, size, size);
+            
+            // Increase brightness as it charges
+            chargeLight.intensity = 1 + progress * 3;
+            
+            // Make it spin faster as it charges
+            chargeSphere.rotation.x += 0.05;
+            chargeSphere.rotation.y += 0.08;
+            
+            // Update color to more intense as it charges
+            const color = new THREE.Color().setHSL(0.12 - progress * 0.12, 1, 0.5 + progress * 0.5);
+            chargeMaterial.color = color;
+            chargeLight.color = color;
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateCharge);
+            } else {
+                // Remove the charging effect when done
+                this.scene.remove(chargeSphere);
+                this.scene.remove(chargeLight);
+                
+                // Clean up resources
+                chargeMaterial.dispose();
+                chargeGeometry.dispose();
+            }
+        };
+        
+        animateCharge();
+        
+        // Play charging sound
+        this.playRangedAttackChargingSound();
+    }
+    
+    // Launch the actual projectile
+    launchRangedProjectile() {
+        if (!this.scene || !this.player) return;
+        
+        // Get direction to player with slight prediction
+        const playerPos = this.player.camera.position.clone();
+        const directionToPlayer = new THREE.Vector3()
+            .subVectors(playerPos, this.group.position)
+            .normalize();
+        
+        // Create a spear-like projectile
+        const projectileGroup = new THREE.Group();
+        
+        // Create spear shaft
+        const shaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 2, 8);
+        const shaftMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffaa,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const shaft = new THREE.Mesh(shaftGeometry, shaftMaterial);
+        shaft.rotation.x = Math.PI / 2; // Rotate to point forward
+        projectileGroup.add(shaft);
+        
+        // Create spear tip
+        const tipGeometry = new THREE.ConeGeometry(0.15, 0.5, 8);
+        const tipMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const tip = new THREE.Mesh(tipGeometry, tipMaterial);
+        tip.rotation.x = Math.PI / 2; // Rotate to point forward
+        tip.position.z = -1.2; // Position at front of shaft
+        projectileGroup.add(tip);
+        
+        // Add a point light for the glow effect
+        const projectileLight = new THREE.PointLight(0xffffaa, 2, 4);
+        projectileLight.position.set(0, 0, -1);
+        projectileGroup.add(projectileLight);
+        
+        // Starting position (in front of enemy)
+        const startPosition = this.group.position.clone();
+        startPosition.y += 1.5; // At eye level
+        
+        // Move forward a bit to avoid self-collision
+        const forwardOffset = directionToPlayer.clone().multiplyScalar(0.8);
+        startPosition.add(forwardOffset);
+        
+        projectileGroup.position.copy(startPosition);
+        
+        // Make projectile face the direction of travel
+        projectileGroup.lookAt(playerPos);
+        
+        // Add to scene
+        this.scene.add(projectileGroup);
+        
+        // Create projectile data structure for tracking
+        this.rangedAttackProjectile = {
+            mesh: projectileGroup,
+            direction: directionToPlayer.clone(),
+            velocity: directionToPlayer.clone().multiplyScalar(this.rangedAttackSpeed),
+            position: startPosition.clone(),
+            active: true,
+            lifeTime: 5, // Maximum life time in seconds
+            currentLifeTime: 0,
+            hasHitPlayer: false
+        };
+        
+        // Play launch sound
+        this.playRangedAttackLaunchSound();
+    }
+    
+    // Update projectile position and check for collisions
+    updateRangedProjectile(deltaTime) {
+        if (!this.rangedAttackProjectile || !this.rangedAttackProjectile.active) return;
+        
+        const projectile = this.rangedAttackProjectile;
+        
+        // Update lifetime
+        projectile.currentLifeTime += deltaTime;
+        if (projectile.currentLifeTime >= projectile.lifeTime) {
+            this.destroyRangedProjectile();
+            return;
+        }
+        
+        // Update position
+        const movement = projectile.velocity.clone().multiplyScalar(deltaTime);
+        projectile.position.add(movement);
+        
+        // Move the mesh
+        if (projectile.mesh) {
+            projectile.mesh.position.copy(projectile.position);
+            
+            // Add some rotation for visual interest
+            projectile.mesh.rotateZ(deltaTime * 2);
+        }
+        
+        // Check for collision with player
+        if (!projectile.hasHitPlayer && this.player && this.player.camera) {
+            const playerPos = this.player.camera.position;
+            const distanceToPlayer = projectile.position.distanceTo(playerPos);
+            
+            // If close to player, check for hit
+            if (distanceToPlayer < 1.2) { // Player hit radius
+                // Player hit!
+                console.log(`Ranged attack hit player for ${this.rangedAttackDamage} damage!`);
+                
+                // Apply damage
+                if (this.player.damage) {
+                    this.player.damage(this.rangedAttackDamage);
+                }
+                
+                // Mark as hit and create impact effect
+                projectile.hasHitPlayer = true;
+                this.createRangedAttackImpactEffect(projectile.position.clone());
+                
+                // Destroy projectile
+                this.destroyRangedProjectile();
+                return;
+            }
+        }
+        
+        // Check for collision with environment using the collision manager
+        if (this.collisionManager) {
+            const collision = this.collisionManager.checkCollision(projectile.position, 0.2, true);
+            
+            // If hit environment (not enemy), destroy projectile
+            if (collision.collides && !collision.isEnemy) {
+                this.createRangedAttackImpactEffect(projectile.position.clone(), false);
+                this.destroyRangedProjectile();
+                return;
+            }
+        }
+    }
+    
+    // Remove the projectile and clean up resources
+    destroyRangedProjectile() {
+        if (!this.rangedAttackProjectile) return;
+        
+        // Remove from scene
+        if (this.rangedAttackProjectile.mesh) {
+            this.scene.remove(this.rangedAttackProjectile.mesh);
+            
+            // Dispose of geometries and materials to free memory
+            this.rangedAttackProjectile.mesh.traverse(child => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => material.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+        
+        // Clear projectile data
+        this.rangedAttackProjectile.active = false;
+        this.rangedAttackProjectile = null;
+    }
+    
+    // Create impact effect for when projectile hits something
+    createRangedAttackImpactEffect(position, hitPlayer = true) {
+        // Create explosion geometry
+        const explosionGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+        const explosionMaterial = new THREE.MeshBasicMaterial({
+            color: hitPlayer ? 0xff6600 : 0xffffaa,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const explosion = new THREE.Mesh(explosionGeometry, explosionMaterial);
+        explosion.position.copy(position);
+        this.scene.add(explosion);
+        
+        // Add an impact light
+        const impactLight = new THREE.PointLight(
+            hitPlayer ? 0xff6600 : 0xffffaa, 
+            hitPlayer ? 3 : 1.5, 
+            hitPlayer ? 5 : 3
+        );
+        impactLight.position.copy(position);
+        this.scene.add(impactLight);
+        
+        // Animate the explosion
+        const duration = 0.5; // 500ms
+        const startTime = performance.now();
+        
+        const animateExplosion = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Expand and fade out
+            const scale = 1 + progress * (hitPlayer ? 5 : 3);
+            explosion.scale.set(scale, scale, scale);
+            
+            // Fade out
+            explosion.material.opacity = 0.8 * (1 - progress);
+            impactLight.intensity = (hitPlayer ? 3 : 1.5) * (1 - progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateExplosion);
+            } else {
+                // Remove when animation completes
+                this.scene.remove(explosion);
+                this.scene.remove(impactLight);
+                
+                // Dispose resources
+                explosion.geometry.dispose();
+                explosion.material.dispose();
+            }
+        };
+        
+        animateExplosion();
+        
+        // Play sound
+        if (hitPlayer) {
+            this.playRangedAttackHitSound();
+        } else {
+            this.playRangedAttackMissSound();
+        }
+    }
+    
+    // Play charging sound for ranged attack
+    playRangedAttackChargingSound() {
+        try {
+            const chargeSound = new Audio('sounds/ranged_charge.mp3');
+            chargeSound.volume = 0.3;
+            chargeSound.play().catch(err => console.log('Could not play ranged attack charging sound', err));
+        } catch (e) {
+            console.log('Error playing ranged attack charging sound', e);
+        }
+    }
+    
+    // Play launch sound for ranged attack
+    playRangedAttackLaunchSound() {
+        try {
+            const launchSound = new Audio('sounds/ranged_launch.mp3');
+            launchSound.volume = 0.4;
+            launchSound.play().catch(err => console.log('Could not play ranged attack launch sound', err));
+        } catch (e) {
+            console.log('Error playing ranged attack launch sound', e);
+        }
+    }
+    
+    // Play hit sound for ranged attack
+    playRangedAttackHitSound() {
+        try {
+            const hitSound = new Audio('sounds/ranged_hit.mp3');
+            hitSound.volume = 0.5;
+            hitSound.play().catch(err => console.log('Could not play ranged attack hit sound', err));
+        } catch (e) {
+            console.log('Error playing ranged attack hit sound', e);
+        }
+    }
+    
+    // Play miss sound for ranged attack
+    playRangedAttackMissSound() {
+        try {
+            const missSound = new Audio('sounds/ranged_miss.mp3');
+            missSound.volume = 0.2;
+            missSound.play().catch(err => console.log('Could not play ranged attack miss sound', err));
+        } catch (e) {
+            console.log('Error playing ranged attack miss sound', e);
+        }
+    }
+    
     // Take damage from player attacks
     takeDamage(amount) {
         // If enemy is invulnerable or already dead, ignore damage
@@ -507,6 +947,11 @@ export class Enemy {
         
         console.log("Enemy died!");
         this.state = 'dead';
+        
+        // Destroy any active projectile
+        if (this.rangedAttackProjectile) {
+            this.destroyRangedProjectile();
+        }
         
         // Simple death animation - shrink and fade out
         const startScale = this.group.scale.clone();
@@ -626,195 +1071,5 @@ export class Enemy {
         
         // Try to play attack sound
         this.playAttackSound();
-    }
-    
-    // Play an attack sound
-    playAttackSound() {
-        try {
-            const attackSound = new Audio('sounds/enemy_attack.mp3');
-            attackSound.volume = 0.3;
-            attackSound.play().catch(err => console.log('Could not play attack sound', err));
-        } catch (e) {
-            console.log('Error playing attack sound', e);
-        }
-    }
-    
-    // Move with collision prevention
-    moveWithCollisionCheck(newPosition) {
-        if (!this.collisionEnabled || !this.collisionManager) {
-            // If collision is disabled, just move
-            this.group.position.copy(newPosition);
-            return true;
-        }
-        
-        // Check for environmental collisions
-        const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
-            
-        // Only consider environmental collisions, not other enemies
-        const isEnvironmentCollision = collision.collides && collision.collider && !collision.collider.isEnemy;
-            
-        if (isEnvironmentCollision) {
-            // Skip moving to this position
-            if (Math.random() < 0.05) { // Log occasionally to avoid spam
-                console.log("Enemy collision detected, can't move to new position");
-            }
-            return false;
-        }
-            
-        // Also check for ground
-        const groundCheck = new THREE.Vector3(newPosition.x, newPosition.y - 1, newPosition.z);
-        const groundHit = this.collisionManager.findFloorBelow(groundCheck, 2);
-            
-        if (!groundHit) {
-            // No ground beneath, skip moving
-            if (Math.random() < 0.05) {
-                console.log("No ground beneath enemy, can't move to new position");
-            }
-            return false;
-        }
-            
-        // No collision, update position
-        this.group.position.copy(newPosition);
-        return true;
-    }
-    
-    // Smoothly rotate to face a target
-    smoothLookAt(target, speed) {
-        // Create a quaternion for current rotation
-        const currentRotation = new THREE.Quaternion().copy(this.group.quaternion);
-        
-        // Create a quaternion for target rotation
-        const targetRotation = new THREE.Quaternion();
-        
-        // Create a temporary object to get the target rotation
-        const tempObj = new THREE.Object3D();
-        tempObj.position.copy(this.group.position);
-        tempObj.lookAt(target);
-        targetRotation.copy(tempObj.quaternion);
-        
-        // Smoothly interpolate between current and target rotation
-        this.group.quaternion.slerp(targetRotation, speed);
-        
-        // Normalize to prevent accumulation errors
-        this.group.quaternion.normalize();
-    }
-    
-    // Update eye appearance based on state and player distance
-    updateEyeAppearance(distanceToPlayer) {
-        // Base color for eyes
-        let eyeColor;
-        let intensity = 0;
-        
-        // Set color based on state
-        switch(this.state) {
-            case this.states.CHASE:
-                eyeColor = 0xff0000; // Red when chasing
-                intensity = 1.0;
-                break;
-                
-            case this.states.PATROL:
-                eyeColor = 0xffff00; // Yellow during patrol
-                intensity = 0.7;
-                break;
-                
-            case this.states.RETURN:
-                eyeColor = 0xff8800; // Orange when returning
-                intensity = 0.8;
-                break;
-                
-            case this.states.IDLE:
-                eyeColor = 0x88ff88; // Green when idle
-                intensity = 0.5;
-                break;
-                
-            case this.states.ATTACK:
-                eyeColor = 0xff0000; // Bright red when attacking
-                intensity = 1.5;
-                break;
-        }
-        
-        // If player is close, increase intensity
-        if (distanceToPlayer < this.detectionRange * 1.5) {
-            intensity = Math.min(1.0, intensity + (1.0 - distanceToPlayer / this.detectionRange) * 0.5);
-        }
-        
-        // Update eye materials
-        if (this.leftEye && this.leftEye.material) {
-            this.leftEye.material.color.set(eyeColor);
-            this.leftEye.material.emissiveIntensity = intensity;
-        }
-        
-        if (this.rightEye && this.rightEye.material) {
-            this.rightEye.material.color.set(eyeColor);
-            this.rightEye.material.emissiveIntensity = intensity;
-        }
-    }
-    
-    // Play effect when detecting player
-    playDetectionEffect() {
-        // Make eyes flash brightly
-        if (this.leftEye && this.leftEye.material) {
-            const originalColor = this.leftEye.material.color.clone();
-            this.leftEye.material.color.set(0xff0000);
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.leftEye && this.leftEye.material) {
-                    this.leftEye.material.color.copy(originalColor);
-                }
-            }, 200);
-        }
-        
-        if (this.rightEye && this.rightEye.material) {
-            const originalColor = this.rightEye.material.color.clone();
-            this.rightEye.material.color.set(0xff0000);
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.rightEye && this.rightEye.material) {
-                    this.rightEye.material.color.copy(originalColor);
-                }
-            }, 200);
-        }
-        
-        // Play alert sound (if available)
-        if (this.scene && typeof Audio !== 'undefined') {
-            try {
-                const alertSound = new Audio('sounds/enemy_alert.mp3');
-                alertSound.volume = 0.3;
-                alertSound.play().catch(err => console.log('Could not play alert sound', err));
-            } catch (e) {
-                console.log('Error playing sound', e);
-            }
-        }
-    }
-    
-    // Reset position if stuck or in an invalid location
-    resetToLastValidPosition() {
-        if (this.lastValidPosition) {
-            this.group.position.copy(this.lastValidPosition);
-            console.log("Enemy reset to last valid position");
-        }
-    }
-    
-    // Change patrol radius or speed
-    setPatrolParameters(radius, speed) {
-        if (radius !== undefined) {
-            this.patrolRadius = radius;
-        }
-        
-        if (speed !== undefined) {
-            this.moveSpeed.patrol = speed;
-            if (this.state !== this.states.CHASE) {
-                this.patrolSpeed = speed;
-            }
-        }
-    }
-    
-    // Set a new patrol center
-    setPatrolCenter(newCenter) {
-        if (newCenter) {
-            this.patrolCenter.copy(newCenter);
-        }
     }
 }
