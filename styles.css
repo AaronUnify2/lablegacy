@@ -199,7 +199,7 @@ canvas {
     100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
 }
 
-/* Updated Touch Controls - Better balanced layout */
+/* Updated Touch Controls Layout */
 #touch-controls {
     position: fixed;
     bottom: 10px;
@@ -213,7 +213,7 @@ canvas {
     align-items: flex-end;
 }
 
-/* Control grid - aligned with joystick */
+/* Control grid - centered on right side to match joystick position on left */
 .control-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -223,54 +223,12 @@ canvas {
     height: 130px; /* Match joystick container height */
     margin-right: 10px;
     align-self: flex-end;
-    justify-self: flex-end;
-}
-
-/* Button positioning within grid */
-#toggle-light {
-    grid-row: 1;
-    grid-column: 1;
-}
-
-#camera-up {
-    grid-row: 1;
-    grid-column: 2;
-}
-
-#attack {
-    grid-row: 1;
-    grid-column: 3;
-}
-
-#camera-left {
-    grid-row: 2;
-    grid-column: 1;
-}
-
-#jump {
-    grid-row: 2;
-    grid-column: 2;
-}
-
-#camera-right {
-    grid-row: 2;
-    grid-column: 3;
-}
-
-#zoom-out {
-    grid-row: 3;
-    grid-column: 1;
-}
-
-#camera-down {
-    grid-row: 3;
-    grid-column: 2;
 }
 
 /* Base button style - Cursed look */
 .control-button {
-    width: 55px;
-    height: 55px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -292,6 +250,23 @@ canvas {
     border: 1px solid rgba(100, 100, 255, 0.3);
     background: radial-gradient(circle at 30% 30%, #222, #111);
 }
+
+/* For better button spacing and positioning */
+#toggle-light, #camera-up, #attack, 
+#camera-left, #jump, #camera-right,
+#zoom-out, #camera-down {
+    margin: auto;
+}
+
+/* Ensure buttons are all centered within their grid cells */
+#toggle-light { grid-row: 1; grid-column: 1; }
+#camera-up { grid-row: 1; grid-column: 2; }
+#attack { grid-row: 1; grid-column: 3; }
+#camera-left { grid-row: 2; grid-column: 1; }
+#jump { grid-row: 2; grid-column: 2; }
+#camera-right { grid-row: 2; grid-column: 3; }
+#zoom-out { grid-row: 3; grid-column: 1; }
+#camera-down { grid-row: 3; grid-column: 2; }
 
 /* Movement buttons - blue theme */
 .control-button[id^="move"] {
@@ -403,8 +378,8 @@ canvas {
     }
     
     .control-button {
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
         font-size: 20px;
     }
     
@@ -424,8 +399,8 @@ canvas {
     }
     
     .control-button {
-        width: 45px;
-        height: 45px;
+        width: 35px;
+        height: 35px;
         font-size: 18px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 3px 0 rgba(0, 0, 0, 0.8),
@@ -466,8 +441,8 @@ canvas {
     }
     
     .control-button {
-        width: 35px;
-        height: 35px;
+        width: 30px;
+        height: 30px;
         font-size: 14px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 3px 0 rgba(0, 0, 0, 0.8),
@@ -780,6 +755,7 @@ canvas {
 .joystick-base:active .joystick-handle {
     animation: none;
 }
+
 
 /* Swipe indicator - only shown when swipe is active */
 .swipe-indicator {
