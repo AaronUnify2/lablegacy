@@ -405,53 +405,54 @@ export class InputManager {
         joystickBase.appendChild(joystickHandle);
         joystickContainer.appendChild(joystickBase);
         touchControls.appendChild(joystickContainer);
-        
-        // Define the button layout using a 6x3 grid - without the left d-pad buttons
-        const buttonLayout = [
-            ['', '', '', 'toggle-light', 'camera-up', 'attack'],
-            ['', '', '', 'camera-left', 'jump', 'camera-right'],
-            ['', '', '', 'zoom-out', 'camera-down', '']
-        ];
-        
-        // Define button icons
-        const buttonIcons = {
-            'camera-up': '↑',
-            'camera-left': '←',
-            'camera-right': '→',
-            'jump': 'Jump',
-            'zoom-out': '-',
-            'toggle-light': 'L',
-            'camera-down': '↓',
-            'attack': 'Atk'
-        };
-        
-        // Create buttons according to layout
-        for (let row = 0; row < buttonLayout.length; row++) {
-            for (let col = 0; col < buttonLayout[row].length; col++) {
-                const buttonId = buttonLayout[row][col];
-                if (buttonId !== '') {
-                    const button = document.createElement('div');
-                    button.id = buttonId;
-                    button.className = 'control-button';
-                    
-                    // Add special class for the jump button
-                    if (buttonId === 'jump') {
-                        button.className += ' jump-button';
-                    }
-                    
-                    button.textContent = buttonIcons[buttonId];
-                    
-                    // Position the button in the grid
-                    button.style.gridRow = row + 1;
-                    button.style.gridColumn = col + 1;
-                    
-                    gridContainer.appendChild(button);
-                    
-                    // Store button reference
-                    this.buttons[buttonId] = button;
-                }
+
+
+// Define the button layout using a 3x3 grid
+const buttonLayout = [
+    ['toggle-light', 'camera-up', 'attack'],
+    ['camera-left', 'jump', 'camera-right'],
+    ['zoom-out', 'camera-down', '']  // Empty string for no button
+];
+
+// Define button icons (no changes needed to this part)
+const buttonIcons = {
+    'camera-up': '↑',
+    'camera-left': '←',
+    'camera-right': '→',
+    'jump': 'Jump',
+    'zoom-out': '-',
+    'toggle-light': 'L',
+    'camera-down': '↓',
+    'attack': 'Atk'
+};
+
+// Create buttons according to layout
+for (let row = 0; row < buttonLayout.length; row++) {
+    for (let col = 0; col < buttonLayout[row].length; col++) {
+        const buttonId = buttonLayout[row][col];
+        if (buttonId !== '') {
+            const button = document.createElement('div');
+            button.id = buttonId;
+            button.className = 'control-button';
+            
+            // Add special class for the jump button
+            if (buttonId === 'jump') {
+                button.className += ' jump-button';
             }
+            
+            button.textContent = buttonIcons[buttonId];
+            
+            // Position the button in the grid
+            button.style.gridRow = row + 1;
+            button.style.gridColumn = col + 1;
+            
+            gridContainer.appendChild(button);
+            
+            // Store button reference
+            this.buttons[buttonId] = button;
         }
+    }
+}       
         
         // Set up joystick event handlers
         this.setupJoystickControls();
