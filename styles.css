@@ -200,13 +200,15 @@ canvas {
 /* Touch Controls - Retro Arcade Style with curse theme */
 #touch-controls {
     position: fixed;
-    bottom: 0;
+    bottom: 10px;
     left: 0;
     width: 100%;
     padding: 10px;
     pointer-events: none;
     z-index: 20;
-    display: none; /* Hidden by default, will be shown on touch devices */
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
 }
 
 .control-grid {
@@ -214,8 +216,10 @@ canvas {
     grid-template-columns: repeat(6, 1fr);
     grid-template-rows: repeat(3, 1fr);
     gap: 6px;
-    width: 100%;
-    max-width: 100%;
+    width: auto;
+    margin-right: 10px;
+    align-self: flex-end;
+    height: 130px;
 }
 
 /* Base button style - Cursed look */
@@ -288,8 +292,6 @@ canvas {
                 0 0 15px rgba(50, 255, 100, 0.3) !important;
 }
 
-/* Add this to styles.css in the appropriate section (e.g., after the jump button styles) */
-
 /* Attack button - purple fire theme */
 #attack {
     background: radial-gradient(circle at 30% 30%, #330033, #220022) !important;
@@ -354,6 +356,7 @@ canvas {
     .control-grid {
         grid-template-columns: repeat(6, 1fr);
         gap: 5px;
+        height: 110px;
     }
     
     .control-button {
@@ -374,6 +377,7 @@ canvas {
 @media (max-width: 600px) {
     .control-grid {
         gap: 4px;
+        height: 110px;
     }
     
     .control-button {
@@ -413,6 +417,8 @@ canvas {
     
     .control-grid {
         gap: 3px;
+        height: 90px;
+        margin-right: 5px;
     }
     
     .control-button {
@@ -648,11 +654,12 @@ canvas {
 
 /* Joystick Styles */
 .joystick-container {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
+    position: relative;
+    bottom: 0;
+    left: 0;
     width: 130px;
     height: 130px;
+    margin-left: 10px;
     z-index: 1000;
     pointer-events: none;
 }
@@ -672,6 +679,7 @@ canvas {
     -webkit-tap-highlight-color: transparent;
     touch-action: none;
     user-select: none;
+    opacity: 0.9;
 }
 
 .joystick-handle {
@@ -684,68 +692,15 @@ canvas {
     transform: translate(0, 0);
     transition: transform 0.1s ease-out;
     pointer-events: none;
+    animation: pulse-handle 2s infinite;
 }
 
 /* Active state for the joystick */
 .joystick-base:active .joystick-handle {
     box-shadow: 0 0 10px rgba(150, 200, 255, 0.9), 0 0 15px rgba(0, 80, 255, 0.8) inset;
     background: radial-gradient(circle at 30% 30%, rgba(100, 150, 255, 0.8), rgba(60, 100, 200, 0.9));
-}
-
-/* Adjust joystick size for smaller screens */
-@media (max-width: 600px) {
-    .joystick-container {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-base {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-handle {
-        width: 50px;
-        height: 50px;
-    }
-}
-
-@media (max-width: 400px) {
-    .joystick-container {
-        width: 90px;
-        height: 90px;
-        bottom: 15px;
-        left: 15px;
-    }
-    
-    .joystick-base {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .joystick-handle {
-        width: 40px;
-        height: 40px;
-    }
-}
-
-/* Add pulsing effect to joystick handle when not active */
-@keyframes pulse-handle {
-    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
-    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-}
-
-.joystick-handle {
-    animation: pulse-handle 2s infinite;
-}
-
-.joystick-base:active .joystick-handle {
     animation: none;
 }
-
-
-/* Add this to your styles.css file */
 
 /* Swipe indicator - only shown when swipe is active */
 .swipe-indicator {
@@ -843,195 +798,9 @@ canvas {
     100% { opacity: 0; }
 }
 
-
-/* Improved Touch Controls - Add this to your styles.css */
-
-/* Make the touch controls more visible and better positioned */
-#touch-controls {
-    position: fixed;
-    bottom: 10px;
-    left: 0;
-    width: 100%;
-    padding: 10px;
-    pointer-events: none;
-    z-index: 20;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-}
-
-/* Improve joystick visibility and usability */
-.joystick-container {
-    position: relative; /* Changed from fixed */
-    bottom: 0;
-    left: 0;
-    width: 130px;
-    height: 130px;
-    margin-left: 10px;
-    z-index: 1000;
-    pointer-events: none;
-}
-
-.joystick-base {
-    position: absolute;
-    width: 130px;
-    height: 130px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
-    border: 2px solid rgba(100, 150, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    pointer-events: auto;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-    user-select: none;
-    opacity: 0.9; /* Increased from default */
-}
-
-.joystick-handle {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
-    border: 2px solid rgba(150, 200, 255, 0.6);
-    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
-    transform: translate(0, 0);
-    transition: transform 0.1s ease-out;
-    pointer-events: none;
-}
-
-/* Improved positioning for control grid */
-.control-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 6px;
-    width: auto; /* Changed from 100% */
-    margin-right: 10px;
-}
-
-/* Improve button visibility */
-.control-button {
-    pointer-events: auto;
-    opacity: 0.9; /* Increased from default */
-}
-
-/* Add visual feedback for active state */
-.control-button.active {
-    transform: translateY(3px);
-    filter: brightness(1.5);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(100, 150, 255, 0.5);
-}
-
-/* Make jump button more prominent */
-.jump-button {
-    background: radial-gradient(circle at 30% 30%, #182818, #091809) !important;
-    border-color: #22aa33 !important;
-    font-size: 16px !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    animation: pulse 2s infinite;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(50, 255, 100, 0.4) !important;
-}
-
-/* Add swipe indicator */
-.swipe-indicator {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 10px rgba(51, 102, 255, 0.3);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    z-index: 15;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.swipe-indicator::after {
-    content: "";
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(51, 102, 255, 0.5), rgba(100, 150, 255, 0.8));
-    box-shadow: 0 0 8px rgba(51, 102, 255, 0.6);
-}
-
-.swipe-indicator.active {
-    opacity: 0.7;
-}
-
-/* Responsive adjustments */
-@media (max-width: 600px) {
-    .joystick-container {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-base {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-handle {
-        width: 50px;
-        height: 50px;
-    }
-    
-    .control-grid {
-        gap: 4px;
-    }
-    
-    .control-button {
-        width: 45px;
-        height: 45px;
-        font-size: 18px;
-    }
-}
-
-@media (max-width: 400px) {
-    #touch-controls {
-        padding: 5px;
-    }
-    
-    .joystick-container {
-        width: 90px;
-        height: 90px;
-        margin-left: 5px;
-    }
-    
-    .joystick-base {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .joystick-handle {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .control-grid {
-        gap: 3px;
-        margin-right: 5px;
-    }
-    
-    .control-button {
-        width: 40px;
-        height: 40px;
-        font-size: 16px;
-    }
+/* Add pulsing effect to joystick handle when not active */
+@keyframes pulse-handle {
+    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
+    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
+    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
 }
