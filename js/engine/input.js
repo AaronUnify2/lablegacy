@@ -405,54 +405,53 @@ export class InputManager {
         joystickBase.appendChild(joystickHandle);
         joystickContainer.appendChild(joystickBase);
         touchControls.appendChild(joystickContainer);
-
-
-// Define the button layout using a 3x3 grid
-const buttonLayout = [
-    ['toggle-light', 'camera-up', 'attack'],
-    ['camera-left', 'jump', 'camera-right'],
-    ['zoom-out', 'camera-down', '']  // Empty string for no button
-];
-
-// Define button icons (no changes needed to this part)
-const buttonIcons = {
-    'camera-up': '↑',
-    'camera-left': '←',
-    'camera-right': '→',
-    'jump': 'Jump',
-    'zoom-out': '-',
-    'toggle-light': 'L',
-    'camera-down': '↓',
-    'attack': 'Atk'
-};
-
-// Create buttons according to layout
-for (let row = 0; row < buttonLayout.length; row++) {
-    for (let col = 0; col < buttonLayout[row].length; col++) {
-        const buttonId = buttonLayout[row][col];
-        if (buttonId !== '') {
-            const button = document.createElement('div');
-            button.id = buttonId;
-            button.className = 'control-button';
-            
-            // Add special class for the jump button
-            if (buttonId === 'jump') {
-                button.className += ' jump-button';
+        
+        // Define the button layout using a 3x3 grid
+        const buttonLayout = [
+            ['toggle-light', 'camera-up', 'attack'],
+            ['camera-left', 'jump', 'camera-right'],
+            ['zoom-out', 'camera-down', '']  // Empty string for no button
+        ];
+        
+        // Define button icons
+        const buttonIcons = {
+            'camera-up': '↑',
+            'camera-left': '←',
+            'camera-right': '→',
+            'jump': 'Jump',
+            'zoom-out': '-',
+            'toggle-light': 'L',
+            'camera-down': '↓',
+            'attack': 'Atk'
+        };
+        
+        // Create buttons according to layout
+        for (let row = 0; row < buttonLayout.length; row++) {
+            for (let col = 0; col < buttonLayout[row].length; col++) {
+                const buttonId = buttonLayout[row][col];
+                if (buttonId !== '') {
+                    const button = document.createElement('div');
+                    button.id = buttonId;
+                    button.className = 'control-button';
+                    
+                    // Add special class for the jump button
+                    if (buttonId === 'jump') {
+                        button.className += ' jump-button';
+                    }
+                    
+                    button.textContent = buttonIcons[buttonId];
+                    
+                    // Position the button in the grid
+                    button.style.gridRow = row + 1;
+                    button.style.gridColumn = col + 1;
+                    
+                    gridContainer.appendChild(button);
+                    
+                    // Store button reference
+                    this.buttons[buttonId] = button;
+                }
             }
-            
-            button.textContent = buttonIcons[buttonId];
-            
-            // Position the button in the grid
-            button.style.gridRow = row + 1;
-            button.style.gridColumn = col + 1;
-            
-            gridContainer.appendChild(button);
-            
-            // Store button reference
-            this.buttons[buttonId] = button;
         }
-    }
-}       
         
         // Set up joystick event handlers
         this.setupJoystickControls();
@@ -625,28 +624,30 @@ for (let row = 0; row < buttonLayout.length; row++) {
             true // Single press (don't repeat)
         );
         
-        // Camera rotation buttons
+        // Camera rotation buttons - fixed to use separate callbacks
         this.setupButtonTouch('camera-up', 
             () => this.rotateCamera(0, -0.05), 
-            null, 
-            true
+            () => {}, // Empty release callback 
+            true // Continuous press
         );
+        
         this.setupButtonTouch('camera-down', 
             () => this.rotateCamera(0, 0.05), 
-            null, 
-            true
+            () => {}, // Empty release callback
+            true // Continuous press
         );
+        
         this.setupButtonTouch('camera-left', 
             () => this.rotateCamera(0.05, 0), 
-            null, 
-            true
+            () => {}, // Empty release callback
+            true // Continuous press
         );
         
         // Camera-right button
         this.setupButtonTouch('camera-right', 
             () => this.rotateCamera(-0.05, 0), 
-            null, 
-            true
+            () => {}, // Empty release callback
+            true // Continuous press
         );
         
         // Jump button
@@ -668,6 +669,18 @@ for (let row = 0; row < buttonLayout.length; row++) {
             false,
             true // Single press (don't repeat)
         );
+        
+        // Zoom out button
+        this.setupButtonTouch('zoom-out',
+            () => {
+                // Add zoom out functionality here
+                // For example, increase the camera's FOV
+                const event = new CustomEvent('zoom-out');
+                document.dispatchEvent(event);
+            },
+            null,
+            true // Continuous press
+        );
     }
     
     setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
@@ -676,6 +689,7 @@ for (let row = 0; row < buttonLayout.length; row++) {
         
         let pressInterval;
         let buttonPressed = false; // Track if button has been pressed (for single press)
+        let buttonIdentifier = buttonId; // Store the button ID for debugging
         
         // Handle touch/mouse events
         const startPress = (e) => {
@@ -687,6 +701,7 @@ for (let row = 0; row < buttonLayout.length; row++) {
             button.classList.add('active');
             
             if (pressCallback) {
+                // Call the specific callback for this button
                 pressCallback();
                 
                 // For single press, mark as pressed after callback
@@ -697,6 +712,8 @@ for (let row = 0; row < buttonLayout.length; row++) {
             
             if (continuousPress) {
                 // For continuous actions like camera rotation, run the callback repeatedly
+                if (pressInterval) clearInterval(pressInterval); // Clear any existing interval
+                
                 pressInterval = setInterval(() => {
                     if (pressCallback) pressCallback();
                 }, 16); // roughly 60fps
@@ -720,13 +737,15 @@ for (let row = 0; row < buttonLayout.length; row++) {
             }
         };
         
-        // Mouse events
+        // Remove any existing event listeners to prevent duplicates
+        button.removeEventListener('mousedown', startPress);
+        button.removeEventListener('mouseup', endPress);
+        button.removeEventListener('mouseleave', endPress);
+        
+        // Add new event listeners
         button.addEventListener('mousedown', startPress);
         button.addEventListener('mouseup', endPress);
         button.addEventListener('mouseleave', endPress);
-        
-        // Touch events - no longer needed as we handle these centrally now
-        // The centralized touch handling system will simulate mouse events
     }
     
     rotateCamera(deltaX, deltaY) {
