@@ -3,6 +3,7 @@ import { InputManager } from './engine/input.js';
 import { DungeonGenerator } from './systems/dungeonGenerator.js';
 import { CollisionManager } from './engine/collision.js';
 import { MagicStaff } from './entities/magicStaff.js';
+import { Sword } from './entities/sword.js';
 import { EnemyManager } from './systems/enemyManager.js';
 import { WeaponSystem } from './systems/weaponSystem.js';
 
@@ -31,6 +32,7 @@ class Game {
         // Player properties
         this.player = {
             magicStaff: null,
+            sword: null, // Add the sword property
             height: 2.0, // Player height in meters
             eyeLevel: 1.7, // Eye level height in meters (for camera)
             walkingSpeed: 5.0, // Walking speed in meters per second
@@ -91,6 +93,9 @@ class Game {
             
             // Create magic staff AFTER confirming the player is in a safe position
             this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
+            
+            // Create sword
+            this.player.sword = new Sword(this.renderer.scene, this.renderer.camera);
             
             // Create enemy manager
             this.enemyManager = new EnemyManager(this.renderer.scene, this.collisionManager, this.player);
@@ -526,19 +531,50 @@ class Game {
         // Add attack key (left mouse button)
         document.addEventListener('mousedown', (event) => {
             if (event.button === 0 && this.weaponSystem) { // Left mouse button
-                this.weaponSystem.staffAttack();
+                if (this.weaponSystem.currentWeapon === "staff") {
+                    this.weaponSystem.staffAttack();
+                } else if (this.weaponSystem.currentWeapon === "sword") {
+                    this.weaponSystem.swordAttack();
+                }
+            }
+        });
+        
+        // Add weapon switching functionality (Tab key)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Tab' && this.weaponSystem) {
+                event.preventDefault(); // Prevent tab from changing focus
+                const newWeapon = this.weaponSystem.toggleWeapon();
+                
+                // Update visibility of weapons
+                if (this.player.magicStaff) {
+                    this.player.magicStaff.setVisible(newWeapon === "staff");
+                }
+                if (this.player.sword) {
+                    this.player.sword.setVisible(newWeapon === "sword");
+                }
+                
+                // Show message about weapon switch
+                this.showMessage(`Switched to ${newWeapon}`);
             }
         });
 
-        // Add this in the setupFirstPersonMode method in main.js, after the existing event listeners
-// (around line 557, near the attack key (left mouse button) event listener)
-
-// Listen for attack button from touch controls
-document.addEventListener('player-attack', () => {
-    if (this.weaponSystem) {
-        this.weaponSystem.staffAttack();
-    }
-});
+        // Listen for attack button from touch controls
+        document.addEventListener('player-attack', () => {
+            if (this.weaponSystem) {
+                if (this.weaponSystem.currentWeapon === "staff") {
+                    this.weaponSystem.staffAttack();
+                } else if (this.weaponSystem.currentWeapon === "sword") {
+                    this.weaponSystem.swordAttack();
+                }
+            }
+        });
+        
+        // Listen for sword-specific attack from the zoom-out button ('-' button)
+        document.addEventListener('zoom-out', () => {
+            if (this.weaponSystem) {
+                this.weaponSystem.swordAttack();
+            }
+        });
         
         // Ensure the camera stays at eye level
         this.renderer.camera.position.y = this.player.eyeLevel;
@@ -707,7 +743,8 @@ document.addEventListener('player-attack', () => {
             torchFlicker: new Audio('sounds/torch_flicker.mp3'), // You'll need to add this file
             staffHum: new Audio('sounds/staff_hum.mp3'), // New sound for the magic staff
             enemyAlert: new Audio('sounds/enemy_alert.mp3'), // Sound for when enemies detect player
-            staffAttack: new Audio('sounds/staff_attack.mp3') // Sound for staff attack
+            staffAttack: new Audio('sounds/staff_attack.mp3'), // Sound for staff attack
+            swordSwing: new Audio('sounds/sword_swing.mp3') // Sound for sword attack
         };
         
         // Prepare the footstep sound
