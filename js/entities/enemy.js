@@ -256,6 +256,7 @@ export class Enemy {
             
             // Update projectile position
             projectile.position.add(projectile.velocity);
+            projectile.mesh.position.copy(projectile.position);
             
             // Check for collisions with player
             if (this.player && this.player.camera) {
@@ -271,6 +272,20 @@ export class Enemy {
                     }
                     
                     // Remove projectile
+                    this.scene.remove(projectile.mesh);
+                    projectilesToRemove.push(i);
+                    
+                    // Create hit effect
+                    this.createProjectileHitEffect(projectile.position);
+                    continue;
+                }
+            }
+            
+            // Check for environment collisions
+            if (this.collisionManager) {
+                const collision = this.collisionManager.checkCollision(projectile.position, 0.3);
+                if (collision.collides && (!collision.collider || !collision.collider.isEnemy)) {
+                    // Hit environment, remove projectile
                     this.scene.remove(projectile.mesh);
                     projectilesToRemove.push(i);
                     
@@ -576,9 +591,13 @@ export class Enemy {
         
         const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
         
-        // Position at enemy "hands" level
+        // Position at enemy "hands" level - FIX 1: Use direction vector to spawn in front
         const spawnPos = this.group.position.clone();
         spawnPos.y += 1.2; // Roughly at the "chest" level of the enemy
+        
+        // Offset the spawn position to be in front of the enemy based on its facing direction
+        // The enemy is already facing the player during chase, so we can use the direction vector
+        spawnPos.add(direction.clone().multiplyScalar(0.8)); // Spawn 0.8 units in front of the enemy
         
         projectileMesh.position.copy(spawnPos);
         
@@ -597,12 +616,29 @@ export class Enemy {
         // Add to scene
         this.scene.add(projectileMesh);
         
+        // Calculate where the player will be after some time (prediction)
+        // This helps the projectile lead the player a bit if they're moving
+        const playerVelocity = this.player.velocity || new THREE.Vector3(0, 0, 0);
+        const predictionTime = 0.5; // Predict where player will be in 0.5 seconds
+        const predictedPlayerPos = playerPos.clone().add(
+            playerVelocity.clone().multiplyScalar(predictionTime)
+        );
+        
+        // Calculate direction to the predicted position
+        const predictedDirection = new THREE.Vector3()
+            .subVectors(predictedPlayerPos, spawnPos)
+            .normalize();
+        
+        // FIX 2: Calculate velocity based on distance to make projectile take ~2.5 seconds to reach player
+        const distanceToPlayer = spawnPos.distanceTo(playerPos);
+        const projectileSpeed = Math.max(distanceToPlayer / 2.5, 3); // At least 3 units per second, adjusted for distance
+        
         // Create projectile data
         const projectile = {
             mesh: projectileMesh,
-            position: spawnPos,
-            velocity: direction.multiplyScalar(this.rangedAttackSpeed * 0.1), // Scale velocity by speed and time factor
-            lifetime: 3.0 // Projectile will disappear after 3 seconds
+            position: spawnPos.clone(),
+            velocity: predictedDirection.multiplyScalar(projectileSpeed * 0.016), // Scale for 60fps (0.016s per frame)
+            lifetime: 5.0 // Increased lifetime to 5 seconds
         };
         
         // Add to projectiles array
@@ -729,8 +765,8 @@ export class Enemy {
             this.scene.add(particle);
             particles.push(particle);
         }
-        
-        // Animate the burst and particles
+
+    // Animate the burst and particles
         const duration = 0.5; // 500ms
         const startTime = performance.now();
         
@@ -785,7 +821,7 @@ export class Enemy {
         }
     }
     
-// Create a visual effect for the attack
+    // Create a visual effect for the attack
     createAttackEffect() {
         if (!this.scene) return;
         
