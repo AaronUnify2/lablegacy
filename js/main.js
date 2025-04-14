@@ -573,7 +573,7 @@ class Game {
         
         // DUAL WIELDING: Show a message about dual wielding controls at game start
         setTimeout(() => {
-            this.showMessage("Dual wielding enabled! Left click: Staff attack | Right click: Sword attack");
+            this.showMessage("");
         }, 5000);
         
         // Ensure the camera stays at eye level
