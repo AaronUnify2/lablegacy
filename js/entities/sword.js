@@ -27,9 +27,9 @@ export class Sword {
         // Define the custom rotation we want for the sword
         // Values control the tilt and angle of the sword
         this.swordRotation = new THREE.Euler(
-            Math.PI * 0.4,  // X rotation (forward/backward tilt)
-            -Math.PI * 0.1, // Y rotation (left/right rotation)
-            -Math.PI * 0.2  // Z rotation (clockwise/counterclockwise)
+            Math.PI * 0.2,  // X rotation (forward/backward tilt)
+            -Math.PI * 1.3, // Y rotation (left/right rotation)
+            -Math.PI * 0.5  // Z rotation (clockwise/counterclockwise)
         );
         
         // Start the animation
