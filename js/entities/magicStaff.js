@@ -11,13 +11,13 @@ export class MagicStaff {
         this.lightDistance = 3; // Base 3m radius
         this.staffLength = 1.2; // Length of the staff
         this.staffThickness = 0.025; // Thickness of the staff
-        this.orbSize = 0.1; // Size of the glowing orb (increased from 0.08)
+        this.orbSize = 0.075; // Size of the glowing orb (reduced from 0.1)
         
-        // Staff position offset relative to camera
-        this.positionOffset = new THREE.Vector3(0.3, -0.4, -0.6);
+        // Staff position offset relative to camera - now positioned for left hand
+        this.positionOffset = new THREE.Vector3(-0.3, -0.4, -0.6);
         
-        // Orb position offset relative to camera (slightly forward and up from staff)
-        this.orbOffset = new THREE.Vector3(0.3, -0.2, -0.5);
+        // Orb position offset relative to camera - repositioned to top of staff
+        this.orbOffset = new THREE.Vector3(-0.3, -0.25, -0.5);
         
         // Staff animation variables
         this.bobAmount = 0.02;
@@ -69,9 +69,9 @@ export class MagicStaff {
         
         const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
         
-        // Create a decorative top wrap near the orb
+        // Create a decorative top wrap near the orb - moved closer to the top
         const topWrapGeometry = new THREE.CylinderGeometry(
-            this.staffThickness * 1.5,
+            this.staffThickness * 1.8, // Slightly wider to support orb
             this.staffThickness * 1.5,
             this.staffThickness * 5,
             8,
@@ -88,7 +88,7 @@ export class MagicStaff {
         });
         
         const topWrap = new THREE.Mesh(topWrapGeometry, wrapMaterial);
-        topWrap.position.y = this.staffLength * 0.4;
+        topWrap.position.y = this.staffLength * 0.45; // Moved closer to top (was 0.4)
         
         // Position the staff handle and rotate it
         staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
@@ -310,21 +310,42 @@ export class MagicStaff {
         
         // Update orb position if it exists
         if (this.orb) {
-            // Create an offset vector for orb
-            const orbOffset = this.orbOffset.clone();
-            
-            // Add subtle bobbing and swaying motion based on time
-            orbOffset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
-            orbOffset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
-            
-            // Apply the offset in camera's local space
-            orbOffset.applyQuaternion(cameraQuaternion);
-            
-            // Position the orb relative to the camera
-            this.orb.position.copy(cameraPosition).add(orbOffset);
-            
-            // Make the orb face the same direction as the camera
-            this.orb.quaternion.copy(cameraQuaternion);
+            // Position the orb at the top of the staff
+            // Get the staff's position and add an offset to place orb at the top
+            let orbPosition;
+            if (this.staff) {
+                // Create a vector for the top of the staff
+                const topOfStaffOffset = new THREE.Vector3(0, 0.6, 0); // Move up to top of staff
+                orbPosition = this.staff.position.clone();
+                
+                // Apply staff's rotation to the offset
+                topOfStaffOffset.applyQuaternion(this.staff.quaternion);
+                
+                // Add the offset to get the final orb position
+                orbPosition.add(topOfStaffOffset);
+                
+                // Set the orb's position
+                this.orb.position.copy(orbPosition);
+                
+                // Make the orb face the same direction as the staff
+                this.orb.quaternion.copy(this.staff.quaternion);
+            } else {
+                // Fallback if staff doesn't exist
+                const orbOffset = this.orbOffset.clone();
+                
+                // Add subtle bobbing and swaying motion based on time
+                orbOffset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
+                orbOffset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
+                
+                // Apply the offset in camera's local space
+                orbOffset.applyQuaternion(cameraQuaternion);
+                
+                // Position the orb relative to the camera
+                this.orb.position.copy(cameraPosition).add(orbOffset);
+                
+                // Make the orb face the same direction as the camera
+                this.orb.quaternion.copy(cameraQuaternion);
+            }
             
             // Animate the light intensity slightly
             if (this.light && this.isLightOn) {
