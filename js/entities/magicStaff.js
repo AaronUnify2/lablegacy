@@ -69,101 +69,26 @@ export class MagicStaff {
         
         const staffMesh = new THREE.Mesh(staffGeometry, staffMaterial);
         
-        // Create a decorative top cap for the staff
-        const topCapGeometry = new THREE.ConeGeometry(
-            this.staffThickness * 2.5, // Wider cap
-            this.staffThickness * 6, // Taller cap
+        // Create a decorative top wrap near the orb - moved closer to the top
+        const topWrapGeometry = new THREE.CylinderGeometry(
+            this.staffThickness * 1.8, // Slightly wider to support orb
+            this.staffThickness * 1.5,
+            this.staffThickness * 5,
             8,
             1,
             false
         );
         
-        const topCapMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3366ff,
-            roughness: 0.2,
-            metalness: 0.9,
+        const wrapMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3366aa,
+            roughness: 0.3,
+            metalness: 0.8,
             emissive: 0x1a3366,
-            emissiveIntensity: 1.0 // Bright glow
+            emissiveIntensity: 0.8 // Increased from 0.3 for brighter glow
         });
         
-        const topCap = new THREE.Mesh(topCapGeometry, topCapMaterial);
-        topCap.position.y = this.staffLength * 0.48; // Place near the top
-        
-        // Create decorative metal bands along the staff
-        const createMetalBand = (position, scale = 1) => {
-            const bandGeometry = new THREE.TorusGeometry(
-                this.staffThickness * 1.2, // Radius
-                this.staffThickness * 0.4, // Tube radius
-                8, // Radial segments
-                12 // Tubular segments
-            );
-            
-            const bandMaterial = new THREE.MeshStandardMaterial({
-                color: 0x666666,
-                roughness: 0.3,
-                metalness: 0.9,
-                emissive: 0x222222,
-                emissiveIntensity: 0.2
-            });
-            
-            const band = new THREE.Mesh(bandGeometry, bandMaterial);
-            band.rotation.x = Math.PI / 2; // Orient horizontally
-            band.position.y = position;
-            band.scale.set(scale, scale, scale);
-            
-            return band;
-        };
-        
-        // Add multiple decorative bands
-        const topBand = createMetalBand(this.staffLength * 0.4, 1.0);
-        const middleBand = createMetalBand(this.staffLength * 0.15, 0.9);
-        const bottomBand = createMetalBand(this.staffLength * -0.2, 1.1);
-        
-        // Add glowing runes on the staff
-        const runeGeometry = new THREE.PlaneGeometry(this.staffThickness * 4, this.staffThickness * 1);
-        const runeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x3366ff,
-            transparent: true,
-            opacity: 0.7,
-            side: THREE.DoubleSide
-        });
-        
-        // Create several runes at different positions and rotations
-        for (let i = 0; i < 5; i++) {
-            const rune = new THREE.Mesh(runeGeometry, runeMaterial.clone());
-            rune.material.opacity = 0.4 + Math.random() * 0.3;
-            
-            // Position along staff
-            const yPos = this.staffLength * (0.3 - i * 0.15);
-            rune.position.set(0, yPos, 0);
-            
-            // Random rotation around staff
-            rune.rotation.y = Math.random() * Math.PI * 2;
-            rune.rotation.x = Math.PI / 2;
-            
-            // Make it hover slightly above the staff surface
-            rune.position.x = (this.staffThickness + 0.01) * Math.cos(rune.rotation.y);
-            rune.position.z = (this.staffThickness + 0.01) * Math.sin(rune.rotation.y);
-            
-            // Add to staff
-            this.staff.add(rune);
-        }
-        
-        // Create a small crystal at the top as a focal point for the light
-        const crystalGeometry = new THREE.OctahedronGeometry(this.staffThickness * 1.2, 0);
-        const crystalMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            roughness: 0.1,
-            metalness: 0.5,
-            transparent: true,
-            opacity: 0.9,
-            emissive: 0x3366ff,
-            emissiveIntensity: 2.0
-        });
-        
-        const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-        crystal.position.y = this.staffLength * 0.56; // Position at the very top
-        crystal.rotation.y = Math.PI / 4; // Rotate for better visual effect
+        const topWrap = new THREE.Mesh(topWrapGeometry, wrapMaterial);
+        topWrap.position.y = this.staffLength * 0.45; // Moved closer to top (was 0.4)
         
         // Position the staff handle and rotate it
         staffMesh.rotation.x = Math.PI / 2; // Rotate to point forward
@@ -171,11 +96,7 @@ export class MagicStaff {
         
         // Add components to the staff group
         this.staff.add(staffMesh);
-        this.staff.add(topCap);
-        this.staff.add(topBand);
-        this.staff.add(middleBand);
-        this.staff.add(bottomBand);
-        this.staff.add(crystal);
+        this.staff.add(topWrap);
         
         // Add the staff to the scene
         this.scene.add(this.staff);
@@ -217,11 +138,11 @@ export class MagicStaff {
         // Add a spotlight at the orb position (directional beam)
         this.spotlight = new THREE.SpotLight(
             this.lightColor,
-            this.lightIntensity * 3.5, // 3.5x brighter (increased from 2.5x)
-            40, // Doubled to 40m beam distance (increased from 20m)
-            Math.PI / 9, // Even narrower angle for more focused beam
-            0.8, // Increased penumbra for slightly softer edge
-            0.5 // Reduced decay further for less falloff at longer distances
+            this.lightIntensity * 2.5, // 2.5x brighter
+            20, // Doubled from 10m to 20m beam distance
+            Math.PI / 8, // Narrower angle (was Math.PI/6) for more focused beam
+            0.7, // Increased penumbra for slightly softer edge
+            0.8 // Reduced decay for less falloff at distance
         );
         
         // Create a spotlight target
@@ -385,29 +306,6 @@ export class MagicStaff {
             const tiltQuaternion = new THREE.Quaternion();
             tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.25);
             this.staff.quaternion.multiply(tiltQuaternion);
-            
-            // Add a slow rotation to the staff around its axis for visual effect
-            const staffMeshes = this.staff.children;
-            for (let i = 0; i < staffMeshes.length; i++) {
-                // Only rotate the rune planes (5th through 9th children)
-                if (i >= 4 && i <= 8) {
-                    // Different rotation speeds for each rune
-                    const rotSpeed = 0.1 + (i - 4) * 0.05;
-                    staffMeshes[i].rotation.y += rotSpeed * Math.sin(time * 0.5) * 0.01;
-                    
-                    // Pulse the opacity of runes
-                    if (staffMeshes[i].material && staffMeshes[i].material.opacity !== undefined) {
-                        staffMeshes[i].material.opacity = 0.4 + 0.3 * Math.sin(time * 0.5 + i);
-                    }
-                }
-                
-                // Make the crystal at the top pulse
-                if (i === 9) { // Crystal is the 10th child
-                    if (staffMeshes[i].material) {
-                        staffMeshes[i].material.emissiveIntensity = 1.5 + Math.sin(time * 2) * 0.5;
-                    }
-                }
-            }
         }
         
         // Update orb position if it exists
@@ -417,7 +315,7 @@ export class MagicStaff {
             let orbPosition;
             if (this.staff) {
                 // Create a vector for the top of the staff
-                const topOfStaffOffset = new THREE.Vector3(0, 0.65, 0); // Move up to top of staff
+                const topOfStaffOffset = new THREE.Vector3(0, 0.6, 0); // Move up to top of staff
                 orbPosition = this.staff.position.clone();
                 
                 // Apply staff's rotation to the offset
@@ -455,14 +353,7 @@ export class MagicStaff {
             }
             
             if (this.spotlight && this.isLightOn) {
-                this.spotlight.intensity = (this.lightIntensity * 3.5) * (0.9 + 0.2 * Math.sin(time * 3));
-                
-                // Add a gentle swaying motion to the spotlight target for more natural light movement
-                if (this.spotlightTarget) {
-                    const swayX = Math.sin(time * 0.7) * 0.3;
-                    const swayZ = Math.cos(time * 0.5) * 0.3;
-                    this.spotlightTarget.position.set(swayX, 0, -1 + swayZ);
-                }
+                this.spotlight.intensity = (this.lightIntensity * 2.5) * (0.9 + 0.2 * Math.sin(time * 3));
             }
             
             // Animate orb glow
@@ -498,9 +389,6 @@ export class MagicStaff {
     toggleLight() {
         this.isLightOn = !this.isLightOn;
         
-        // Add visual effects to the staff when toggling
-        this.animateStaffLightToggle(this.isLightOn);
-        
         if (this.isLightOn) {
             // Turn point light on (3m pool)
             if (this.light) {
@@ -510,7 +398,7 @@ export class MagicStaff {
             
             // Turn spotlight on
             if (this.spotlight) {
-                this.spotlight.intensity = this.savedLightIntensity * 3.5; // 3.5x the intensity
+                this.spotlight.intensity = this.savedLightIntensity * 2.5; // 2.5x the intensity
             }
             
             // Make orb glow brightly
@@ -567,9 +455,11 @@ export class MagicStaff {
     
     // Show visual effect when toggling the light
     showToggleEffect(isOn) {
+        
         // Create a message element
+        
         const message = document.createElement('div');
-        message.textContent = isOn ? "Staff Light: ON" : "Staff Light: OFF";
+        message.textContent = isOn ? " " : " ";
         message.style.position = 'absolute';
         message.style.bottom = '10%';
         message.style.left = '0';
@@ -603,134 +493,4 @@ export class MagicStaff {
         }, 2000);
     }
     
-    // Add visual effects to the staff when toggling the light
-    animateStaffLightToggle(isOn) {
-        if (!this.staff) return;
-        
-        const staffMeshes = this.staff.children;
-        
-        // Create a flash effect
-        const flash = (mesh, intensity = 2, duration = 300) => {
-            if (!mesh.material) return;
-            
-            // Store original properties
-            const originalEmissive = mesh.material.emissive ? mesh.material.emissive.clone() : new THREE.Color(0x000000);
-            const originalEmissiveIntensity = mesh.material.emissiveIntensity || 0;
-            
-            // Flash effect
-            mesh.material.emissive = new THREE.Color(isOn ? 0x3366ff : 0x112233);
-            mesh.material.emissiveIntensity = intensity;
-            
-            // Reset after duration
-            setTimeout(() => {
-                if (mesh.material) {
-                    mesh.material.emissive = originalEmissive;
-                    mesh.material.emissiveIntensity = originalEmissiveIntensity;
-                }
-            }, duration);
-        };
-        
-        // Flash the crystal at the top
-        if (staffMeshes[9]) { // Crystal is the 10th child
-            flash(staffMeshes[9], 5, 500); // Stronger flash for crystal
-        }
-        
-        // Flash the metal bands with a staggered delay for a ripple effect
-        if (staffMeshes[5]) { // Top band
-            setTimeout(() => flash(staffMeshes[5], 3, 300), 0);
-        }
-        
-        if (staffMeshes[6]) { // Middle band
-            setTimeout(() => flash(staffMeshes[6], 2.5, 300), 100);
-        }
-        
-        if (staffMeshes[7]) { // Bottom band
-            setTimeout(() => flash(staffMeshes[7], 2, 300), 200);
-        }
-        
-        // Flash the runes with a cascading effect
-        for (let i = 4; i <= 8; i++) {
-            if (staffMeshes[i]) {
-                // Calculate delay based on position - cascade from top to bottom
-                const delay = (i - 4) * 50;
-                
-                // Flash the rune with decreasing intensity for ones further down
-                setTimeout(() => {
-                    if (staffMeshes[i].material) {
-                        const originalOpacity = staffMeshes[i].material.opacity;
-                        // Make runes pulse
-                        staffMeshes[i].material.opacity = isOn ? 0.9 : 0.2;
-                        
-                        // Return to normal after a delay
-                        setTimeout(() => {
-                            if (staffMeshes[i].material) {
-                                staffMeshes[i].material.opacity = originalOpacity;
-                            }
-                        }, 300);
-                    }
-                }, delay);
-            }
-        }
-        
-        // Create a pulse wave that travels down the staff
-        this.createStaffPulseWave(isOn);
-    }
-    
-    // Create a pulse wave effect that travels down the staff
-    createStaffPulseWave(isActivating) {
-        if (!this.staff || !this.scene) return;
-        
-        // Create a ring geometry for the pulse
-        const ringGeometry = new THREE.TorusGeometry(this.staffThickness * 2, 0.01, 8, 16);
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: isActivating ? 0x3366ff : 0x662222,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
-        });
-        
-        // Create the ring mesh
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        
-        // Add to staff at the top
-        ring.position.y = this.staffLength * 0.55; // Start at the top
-        ring.rotation.x = Math.PI / 2; // Align with staff
-        
-        this.staff.add(ring);
-        
-        // Animate the pulse wave
-        const duration = 600; // ms
-        const startTime = performance.now();
-        const startY = ring.position.y;
-        const endY = -this.staffLength / 2; // Bottom of staff
-        
-        const animateRing = () => {
-            const now = performance.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Move ring down the staff
-            ring.position.y = startY - (startY - endY) * progress;
-            
-            // Scale the ring slightly as it moves
-            const scale = 1 + progress * 0.5;
-            ring.scale.set(scale, scale, scale);
-            
-            // Fade out as it moves
-            ring.material.opacity = 0.9 * (1 - progress);
-            
-            if (progress < 1) {
-                requestAnimationFrame(animateRing);
-            } else {
-                // Remove when done
-                this.staff.remove(ring);
-                ring.geometry.dispose();
-                ring.material.dispose();
-            }
-        };
-        
-        animateRing();
-    }
 }
-    
-
