@@ -93,9 +93,11 @@ class Game {
             
             // Create magic staff AFTER confirming the player is in a safe position
             this.player.magicStaff = new MagicStaff(this.renderer.scene, this.renderer.camera);
+            this.player.magicStaff.setVisible(true); // Always visible in dual wield mode
             
             // Create sword
             this.player.sword = new Sword(this.renderer.scene, this.renderer.camera);
+            this.player.sword.setVisible(true); // Always visible in dual wield mode
             
             // Create enemy manager
             this.enemyManager = new EnemyManager(this.renderer.scene, this.collisionManager, this.player);
@@ -528,53 +530,51 @@ class Game {
             }
         });
         
-        // Add attack key (left mouse button)
+        // DUAL WIELDING: Add separate mouse button controls for staff and sword
         document.addEventListener('mousedown', (event) => {
-            if (event.button === 0 && this.weaponSystem) { // Left mouse button
-                if (this.weaponSystem.currentWeapon === "staff") {
+            if (this.weaponSystem) {
+                if (event.button === 0) { // Left mouse button for staff
                     this.weaponSystem.staffAttack();
-                } else if (this.weaponSystem.currentWeapon === "sword") {
+                } else if (event.button === 2) { // Right mouse button for sword
                     this.weaponSystem.swordAttack();
+                    
+                    // Prevent context menu when right-clicking for sword attack
+                    event.preventDefault();
                 }
             }
         });
         
-        // Add weapon switching functionality (Tab key)
-        document.addEventListener('keydown', (event) => {
-            if (event.code === 'Tab' && this.weaponSystem) {
-                event.preventDefault(); // Prevent tab from changing focus
-                const newWeapon = this.weaponSystem.toggleWeapon();
-                
-                // Update visibility of weapons
-                if (this.player.magicStaff) {
-                    this.player.magicStaff.setVisible(newWeapon === "staff");
-                }
-                if (this.player.sword) {
-                    this.player.sword.setVisible(newWeapon === "sword");
-                }
-                
-                // Show message about weapon switch
-                this.showMessage(`Switched to ${newWeapon}`);
-            }
+        // Prevent context menu to allow right-click for sword attacks
+        document.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
         });
+        
+        // DUAL WIELDING: Make both weapons visible since we're dual wielding
+        if (this.player.magicStaff) {
+            this.player.magicStaff.setVisible(true);
+        }
+        if (this.player.sword) {
+            this.player.sword.setVisible(true);
+        }
 
-        // Listen for attack button from touch controls
+        // Listen for attack button from touch controls for staff
         document.addEventListener('player-attack', () => {
             if (this.weaponSystem) {
-                if (this.weaponSystem.currentWeapon === "staff") {
-                    this.weaponSystem.staffAttack();
-                } else if (this.weaponSystem.currentWeapon === "sword") {
-                    this.weaponSystem.swordAttack();
-                }
+                this.weaponSystem.staffAttack();
             }
         });
         
-        // Listen for sword-specific attack from the zoom-out button ('-' button)
+        // Listen for sword-specific attack from the "sword" button
         document.addEventListener('zoom-out', () => {
             if (this.weaponSystem) {
                 this.weaponSystem.swordAttack();
             }
         });
+        
+        // DUAL WIELDING: Show a message about dual wielding controls at game start
+        setTimeout(() => {
+            this.showMessage("Dual wielding enabled! Left click: Staff attack | Right click: Sword attack");
+        }, 5000);
         
         // Ensure the camera stays at eye level
         this.renderer.camera.position.y = this.player.eyeLevel;
@@ -854,8 +854,6 @@ class Game {
         }
     }
     
-    
-        
     updateCurseEffects(currentTime, deltaTime) {
         // Subtle camera shake based on curse level
         if (this.gameState.curseLevel > 0) {
@@ -886,8 +884,8 @@ class Game {
             this.player.magicStaff.setLightIntensity(2.5 * curseEffect + flickerIntensity);
         }
     }
-
 }
+
 // Initialize and start the game when the window loads
 let game;
 window.addEventListener('load', () => {
