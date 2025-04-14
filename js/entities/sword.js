@@ -1,3 +1,5 @@
+
+
 export class Sword {
     constructor(scene, camera) {
         this.scene = scene;
@@ -7,8 +9,8 @@ export class Sword {
         this.swordWidth = 0.08; // Width of the blade
         this.handleLength = 0.2; // Length of the handle
         
-        // Sword position offset relative to camera - positioned for right hand
-        this.positionOffset = new THREE.Vector3(0.3, -0.4, -0.6);
+        // Sword position offset relative to camera - adjusted for right hand dual wielding
+        this.positionOffset = new THREE.Vector3(0.45, -0.4, -0.6);
         
         // Sword animation variables
         this.bobAmount = 0.02;
@@ -32,6 +34,7 @@ export class Sword {
         this.setupAnimations();
     }
     
+
     createSword() {
         // Create the sword group to hold sword components
         this.sword = new THREE.Group();
