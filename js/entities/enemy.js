@@ -54,6 +54,15 @@ export class Enemy {
         this.attackDuration = 0.5; // Duration of attack animation in seconds
         this.isAttacking = false; // Flag to track if currently attacking
         
+        // Ranged attack properties
+        this.rangedAttackRange = 15; // Distance at which enemy can use ranged attack
+        this.rangedAttackCooldown = 0; // Current cooldown timer
+        this.rangedAttackCooldownTime = 3; // Time between ranged attacks in seconds
+        this.rangedAttackDamage = 10; // Damage per ranged attack
+        this.rangedAttackSpeed = 5; // Speed of projectile
+        this.useRangedAttack = true; // Flag to enable/disable ranged attacks
+        this.projectiles = []; // Array to store active projectiles
+        
         // Health and damage properties
         this.health = 100; // Max health for enemies
         this.maxHealth = 100; // Store max health
@@ -163,6 +172,11 @@ export class Enemy {
             this.attackCooldown -= deltaTime;
         }
         
+        // Decrease ranged attack cooldown
+        if (this.rangedAttackCooldown > 0) {
+            this.rangedAttackCooldown -= deltaTime;
+        }
+        
         // Update damage flash effect
         if (this.isDamaged) {
             this.damageFlashTime -= deltaTime;
@@ -234,6 +248,55 @@ export class Enemy {
         
         // Rotate the body slightly to show it's active even if not moving
         this.bodyMesh.rotation.y += deltaTime * 1.0;
+        
+        // Update projectiles
+        const projectilesToRemove = [];
+        for (let i = 0; i < this.projectiles.length; i++) {
+            const projectile = this.projectiles[i];
+            
+            // Update projectile position
+            projectile.position.add(projectile.velocity);
+            
+            // Check for collisions with player
+            if (this.player && this.player.camera) {
+                const playerPos = this.player.camera.position;
+                const distance = projectile.position.distanceTo(playerPos);
+                
+                // If projectile hits player (using a simple radius check)
+                if (distance < 1.0) {
+                    // Call player damage function
+                    if (this.player.damage) {
+                        this.player.damage(this.rangedAttackDamage);
+                        console.log(`Projectile hit player for ${this.rangedAttackDamage} damage!`);
+                    }
+                    
+                    // Remove projectile
+                    this.scene.remove(projectile.mesh);
+                    projectilesToRemove.push(i);
+                    
+                    // Create hit effect
+                    this.createProjectileHitEffect(projectile.position);
+                    continue;
+                }
+            }
+            
+            // Check for lifetime
+            projectile.lifetime -= deltaTime;
+            if (projectile.lifetime <= 0) {
+                this.scene.remove(projectile.mesh);
+                projectilesToRemove.push(i);
+                continue;
+            }
+            
+            // Update visual effect (pulsing)
+            const pulse = Math.sin(performance.now() * 0.01) * 0.2 + 0.8;
+            projectile.mesh.scale.set(pulse, pulse, pulse);
+        }
+        
+        // Remove projectiles marked for deletion (in reverse order to avoid index problems)
+        for (let i = projectilesToRemove.length - 1; i >= 0; i--) {
+            this.projectiles.splice(projectilesToRemove[i], 1);
+        }
     }
     
     // State transition handler - checks proximity to player and changes state
@@ -255,6 +318,18 @@ export class Enemy {
             if (this.state === this.states.CHASE) {
                 this.changeState(this.states.ATTACK);
                 this.performAttack();
+            }
+        }
+        
+        // Check if player is in ranged attack range but outside melee range
+        if (this.useRangedAttack && 
+            distanceToPlayer < this.rangedAttackRange && 
+            distanceToPlayer > this.attackRange + 3 && // Keep some distance from melee range
+            this.rangedAttackCooldown <= 0) {
+            
+            // Only use ranged attack in chase state
+            if (this.state === this.states.CHASE) {
+                this.performRangedAttack();
             }
         }
         
@@ -472,47 +547,119 @@ export class Enemy {
         }, this.attackDuration * 1000);
     }
     
-    // Take damage from player attacks
-    takeDamage(amount) {
-        // If enemy is invulnerable or already dead, ignore damage
-        if (this.isInvulnerable || this.state === 'dead') {
-            return false;
+    // Perform a ranged attack - shoots a projectile at the player
+    performRangedAttack() {
+        if (!this.player || this.rangedAttackCooldown > 0) return;
+
+        // Set cooldown
+        this.rangedAttackCooldown = this.rangedAttackCooldownTime;
+        
+        // Get direction to player
+        const playerPos = this.player.camera.position;
+        const direction = new THREE.Vector3()
+            .subVectors(playerPos, this.group.position)
+            .normalize();
+        
+        // Slightly adjust aim for difficulty balance (less perfect aim)
+        const aimError = 0.2; // Higher values = less accurate
+        direction.x += (Math.random() - 0.5) * aimError;
+        direction.z += (Math.random() - 0.5) * aimError;
+        direction.normalize();
+        
+        // Create projectile mesh
+        const projectileGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const projectileMaterial = new THREE.MeshBasicMaterial({
+            color: 0x33ff33, // Green energy
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        
+        // Position at enemy "hands" level
+        const spawnPos = this.group.position.clone();
+        spawnPos.y += 1.2; // Roughly at the "chest" level of the enemy
+        
+        projectileMesh.position.copy(spawnPos);
+        
+        // Add glow effect
+        const glowGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x33ff33,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.BackSide
+        });
+        
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        projectileMesh.add(glowMesh);
+        
+        // Add to scene
+        this.scene.add(projectileMesh);
+        
+        // Create projectile data
+        const projectile = {
+            mesh: projectileMesh,
+            position: spawnPos,
+            velocity: direction.multiplyScalar(this.rangedAttackSpeed * 0.1), // Scale velocity by speed and time factor
+            lifetime: 3.0 // Projectile will disappear after 3 seconds
+        };
+        
+        // Add to projectiles array
+        this.projectiles.push(projectile);
+        
+        // Create firing effect
+        this.createProjectileFiringEffect(spawnPos);
+        
+        // Eye flash effect
+        if (this.leftEye && this.leftEye.material) {
+            this.leftEye.material.color.set(0x33ff33); // Green flash
+            this.leftEye.material.emissiveIntensity = 2.0;
+            
+            // Reset after a short delay
+            setTimeout(() => {
+                if (this.leftEye && this.leftEye.material) {
+                    this.leftEye.material.color.set(0xffff00);
+                    this.leftEye.material.emissiveIntensity = 1.0;
+                }
+            }, 200);
         }
         
-        // Apply damage
-        this.health = Math.max(0, this.health - amount);
-        
-        // Visual damage effect
-        this.isDamaged = true;
-        this.damageFlashTime = 0.2; // Flash duration in seconds
-        
-        // Make enemy briefly invulnerable to prevent multi-hits
-        this.isInvulnerable = true;
-        this.invulnerabilityTime = 0.5; // Invulnerability duration in seconds
-        
-        console.log(`Enemy took ${amount} damage, health: ${this.health}/${this.maxHealth}`);
-        
-        // Check for death
-        if (this.health <= 0) {
-            this.die();
-            return true; // Enemy died
+        if (this.rightEye && this.rightEye.material) {
+            this.rightEye.material.color.set(0x33ff33); // Green flash
+            this.rightEye.material.emissiveIntensity = 2.0;
+            
+            // Reset after a short delay
+            setTimeout(() => {
+                if (this.rightEye && this.rightEye.material) {
+                    this.rightEye.material.color.set(0xffff00);
+                    this.rightEye.material.emissiveIntensity = 1.0;
+                }
+            }, 200);
         }
         
-        return false; // Enemy still alive
+        // Play ranged attack sound
+        this.playRangedAttackSound();
+        
+        console.log("Enemy fired ranged attack!");
     }
     
-    // Handle enemy death
-    die() {
-        if (this.state === 'dead') return; // Already dead
+    // Create visual effect for firing projectile
+    createProjectileFiringEffect(position) {
+        // Create a flash effect at the firing position
+        const flashGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0x33ff33,
+            transparent: true,
+            opacity: 0.8
+        });
         
-        console.log("Enemy died!");
-        this.state = 'dead';
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
         
-        // Simple death animation - shrink and fade out
-        const startScale = this.group.scale.clone();
-        const startPosition = this.group.position.clone();
-        
-        const duration = 1.0; // Death animation duration in seconds
+        // Animate the flash
+        const duration = 0.3; // 300ms
         const startTime = performance.now();
         
         const animate = () => {
@@ -520,45 +667,125 @@ export class Enemy {
             const elapsed = (now - startTime) / 1000; // to seconds
             const progress = Math.min(elapsed / duration, 1);
             
-            // Scale down
-            const scale = 1 - progress * 0.8;
-            this.group.scale.set(scale, scale * 0.5, scale); // Flatten as it shrinks
-            
-            // Sink into ground
-            this.group.position.y = startPosition.y - progress * 1.0;
-            
-            // Fade materials
-            if (this.bodyMesh && this.bodyMesh.material) {
-                this.bodyMesh.material.opacity = 1 - progress;
-                this.bodyMesh.material.transparent = true;
-            }
-            
-            if (this.leftEye && this.leftEye.material) {
-                this.leftEye.material.opacity = 1 - progress;
-                this.leftEye.material.transparent = true;
-            }
-            
-            if (this.rightEye && this.rightEye.material) {
-                this.rightEye.material.opacity = 1 - progress;
-                this.rightEye.material.transparent = true;
-            }
+            // Expand and fade out
+            const scale = 1 + progress * 2;
+            flash.scale.set(scale, scale, scale);
+            flash.material.opacity = 0.8 * (1 - progress);
             
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                // After death animation completes, remove from scene
-                // Don't actually remove - just make invisible to avoid Three.js issues
-                this.group.visible = false;
-                
-                // Disable collisions for this enemy
-                this.collisionEnabled = false;
+                // Remove after animation completes
+                this.scene.remove(flash);
+                if (flash.material) flash.material.dispose();
+                if (flash.geometry) flash.geometry.dispose();
             }
         };
         
         animate();
     }
     
-    // Create a visual effect for the attack
+    // Create effect for projectile hitting something
+    createProjectileHitEffect(position) {
+        // Create burst effect at hit location
+        const burstGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const burstMaterial = new THREE.MeshBasicMaterial({
+            color: 0x33ff33,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const burst = new THREE.Mesh(burstGeometry, burstMaterial);
+        burst.position.copy(position);
+        this.scene.add(burst);
+        
+        // Create particles for the hit effect
+        const particles = [];
+        const particleCount = 8;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create small particle spheres
+            const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0x33ff33,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(position);
+            
+            // Random direction for particle
+            const angle = Math.random() * Math.PI * 2;
+            const height = Math.random() * Math.PI - Math.PI/2;
+            const speed = 0.05 + Math.random() * 0.1;
+            
+            particle.velocity = new THREE.Vector3(
+                Math.cos(angle) * Math.cos(height) * speed,
+                Math.sin(height) * speed,
+                Math.sin(angle) * Math.cos(height) * speed
+            );
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Animate the burst and particles
+        const duration = 0.5; // 500ms
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Expand and fade burst
+            const scale = 1 + progress * 3;
+            burst.scale.set(scale, scale, scale);
+            burst.material.opacity = 0.8 * (1 - progress);
+            
+            // Move and fade particles
+            for (const particle of particles) {
+                particle.position.add(particle.velocity);
+                
+                // Add gravity effect
+                particle.velocity.y -= 0.002;
+                
+                // Fade out
+                particle.material.opacity = 0.8 * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up meshes
+                this.scene.remove(burst);
+                if (burst.material) burst.material.dispose();
+                if (burst.geometry) burst.geometry.dispose();
+                
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                    if (particle.material) particle.material.dispose();
+                    if (particle.geometry) particle.geometry.dispose();
+                }
+            }
+        };
+        
+        animate();
+    }
+    
+    // Play ranged attack sound
+    playRangedAttackSound() {
+        try {
+            const attackSound = new Audio('sounds/enemy_ranged_attack.mp3');
+            attackSound.volume = 0.3;
+            attackSound.play().catch(err => console.log('Could not play ranged attack sound', err));
+        } catch (e) {
+            console.log('Error playing ranged attack sound', e);
+        }
+    }
+    
+// Create a visual effect for the attack
     createAttackEffect() {
         if (!this.scene) return;
         
@@ -637,6 +864,110 @@ export class Enemy {
         } catch (e) {
             console.log('Error playing attack sound', e);
         }
+    }
+    
+    // Take damage from player attacks
+    takeDamage(amount) {
+        // If enemy is invulnerable or already dead, ignore damage
+        if (this.isInvulnerable || this.state === 'dead') {
+            return false;
+        }
+        
+        // Apply damage
+        this.health = Math.max(0, this.health - amount);
+        
+        // Visual damage effect
+        this.isDamaged = true;
+        this.damageFlashTime = 0.2; // Flash duration in seconds
+        
+        // Make enemy briefly invulnerable to prevent multi-hits
+        this.isInvulnerable = true;
+        this.invulnerabilityTime = 0.5; // Invulnerability duration in seconds
+        
+        console.log(`Enemy took ${amount} damage, health: ${this.health}/${this.maxHealth}`);
+        
+        // Check for death
+        if (this.health <= 0) {
+            this.die();
+            return true; // Enemy died
+        }
+        
+        return false; // Enemy still alive
+    }
+    
+    // Handle enemy death
+    die() {
+        if (this.state === 'dead') return; // Already dead
+        
+        console.log("Enemy died!");
+        this.state = 'dead';
+        
+        // Clean up projectiles
+        this.cleanupProjectiles();
+        
+        // Simple death animation - shrink and fade out
+        const startScale = this.group.scale.clone();
+        const startPosition = this.group.position.clone();
+        
+        const duration = 1.0; // Death animation duration in seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Scale down
+            const scale = 1 - progress * 0.8;
+            this.group.scale.set(scale, scale * 0.5, scale); // Flatten as it shrinks
+            
+            // Sink into ground
+            this.group.position.y = startPosition.y - progress * 1.0;
+            
+            // Fade materials
+            if (this.bodyMesh && this.bodyMesh.material) {
+                this.bodyMesh.material.opacity = 1 - progress;
+                this.bodyMesh.material.transparent = true;
+            }
+            
+            if (this.leftEye && this.leftEye.material) {
+                this.leftEye.material.opacity = 1 - progress;
+                this.leftEye.material.transparent = true;
+            }
+            
+            if (this.rightEye && this.rightEye.material) {
+                this.rightEye.material.opacity = 1 - progress;
+                this.rightEye.material.transparent = true;
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // After death animation completes, remove from scene
+                // Don't actually remove - just make invisible to avoid Three.js issues
+                this.group.visible = false;
+                
+                // Disable collisions for this enemy
+                this.collisionEnabled = false;
+            }
+        };
+        
+        animate();
+    }
+    
+    // Clean up projectiles when enemy is removed or killed
+    cleanupProjectiles() {
+        // Remove all projectiles from the scene
+        for (const projectile of this.projectiles) {
+            if (projectile.mesh) {
+                this.scene.remove(projectile.mesh);
+                if (projectile.mesh.material) projectile.mesh.material.dispose();
+                if (projectile.mesh.geometry) projectile.mesh.geometry.dispose();
+            }
+        }
+        
+        // Clear projectiles array
+        this.projectiles = [];
     }
     
     // Move with collision prevention
