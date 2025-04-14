@@ -5,8 +5,26 @@ export class WeaponSystem {
         this.enemyManager = enemyManager;
         
         // Weapon state
-        this.currentWeapon = null;
+        this.currentWeapon = "staff"; // Default to staff
         this.attackCooldown = 0;
+        
+        // Set cooldown times for each weapon type
+        this.cooldownTimes = {
+            staff: 0.8, // 800ms between staff attacks
+            sword: 0.4  // 400ms between sword attacks (faster than staff)
+        };
+        
+        // Set damage values for each weapon
+        this.damageValues = {
+            staff: 25, // Staff damage (ranged)
+            sword: 40  // Sword damage (melee, but higher)
+        };
+        
+        // Set attack ranges
+        this.attackRanges = {
+            staff: 15, // Staff has longer range
+            sword: 2.5 // Sword has much shorter range
+        };
         
         // Add crosshair properties
         this.targetingRange = 30; // How far to check for targets (raycasting distance)
@@ -18,6 +36,7 @@ export class WeaponSystem {
         // Bind methods
         this.update = this.update.bind(this);
         this.staffAttack = this.staffAttack.bind(this);
+        this.swordAttack = this.swordAttack.bind(this);
         this.updateCrosshair = this.updateCrosshair.bind(this);
     }
     
@@ -68,9 +87,22 @@ export class WeaponSystem {
         
         // Update crosshair appearance
         if (this.currentTarget) {
-            this.crosshair.classList.add('target-acquired');
+            // Also consider weapon range when showing target acquired
+            const distanceToTarget = this.player.camera.position.distanceTo(this.currentTarget.group.position);
+            const inWeaponRange = distanceToTarget <= this.attackRanges[this.currentWeapon];
+            
+            // Only show target acquired if in range of current weapon
+            if (inWeaponRange) {
+                this.crosshair.classList.add('target-acquired');
+                
+                // Add sword-target or staff-target class based on current weapon
+                this.crosshair.classList.remove('sword-target', 'staff-target');
+                this.crosshair.classList.add(`${this.currentWeapon}-target`);
+            } else {
+                this.crosshair.classList.remove('target-acquired', 'sword-target', 'staff-target');
+            }
         } else {
-            this.crosshair.classList.remove('target-acquired');
+            this.crosshair.classList.remove('target-acquired', 'sword-target', 'staff-target');
         }
     }
     
@@ -117,14 +149,14 @@ export class WeaponSystem {
             // Get the distance to the target
             const distance = hit.distance;
             
-            // Calculate attack range based on current weapon
-            const attackRange = 15; // Base range
+            // We'll check the actual weapon range in the calling function
+            const maxRangeCheck = Math.max(this.attackRanges.staff, this.attackRanges.sword) + 5;
             
             // Get enemy index from userData
             const enemyIndex = hit.object.userData.enemyIndex;
             
-            // Check if this is a valid enemy and within range
-            if (enemyIndex !== undefined && distance <= attackRange) {
+            // Check if this is a valid enemy and within max checking range
+            if (enemyIndex !== undefined && distance <= maxRangeCheck) {
                 return this.enemyManager.enemies[enemyIndex];
             }
         }
@@ -136,8 +168,8 @@ export class WeaponSystem {
         // Check if attack is on cooldown
         if (this.attackCooldown > 0) return false;
         
-        // Set cooldown
-        this.attackCooldown = 0.8; // 800ms between attacks
+        // Set cooldown for staff
+        this.attackCooldown = this.cooldownTimes.staff;
         
         // Get staff position and forward direction
         const staffPosition = new THREE.Vector3();
@@ -153,9 +185,9 @@ export class WeaponSystem {
         forward.applyQuaternion(this.player.camera.quaternion);
         
         // Attack parameters
-        const attackRange = 15;
+        const attackRange = this.attackRanges.staff;
         const attackRadius = 2;
-        const attackDamage = 25;
+        const attackDamage = this.damageValues.staff;
         
         // Create attack endpoint based on targeting
         let attackEnd, hitEnemy = false;
@@ -165,12 +197,20 @@ export class WeaponSystem {
             // Get position of targeted enemy
             attackEnd = this.currentTarget.group.position.clone();
             
-            // Apply damage directly to the targeted enemy
-            const killed = this.currentTarget.takeDamage(attackDamage);
-            hitEnemy = true;
+            // Check if enemy is within staff range
+            const distanceToTarget = staffPosition.distanceTo(attackEnd);
             
-            if (this.enemyManager.debug && killed) {
-                console.log("Enemy was killed by direct hit!");
+            if (distanceToTarget <= attackRange) {
+                // Apply damage directly to the targeted enemy
+                const killed = this.currentTarget.takeDamage(attackDamage);
+                hitEnemy = true;
+                
+                if (this.enemyManager.debug && killed) {
+                    console.log("Enemy was killed by direct staff hit!");
+                }
+            } else {
+                // Target too far away, use max range
+                attackEnd = staffPosition.clone().addScaledVector(forward, attackRange);
             }
         } else {
             // Fallback to old behavior: ray in front of player
@@ -181,10 +221,10 @@ export class WeaponSystem {
         }
         
         // Visual feedback
-        this.showAttackEffect(staffPosition, attackEnd, attackRadius, hitEnemy);
+        this.showStaffAttackEffect(staffPosition, attackEnd, attackRadius, hitEnemy);
         
         // Play attack sound
-        this.playAttackSound(hitEnemy);
+        this.playAttackSound(hitEnemy, "staff");
         
         // Perform attack animation on the staff
         this.animateStaffAttack();
@@ -197,7 +237,85 @@ export class WeaponSystem {
         return hitEnemy;
     }
     
-    showAttackEffect(start, end, radius, hitTarget) {
+    swordAttack() {
+        // Check if attack is on cooldown
+        if (this.attackCooldown > 0) return false;
+        
+        // Set cooldown for sword
+        this.attackCooldown = this.cooldownTimes.sword;
+        
+        // Get sword position
+        const swordPosition = new THREE.Vector3();
+        if (this.player.sword && this.player.sword.sword) {
+            // Try to get the blade position for better hit location
+            if (this.player.sword.blade) {
+                this.player.sword.blade.getWorldPosition(swordPosition);
+            } else {
+                this.player.sword.sword.getWorldPosition(swordPosition);
+            }
+        } else {
+            // Fallback to camera position
+            swordPosition.copy(this.player.camera.position);
+        }
+        
+        // Get camera forward direction
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyQuaternion(this.player.camera.quaternion);
+        
+        // Attack parameters
+        const attackRange = this.attackRanges.sword;
+        const attackRadius = 1.2; // Smaller radius than staff
+        const attackDamage = this.damageValues.sword;
+        
+        // Calculate the sword strike endpoint
+        let attackEnd = swordPosition.clone().addScaledVector(forward, attackRange);
+        let hitEnemy = false;
+        
+        // First priority: use targeted enemy if available
+        if (this.currentTarget) {
+            // Get position of targeted enemy
+            const targetPosition = this.currentTarget.group.position.clone();
+            
+            // Check if enemy is within sword range
+            const distanceToTarget = swordPosition.distanceTo(targetPosition);
+            
+            if (distanceToTarget <= attackRange) {
+                // Apply damage directly to the targeted enemy
+                const killed = this.currentTarget.takeDamage(attackDamage);
+                hitEnemy = true;
+                attackEnd = targetPosition;
+                
+                if (this.enemyManager.debug && killed) {
+                    console.log("Enemy was killed by direct sword hit!");
+                }
+            }
+        }
+        
+        // If no direct hit, check for enemies in sword swing arc
+        if (!hitEnemy) {
+            hitEnemy = this.enemyManager.damageEnemiesInRadius(attackEnd, attackRadius, attackDamage) > 0;
+        }
+        
+        // Animate the sword strike
+        if (this.player.sword) {
+            this.player.sword.attack();
+        }
+        
+        // Visual feedback - sword swing effect
+        this.showSwordAttackEffect(swordPosition, attackEnd, hitEnemy);
+        
+        // Play attack sound
+        this.playAttackSound(hitEnemy, "sword");
+        
+        // Add hit impact effect if we hit an enemy
+        if (hitEnemy) {
+            this.showSwordHitEffect(attackEnd);
+        }
+        
+        return hitEnemy;
+    }
+    
+    showStaffAttackEffect(start, end, radius, hitTarget) {
         // Create a beam effect for the attack
         const beamGeometry = new THREE.CylinderGeometry(0.05, 0.2, start.distanceTo(end), 8, 1, false);
         
@@ -262,6 +380,63 @@ export class WeaponSystem {
         animate();
     }
     
+    showSwordAttackEffect(start, end, hitTarget) {
+        // Create a simple sword swing trail effect
+        const swingGeometry = new THREE.PlaneGeometry(1, 0.3);
+        
+        // Create material with glow
+        const swingMaterial = new THREE.MeshBasicMaterial({
+            color: hitTarget ? 0xff6600 : 0xcccccc,
+            transparent: true,
+            opacity: 0.6,
+            side: THREE.DoubleSide
+        });
+        
+        const swingTrail = new THREE.Mesh(swingGeometry, swingMaterial);
+        
+        // Get direction to end point
+        const direction = new THREE.Vector3().subVectors(end, start).normalize();
+        
+        // Calculate position for swing trail (slightly offset from player position)
+        const swingPosition = new THREE.Vector3().addVectors(
+            start,
+            direction.clone().multiplyScalar(0.7)
+        );
+        
+        swingTrail.position.copy(swingPosition);
+        
+        // Orient the swing trail
+        swingTrail.lookAt(end);
+        // Rotate it 90 degrees to make it vertical
+        swingTrail.rotateX(Math.PI / 2);
+        
+        // Add to scene
+        this.scene.add(swingTrail);
+        
+        // Animate the swing trail
+        const duration = 300; // 300ms for sword (faster than staff)
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Fade out and stretch the swing trail
+            swingTrail.material.opacity = 0.6 * (1 - progress);
+            swingTrail.scale.set(1 + progress, 1 + progress * 2, 1);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Remove after animation completes
+                this.scene.remove(swingTrail);
+            }
+        };
+        
+        animate();
+    }
+    
     createImpactEffect(position, radius) {
         // Create impact sphere
         const impactGeometry = new THREE.SphereGeometry(radius * 0.5, 16, 16);
@@ -306,6 +481,93 @@ export class WeaponSystem {
                 // Remove after animation completes
                 this.scene.remove(impact);
                 this.scene.remove(impactLight);
+            }
+        };
+        
+        animate();
+    }
+    
+    showSwordHitEffect(position) {
+        // Create a simple hit effect for sword (sparks and impact)
+        const particleCount = 10;
+        const particles = [];
+        
+        // Create particles
+        for (let i = 0; i < particleCount; i++) {
+            const size = Math.random() * 0.1 + 0.05;
+            const geometry = new THREE.BoxGeometry(size, size, size);
+            const material = new THREE.MeshBasicMaterial({
+                color: Math.random() < 0.7 ? 0xffcc00 : 0xff6600,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            
+            // Position at impact point
+            particle.position.copy(position);
+            
+            // Add random velocity - more horizontal spread for sword
+            particle.velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 4,
+                Math.random() * 2,
+                (Math.random() - 0.5) * 4
+            );
+            
+            // Add to scene and array
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Add a flash light
+        const flashLight = new THREE.PointLight(0xffcc00, 3, 3);
+        flashLight.position.copy(position);
+        this.scene.add(flashLight);
+        
+        // Animate the effect
+        const duration = 0.5; // seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Update each particle
+            particles.forEach(particle => {
+                // Apply velocity
+                particle.position.x += particle.velocity.x * 0.016;
+                particle.position.y += particle.velocity.y * 0.016;
+                particle.position.z += particle.velocity.z * 0.016;
+                
+                // Apply gravity
+                particle.velocity.y -= 9.8 * 0.016;
+                
+                // Fade out
+                if (particle.material) {
+                    particle.material.opacity = 0.8 * (1 - progress);
+                }
+                
+                // Slow down particles
+                particle.velocity.multiplyScalar(0.95);
+            });
+            
+            // Fade light
+            if (flashLight) {
+                flashLight.intensity = 3 * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up
+                particles.forEach(particle => {
+                    this.scene.remove(particle);
+                    if (particle.geometry) particle.geometry.dispose();
+                    if (particle.material) particle.material.dispose();
+                });
+                
+                this.scene.remove(flashLight);
             }
         };
         
@@ -400,12 +662,21 @@ export class WeaponSystem {
         animate();
     }
     
-    playAttackSound(hitTarget) {
+    playAttackSound(hitTarget, weaponType) {
         // Create attack sound
         const attackSound = new Audio();
-        attackSound.src = hitTarget ? 
-            'sounds/staff_attack_hit.mp3' : // Sound for hitting target
-            'sounds/staff_attack_miss.mp3'; // Sound for missing
+        
+        // Different sounds for staff vs sword
+        if (weaponType === "staff") {
+            attackSound.src = hitTarget ? 
+                'sounds/staff_attack_hit.mp3' : // Sound for hitting target
+                'sounds/staff_attack_miss.mp3'; // Sound for missing
+        } else if (weaponType === "sword") {
+            attackSound.src = hitTarget ? 
+                'sounds/sword_hit.mp3' : // Sound for sword hit
+                'sounds/sword_swing.mp3'; // Sound for sword swing
+        }
+        
         attackSound.volume = 0.3;
         
         // Play attack sound
@@ -475,5 +746,18 @@ export class WeaponSystem {
         
         // Start the animation
         thrust();
+    }
+    
+    // Method to toggle between weapons
+    toggleWeapon() {
+        // Switch between staff and sword
+        this.currentWeapon = this.currentWeapon === "staff" ? "sword" : "staff";
+        
+        return this.currentWeapon;
+    }
+    
+    // Method to get the current weapon range
+    getCurrentWeaponRange() {
+        return this.attackRanges[this.currentWeapon];
     }
 }
