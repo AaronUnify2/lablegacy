@@ -311,13 +311,18 @@ export class InputManager {
             // Store the touch ID with the button for tracking
             this.buttons[buttonId].touchId = touch.identifier;
             
-            // Trigger the button's press action
-            const pressEvent = new MouseEvent('mousedown', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
-            element.dispatchEvent(pressEvent);
+            // Trigger the button's press action using stored handler if available
+            if (element._startPressHandler) {
+                element._startPressHandler();
+            } else {
+                // Fallback to event dispatch
+                const pressEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                element.dispatchEvent(pressEvent);
+            }
         }
     }
     
@@ -331,13 +336,18 @@ export class InputManager {
                 // Clear the touch ID
                 element.touchId = null;
                 
-                // Trigger the button's release action
-                const releaseEvent = new MouseEvent('mouseup', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                element.dispatchEvent(releaseEvent);
+                // Trigger the button's release action using stored handler if available
+                if (element._endPressHandler) {
+                    element._endPressHandler();
+                } else {
+                    // Fallback to event dispatch
+                    const releaseEvent = new MouseEvent('mouseup', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    });
+                    element.dispatchEvent(releaseEvent);
+                }
             }
         }
     }
@@ -375,99 +385,96 @@ export class InputManager {
         );
     }
 
-
-createTouchButtons() {
-    const touchControls = document.getElementById('touch-controls');
-    
-    // Clear existing content
-    touchControls.innerHTML = '';
-    
-    // Create the container for both joystick and control grid
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'controls-container';
-    touchControls.appendChild(controlsContainer);
-    
-    // Create the joystick container
-    const joystickContainer = document.createElement('div');
-    joystickContainer.id = 'joystick-container';
-    joystickContainer.className = 'joystick-container';
-    
-    // Create the joystick base (static circle)
-    const joystickBase = document.createElement('div');
-    joystickBase.id = 'joystick-base';
-    joystickBase.className = 'joystick-base';
-    
-    // Create the joystick handle (movable part)
-    const joystickHandle = document.createElement('div');
-    joystickHandle.id = 'joystick-handle';
-    joystickHandle.className = 'joystick-handle';
-    
-    // Assemble the joystick
-    joystickBase.appendChild(joystickHandle);
-    joystickContainer.appendChild(joystickBase);
-    controlsContainer.appendChild(joystickContainer);
-    
-    // Create the grid container for buttons
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'control-grid';
-    controlsContainer.appendChild(gridContainer);
-    
-    // Define the button layout using a 3x3 grid
-    const buttonLayout = [
-        ['toggle-light', 'camera-up', 'attack'],
-        ['camera-left', 'jump', 'camera-right'],
-        ['zoom-out', 'camera-down', '']  // Empty string for no button
-    ];
-    
-    // Define button icons
-    const buttonIcons = {
-        'camera-up': '↑',
-        'camera-left': '←',
-        'camera-right': '→',
-        'jump': 'Jump',
-        'zoom-out': '-',
-        'toggle-light': 'L',
-        'camera-down': '↓',
-        'attack': 'Atk'
-    };
-    
-    // Create buttons according to layout
-    for (let row = 0; row < buttonLayout.length; row++) {
-        for (let col = 0; col < buttonLayout[row].length; col++) {
-            const buttonId = buttonLayout[row][col];
-            if (buttonId !== '') {
-                const button = document.createElement('div');
-                button.id = buttonId;
-                button.className = 'control-button';
-                
-                // Add special class for the jump button
-                if (buttonId === 'jump') {
-                    button.className += ' jump-button';
+    createTouchButtons() {
+        const touchControls = document.getElementById('touch-controls');
+        
+        // Clear existing content
+        touchControls.innerHTML = '';
+        
+        // Create the container for both joystick and control grid
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'controls-container';
+        touchControls.appendChild(controlsContainer);
+        
+        // Create the joystick container
+        const joystickContainer = document.createElement('div');
+        joystickContainer.id = 'joystick-container';
+        joystickContainer.className = 'joystick-container';
+        
+        // Create the joystick base (static circle)
+        const joystickBase = document.createElement('div');
+        joystickBase.id = 'joystick-base';
+        joystickBase.className = 'joystick-base';
+        
+        // Create the joystick handle (movable part)
+        const joystickHandle = document.createElement('div');
+        joystickHandle.id = 'joystick-handle';
+        joystickHandle.className = 'joystick-handle';
+        
+        // Assemble the joystick
+        joystickBase.appendChild(joystickHandle);
+        joystickContainer.appendChild(joystickBase);
+        controlsContainer.appendChild(joystickContainer);
+        
+        // Create the grid container for buttons
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'control-grid';
+        controlsContainer.appendChild(gridContainer);
+        
+        // Define the button layout using a 3x3 grid
+        const buttonLayout = [
+            ['toggle-light', 'camera-up', 'attack'],
+            ['camera-left', 'jump', 'camera-right'],
+            ['zoom-out', 'camera-down', '']  // Empty string for no button
+        ];
+        
+        // Define button icons
+        const buttonIcons = {
+            'camera-up': '↑',
+            'camera-left': '←',
+            'camera-right': '→',
+            'jump': 'Jump',
+            'zoom-out': '-',
+            'toggle-light': 'L',
+            'camera-down': '↓',
+            'attack': 'Atk'
+        };
+        
+        // Create buttons according to layout
+        for (let row = 0; row < buttonLayout.length; row++) {
+            for (let col = 0; col < buttonLayout[row].length; col++) {
+                const buttonId = buttonLayout[row][col];
+                if (buttonId !== '') {
+                    const button = document.createElement('div');
+                    button.id = buttonId;
+                    button.className = 'control-button';
+                    
+                    // Add special class for the jump button
+                    if (buttonId === 'jump') {
+                        button.className += ' jump-button';
+                    }
+                    
+                    button.textContent = buttonIcons[buttonId];
+                    
+                    // Position the button in the grid
+                    button.style.gridRow = row + 1;
+                    button.style.gridColumn = col + 1;
+                    
+                    gridContainer.appendChild(button);
+                    
+                    // Store button reference
+                    this.buttons[buttonId] = button;
                 }
-                
-                button.textContent = buttonIcons[buttonId];
-                
-                // Position the button in the grid
-                button.style.gridRow = row + 1;
-                button.style.gridColumn = col + 1;
-                
-                gridContainer.appendChild(button);
-                
-                // Store button reference
-                this.buttons[buttonId] = button;
             }
         }
+        
+        // Set up joystick event handlers
+        this.setupJoystickControls();
+        
+        // Adjust layout based on screen size
+        this.adjustButtonSizes();
+        window.addEventListener('resize', this.adjustButtonSizes.bind(this));
     }
-    
-    // Set up joystick event handlers
-    this.setupJoystickControls();
-    
-    // Adjust layout based on screen size
-    this.adjustButtonSizes();
-    window.addEventListener('resize', this.adjustButtonSizes.bind(this));
-}
-
-
     
     // Improved method to set up joystick controls
     setupJoystickControls() {
@@ -632,7 +639,7 @@ createTouchButtons() {
             true // Single press (don't repeat)
         );
         
-        // Camera rotation buttons - fixed to use separate callbacks
+        // Camera rotation buttons
         this.setupButtonTouch('camera-up', 
             () => this.rotateCamera(0, -0.05), 
             () => {}, // Empty release callback 
@@ -697,11 +704,13 @@ createTouchButtons() {
         
         let pressInterval;
         let buttonPressed = false; // Track if button has been pressed (for single press)
-        let buttonIdentifier = buttonId; // Store the button ID for debugging
         
-        // Handle touch/mouse events
+        // Create bound handlers that we can reference for removal
         const startPress = (e) => {
-            if (e) e.preventDefault(); // Prevent default behavior
+            if (e) {
+                e.preventDefault(); // Prevent default behavior
+                e.stopPropagation(); // Stop event propagation - THIS IS IMPORTANT
+            }
             
             // For single press buttons, only trigger once per press
             if (singlePress && buttonPressed) return;
@@ -729,7 +738,11 @@ createTouchButtons() {
         };
         
         const endPress = (e) => {
-            if (e) e.preventDefault(); // Prevent default behavior
+            if (e) {
+                e.preventDefault(); // Prevent default behavior
+                e.stopPropagation(); // Stop event propagation - THIS IS IMPORTANT
+            }
+            
             button.classList.remove('active');
             
             // Reset button pressed state
@@ -746,9 +759,13 @@ createTouchButtons() {
         };
         
         // Remove any existing event listeners to prevent duplicates
-        button.removeEventListener('mousedown', startPress);
-        button.removeEventListener('mouseup', endPress);
-        button.removeEventListener('mouseleave', endPress);
+        button.removeEventListener('mousedown', button._startPressHandler);
+        button.removeEventListener('mouseup', button._endPressHandler);
+        button.removeEventListener('mouseleave', button._endPressHandler);
+        
+        // Store handlers on the button for later removal
+        button._startPressHandler = startPress;
+        button._endPressHandler = endPress;
         
         // Add new event listeners
         button.addEventListener('mousedown', startPress);
