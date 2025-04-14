@@ -238,9 +238,9 @@ canvas {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 6px;
-    width: 130px;
-    height: 130px;
+    gap: 10px;
+    width: 160px;
+    height: 160px;
     position: relative;
     bottom: 20px;
     pointer-events: none;
@@ -258,8 +258,8 @@ canvas {
 
 /* Base button style - Cursed look */
 .control-button {
-    width: 60px;
-    height: 60px;
+    width: 75px;
+    height: 75px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -476,9 +476,14 @@ canvas {
 /* Improved responsive adjustments */
 @media (max-width: 800px) {
     .control-button {
-        width: 55px;
-        height: 55px;
+        width: 65px;
+        height: 65px;
         font-size: 20px;
+    }
+    
+    .control-grid {
+        width: 150px;
+        height: 150px;
     }
     
     .loading-content h1 {
@@ -491,7 +496,7 @@ canvas {
 }
 
 @media (max-width: 600px) {
-    .joystick-container, .control-grid {
+    .joystick-container {
         width: 110px;
         height: 110px;
     }
@@ -501,9 +506,14 @@ canvas {
         height: 110px;
     }
     
+    .control-grid {
+        width: 140px;
+        height: 140px;
+    }
+    
     .control-button {
-        width: 50px;
-        height: 50px;
+        width: 55px;
+        height: 55px;
         font-size: 18px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 3px 0 rgba(0, 0, 0, 0.8),
@@ -553,14 +563,14 @@ canvas {
     }
     
     .control-grid {
-        width: 120px;
-        height: 120px;
+        width: 130px;
+        height: 130px;
         bottom: 15px;
     }
     
     .control-button {
-        width: 40px;
-        height: 40px;
+        width: 45px;
+        height: 45px;
         font-size: 14px;
         box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
                     0 3px 0 rgba(0, 0, 0, 0.8),
