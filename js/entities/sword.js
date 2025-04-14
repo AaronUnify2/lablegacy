@@ -8,7 +8,7 @@ export class Sword {
         this.handleLength = 0.2; // Length of the handle
         
         // Sword position offset relative to camera - positioned for right hand
-        this.positionOffset = new THREE.Vector3(0.35, -0.35, -0.9);
+        this.positionOffset = new THREE.Vector3(0.45, -0.38, -0.7);
         
         // Sword animation variables
         this.bobAmount = 0.02;
@@ -27,9 +27,9 @@ export class Sword {
         // Define the custom rotation we want for the sword
         // Values control the tilt and angle of the sword
         this.swordRotation = new THREE.Euler(
-            Math.PI * 0.05,  // X rotation (forward/backward tilt)
-            -Math.PI * 0.7, // Y rotation (left/right rotation)
-            -Math.PI * 0.0  // Z rotation (clockwise/counterclockwise)
+            Math.PI * 0.25,  // X rotation - tilt forward similar to staff
+            -Math.PI * 0.7,  // Y rotation - angled outward from body
+            Math.PI * 0.9    // Z rotation - blade edge facing forward
         );
         
         // Start the animation
@@ -197,6 +197,11 @@ export class Sword {
             // Apply camera orientation first, then our custom sword rotation
             const swordQuaternion = new THREE.Quaternion().setFromEuler(this.swordRotation);
             this.sword.quaternion.copy(cameraQuaternion).multiply(swordQuaternion);
+            
+            // Similar to what the staff code does with tilt quaternion
+            const tiltQuaternion = new THREE.Quaternion();
+            tiltQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI * 0.05);
+            this.sword.quaternion.multiply(tiltQuaternion);
         }
         
         // Apply the offset in camera's local space
