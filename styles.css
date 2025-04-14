@@ -233,7 +233,7 @@ canvas {
     pointer-events: none;
 }
 
-/* Control grid - positioned on the right side */
+/* Control grid - positioned on the right side and shifted 20px left */
 .control-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -243,6 +243,7 @@ canvas {
     height: 130px;
     position: relative;
     bottom: 20px;
+    right: 20px; /* Shift 20px to the left (by adding negative right offset) */
     pointer-events: none;
 }
 
@@ -695,6 +696,7 @@ canvas {
     opacity: 0.4;
     mix-blend-mode: multiply;
 }
+
 
 /* Scanlines effect for retro/cursed feel */
 .scanlines {
