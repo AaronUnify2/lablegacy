@@ -1,38 +1,41 @@
 
 
 export class Sword {
-    constructor(scene, camera) {
-        this.scene = scene;
-        this.camera = camera;
-        this.sword = null;
-        this.swordLength = 0.8; // Length of the sword
-        this.swordWidth = 0.08; // Width of the blade
-        this.handleLength = 0.2; // Length of the handle
-        
-        // Sword position offset relative to camera - adjusted for right hand dual wielding
-        this.positionOffset = new THREE.Vector3(0.45, -0.4, -0.6);
-        
-        // Sword animation variables
-        this.bobAmount = 0.02;
-        this.swayAmount = 0.01;
-        this.bobSpeed = 2;
-        this.swaySpeed = 1.5;
-        
-        // Attack animation state
-        this.isAttacking = false;
-        this.attackAnimationTime = 0;
-        this.attackDuration = 0.3; // Duration of attack animation in seconds
-        
-        // Create and add to scene
-        this.createSword();
-        
-        // Store original positions for animation
-        this.originalPosition = this.positionOffset.clone();
-        this.originalRotation = new THREE.Euler(Math.PI * 0.25, 0, 0);
-        
-        // Start the animation
-        this.setupAnimations();
-    }
+    constructor:
+
+constructor(scene, camera) {
+    this.scene = scene;
+    this.camera = camera;
+    this.sword = null;
+    this.swordLength = 0.8; // Length of the sword
+    this.swordWidth = 0.08; // Width of the blade
+    this.handleLength = 0.2; // Length of the handle
+    
+    // Update this line for better right-hand positioning:
+    // Sword position offset relative to camera - adjusted for right hand dual wielding
+    this.positionOffset = new THREE.Vector3(0.45, -0.35, -0.6);
+    
+    // Optional: Adjust these values for better sword animation feel
+    this.bobAmount = 0.02;
+    this.swayAmount = 0.01;
+    this.bobSpeed = 2;
+    this.swaySpeed = 1.5;
+    
+    // Attack animation state
+    this.isAttacking = false;
+    this.attackAnimationTime = 0;
+    this.attackDuration = 0.3; // Duration of attack animation in seconds
+    
+    // Create and add to scene
+    this.createSword();
+    
+    // Store original positions for animation
+    this.originalPosition = this.positionOffset.clone();
+    this.originalRotation = new THREE.Euler(Math.PI * 0.25, 0, 0);
+    
+    // Start the animation
+    this.setupAnimations();
+}
     
 
     createSword() {
