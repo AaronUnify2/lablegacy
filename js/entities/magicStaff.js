@@ -1,3 +1,4 @@
+
 export class MagicStaff {
     constructor(scene, camera) {
         this.scene = scene;
@@ -13,11 +14,11 @@ export class MagicStaff {
         this.staffThickness = 0.025; // Thickness of the staff
         this.orbSize = 0.075; // Size of the glowing orb (reduced from 0.1)
         
-        // Staff position offset relative to camera - now positioned for left hand
-        this.positionOffset = new THREE.Vector3(-0.3, -0.4, -0.6);
+        // Staff position offset relative to camera - adjusted for left hand dual wielding
+        this.positionOffset = new THREE.Vector3(-0.45, -0.4, -0.6);
         
         // Orb position offset relative to camera - repositioned to top of staff
-        this.orbOffset = new THREE.Vector3(-0.3, -0.25, -0.5);
+        this.orbOffset = new THREE.Vector3(-0.45, -0.25, -0.5);
         
         // Staff animation variables
         this.bobAmount = 0.02;
@@ -44,6 +45,7 @@ export class MagicStaff {
         });
     }
     
+
     createStaff() {
         // Create the staff group to hold staff components
         this.staff = new THREE.Group();
