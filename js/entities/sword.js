@@ -26,7 +26,7 @@ export class Sword {
         
         // Store original positions for animation
         this.originalPosition = this.positionOffset.clone();
-        this.originalRotation = new THREE.Euler(Math.PI * 0.25, 0, 0);
+        this.originalRotation = new THREE.Euler(Math.PI * 0.2, -Math.PI * 0.1, 0);
         
         // Start the animation
         this.setupAnimations();
