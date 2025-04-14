@@ -385,6 +385,12 @@ export class InputManager {
         );
     }
 
+
+
+
+// Find the createTouchButtons method (around line 280-370)
+// Update the button icons and layout:
+
     createTouchButtons() {
         const touchControls = document.getElementById('touch-controls');
         
@@ -434,10 +440,10 @@ export class InputManager {
             'camera-left': '←',
             'camera-right': '→',
             'jump': 'Jump',
-            'zoom-out': '-',
+            'zoom-out': 'Sword', // Changed from '-' to 'Sword'
             'toggle-light': 'L',
             'camera-down': '↓',
-            'attack': 'Atk'
+            'attack': 'Staff' // Changed from 'Atk' to 'Staff'
         };
         
         // Create buttons according to layout
@@ -452,6 +458,16 @@ export class InputManager {
                     // Add special class for the jump button
                     if (buttonId === 'jump') {
                         button.className += ' jump-button';
+                    }
+                    
+                    // Add sword-button class to zoom-out button
+                    if (buttonId === 'zoom-out') {
+                        button.className += ' sword-button';
+                    }
+                    
+                    // Add staff-button class to attack button
+                    if (buttonId === 'attack') {
+                        button.className += ' staff-button';
                     }
                     
                     button.textContent = buttonIcons[buttonId];
@@ -475,6 +491,8 @@ export class InputManager {
         this.adjustButtonSizes();
         window.addEventListener('resize', this.adjustButtonSizes.bind(this));
     }
+
+    
     
     // Improved method to set up joystick controls
     setupJoystickControls() {
@@ -625,78 +643,17 @@ export class InputManager {
             });
         }
     }
+
+
+
+
+
+
+
+
+
+
     
-    setupButtonEventListeners() {
-        // Light toggle button
-        this.setupButtonTouch('toggle-light', 
-            () => {
-                // Dispatch a custom event that the game can listen for
-                const event = new CustomEvent('toggle-staff-light');
-                document.dispatchEvent(event);
-            }, 
-            null,
-            false,
-            true // Single press (don't repeat)
-        );
-        
-        // Camera rotation buttons
-        this.setupButtonTouch('camera-up', 
-            () => this.rotateCamera(0, -0.05), 
-            () => {}, // Empty release callback 
-            true // Continuous press
-        );
-        
-        this.setupButtonTouch('camera-down', 
-            () => this.rotateCamera(0, 0.05), 
-            () => {}, // Empty release callback
-            true // Continuous press
-        );
-        
-        this.setupButtonTouch('camera-left', 
-            () => this.rotateCamera(0.05, 0), 
-            () => {}, // Empty release callback
-            true // Continuous press
-        );
-        
-        // Camera-right button
-        this.setupButtonTouch('camera-right', 
-            () => this.rotateCamera(-0.05, 0), 
-            () => {}, // Empty release callback
-            true // Continuous press
-        );
-        
-        // Jump button
-        if (this.buttons['jump']) {
-            this.setupButtonTouch('jump', 
-                () => this.jump = true, 
-                () => this.jump = false
-            );
-        }
-        
-        // Attack button
-        this.setupButtonTouch('attack', 
-            () => {
-                // Dispatch a custom event that the game can listen for
-                const event = new CustomEvent('player-attack');
-                document.dispatchEvent(event);
-            }, 
-            null,
-            false,
-            true // Single press (don't repeat)
-        );
-        
-        // Zoom out button
-        this.setupButtonTouch('zoom-out',
-            () => {
-                // Add zoom out functionality here
-                // For example, increase the camera's FOV
-                const event = new CustomEvent('zoom-out');
-                document.dispatchEvent(event);
-            },
-            null,
-            true // Continuous press
-        );
-    }
     
     setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
         const button = this.buttons[buttonId];
