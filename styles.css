@@ -238,9 +238,9 @@ canvas {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(3, 1fr);
-    gap: 10px;
-    width: 160px;
-    height: 160px;
+    gap: 6px;
+    width: 130px;
+    height: 130px;
     position: relative;
     bottom: 20px;
     pointer-events: none;
@@ -258,8 +258,8 @@ canvas {
 
 /* Base button style - Cursed look */
 .control-button {
-    width: 75px;
-    height: 75px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
