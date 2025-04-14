@@ -8,7 +8,7 @@ export class Sword {
         this.handleLength = 0.2; // Length of the handle
         
         // Sword position offset relative to camera - adjusted for right hand dual wielding
-        this.positionOffset = new THREE.Vector3(1, -0.35, -3);
+        this.positionOffset = new THREE.Vector3(0.3, -0.35, -1);
         
         // Sword animation variables
         this.bobAmount = 0.02;
