@@ -97,7 +97,7 @@ export class Sword {
         
         // Rotate the sword to appear in a resting position
 
-this.sword.rotation.set(Math.PI * 0.25, -Math.PI * 0.15, -Math.PI * 0.5);
+// this.sword.rotation.set(Math.PI * 0.25, -Math.PI * 0.15, -Math.PI * 0.5);
         // Add the sword to the scene
         this.scene.add(this.sword);
     }
