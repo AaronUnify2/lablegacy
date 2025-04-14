@@ -384,13 +384,7 @@ export class InputManager {
             touch.clientY <= controlsRect.bottom
         );
     }
-
-
-
-
-// Find the createTouchButtons method (around line 280-370)
-// Update the button icons and layout:
-
+    
     createTouchButtons() {
         const touchControls = document.getElementById('touch-controls');
         
@@ -491,8 +485,6 @@ export class InputManager {
         this.adjustButtonSizes();
         window.addEventListener('resize', this.adjustButtonSizes.bind(this));
     }
-
-    
     
     // Improved method to set up joystick controls
     setupJoystickControls() {
@@ -643,17 +635,78 @@ export class InputManager {
             });
         }
     }
-
-
-
-
-
-
-
-
-
-
     
+    setupButtonEventListeners() {
+        // Light toggle button
+        this.setupButtonTouch('toggle-light', 
+            () => {
+                // Dispatch a custom event that the game can listen for
+                const event = new CustomEvent('toggle-staff-light');
+                document.dispatchEvent(event);
+            }, 
+            null,
+            false,
+            true // Single press (don't repeat)
+        );
+        
+        // Camera rotation buttons
+        this.setupButtonTouch('camera-up', 
+            () => this.rotateCamera(0, -0.05), 
+            () => {}, // Empty release callback 
+            true // Continuous press
+        );
+        
+        this.setupButtonTouch('camera-down', 
+            () => this.rotateCamera(0, 0.05), 
+            () => {}, // Empty release callback
+            true // Continuous press
+        );
+        
+        this.setupButtonTouch('camera-left', 
+            () => this.rotateCamera(0.05, 0), 
+            () => {}, // Empty release callback
+            true // Continuous press
+        );
+        
+        // Camera-right button
+        this.setupButtonTouch('camera-right', 
+            () => this.rotateCamera(-0.05, 0), 
+            () => {}, // Empty release callback
+            true // Continuous press
+        );
+        
+        // Jump button
+        if (this.buttons['jump']) {
+            this.setupButtonTouch('jump', 
+                () => this.jump = true, 
+                () => this.jump = false
+            );
+        }
+        
+        // Attack button (staff attack)
+        this.setupButtonTouch('attack', 
+            () => {
+                // Dispatch a custom event that the game can listen for
+                const event = new CustomEvent('player-attack');
+                document.dispatchEvent(event);
+            }, 
+            null,
+            false,
+            true // Single press (don't repeat)
+        );
+        
+        // Change zoom-out button to be sword attack button
+        this.setupButtonTouch('zoom-out',
+            () => {
+                // Dispatch sword attack event
+                const event = new CustomEvent('zoom-out');
+                document.dispatchEvent(event);
+            },
+            null,
+            false,
+            true // Change to single press
+        );
+    }
     
     setupButtonTouch(buttonId, pressCallback, releaseCallback, continuousPress = false, singlePress = false) {
         const button = this.buttons[buttonId];
