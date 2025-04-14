@@ -4,9 +4,15 @@ export class WeaponSystem {
         this.player = player;
         this.enemyManager = enemyManager;
         
-        // Weapon state
-        this.currentWeapon = "staff"; // Default to staff
-        this.attackCooldown = 0;
+        // Both weapons are active in dual wield mode
+        this.dualWieldMode = true;
+        
+        // Track last used weapon for animation cooldowns
+        this.lastUsedWeapon = "staff";
+        this.attackCooldown = {
+            staff: 0,
+            sword: 0
+        };
         
         // Set cooldown times for each weapon type
         this.cooldownTimes = {
@@ -41,9 +47,13 @@ export class WeaponSystem {
     }
     
     update(deltaTime) {
-        // Update cooldowns
-        if (this.attackCooldown > 0) {
-            this.attackCooldown -= deltaTime;
+        // Update cooldowns for both weapons
+        if (this.attackCooldown.staff > 0) {
+            this.attackCooldown.staff -= deltaTime;
+        }
+        
+        if (this.attackCooldown.sword > 0) {
+            this.attackCooldown.sword -= deltaTime;
         }
         
         // Update the crosshair targeting
@@ -70,7 +80,7 @@ export class WeaponSystem {
         document.getElementById('game-container').appendChild(this.crosshair);
     }
     
-    // Update crosshair target status
+    // Modified for dual wielding - update crosshair appearance based on weapon ranges
     updateCrosshair() {
         if (!this.player || !this.player.camera) return;
         
@@ -85,24 +95,25 @@ export class WeaponSystem {
         // Check if we're targeting an enemy
         this.currentTarget = this.checkTargetInCrosshair(raycaster);
         
-        // Update crosshair appearance
+        // Update crosshair appearance - show if target is acquired
         if (this.currentTarget) {
-            // Also consider weapon range when showing target acquired
+            // Calculate distance to determine if any weapon is in range
             const distanceToTarget = this.player.camera.position.distanceTo(this.currentTarget.group.position);
-            const inWeaponRange = distanceToTarget <= this.attackRanges[this.currentWeapon];
             
-            // Only show target acquired if in range of current weapon
-            if (inWeaponRange) {
-                this.crosshair.classList.add('target-acquired');
-                
-                // Add sword-target or staff-target class based on current weapon
-                this.crosshair.classList.remove('sword-target', 'staff-target');
-                this.crosshair.classList.add(`${this.currentWeapon}-target`);
+            // In range of either weapon
+            if (distanceToTarget <= this.attackRanges.sword) {
+                // In range of sword (and staff)
+                this.crosshair.classList.add('target-acquired', 'dual-target');
+            } else if (distanceToTarget <= this.attackRanges.staff) {
+                // Only in range of staff
+                this.crosshair.classList.add('target-acquired', 'staff-target');
+                this.crosshair.classList.remove('dual-target');
             } else {
-                this.crosshair.classList.remove('target-acquired', 'sword-target', 'staff-target');
+                // Target acquired but out of range
+                this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target');
             }
         } else {
-            this.crosshair.classList.remove('target-acquired', 'sword-target', 'staff-target');
+            this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target');
         }
     }
     
@@ -149,7 +160,7 @@ export class WeaponSystem {
             // Get the distance to the target
             const distance = hit.distance;
             
-            // We'll check the actual weapon range in the calling function
+            // Check against the maximum range of any weapon plus some buffer
             const maxRangeCheck = Math.max(this.attackRanges.staff, this.attackRanges.sword) + 5;
             
             // Get enemy index from userData
@@ -166,10 +177,11 @@ export class WeaponSystem {
     
     staffAttack() {
         // Check if attack is on cooldown
-        if (this.attackCooldown > 0) return false;
+        if (this.attackCooldown.staff > 0) return false;
         
-        // Set cooldown for staff
-        this.attackCooldown = this.cooldownTimes.staff;
+        // Set cooldown for staff - only staff cooldown, sword remains independent
+        this.attackCooldown.staff = this.cooldownTimes.staff;
+        this.lastUsedWeapon = "staff";
         
         // Get staff position and forward direction
         const staffPosition = new THREE.Vector3();
@@ -239,10 +251,11 @@ export class WeaponSystem {
     
     swordAttack() {
         // Check if attack is on cooldown
-        if (this.attackCooldown > 0) return false;
+        if (this.attackCooldown.sword > 0) return false;
         
-        // Set cooldown for sword
-        this.attackCooldown = this.cooldownTimes.sword;
+        // Set cooldown for sword - only sword cooldown, staff remains independent
+        this.attackCooldown.sword = this.cooldownTimes.sword;
+        this.lastUsedWeapon = "sword";
         
         // Get sword position
         const swordPosition = new THREE.Vector3();
@@ -748,16 +761,13 @@ export class WeaponSystem {
         thrust();
     }
     
-    // Method to toggle between weapons
-    toggleWeapon() {
-        // Switch between staff and sword
-        this.currentWeapon = this.currentWeapon === "staff" ? "sword" : "staff";
-        
-        return this.currentWeapon;
-    }
-    
-    // Method to get the current weapon range
-    getCurrentWeaponRange() {
-        return this.attackRanges[this.currentWeapon];
+    // Method to check if a weapon is ready
+    isWeaponReady(weaponType) {
+        if (weaponType === "staff") {
+            return this.attackCooldown.staff <= 0;
+        } else if (weaponType === "sword") {
+            return this.attackCooldown.sword <= 0;
+        }
+        return false;
     }
 }
