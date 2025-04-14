@@ -8,7 +8,7 @@ export class Sword {
         this.handleLength = 0.2; // Length of the handle
         
         // Sword position offset relative to camera - positioned for right hand
-        this.positionOffset = new THREE.Vector3(0.35, -0.35, -0.9);
+        this.positionOffset = new THREE.Vector3(0.5, -0.25, -0.7);
         
         // Sword animation variables
         this.bobAmount = 0.02;
@@ -27,8 +27,8 @@ export class Sword {
         // Define the custom rotation we want for the sword
         // Values control the tilt and angle of the sword
         this.swordRotation = new THREE.Euler(
-            Math.PI * 0.05,  // X rotation (forward/backward tilt)
-            -Math.PI * 0.7, // Y rotation (left/right rotation)
+            -Math.PI * 0.15,  // X rotation (forward/backward tilt)
+            -Math.PI * 0.5, // Y rotation (left/right rotation)
             -Math.PI * 0.0  // Z rotation (clockwise/counterclockwise)
         );
         
