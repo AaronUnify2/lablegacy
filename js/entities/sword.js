@@ -7,8 +7,8 @@ export class Sword {
         this.swordWidth = 0.08; // Width of the blade
         this.handleLength = 0.2; // Length of the handle
         
-        // Sword position offset relative to camera - adjusted for right hand dual wielding
-        this.positionOffset = new THREE.Vector3(0.35, -0.6, -1);
+        // Sword position offset relative to camera - positioned for right hand
+        this.positionOffset = new THREE.Vector3(0.45, -0.45, -0.8);
         
         // Sword animation variables
         this.bobAmount = 0.02;
@@ -21,18 +21,21 @@ export class Sword {
         this.attackAnimationTime = 0;
         this.attackDuration = 0.3; // Duration of attack animation in seconds
         
-        // Create and add to scene
+        // Create the sword parts and add to scene
         this.createSword();
         
-        // Store original positions for animation
-        this.originalPosition = this.positionOffset.clone();
-        this.originalRotation = new THREE.Euler(Math.PI * 0.7, -Math.PI * 0.1, -Math.PI * 0.3);
+        // Define the custom rotation we want for the sword
+        // Values control the tilt and angle of the sword
+        this.swordRotation = new THREE.Euler(
+            Math.PI * 0.4,  // X rotation (forward/backward tilt)
+            -Math.PI * 0.1, // Y rotation (left/right rotation)
+            -Math.PI * 0.2  // Z rotation (clockwise/counterclockwise)
+        );
         
         // Start the animation
         this.setupAnimations();
     }
     
-
     createSword() {
         // Create the sword group to hold sword components
         this.sword = new THREE.Group();
@@ -95,9 +98,6 @@ export class Sword {
         this.sword.add(handle);
         this.sword.add(guard);
         
-        // Rotate the sword to appear in a resting position
-
-// this.sword.rotation.set(Math.PI * 0.25, -Math.PI * 0.15, -Math.PI * 0.5);
         // Add the sword to the scene
         this.scene.add(this.sword);
     }
@@ -151,12 +151,16 @@ export class Sword {
                 // Forward slash motion (0-0.5 of animation)
                 const slashProgress = attackProgress * 2; // Normalize to 0-1 for first half
                 
-                // Adjust rotation for forward slash
-                this.sword.rotation.set(
-                    this.originalRotation.x - Math.PI * 0.4 * slashProgress, // Rotate upward
-                    this.originalRotation.y,
-                    this.originalRotation.z - Math.PI * 0.3 * slashProgress  // Rotate outward
-                );
+                // Create a modified rotation for the attack animation
+                const attackRotation = this.swordRotation.clone();
+                attackRotation.x -= Math.PI * 0.4 * slashProgress; // Rotate upward
+                attackRotation.z -= Math.PI * 0.3 * slashProgress; // Rotate outward
+                
+                // Create quaternion from attack rotation
+                const attackQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
+                
+                // Set the sword's quaternion
+                this.sword.quaternion.copy(cameraQuaternion).multiply(attackQuaternion);
                 
                 // Push the sword a bit forward during slash
                 swordOffset.z -= 0.2 * slashProgress;
@@ -164,12 +168,16 @@ export class Sword {
                 // Return motion (0.5-1 of animation)
                 const returnProgress = (attackProgress - 0.5) * 2; // Normalize to 0-1 for second half
                 
-                // Return to original rotation
-                this.sword.rotation.set(
-                    this.originalRotation.x - Math.PI * 0.4 * (1 - returnProgress), // Return from upward
-                    this.originalRotation.y,
-                    this.originalRotation.z - Math.PI * 0.3 * (1 - returnProgress)  // Return from outward
-                );
+                // Create a modified rotation for the return animation
+                const returnRotation = this.swordRotation.clone();
+                returnRotation.x -= Math.PI * 0.4 * (1 - returnProgress); // Return from upward
+                returnRotation.z -= Math.PI * 0.3 * (1 - returnProgress); // Return from outward
+                
+                // Create quaternion from return rotation
+                const returnQuaternion = new THREE.Quaternion().setFromEuler(returnRotation);
+                
+                // Set the sword's quaternion
+                this.sword.quaternion.copy(cameraQuaternion).multiply(returnQuaternion);
                 
                 // Return from forward push
                 swordOffset.z -= 0.2 * (1 - returnProgress);
@@ -179,9 +187,6 @@ export class Sword {
             if (attackProgress >= 1) {
                 this.isAttacking = false;
                 this.attackAnimationTime = 0;
-                
-                // Ensure sword returns to exactly the original position
-                this.sword.rotation.copy(this.originalRotation);
             }
         } else {
             // Normal idle animation when not attacking
@@ -189,8 +194,9 @@ export class Sword {
             swordOffset.y += Math.sin(time * this.bobSpeed) * this.bobAmount;
             swordOffset.x += Math.sin(time * this.swaySpeed) * this.swayAmount;
             
-            // Reset rotation to original when not attacking
-            this.sword.rotation.copy(this.originalRotation);
+            // Apply camera orientation first, then our custom sword rotation
+            const swordQuaternion = new THREE.Quaternion().setFromEuler(this.swordRotation);
+            this.sword.quaternion.copy(cameraQuaternion).multiply(swordQuaternion);
         }
         
         // Apply the offset in camera's local space
@@ -198,10 +204,6 @@ export class Sword {
         
         // Position the sword relative to the camera
         this.sword.position.copy(cameraPosition).add(swordOffset);
-        
-        // Keep the sword oriented with the camera
-        const baseQuaternion = new THREE.Quaternion().copy(cameraQuaternion);
-        this.sword.quaternion.copy(baseQuaternion);
     }
     
     // Perform sword attack animation
