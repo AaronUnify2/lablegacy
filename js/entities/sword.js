@@ -29,7 +29,7 @@ export class Sword {
         this.swordRotation = new THREE.Euler(
             Math.PI * 0.2,  // X rotation (forward/backward tilt)
             -Math.PI * 1.3, // Y rotation (left/right rotation)
-            -Math.PI * 0  // Z rotation (clockwise/counterclockwise)
+            -Math.PI * 0.5  // Z rotation (clockwise/counterclockwise)
         );
         
         // Start the animation
