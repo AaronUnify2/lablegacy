@@ -473,6 +473,64 @@ canvas {
     }
 }
 
+/* Sword button styling */
+.sword-button {
+    background: radial-gradient(circle at 30% 30%, #664433, #442211) !important;
+    border-color: #aa7755 !important;
+    color: #ffddbb;
+    font-size: 14px !important;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 221, 187, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(170, 119, 85, 0.4) !important;
+    animation: pulse-sword 2s infinite alternate;
+}
+
+.sword-button.active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 1px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.7),
+                0 0 20px rgba(170, 119, 85, 0.7) !important;
+}
+
+@keyframes pulse-sword {
+    0% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(170, 119, 85, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 15px rgba(170, 119, 85, 0.6);
+    }
+    100% {
+        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                    0 4px 0 rgba(0, 0, 0, 0.8),
+                    inset 0 0 10px rgba(0, 0, 0, 0.5),
+                    0 0 8px rgba(170, 119, 85, 0.4);
+    }
+}
+
+/* Staff button styling */
+.staff-button {
+    background: radial-gradient(circle at 30% 30%, #334466, #112244) !important;
+    border-color: #3366aa !important;
+    color: #aaccff;
+    font-size: 14px !important;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
+                0 4px 0 rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(51, 102, 255, 0.4) !important;
+}
+
 /* Improved responsive adjustments */
 @media (max-width: 800px) {
     .control-button {
@@ -654,6 +712,7 @@ canvas {
     pointer-events: none;
     z-index: 6;
     opacity: 0.1;
+    mix-blend-mode: overlay
     mix-blend-mode: overlay;
 }
 
@@ -756,6 +815,28 @@ canvas {
     background-color: rgba(255, 100, 100, 0.9);
     box-shadow: 0 0 2px rgba(255, 0, 0, 0.7);
 }
+
+/* Crosshair styles for different weapon targets */
+.crosshair.sword-target .crosshair-circle {
+    border-color: rgba(255, 200, 100, 0.9);
+    box-shadow: 0 0 5px rgba(255, 150, 0, 0.5);
+}
+
+.crosshair.sword-target .crosshair-dot {
+    background-color: rgba(255, 200, 100, 0.9);
+    box-shadow: 0 0 2px rgba(255, 150, 0, 0.7);
+}
+
+.crosshair.staff-target .crosshair-circle {
+    border-color: rgba(100, 150, 255, 0.9);
+    box-shadow: 0 0 5px rgba(0, 100, 255, 0.5);
+}
+
+.crosshair.staff-target .crosshair-dot {
+    background-color: rgba(100, 150, 255, 0.9);
+    box-shadow: 0 0 2px rgba(0, 100, 255, 0.7);
+}
+
 /* Swipe indicator - only shown when swipe is active */
 .swipe-indicator {
     position: fixed;
@@ -850,86 +931,4 @@ canvas {
 @keyframes fadeOut {
     0% { opacity: 0.1; }
     100% { opacity: 0; }
-}
-
-
-/* Add these classes to the existing styles.css file */
-
-/* Sword button styling */
-.sword-button {
-    background: radial-gradient(circle at 30% 30%, #664433, #442211) !important;
-    border-color: #aa7755 !important;
-    color: #ffddbb;
-    font-size: 14px !important;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(255, 221, 187, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(170, 119, 85, 0.4) !important;
-    animation: pulse-sword 2s infinite alternate;
-}
-
-.sword-button.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(170, 119, 85, 0.7) !important;
-}
-
-@keyframes pulse-sword {
-    0% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(170, 119, 85, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 15px rgba(170, 119, 85, 0.6);
-    }
-    100% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(170, 119, 85, 0.4);
-    }
-}
-
-/* Staff button styling */
-.staff-button {
-    background: radial-gradient(circle at 30% 30%, #334466, #112244) !important;
-    border-color: #3366aa !important;
-    color: #aaccff;
-    font-size: 14px !important;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(51, 102, 255, 0.4) !important;
-}
-
-/* Crosshair styles for different weapon targets */
-.crosshair.sword-target .crosshair-circle {
-    border-color: rgba(255, 200, 100, 0.9);
-    box-shadow: 0 0 5px rgba(255, 150, 0, 0.5);
-}
-
-.crosshair.sword-target .crosshair-dot {
-    background-color: rgba(255, 200, 100, 0.9);
-    box-shadow: 0 0 2px rgba(255, 150, 0, 0.7);
-}
-
-.crosshair.staff-target .crosshair-circle {
-    border-color: rgba(100, 150, 255, 0.9);
-    box-shadow: 0 0 5px rgba(0, 100, 255, 0.5);
-}
-
-.crosshair.staff-target .crosshair-dot {
-    background-color: rgba(100, 150, 255, 0.9);
-    box-shadow: 0 0 2px rgba(0, 100, 255, 0.7);
 }
