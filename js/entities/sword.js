@@ -28,7 +28,7 @@ export class Sword {
         // Values control the tilt and angle of the sword
         this.swordRotation = new THREE.Euler(
             Math.PI * 0.2,  // X rotation (forward/backward tilt)
-            Math.PI * 0.3, // Y rotation (left/right rotation)
+            -Math.PI * 1.3, // Y rotation (left/right rotation)
             -Math.PI * 0  // Z rotation (clockwise/counterclockwise)
         );
         
