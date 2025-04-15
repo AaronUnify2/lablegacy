@@ -954,43 +954,80 @@ class Game {
             }
         }
     }
+
+
+
+
+
+
+
+
     
-    // New method for collecting mana orbs
-    collectManaOrb(orbMesh, manaAmount) {
-        // Add mana to player's weapon system
-        if (this.weaponSystem) {
-            // Add mana, capped at max
-            this.weaponSystem.manaSystem.current = Math.min(
-                this.weaponSystem.manaSystem.max,
-                this.weaponSystem.manaSystem.current + manaAmount
-            );
-            
-            // Update display
-            this.weaponSystem.updateManaDisplay();
-            
-            // Show message
-            this.showMessage(`+${manaAmount} Mana`);
-        }
+// Fixed version of collectManaOrb method
+collectManaOrb(orbMesh, manaAmount) {
+    // Add mana to player's weapon system
+    if (this.weaponSystem) {
+        // Add mana, capped at max
+        this.weaponSystem.manaSystem.current = Math.min(
+            this.weaponSystem.manaSystem.max,
+            this.weaponSystem.manaSystem.current + manaAmount
+        );
         
-        // Play collection sound
-        this.playManaCollectSound();
+        // Update display
+        this.weaponSystem.updateManaDisplay();
         
-        // Create collection effect
-        this.showManaCollectEffect(orbMesh.position);
-        
-        // Remove orb from scene
-        this.scene.remove(orbMesh);
-        
-        // Remove from animation system if it exists
-        if (window.animatedOrbs) {
-            const index = window.animatedOrbs.indexOf(orbMesh);
-            if (index !== -1) {
-                window.animatedOrbs.splice(index, 1);
-            }
-        }
-        
-        console.log(`Collected mana orb: +${manaAmount} mana`);
+        // Show message
+        this.showMessage(`+${manaAmount} Mana`);
     }
+    
+    // Try-catch for possible audio errors
+    try {
+        // Simple beep sound if mana_collect.mp3 doesn't exist
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+        
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+        console.log('Audio system error:', e);
+    }
+    
+    // Safer collection effect without particles
+    const flashLight = new THREE.PointLight(0x3366ff, 3, 5);
+    flashLight.position.copy(orbMesh.position);
+    this.renderer.scene.add(flashLight);
+    
+    // Simple fade animation for the light
+    setTimeout(() => {
+        this.renderer.scene.remove(flashLight);
+    }, 300);
+    
+    // Safely remove orb from scene
+    this.renderer.scene.remove(orbMesh);
+    
+    // Safer way to remove from animation system
+    if (window.animatedOrbs) {
+        const index = window.animatedOrbs.indexOf(orbMesh);
+        if (index !== -1) {
+            window.animatedOrbs.splice(index, 1);
+        }
+    }
+    
+    console.log(`Collected mana orb: +${manaAmount} mana`);
+}
+
+
+
+    
     
     // New method for mana collect sound
     playManaCollectSound() {
