@@ -104,6 +104,12 @@ class Game {
             
             // NEW: Spawn King Cylindars in cardinal rooms
             this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
+
+// NEW: Spawn Shadow Crawlers in cardinal rooms (5 per room)
+this.enemyManager.spawnShadowCrawlersInCardinalRooms(dungeon.rooms, 5);
+
+console.log("Spawned both King Cylindars and Shadow Crawlers in cardinal rooms");
+
             
             // Create weapon system
             this.weaponSystem = new WeaponSystem(this.renderer.scene, this.player, this.enemyManager);
