@@ -102,6 +102,9 @@ class Game {
             // Create enemy manager
             this.enemyManager = new EnemyManager(this.renderer.scene, this.collisionManager, this.player);
             
+            // NEW: Spawn King Cylindars in cardinal rooms
+            this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
+            
             // Create weapon system
             this.weaponSystem = new WeaponSystem(this.renderer.scene, this.player, this.enemyManager);
             
@@ -120,6 +123,9 @@ class Game {
             // Start regular ground checks to prevent falling through terrain
             this.enableFallSafety();
             
+            // NEW: Set up screen shake effect for King Cylindar deaths
+            this.setupScreenShakeEffect();
+            
             // Hide loading screen with slight delay for dramatic effect
             setTimeout(() => {
                 this.loadingScreen.classList.add('fade-out');
@@ -137,6 +143,54 @@ class Game {
         } catch (error) {
             console.error('Error initializing game:', error);
         }
+    }
+    
+    // NEW: Setup Screen Shake Effect for King Cylindar deaths
+    setupScreenShakeEffect() {
+        // Listen for screen shake events
+        document.addEventListener('screen-shake', (event) => {
+            const intensity = event.detail?.intensity || 0.3;
+            const duration = event.detail?.duration || 0.5;
+            
+            this.applyScreenShake(intensity, duration);
+        });
+    }
+    
+    // NEW: Apply Screen Shake Effect
+    applyScreenShake(intensity, duration) {
+        const camera = this.renderer.camera;
+        const originalPosition = camera.position.clone();
+        
+        const startTime = performance.now();
+        
+        const shakeAnimation = () => {
+            const elapsed = (performance.now() - startTime) / 1000;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Decreasing intensity as the shake progresses
+            const currentIntensity = intensity * (1 - progress);
+            
+            // Apply random offsets to camera position
+            const offsetX = (Math.random() * 2 - 1) * currentIntensity;
+            const offsetY = (Math.random() * 2 - 1) * currentIntensity;
+            const offsetZ = (Math.random() * 2 - 1) * currentIntensity * 0.5; // Less Z-axis movement
+            
+            camera.position.set(
+                originalPosition.x + offsetX,
+                originalPosition.y + offsetY,
+                originalPosition.z + offsetZ
+            );
+            
+            if (progress < 1) {
+                requestAnimationFrame(shakeAnimation);
+            } else {
+                // Reset to original position when done
+                camera.position.copy(originalPosition);
+            }
+        };
+        
+        // Start shake animation
+        shakeAnimation();
     }
     
     createHealthDisplay() {
@@ -789,9 +843,9 @@ class Game {
             this.sounds.staffHum.volume = 0.2;
             this.sounds.staffHum.play().catch(() => {});
         }
-    }
-    
-    update(currentTime) {
+            }
+
+update(currentTime) {
         if (!this.isRunning) return;
         
         // Calculate delta time in seconds
@@ -955,79 +1009,81 @@ class Game {
         }
     }
 
-
-
-
-
-
-
-
-    
-// Fixed version of collectManaOrb method
-collectManaOrb(orbMesh, manaAmount) {
-    // Add mana to player's weapon system
-    if (this.weaponSystem) {
-        // Add mana, capped at max
-        this.weaponSystem.manaSystem.current = Math.min(
-            this.weaponSystem.manaSystem.max,
-            this.weaponSystem.manaSystem.current + manaAmount
-        );
-        
-        // Update display
-        this.weaponSystem.updateManaDisplay();
-        
-        // Show message
-        this.showMessage(`+${manaAmount} Mana`);
-    }
-    
-    // Try-catch for possible audio errors
-    try {
-        // Simple beep sound if mana_collect.mp3 doesn't exist
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
-        
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.5);
-    } catch (e) {
-        console.log('Audio system error:', e);
-    }
-    
-    // Safer collection effect without particles
-    const flashLight = new THREE.PointLight(0x3366ff, 3, 5);
-    flashLight.position.copy(orbMesh.position);
-    this.renderer.scene.add(flashLight);
-    
-    // Simple fade animation for the light
-    setTimeout(() => {
-        this.renderer.scene.remove(flashLight);
-    }, 300);
-    
-    // Safely remove orb from scene
-    this.renderer.scene.remove(orbMesh);
-    
-    // Safer way to remove from animation system
-    if (window.animatedOrbs) {
-        const index = window.animatedOrbs.indexOf(orbMesh);
-        if (index !== -1) {
-            window.animatedOrbs.splice(index, 1);
+    // Fixed version of collectManaOrb method
+    collectManaOrb(orbMesh, manaAmount) {
+        // Add mana to player's weapon system
+        if (this.weaponSystem) {
+            // Add mana, capped at max
+            this.weaponSystem.manaSystem.current = Math.min(
+                this.weaponSystem.manaSystem.max,
+                this.weaponSystem.manaSystem.current + manaAmount
+            );
+            
+            // Update display
+            this.weaponSystem.updateManaDisplay();
+            
+            // Show message
+            this.showMessage(`+${manaAmount} Mana`);
         }
+        
+        // Try-catch for possible audio errors
+        try {
+            // Simple beep sound if mana_collect.mp3 doesn't exist
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4 note
+            
+            const gainNode = audioCtx.createGain();
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        } catch (e) {
+            console.log('Audio system error:', e);
+        }
+        
+        // Safer collection effect without particles
+        const flashLight = new THREE.PointLight(0x3366ff, 3, 5);
+        flashLight.position.copy(orbMesh.position);
+        this.renderer.scene.add(flashLight);
+        
+        // Simple fade animation for the light
+        setTimeout(() => {
+            this.renderer.scene.remove(flashLight);
+        }, 300);
+        
+        // Safely remove orb from scene
+        this.renderer.scene.remove(orbMesh);
+        
+        // Safer way to remove from animation system
+        if (window.animatedOrbs) {
+            const index = window.animatedOrbs.indexOf(orbMesh);
+            if (index !== -1) {
+                window.animatedOrbs.splice(index, 1);
+            }
+        }
+        
+        // Check for King Cylindar orbs (special larger orbs)
+        if (orbMesh.userData && orbMesh.userData.isKingOrb) {
+            // Display special message for king orb collection
+            this.showMessage(`Collected a King's Mana Orb: +${manaAmount} Mana!`);
+            
+            // Remove from king orb animation system too
+            if (window.animatedKingOrbs) {
+                const kingIndex = window.animatedKingOrbs.indexOf(orbMesh);
+                if (kingIndex !== -1) {
+                    window.animatedKingOrbs.splice(kingIndex, 1);
+                }
+            }
+        }
+        
+        console.log(`Collected mana orb: +${manaAmount} mana`);
     }
-    
-    console.log(`Collected mana orb: +${manaAmount} mana`);
-}
-
-
-
-    
     
     // New method for mana collect sound
     playManaCollectSound() {
