@@ -114,6 +114,9 @@ class Game {
             // Create health display
             this.createHealthDisplay();
             
+            // Create mana display
+            this.createManaDisplay();
+            
             // Start regular ground checks to prevent falling through terrain
             this.enableFallSafety();
             
@@ -166,6 +169,35 @@ class Game {
         
         // Update health display
         this.updateHealthDisplay();
+    }
+    
+    createManaDisplay() {
+        // Create mana display container
+        this.manaDisplay = document.createElement('div');
+        this.manaDisplay.id = 'mana-display';
+        
+        // Create mana bar background
+        this.manaBar = document.createElement('div');
+        this.manaBar.id = 'mana-bar';
+        
+        // Create mana bar fill
+        this.manaBarFill = document.createElement('div');
+        this.manaBarFill.id = 'mana-bar-fill';
+        
+        // Add mana bar fill to mana bar
+        this.manaBar.appendChild(this.manaBarFill);
+        
+        // Create mana text
+        this.manaText = document.createElement('div');
+        this.manaText.id = 'mana-text';
+        this.manaText.textContent = '0/100';
+        
+        // Add mana bar and text to mana display
+        this.manaDisplay.appendChild(this.manaBar);
+        this.manaDisplay.appendChild(this.manaText);
+        
+        // Add mana display to game container
+        document.getElementById('game-container').appendChild(this.manaDisplay);
     }
     
     updateHealthDisplay() {
@@ -812,6 +844,9 @@ class Game {
             this.updateHealthDisplay();
         }
         
+        // Check for mana orb collisions
+        this.checkManaOrbCollisions();
+        
         // Render the scene with time parameter for effects
         this.renderer.render(currentTime);
         
@@ -883,6 +918,174 @@ class Game {
             
             this.player.magicStaff.setLightIntensity(2.5 * curseEffect + flickerIntensity);
         }
+    }
+    
+    // New method for handling mana orb collisions
+    checkManaOrbCollisions() {
+        if (!this.collisionManager) return;
+        
+        // Get player position
+        const playerPos = this.renderer.camera.position;
+        
+        // Check all colliders
+        for (let i = 0; i < this.collisionManager.colliders.length; i++) {
+            const collider = this.collisionManager.colliders[i];
+            
+            // Skip if not a mana orb
+            if (!collider || !collider.isManaOrb) continue;
+            
+            // Calculate distance to player
+            const orbPos = collider.object.position;
+            const distance = playerPos.distanceTo(orbPos);
+            
+            // Collect orb if player is close enough
+            if (distance < 2.0) { // 2-meter pickup radius
+                // Get mana amount
+                const manaAmount = collider.manaAmount || 30; // Default to 30 if not specified
+                
+                // Add mana to player
+                this.collectManaOrb(collider.object, manaAmount);
+                
+                // Remove collider
+                this.collisionManager.removeCollider(i);
+                
+                // We've processed this orb, no need to check others this frame
+                break;
+            }
+        }
+    }
+    
+    // New method for collecting mana orbs
+    collectManaOrb(orbMesh, manaAmount) {
+        // Add mana to player's weapon system
+        if (this.weaponSystem) {
+            // Add mana, capped at max
+            this.weaponSystem.manaSystem.current = Math.min(
+                this.weaponSystem.manaSystem.max,
+                this.weaponSystem.manaSystem.current + manaAmount
+            );
+            
+            // Update display
+            this.weaponSystem.updateManaDisplay();
+            
+            // Show message
+            this.showMessage(`+${manaAmount} Mana`);
+        }
+        
+        // Play collection sound
+        this.playManaCollectSound();
+        
+        // Create collection effect
+        this.showManaCollectEffect(orbMesh.position);
+        
+        // Remove orb from scene
+        this.scene.remove(orbMesh);
+        
+        // Remove from animation system if it exists
+        if (window.animatedOrbs) {
+            const index = window.animatedOrbs.indexOf(orbMesh);
+            if (index !== -1) {
+                window.animatedOrbs.splice(index, 1);
+            }
+        }
+        
+        console.log(`Collected mana orb: +${manaAmount} mana`);
+    }
+    
+    // New method for mana collect sound
+    playManaCollectSound() {
+        try {
+            const collectSound = new Audio('sounds/mana_collect.mp3');
+            collectSound.volume = 0.3;
+            collectSound.play().catch(error => {
+                console.log('Audio playback failed:', error);
+            });
+        } catch (e) {
+            console.log('Error playing mana collect sound', e);
+        }
+    }
+    
+    // New method for mana collection effect
+    showManaCollectEffect(position) {
+        // Create particles for collection effect
+        const particleCount = 10;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x3366ff,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            particle.position.copy(position);
+            
+            // Random velocity outward
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.05 + Math.random() * 0.1;
+            particle.velocity = new THREE.Vector3(
+                Math.cos(angle) * speed,
+                0.1 + Math.random() * 0.2,
+                Math.sin(angle) * speed
+            );
+            
+            this.renderer.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Create a flash effect
+        const flash = new THREE.PointLight(0x3366ff, 3, 5);
+        flash.position.copy(position);
+        this.renderer.scene.add(flash);
+        
+        // Animate the particles
+        const duration = 0.8; // seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Update particles
+            for (const particle of particles) {
+                // Move particle
+                particle.position.add(particle.velocity);
+                
+                // Apply gravity
+                particle.velocity.y -= 0.01;
+                
+                // Shrink and fade
+                const scale = 1 - progress;
+                particle.scale.set(scale, scale, scale);
+                
+                if (particle.material) {
+                    particle.material.opacity = 0.7 * (1 - progress);
+                }
+            }
+            
+            // Fade flash
+            if (flash) {
+                flash.intensity = 3 * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up
+                for (const particle of particles) {
+                    this.renderer.scene.remove(particle);
+                    if (particle.material) particle.material.dispose();
+                    if (particle.geometry) particle.geometry.dispose();
+                }
+                
+                this.renderer.scene.remove(flash);
+            }
+        };
+        
+        animate();
     }
 }
 
