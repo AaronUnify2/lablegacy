@@ -19,8 +19,10 @@ export class Sword {
         // Attack animation state
         this.isAttacking = false;
         this.attackAnimationTime = 0;
-        this.attackDuration = 0.5; // Increased duration for even more dramatic wind-up
-        this.windUpPortion = 0.4; // 40% of animation is wind-up for more exaggeration
+        this.attackDuration = 0.6; // Increased overall duration for more follow-through
+        this.windUpPortion = 0.35; // Slightly reduced wind-up portion
+        this.slashPortion = 0.35; // New portion for the main slash
+        // Remaining 0.3 (30%) is follow-through
         
         // Create the sword parts and add to scene
         this.createSword();
@@ -152,7 +154,7 @@ export class Sword {
             const attackRotation = this.swordRotation.clone();
             
             if (attackProgress < this.windUpPortion) {
-                // Wind-up phase - EXTREME raise of the sword up and back
+                // PHASE 1: Wind-up phase - EXTREME raise of the sword up and back
                 const windUpProgress = attackProgress / this.windUpPortion; // Normalize to 0-1 for wind-up
                 
                 // Dramatic raise sword high up and far back - like a madman
@@ -176,19 +178,31 @@ export class Sword {
                 swordOffset.y += 0.35 * windUpProgress; // Much higher upward movement
                 swordOffset.z += 0.3 * windUpProgress;  // Pull far back
                 swordOffset.x += 0.15 * windUpProgress; // Pull slightly right for dramatic wind-up
-            } else {
-                // Slash phase - diagonal down-left motion
-                const slashProgress = (attackProgress - this.windUpPortion) / (1 - this.windUpPortion); // Normalize to 0-1 for slash
+            } 
+            else if (attackProgress < (this.windUpPortion + this.slashPortion)) {
+                // PHASE 2: Main slash phase - FEROCIOUS diagonal down-left motion
+                const slashProgress = (attackProgress - this.windUpPortion) / this.slashPortion; // Normalize to 0-1 for slash
                 
-                // Start from the wound-up position
-                attackRotation.x += Math.PI * 0.3 * (1 - slashProgress); // Start from raised position
-                attackRotation.y -= Math.PI * 0.1 * (1 - slashProgress); // Start from right-rotated position
-                attackRotation.z += Math.PI * 0.15 * (1 - slashProgress); // Start from tilted position
+                // Easing function for a more explosive start to the slash
+                const easedSlashProgress = Math.pow(slashProgress, 0.6); // Front-loaded easing
                 
-                // Add the slash motion - moving down and to the left
-                attackRotation.x -= Math.PI * 0.5 * slashProgress; // Sharp downward rotation
-                attackRotation.y += Math.PI * 0.3 * slashProgress; // Rotate toward left
-                attackRotation.z -= Math.PI * 0.4 * slashProgress; // Enhanced rotation for diagonal
+                // Start from the extreme wound-up position
+                attackRotation.x += Math.PI * 0.7 * (1 - slashProgress); // Start from high raised position
+                attackRotation.y -= Math.PI * 0.25 * (1 - slashProgress); // Start from right-rotated position
+                attackRotation.z += Math.PI * 0.4 * (1 - slashProgress); // Start from extreme tilted position
+                
+                // Add the violent slash motion - moving down and to the left with extreme force
+                attackRotation.x -= Math.PI * 0.9 * easedSlashProgress; // Very sharp downward rotation
+                attackRotation.y += Math.PI * 0.5 * easedSlashProgress; // Strong rotate toward left
+                attackRotation.z -= Math.PI * 0.7 * easedSlashProgress; // Extreme rotation for diagonal
+                
+                // Add a slight blur-like effect by oscillating very quickly during the slash
+                if (slashProgress < 0.7) { // Only during the main part of the slash
+                    const blurFrequency = 40;
+                    const blurAmount = 0.08 * (1 - slashProgress); // Diminishing over time
+                    attackRotation.y += Math.sin(time * blurFrequency) * blurAmount;
+                    attackRotation.z += Math.cos(time * blurFrequency) * blurAmount;
+                }
                 
                 // Create quaternion from slash rotation
                 const slashQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
@@ -196,15 +210,68 @@ export class Sword {
                 // Set the sword's quaternion
                 this.sword.quaternion.copy(cameraQuaternion).multiply(slashQuaternion);
                 
-                // Start position offsets from the wound-up position
-                swordOffset.y += 0.15 * (1 - slashProgress); // Start from raised position
-                swordOffset.z += 0.1 * (1 - slashProgress);  // Start from pulled back position
-                swordOffset.x -= 0.05 * (1 - slashProgress); // Start from initial left adjustment
+                // Start position offsets from the extreme wound-up position
+                swordOffset.y += 0.35 * (1 - slashProgress); // Start from high raised position
+                swordOffset.z += 0.3 * (1 - slashProgress);  // Start from pulled back position
+                swordOffset.x += 0.15 * (1 - slashProgress); // Start from right position
                 
-                // Add the diagonal down-left cutting motion
-                swordOffset.y -= 0.25 * slashProgress;  // Sharp downward movement
-                swordOffset.x -= 0.3 * slashProgress;   // Strong leftward movement
-                swordOffset.z -= 0.15 * slashProgress;  // Forward movement for the slash
+                // Add the ferocious diagonal down-left cutting motion
+                swordOffset.y -= 0.45 * easedSlashProgress;  // Extreme downward movement
+                swordOffset.x -= 0.5 * easedSlashProgress;   // Extreme leftward movement
+                swordOffset.z -= 0.3 * easedSlashProgress;   // Strong forward movement for the slash
+            }
+            else {
+                // PHASE 3: Follow-through phase - extend the slash and add weight to it
+                const followThroughProgress = (attackProgress - (this.windUpPortion + this.slashPortion)) / (1 - this.windUpPortion - this.slashPortion);
+                
+                // Easing function for realistic deceleration in follow-through
+                const easedFollowThrough = 1 - Math.pow(1 - followThroughProgress, 2); // Ease-out quad
+                
+                // Start from the end position of the main slash
+                const endSlashRotation = {
+                    x: this.swordRotation.x - Math.PI * 0.9,
+                    y: this.swordRotation.y + Math.PI * 0.5,
+                    z: this.swordRotation.z - Math.PI * 0.7
+                };
+                
+                // Continue the motion downward but with gradually decreasing speed
+                attackRotation.x = endSlashRotation.x - Math.PI * 0.2 * easedFollowThrough; // Continue downward
+                attackRotation.y = endSlashRotation.y + Math.PI * 0.15 * easedFollowThrough; // Continue leftward
+                attackRotation.z = endSlashRotation.z - Math.PI * 0.1 * easedFollowThrough; // Continue rotation
+                
+                // Add a slight oscillation to simulate the impact and weight of the sword
+                const impactFrequency = 20;
+                const impactAmount = 0.05 * (1 - easedFollowThrough); // Diminishing over time
+                attackRotation.x += Math.sin(time * impactFrequency) * impactAmount;
+                
+                // Create quaternion from follow-through rotation
+                const followThroughQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+                    attackRotation.x, 
+                    attackRotation.y, 
+                    attackRotation.z
+                ));
+                
+                // Set the sword's quaternion
+                this.sword.quaternion.copy(cameraQuaternion).multiply(followThroughQuaternion);
+                
+                // Start position offsets from the end of main slash
+                const endSlashPosition = {
+                    y: this.positionOffset.y - 0.45,
+                    x: this.positionOffset.x - 0.5,
+                    z: this.positionOffset.z - 0.3
+                };
+                
+                // Continue the motion and add slight bounce/recoil at the end
+                swordOffset.y = endSlashPosition.y - 0.15 * easedFollowThrough; // Continue downward
+                swordOffset.x = endSlashPosition.x - 0.1 * easedFollowThrough;  // Continue leftward
+                swordOffset.z = endSlashPosition.z + 0.05 * easedFollowThrough; // Slight pullback after slash
+                
+                // Add a slight vibration to simulate impact
+                if (followThroughProgress < 0.6) {
+                    const vibrationAmount = 0.02 * (1 - followThroughProgress / 0.6);
+                    swordOffset.y += Math.sin(time * 30) * vibrationAmount;
+                    swordOffset.x += Math.cos(time * 30) * vibrationAmount;
+                }
             }
             
             // End of attack animation
