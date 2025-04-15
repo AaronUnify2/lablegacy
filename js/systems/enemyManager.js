@@ -752,5 +752,30 @@ export class EnemyManager {
         }
         
         return totalSpawned;
+
     }
+
+// Method to spawn Shadow Crawlers in the central room
+spawnShadowCrawlersInCentralRoom(rooms, count = 5) {
+    // Find the central room
+    const centralRoom = rooms.find(room => room.type === 'central');
+    
+    if (!centralRoom) {
+        console.log("No central room found!");
+        return [];
+    }
+    
+    if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in central room`);
+    
+    // Use the existing method to spawn crawlers in this room
+    const spawned = this.spawnShadowCrawlersInRoom(centralRoom, count);
+    
+    if (this.debug) {
+        console.log(`Spawned ${spawned.length} Shadow Crawlers in central room`);
+    }
+    
+    return spawned;
+}
+
+
 }
