@@ -199,6 +199,136 @@ canvas {
     100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
 }
 
+/* Add these styles to your styles.css file */
+
+/* Mana Display */
+#mana-display {
+    position: absolute;
+    top: 60px; /* Position below health display */
+    right: 20px;
+    display: flex;
+    align-items: center;
+    z-index: 10;
+    transition: transform 0.3s ease;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 8px 12px;
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    border-right: 3px solid #3366ff;
+}
+
+#mana-display:hover {
+    transform: scale(1.05);
+    background: rgba(0, 0, 0, 0.6);
+}
+
+/* Mana bar styling */
+#mana-bar {
+    width: 200px;
+    height: 15px;
+    background: rgba(20, 20, 20, 0.7);
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#mana-bar-fill {
+    width: 0%; /* Start with 0 mana */
+    height: 100%;
+    background: linear-gradient(to right, #3366ff, #66aaff);
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(51, 102, 255, 0.5);
+}
+
+#mana-text {
+    margin-left: 10px;
+    color: #fff;
+    text-shadow: 0 0 3px rgba(0, 0, 0, 1);
+    font-family: 'Cinzel', serif;
+    font-size: 1rem;
+    min-width: 60px;
+    text-align: center;
+}
+
+/* Pulse animation for low mana */
+@keyframes mana-pulse {
+    0% { 
+        opacity: 0.8; 
+        box-shadow: 0 0 5px rgba(51, 102, 255, 0.5); 
+        background: linear-gradient(to right, #3366ff, #66aaff);
+    }
+    50% { 
+        opacity: 1; 
+        box-shadow: 0 0 15px rgba(51, 102, 255, 0.8); 
+        background: linear-gradient(to right, #5588ff, #88ccff);
+    }
+    100% { 
+        opacity: 0.8; 
+        box-shadow: 0 0 5px rgba(51, 102, 255, 0.5); 
+        background: linear-gradient(to right, #3366ff, #66aaff);
+    }
+}
+
+.mana-pulse {
+    animation: mana-pulse 0.5s infinite alternate !important;
+}
+
+/* Low mana message styling */
+.low-mana-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #3366ff;
+    font-family: 'Cinzel', serif;
+    font-size: 1.5rem;
+    text-shadow: 0 0 10px rgba(51, 102, 255, 0.7);
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px 20px;
+    border-radius: 5px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Mana collection message styling */
+.mana-collect-message {
+    color: #66aaff;
+    text-shadow: 0 0 8px rgba(51, 102, 255, 0.8);
+    font-weight: bold;
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+    #mana-bar {
+        width: 150px;
+    }
+}
+
+@media (max-width: 600px) {
+    #mana-bar {
+        width: 120px;
+    }
+    
+    #mana-text {
+        font-size: 0.9rem;
+        min-width: 50px;
+    }
+}
+
+@media (max-width: 400px) {
+    #mana-bar {
+        width: 100px;
+    }
+    
+    #mana-text {
+        font-size: 0.8rem;
+        min-width: 45px;
+    }
+}
+
+
 /* Touch Controls - Container styling */
 #touch-controls {
     position: fixed;
