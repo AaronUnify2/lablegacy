@@ -104,10 +104,30 @@ class Game {
             
             // NEW: Spawn King Cylindars in cardinal rooms
             this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
+// In your main.js init() method, add this code after the dungeon is generated
 
-// NEW: Spawn Shadow Crawlers in cardinal rooms (5 per room)
-this.enemyManager.spawnShadowCrawlersInCardinalRooms(dungeon.rooms, 5);
+// First spawn King Cylindars in cardinal rooms as before
+this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
 
+// IMPORTANT: Use our new method to spawn shadow crawlers in the CENTRAL room
+console.log("About to spawn Shadow Crawlers in central room...");
+this.enemyManager.spawnShadowCrawlersInCentralRoom(dungeon.rooms, 5);
+console.log("Called method to spawn Shadow Crawlers in central room");
+
+// Additional debugging
+setTimeout(() => {
+    console.log("Checking enemy count after 3 seconds:");
+    console.log(`Total enemies: ${this.enemyManager.enemies.length}`);
+    
+    // Count Shadow Crawlers
+    const crawlerCount = this.enemyManager.enemies.filter(
+        e => e && e.constructor && e.constructor.name === "ShadowCrawler"
+    ).length;
+    
+    console.log(`Shadow Crawlers: ${crawlerCount}`);
+}, 3000);
+
+            
             // Create weapon system
             this.weaponSystem = new WeaponSystem(this.renderer.scene, this.player, this.enemyManager);
             
