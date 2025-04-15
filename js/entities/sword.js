@@ -153,8 +153,11 @@ export class Sword {
                 
                 // Create a modified rotation for the attack animation
                 const attackRotation = this.swordRotation.clone();
-                attackRotation.x -= Math.PI * 0.4 * slashProgress; // Rotate upward
-                attackRotation.z -= Math.PI * 0.3 * slashProgress; // Rotate outward
+                
+                // Modified for diagonal down-left slash:
+                attackRotation.x -= Math.PI * 0.3 * slashProgress; // Rotate downward (less than before)
+                attackRotation.y += Math.PI * 0.2 * slashProgress; // Rotate toward left
+                attackRotation.z -= Math.PI * 0.4 * slashProgress; // Enhanced rotation for diagonal
                 
                 // Create quaternion from attack rotation
                 const attackQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
@@ -162,16 +165,21 @@ export class Sword {
                 // Set the sword's quaternion
                 this.sword.quaternion.copy(cameraQuaternion).multiply(attackQuaternion);
                 
-                // Push the sword a bit forward during slash
-                swordOffset.z -= 0.2 * slashProgress;
+                // Push the sword in a diagonal left-down cutting motion during slash
+                swordOffset.z -= 0.15 * slashProgress; // Reduced forward push
+                swordOffset.x -= 0.25 * slashProgress; // Stronger leftward movement
+                swordOffset.y -= 0.2 * slashProgress;  // Add downward movement for diagonal cut
             } else {
                 // Return motion (0.5-1 of animation)
                 const returnProgress = (attackProgress - 0.5) * 2; // Normalize to 0-1 for second half
                 
                 // Create a modified rotation for the return animation
                 const returnRotation = this.swordRotation.clone();
-                returnRotation.x -= Math.PI * 0.4 * (1 - returnProgress); // Return from upward
-                returnRotation.z -= Math.PI * 0.3 * (1 - returnProgress); // Return from outward
+                
+                // Modified for diagonal return:
+                returnRotation.x -= Math.PI * 0.3 * (1 - returnProgress); // Return from downward
+                returnRotation.y += Math.PI * 0.2 * (1 - returnProgress); // Return from leftward
+                returnRotation.z -= Math.PI * 0.4 * (1 - returnProgress); // Return from diagonal
                 
                 // Create quaternion from return rotation
                 const returnQuaternion = new THREE.Quaternion().setFromEuler(returnRotation);
@@ -179,8 +187,10 @@ export class Sword {
                 // Set the sword's quaternion
                 this.sword.quaternion.copy(cameraQuaternion).multiply(returnQuaternion);
                 
-                // Return from forward push
-                swordOffset.z -= 0.2 * (1 - returnProgress);
+                // Return from diagonal cutting motion
+                swordOffset.z -= 0.15 * (1 - returnProgress); // Return from forward
+                swordOffset.x -= 0.25 * (1 - returnProgress); // Return from stronger leftward
+                swordOffset.y -= 0.2 * (1 - returnProgress);  // Return from downward
             }
             
             // End of attack animation
