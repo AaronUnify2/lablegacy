@@ -19,7 +19,8 @@ export class Sword {
         // Attack animation state
         this.isAttacking = false;
         this.attackAnimationTime = 0;
-        this.attackDuration = 0.3; // Duration of attack animation in seconds
+        this.attackDuration = 0.5; // Increased duration for even more dramatic wind-up
+        this.windUpPortion = 0.4; // 40% of animation is wind-up for more exaggeration
         
         // Create the sword parts and add to scene
         this.createSword();
@@ -147,50 +148,63 @@ export class Sword {
             // Update the attack animation timer
             this.attackAnimationTime += 0.016; // Assume ~60fps
             
-            if (attackProgress < 0.5) {
-                // Forward slash motion (0-0.5 of animation)
-                const slashProgress = attackProgress * 2; // Normalize to 0-1 for first half
+            // Create a modified rotation for the attack animation based on the base sword rotation
+            const attackRotation = this.swordRotation.clone();
+            
+            if (attackProgress < this.windUpPortion) {
+                // Wind-up phase - EXTREME raise of the sword up and back
+                const windUpProgress = attackProgress / this.windUpPortion; // Normalize to 0-1 for wind-up
                 
-                // Create a modified rotation for the attack animation
-                const attackRotation = this.swordRotation.clone();
+                // Dramatic raise sword high up and far back - like a madman
+                attackRotation.x += Math.PI * 0.7 * windUpProgress; // Extreme upward raise
+                attackRotation.y -= Math.PI * 0.25 * windUpProgress; // Strong rightward rotation 
+                attackRotation.z += Math.PI * 0.4 * windUpProgress; // Extreme tilt for wind-up position
                 
-                // Modified for diagonal down-left slash:
-                attackRotation.x -= Math.PI * 0.3 * slashProgress; // Rotate downward (less than before)
-                attackRotation.y += Math.PI * 0.2 * slashProgress; // Rotate toward left
+                // Add a slight wobble to the wind-up for a berserker feel
+                const wobbleAmount = 0.1;
+                const wobbleSpeed = 15;
+                attackRotation.x += Math.sin(time * wobbleSpeed) * wobbleAmount * windUpProgress;
+                attackRotation.z += Math.cos(time * wobbleSpeed) * wobbleAmount * windUpProgress;
+                
+                // Create quaternion from wind-up rotation
+                const windUpQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
+                
+                // Set the sword's quaternion
+                this.sword.quaternion.copy(cameraQuaternion).multiply(windUpQuaternion);
+                
+                // Dramatically raise the sword high up and far back during wind-up
+                swordOffset.y += 0.35 * windUpProgress; // Much higher upward movement
+                swordOffset.z += 0.3 * windUpProgress;  // Pull far back
+                swordOffset.x += 0.15 * windUpProgress; // Pull slightly right for dramatic wind-up
+            } else {
+                // Slash phase - diagonal down-left motion
+                const slashProgress = (attackProgress - this.windUpPortion) / (1 - this.windUpPortion); // Normalize to 0-1 for slash
+                
+                // Start from the wound-up position
+                attackRotation.x += Math.PI * 0.3 * (1 - slashProgress); // Start from raised position
+                attackRotation.y -= Math.PI * 0.1 * (1 - slashProgress); // Start from right-rotated position
+                attackRotation.z += Math.PI * 0.15 * (1 - slashProgress); // Start from tilted position
+                
+                // Add the slash motion - moving down and to the left
+                attackRotation.x -= Math.PI * 0.5 * slashProgress; // Sharp downward rotation
+                attackRotation.y += Math.PI * 0.3 * slashProgress; // Rotate toward left
                 attackRotation.z -= Math.PI * 0.4 * slashProgress; // Enhanced rotation for diagonal
                 
-                // Create quaternion from attack rotation
-                const attackQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
+                // Create quaternion from slash rotation
+                const slashQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
                 
                 // Set the sword's quaternion
-                this.sword.quaternion.copy(cameraQuaternion).multiply(attackQuaternion);
+                this.sword.quaternion.copy(cameraQuaternion).multiply(slashQuaternion);
                 
-                // Push the sword in a diagonal left-down cutting motion during slash
-                swordOffset.z -= 0.15 * slashProgress; // Reduced forward push
-                swordOffset.x -= 0.25 * slashProgress; // Stronger leftward movement
-                swordOffset.y -= 0.2 * slashProgress;  // Add downward movement for diagonal cut
-            } else {
-                // Return motion (0.5-1 of animation)
-                const returnProgress = (attackProgress - 0.5) * 2; // Normalize to 0-1 for second half
+                // Start position offsets from the wound-up position
+                swordOffset.y += 0.15 * (1 - slashProgress); // Start from raised position
+                swordOffset.z += 0.1 * (1 - slashProgress);  // Start from pulled back position
+                swordOffset.x -= 0.05 * (1 - slashProgress); // Start from initial left adjustment
                 
-                // Create a modified rotation for the return animation
-                const returnRotation = this.swordRotation.clone();
-                
-                // Modified for diagonal return:
-                returnRotation.x -= Math.PI * 0.3 * (1 - returnProgress); // Return from downward
-                returnRotation.y += Math.PI * 0.2 * (1 - returnProgress); // Return from leftward
-                returnRotation.z -= Math.PI * 0.4 * (1 - returnProgress); // Return from diagonal
-                
-                // Create quaternion from return rotation
-                const returnQuaternion = new THREE.Quaternion().setFromEuler(returnRotation);
-                
-                // Set the sword's quaternion
-                this.sword.quaternion.copy(cameraQuaternion).multiply(returnQuaternion);
-                
-                // Return from diagonal cutting motion
-                swordOffset.z -= 0.15 * (1 - returnProgress); // Return from forward
-                swordOffset.x -= 0.25 * (1 - returnProgress); // Return from stronger leftward
-                swordOffset.y -= 0.2 * (1 - returnProgress);  // Return from downward
+                // Add the diagonal down-left cutting motion
+                swordOffset.y -= 0.25 * slashProgress;  // Sharp downward movement
+                swordOffset.x -= 0.3 * slashProgress;   // Strong leftward movement
+                swordOffset.z -= 0.15 * slashProgress;  // Forward movement for the slash
             }
             
             // End of attack animation
