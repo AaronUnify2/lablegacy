@@ -1,5 +1,6 @@
 import { Enemy } from '../entities/enemy.js';
 import { KingCylindar } from '../entities/KingCylindar.js';
+import { ShadowCrawler } from '../entities/ShadowCrawler.js';
 
 export class EnemyManager {
     constructor(scene, collisionManager, player) {
@@ -629,5 +630,127 @@ export class EnemyManager {
         if (this.debug) {
             console.log(`Spawned King Cylindars in ${cardinalRooms.length} cardinal rooms`);
         }
+    }
+    
+    //=============================================================================
+    // SHADOW CRAWLER METHODS
+    //=============================================================================
+    
+    // Method to spawn Shadow Crawlers in a room
+    spawnShadowCrawlersInRoom(room, count = 5) {
+        if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in ${room.type} room`);
+        
+        const spawned = [];
+        
+        // Calculate room center
+        const roomCenterX = room.x + room.width / 2;
+        const roomCenterZ = room.y + room.height / 2;
+        
+        // Spawn Shadow Crawlers in a pattern around the room
+        for (let i = 0; i < count; i++) {
+            // Calculate spawn position
+            // Use different positions based on the index to spread them out
+            let spawnX, spawnZ;
+            
+            // For first crawler, use room center
+            if (i === 0) {
+                spawnX = roomCenterX;
+                spawnZ = roomCenterZ;
+            } 
+            // For others, distribute around the room
+            else {
+                // Calculate angle for circular distribution
+                const angle = (i / count) * Math.PI * 2;
+                
+                // Distance from center (60% of the way to the walls)
+                const distance = Math.min(room.width, room.height) * 0.3;
+                
+                // Calculate position
+                spawnX = roomCenterX + Math.cos(angle) * distance;
+                spawnZ = roomCenterZ + Math.sin(angle) * distance;
+            }
+            
+            // Create spawn position
+            const spawnPos = new THREE.Vector3(spawnX, 0.2, spawnZ); // Start just above the floor
+            
+            // Find floor beneath the position
+            if (this.collisionManager) {
+                const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+                if (floorHit && floorHit.point) {
+                    spawnPos.y = floorHit.point.y + 0.2; // Position just above floor
+                }
+            }
+            
+            // Check for collision at spawn point
+            let validPosition = true;
+            if (this.collisionManager) {
+                const collision = this.collisionManager.checkCollision(spawnPos, 0.6);
+                if (collision.collides) {
+                    // Try adjusting the position
+                    spawnPos.x += (Math.random() - 0.5) * 2;
+                    spawnPos.z += (Math.random() - 0.5) * 2;
+                    
+                    // Check again
+                    const newCollision = this.collisionManager.checkCollision(spawnPos, 0.6);
+                    if (newCollision.collides) {
+                        validPosition = false;
+                        if (this.debug) console.log(`Could not find valid position for Shadow Crawler ${i}`);
+                    }
+                }
+            }
+            
+            // Only spawn if position is valid
+            if (validPosition) {
+                // Create the Shadow Crawler
+                const crawler = new ShadowCrawler(this.scene, spawnPos, this.collisionManager, this.player);
+                
+                // Set different patrol radius for each crawler
+                crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
+                
+                // Add to enemies array
+                const enemyIndex = this.enemies.push(crawler) - 1;
+                
+                // Add to collision system
+                this.addEnemyToCollisionSystem(crawler, enemyIndex);
+                
+                // Add to spawned array
+                spawned.push(crawler);
+                
+                // Set patrol center
+                crawler.patrolCenter = spawnPos.clone();
+            }
+        }
+        
+        if (this.debug) {
+            console.log(`Successfully spawned ${spawned.length} Shadow Crawlers in ${room.type} room`);
+        }
+        
+        return spawned;
+    }
+    
+    // Method to spawn Shadow Crawlers in all cardinal rooms
+    spawnShadowCrawlersInCardinalRooms(rooms, countPerRoom = 5) {
+        // Find all cardinal rooms
+        const cardinalRooms = rooms.filter(room => 
+            room.type === 'north' || 
+            room.type === 'east' || 
+            room.type === 'south' || 
+            room.type === 'west'
+        );
+        
+        // Total crawlers spawned
+        let totalSpawned = 0;
+        
+        // Spawn Shadow Crawlers in each cardinal room
+        for (const room of cardinalRooms) {
+            const spawned = this.spawnShadowCrawlersInRoom(room, countPerRoom);
+            totalSpawned += spawned.length;
+        }
+        
+        if (this.debug) {
+            console.log(`Spawned a total of ${totalSpawned} Shadow Crawlers across ${cardinalRooms.length} cardinal rooms`);
+        }
+        
+        return totalSpawned;
     }
 }
