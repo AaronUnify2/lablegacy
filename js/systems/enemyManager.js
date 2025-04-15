@@ -1,4 +1,5 @@
 import { Enemy } from '../entities/enemy.js';
+import { KingCylindar } from '../entities/KingCylindar.js';
 
 export class EnemyManager {
     constructor(scene, collisionManager, player) {
@@ -407,5 +408,226 @@ export class EnemyManager {
         
         this.enemies = [];
         if (this.debug) console.log("Cleared all enemies");
+    }
+    
+    //=============================================================================
+    // KING CYLINDAR METHODS
+    //=============================================================================
+    
+    // Method to spawn a King Cylindar in a specific room
+    spawnKingCylindarInRoom(room) {
+        if (this.debug) console.log(`Attempting to spawn King Cylindar in ${room.type} room`);
+        
+        // Calculate spawn position in the center of the room
+        const spawnPos = new THREE.Vector3(
+            room.x + room.width / 2,
+            1.0, // Start slightly above ground level
+            room.y + room.height / 2
+        );
+        
+        // Try to find floor beneath
+        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 4.5; // Position at half height of King Cylindar
+                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            }
+        }
+        
+        // Create King Cylindar instance
+        const kingCylindar = new KingCylindar(this.scene, spawnPos, this.collisionManager, this.player);
+        
+        // Set room-specific parameters if needed
+        kingCylindar.patrolCenter = spawnPos.clone();
+        kingCylindar.patrolRadius = room.width / 4; // Patrol within a quarter of the room width
+        
+        const enemyIndex = this.enemies.push(kingCylindar) - 1; // Add to enemies array and get index
+        
+        // Add enemy to collision system
+        this.addEnemyToCollisionSystem(kingCylindar, enemyIndex);
+        
+        // Show dramatic spawn effect
+        this.showKingCylindarSpawnEffect(spawnPos);
+        
+        if (this.debug) console.log(`Spawned King Cylindar in ${room.type} room at (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
+        
+        return kingCylindar;
+    }
+    
+    // Create a dramatic spawn effect for King Cylindar
+    showKingCylindarSpawnEffect(position) {
+        // Create a dramatic energy gathering effect
+        const particleCount = 20;
+        const particles = [];
+        
+        // Create converging particles that flow into the spawn point
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 5 + Math.random() * 10;
+            const height = Math.random() * 10 - 5;
+            
+            // Position in a circle around spawn point
+            const particlePos = new THREE.Vector3(
+                position.x + Math.cos(angle) * radius,
+                position.y + height,
+                position.z + Math.sin(angle) * radius
+            );
+            
+            // Create particle
+            const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x3366ff,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            particle.position.copy(particlePos);
+            
+            // Calculate direction to spawn point
+            const direction = new THREE.Vector3().subVectors(position, particlePos).normalize();
+            
+            // Random speed
+            const speed = 0.05 + Math.random() * 0.1;
+            particle.velocity = direction.multiplyScalar(speed);
+            
+            // Set lifetime
+            particle.lifetime = 1 + Math.random() * 2;
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Create central energy ball that grows then explodes
+        const coreGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+        const coreMaterial = new THREE.MeshBasicMaterial({
+            color: 0x66ccff,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const core = new THREE.Mesh(coreGeometry, coreMaterial);
+        core.position.copy(position);
+        this.scene.add(core);
+        
+        // Add a light at the spawn point
+        const light = new THREE.PointLight(0x3366ff, 2, 20);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Animate the spawn effect
+        const duration = 4.0; // 4 seconds
+        const explosionTime = 3.0; // When the explosion happens
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            
+            // Pre-explosion phase
+            if (elapsed < explosionTime) {
+                const progress = elapsed / explosionTime;
+                
+                // Particles converge on the spawn point
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const particle = particles[i];
+                    
+                    // Move particle towards center
+                    particle.position.add(particle.velocity);
+                    
+                    // Decrease lifetime
+                    particle.lifetime -= 0.016;
+                    
+                    // Remove if it reached center or lifetime expired
+                    if (particle.lifetime <= 0 || particle.position.distanceTo(position) < 0.5) {
+                        // Make core grow as particles are absorbed
+                        if (core) {
+                            const currentScale = core.scale.x;
+                            core.scale.set(currentScale + 0.03, currentScale + 0.03, currentScale + 0.03);
+                        }
+                        
+                        // Remove particle
+                        this.scene.remove(particle);
+                        particles.splice(i, 1);
+                    }
+                }
+                
+                // Core grows and pulses
+                if (core) {
+                    // Base growth
+                    const baseScale = 1 + progress * 5;
+                    // Pulsing effect increases as we approach explosion
+                    const pulseIntensity = 0.2 + progress * 0.8;
+                    const pulseFrequency = 5 + progress * 10;
+                    const pulse = 1 + Math.sin(elapsed * pulseFrequency) * pulseIntensity;
+                    
+                    core.scale.set(baseScale * pulse, baseScale * pulse, baseScale * pulse);
+                    core.material.opacity = 0.9 * (1 - Math.pow(progress, 2) * 0.5);
+                }
+                
+                // Light pulses more intensely approaching explosion
+                if (light) {
+                    const baseLightIntensity = 2 + progress * 3;
+                    const pulseFactor = 1 + Math.sin(elapsed * 8) * progress;
+                    light.intensity = baseLightIntensity * pulseFactor;
+                }
+            } 
+            // Explosion phase
+            else if (elapsed < duration) {
+                const postExplosionProgress = (elapsed - explosionTime) / (duration - explosionTime);
+                
+                // Expand core rapidly then fade
+                if (core) {
+                    const explosionScale = 6 + postExplosionProgress * 10;
+                    core.scale.set(explosionScale, explosionScale, explosionScale);
+                    core.material.opacity = 0.9 * (1 - postExplosionProgress);
+                }
+                
+                // Light flashes then fades
+                if (light) {
+                    if (postExplosionProgress < 0.1) {
+                        // Initial flash
+                        light.intensity = 10;
+                    } else {
+                        // Fade out
+                        light.intensity = 10 * (1 - postExplosionProgress);
+                    }
+                }
+            } else {
+                // Clean up
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                }
+                
+                this.scene.remove(core);
+                this.scene.remove(light);
+                
+                return; // Stop animation
+            }
+            
+            requestAnimationFrame(animate);
+        };
+        
+        animate();
+    }
+    
+    // Add a method to spawn kings in all cardinal rooms
+    spawnKingCylindarsInCardinalRooms(rooms) {
+        // Find all cardinal rooms
+        const cardinalRooms = rooms.filter(room => 
+            room.type === 'north' || 
+            room.type === 'east' || 
+            room.type === 'south' || 
+            room.type === 'west'
+        );
+        
+        // Spawn a King Cylindar in each cardinal room
+        for (const room of cardinalRooms) {
+            this.spawnKingCylindarInRoom(room);
+        }
+        
+        if (this.debug) {
+            console.log(`Spawned King Cylindars in ${cardinalRooms.length} cardinal rooms`);
+        }
     }
 }
