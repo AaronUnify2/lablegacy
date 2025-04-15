@@ -22,8 +22,8 @@ export class WeaponSystem {
         
         // Set damage values for each weapon
         this.damageValues = {
-            staff: 25, // Staff damage (ranged)
-            sword: 40  // Sword damage (melee, but higher)
+            staff: 50, // Staff damage (ranged)
+            sword: 35  // Sword damage (melee, but higher)
         };
         
         // Set attack ranges
