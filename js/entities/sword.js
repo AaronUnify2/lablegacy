@@ -19,10 +19,7 @@ export class Sword {
         // Attack animation state
         this.isAttacking = false;
         this.attackAnimationTime = 0;
-        this.attackDuration = 0.4; // Slightly longer duration for wind-up + slash
-        this.windUpPortion = 0.25; // Wind-up takes 25% of the animation
-        this.slashPortion = 0.5; // Slash takes 50% of the animation
-        // Return takes remaining 25%
+        this.attackDuration = 0.3; // Duration of attack animation in seconds
         
         // Create the sword parts and add to scene
         this.createSword();
@@ -150,89 +147,50 @@ export class Sword {
             // Update the attack animation timer
             this.attackAnimationTime += 0.016; // Assume ~60fps
             
-            // Phase 1: Wind-up (raising the sword) - first 25% of animation
-            if (attackProgress < this.windUpPortion) {
-                const windUpProgress = attackProgress / this.windUpPortion; // Normalize to 0-1 for wind-up
+            if (attackProgress < 0.5) {
+                // Forward slash motion (0-0.5 of animation)
+                const slashProgress = attackProgress * 2; // Normalize to 0-1 for first half
                 
-                // Wind-up rotation (raising the sword up and to the right)
-                const windUpRotation = this.swordRotation.clone();
+                // Create a modified rotation for the attack animation
+                const attackRotation = this.swordRotation.clone();
                 
-                // Raise the sword up and slightly to the right
-                windUpRotation.x += Math.PI * 0.3 * windUpProgress; // Rotate upward
-                windUpRotation.y -= Math.PI * 0.15 * windUpProgress; // Rotate slightly right
-                windUpRotation.z += Math.PI * 0.2 * windUpProgress; // Tilt for wind-up
+                // Modified for diagonal down-left slash:
+                attackRotation.x -= Math.PI * 0.3 * slashProgress; // Rotate downward (less than before)
+                attackRotation.y += Math.PI * 0.2 * slashProgress; // Rotate toward left
+                attackRotation.z -= Math.PI * 0.4 * slashProgress; // Enhanced rotation for diagonal
                 
-                const windUpQuaternion = new THREE.Quaternion().setFromEuler(windUpRotation);
-                this.sword.quaternion.copy(cameraQuaternion).multiply(windUpQuaternion);
+                // Create quaternion from attack rotation
+                const attackQuaternion = new THREE.Quaternion().setFromEuler(attackRotation);
                 
-                // Move sword up and slightly right during wind-up
-                swordOffset.y += 0.25 * windUpProgress; // Raise upward
-                swordOffset.x += 0.1 * windUpProgress; // Slight movement right
-                swordOffset.z += 0.1 * windUpProgress; // Pull back slightly
-            }
-            // Phase 2: Slash (quick down-left diagonal) - middle 50% of animation
-            else if (attackProgress < this.windUpPortion + this.slashPortion) {
-                const slashProgress = (attackProgress - this.windUpPortion) / this.slashPortion; // Normalize to 0-1 for slash
+                // Set the sword's quaternion
+                this.sword.quaternion.copy(cameraQuaternion).multiply(attackQuaternion);
                 
-                // Start from wound-up position and slash down diagonally to the left
-                const slashRotation = this.swordRotation.clone();
+                // Push the sword in a diagonal left-down cutting motion during slash
+                swordOffset.z -= 0.15 * slashProgress; // Reduced forward push
+                swordOffset.x -= 0.25 * slashProgress; // Stronger leftward movement
+                swordOffset.y -= 0.2 * slashProgress;  // Add downward movement for diagonal cut
+            } else {
+                // Return motion (0.5-1 of animation)
+                const returnProgress = (attackProgress - 0.5) * 2; // Normalize to 0-1 for second half
                 
-                // Calculate positions representing transition from wound-up to slashed down-left
-                const upwardComponent = Math.PI * 0.3 * (1 - slashProgress);
-                const rightwardComponent = Math.PI * 0.15 * (1 - slashProgress);
-                const windupTiltComponent = Math.PI * 0.2 * (1 - slashProgress);
-                
-                // Add downward-left slash components
-                const downwardComponent = Math.PI * 0.4 * slashProgress;
-                const leftwardComponent = Math.PI * 0.3 * slashProgress;
-                const slashTiltComponent = Math.PI * 0.5 * slashProgress;
-                
-                // Combine the movements
-                slashRotation.x += upwardComponent - downwardComponent; // From up to down
-                slashRotation.y -= rightwardComponent + leftwardComponent; // From right to left
-                slashRotation.z += windupTiltComponent - slashTiltComponent; // Tilting for slash
-                
-                const slashQuaternion = new THREE.Quaternion().setFromEuler(slashRotation);
-                this.sword.quaternion.copy(cameraQuaternion).multiply(slashQuaternion);
-                
-                // Move sword in a diagonal down-left path - faster in middle of swing for natural acceleration
-                const speedCurve = Math.sin(slashProgress * Math.PI); // Peaks at middle of swing
-                
-                // Initial position components (from wind-up)
-                const upPosition = 0.25 * (1 - slashProgress);
-                const rightPosition = 0.1 * (1 - slashProgress);
-                const backPosition = 0.1 * (1 - slashProgress);
-                
-                // Final position components (diagonal down-left slash)
-                const downPosition = 0.3 * slashProgress;
-                const leftPosition = 0.35 * slashProgress;
-                const forwardPosition = 0.2 * slashProgress;
-                
-                // Apply positions with acceleration curve
-                swordOffset.y += upPosition - (downPosition * speedCurve); // From up to down
-                swordOffset.x += rightPosition - (leftPosition * speedCurve); // From right to left
-                swordOffset.z += backPosition - (forwardPosition * speedCurve); // From back to forward
-            }
-            // Phase 3: Return to neutral - remaining 25% of animation
-            else {
-                const returnProgress = (attackProgress - (this.windUpPortion + this.slashPortion)) / 
-                                    (1 - this.windUpPortion - this.slashPortion); // Normalize to 0-1 for return
-                
-                // Return from slashed position to neutral
+                // Create a modified rotation for the return animation
                 const returnRotation = this.swordRotation.clone();
                 
-                // Apply return rotation (smoothly go back to neutral)
+                // Modified for diagonal return:
+                returnRotation.x -= Math.PI * 0.3 * (1 - returnProgress); // Return from downward
+                returnRotation.y += Math.PI * 0.2 * (1 - returnProgress); // Return from leftward
+                returnRotation.z -= Math.PI * 0.4 * (1 - returnProgress); // Return from diagonal
+                
+                // Create quaternion from return rotation
                 const returnQuaternion = new THREE.Quaternion().setFromEuler(returnRotation);
+                
+                // Set the sword's quaternion
                 this.sword.quaternion.copy(cameraQuaternion).multiply(returnQuaternion);
                 
-                // Return position to neutral smoothly
-                const finalDownComponent = 0.3 * (1 - returnProgress);
-                const finalLeftComponent = 0.35 * (1 - returnProgress);
-                const finalForwardComponent = 0.2 * (1 - returnProgress);
-                
-                swordOffset.y -= finalDownComponent; // Return from down
-                swordOffset.x -= finalLeftComponent; // Return from left
-                swordOffset.z -= finalForwardComponent; // Return from forward
+                // Return from diagonal cutting motion
+                swordOffset.z -= 0.15 * (1 - returnProgress); // Return from forward
+                swordOffset.x -= 0.25 * (1 - returnProgress); // Return from stronger leftward
+                swordOffset.y -= 0.2 * (1 - returnProgress);  // Return from downward
             }
             
             // End of attack animation
