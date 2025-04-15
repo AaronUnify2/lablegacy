@@ -34,6 +34,13 @@ export class Enemy {
         this.patrolCenter = position.clone(); // Center of patrol circle
         this.patrolActive = true; // Flag to enable/disable patrol
         
+        // NEW: Mana drop properties
+        this.manaDrop = {
+            min: 20,
+            max: 50,
+            dropped: false
+        };
+        
         // Track last known player position for chase behavior
         this.lastKnownPlayerPos = new THREE.Vector3();
         
@@ -766,7 +773,7 @@ export class Enemy {
             particles.push(particle);
         }
 
-    // Animate the burst and particles
+        // Animate the burst and particles
         const duration = 0.5; // 500ms
         const startTime = performance.now();
         
@@ -836,6 +843,11 @@ export class Enemy {
         
         // Create a cone geometry pointing in the attack direction
         const attackGeometry = new THREE.ConeGeometry(0.5, 1.5, 8);
+        
+        // Rotate cylinder to point in the right direction
+        attackGeometry.rotateX(Math.PI / 2);
+        
+        // Create material with glow
         const attackMaterial = new THREE.MeshBasicMaterial({
             color: 0xff0000,
             transparent: true,
@@ -941,6 +953,12 @@ export class Enemy {
         // Clean up projectiles
         this.cleanupProjectiles();
         
+        // Drop mana orb if not already dropped
+        if (!this.manaDrop.dropped) {
+            this.dropManaOrb();
+            this.manaDrop.dropped = true;
+        }
+        
         // Simple death animation - shrink and fade out
         const startScale = this.group.scale.clone();
         const startPosition = this.group.position.clone();
@@ -989,6 +1007,131 @@ export class Enemy {
         };
         
         animate();
+    }
+    
+    // NEW METHOD: Drop mana orb when enemy dies
+    dropManaOrb() {
+        // Calculate random mana amount to drop
+        const manaAmount = Math.floor(Math.random() * 
+            (this.manaDrop.max - this.manaDrop.min + 1)) + this.manaDrop.min;
+        
+        // Create mana orb mesh
+        const orbGeometry = new THREE.SphereGeometry(0.4, 12, 12);
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3366ff,
+            emissive: 0x3366ff,
+            emissiveIntensity: 0.5,
+            metalness: 0.7,
+            roughness: 0.3,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
+        
+        // Position the orb at the enemy's death location
+        orbMesh.position.copy(this.group.position);
+        orbMesh.position.y = 0.5; // Float slightly above the ground
+        
+        // Add glow effect
+        const glowGeometry = new THREE.SphereGeometry(0.6, 12, 12);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3366ff,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.BackSide
+        });
+        
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        orbMesh.add(glowMesh);
+        
+        // Add point light to make it glow
+        const orbLight = new THREE.PointLight(0x3366ff, 1.5, 3);
+        orbLight.position.set(0, 0, 0);
+        orbMesh.add(orbLight);
+        
+        // Add userData to identify this as a mana orb and store mana amount
+        orbMesh.userData = {
+            isManaOrb: true,
+            manaAmount: manaAmount
+        };
+        
+        // Add to scene
+        this.scene.add(orbMesh);
+        
+        // Add a collider for the orb
+        if (this.collisionManager) {
+            const colliderIndex = this.collisionManager.addCollider(orbMesh);
+            
+            // Tag this collider as a mana orb
+            if (this.collisionManager.colliders[colliderIndex]) {
+                this.collisionManager.colliders[colliderIndex].isManaOrb = true;
+                this.collisionManager.colliders[colliderIndex].manaAmount = manaAmount;
+            }
+        }
+        
+        // Add animation for the orb
+        this.animateManaOrb(orbMesh);
+        
+        console.log(`Dropped mana orb containing ${manaAmount} mana`);
+    }
+    
+    // NEW METHOD: Animate mana orb
+    animateManaOrb(orbMesh) {
+        // Make the orb bob up and down
+        const startY = orbMesh.position.y;
+        const floatHeight = 0.3;
+        const floatSpeed = 1.5;
+        
+        // Make orb pulse
+        const pulseSpeed = 2;
+        
+        // If we already have an animation system, use it
+        if (!window.animatedOrbs) {
+            window.animatedOrbs = [];
+            
+            const animateOrbs = () => {
+                const orbs = window.animatedOrbs;
+                if (orbs && orbs.length > 0) {
+                    const time = performance.now() * 0.001;
+                    
+                    for (const orb of orbs) {
+                        // Bob up and down
+                        orb.position.y = orb.userData.startY + 
+                            Math.sin(time * orb.userData.floatSpeed) * orb.userData.floatHeight;
+                        
+                        // Rotate slowly
+                        orb.rotation.y += 0.01;
+                        
+                        // Pulse glow
+                        if (orb.children && orb.children[0]) {
+                            const glow = orb.children[0];
+                            const pulseScale = 1 + Math.sin(time * orb.userData.pulseSpeed) * 0.2;
+                            glow.scale.set(pulseScale, pulseScale, pulseScale);
+                        }
+                        
+                        // Pulse light
+                        if (orb.children && orb.children[1]) {
+                            const light = orb.children[1];
+                            light.intensity = 1 + Math.sin(time * orb.userData.pulseSpeed) * 0.5;
+                        }
+                    }
+                }
+                
+                requestAnimationFrame(animateOrbs);
+            };
+            
+            animateOrbs();
+        }
+        
+        // Store animation parameters with the orb
+        orbMesh.userData.startY = startY;
+        orbMesh.userData.floatHeight = floatHeight;
+        orbMesh.userData.floatSpeed = floatSpeed;
+        orbMesh.userData.pulseSpeed = pulseSpeed;
+        
+        // Add to animated orbs
+        window.animatedOrbs.push(orbMesh);
     }
     
     // Clean up projectiles when enemy is removed or killed
