@@ -32,12 +32,22 @@ export class WeaponSystem {
             sword: 2.5 // Sword has much shorter range
         };
         
+        // Add mana system properties
+        this.manaSystem = {
+            current: 0,
+            max: 100,
+            staffCost: 10
+        };
+        
         // Add crosshair properties
         this.targetingRange = 30; // How far to check for targets (raycasting distance)
         this.currentTarget = null; // Currently targeted enemy
         
         // Create crosshair element
         this.createCrosshair();
+        
+        // Create or update mana display
+        this.updateManaDisplay();
         
         // Bind methods
         this.update = this.update.bind(this);
@@ -178,6 +188,19 @@ export class WeaponSystem {
     staffAttack() {
         // Check if attack is on cooldown
         if (this.attackCooldown.staff > 0) return false;
+        
+        // NEW: Check if player has enough mana for staff attack
+        if (this.manaSystem.current < this.manaSystem.staffCost) {
+            // Not enough mana - show feedback to player
+            this.showLowManaEffect();
+            return false;
+        }
+        
+        // Deduct mana cost
+        this.manaSystem.current -= this.manaSystem.staffCost;
+        
+        // Update the mana display
+        this.updateManaDisplay();
         
         // Set cooldown for staff - only staff cooldown, sword remains independent
         this.attackCooldown.staff = this.cooldownTimes.staff;
@@ -326,6 +349,67 @@ export class WeaponSystem {
         }
         
         return hitEnemy;
+    }
+    
+    showLowManaEffect() {
+        // Create a visual feedback for low mana
+        const message = document.createElement('div');
+        message.textContent = "Not enough mana!";
+        message.style.position = 'absolute';
+        message.style.top = '50%';
+        message.style.left = '50%';
+        message.style.transform = 'translate(-50%, -50%)';
+        message.style.color = '#3366ff';
+        message.style.fontFamily = 'Cinzel, serif';
+        message.style.fontSize = '1.5rem';
+        message.style.textShadow = '0 0 10px rgba(51, 102, 255, 0.7)';
+        message.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        message.style.padding = '10px 20px';
+        message.style.borderRadius = '5px';
+        message.style.zIndex = '1000';
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.2s ease-in-out';
+        
+        // Add to document
+        document.getElementById('game-container').appendChild(message);
+        
+        // Fade in
+        setTimeout(() => {
+            message.style.opacity = '1';
+        }, 10);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            message.style.opacity = '0';
+            setTimeout(() => {
+                if (message.parentNode) {
+                    message.parentNode.removeChild(message);
+                }
+            }, 200);
+        }, 2000);
+        
+        // Add a flash effect to the mana bar
+        const manaBar = document.getElementById('mana-bar');
+        if (manaBar) {
+            manaBar.classList.add('mana-pulse');
+            setTimeout(() => {
+                manaBar.classList.remove('mana-pulse');
+            }, 1000);
+        }
+    }
+    
+    updateManaDisplay() {
+        const manaBarFill = document.getElementById('mana-bar-fill');
+        const manaText = document.getElementById('mana-text');
+        
+        if (manaBarFill && manaText) {
+            // Update width percentage
+            const manaPercent = (this.manaSystem.current / this.manaSystem.max) * 100;
+            manaBarFill.style.width = `${manaPercent}%`;
+            
+            // Update text
+            manaText.textContent = `${Math.floor(this.manaSystem.current)}/${this.manaSystem.max}`;
+        }
     }
     
     showStaffAttackEffect(start, end, radius, hitTarget) {
