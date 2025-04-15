@@ -765,13 +765,101 @@ spawnShadowCrawlersInCentralRoom(rooms, count = 5) {
         return [];
     }
     
-    if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in central room`);
+    if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in central room at ${new Date().toISOString()}`);
     
-    // Use the existing method to spawn crawlers in this room
-    const spawned = this.spawnShadowCrawlersInRoom(centralRoom, count);
+    const spawned = [];
+    
+    // Calculate room center
+    const roomCenterX = centralRoom.x + centralRoom.width / 2;
+    const roomCenterZ = centralRoom.y + centralRoom.height / 2;
+    
+    // Spawn Shadow Crawlers in a pattern around the central room
+    for (let i = 0; i < count; i++) {
+        // Calculate spawn position
+        let spawnX, spawnZ;
+        
+        // For first crawler, use room center
+        if (i === 0) {
+            spawnX = roomCenterX;
+            spawnZ = roomCenterZ;
+        } 
+        // For others, distribute around the room
+        else {
+            // Calculate angle for circular distribution
+            const angle = (i / count) * Math.PI * 2;
+            
+            // Distance from center (50% of the way to the walls)
+            const distance = Math.min(centralRoom.width, centralRoom.height) * 0.25;
+            
+            // Calculate position
+            spawnX = roomCenterX + Math.cos(angle) * distance;
+            spawnZ = roomCenterZ + Math.sin(angle) * distance;
+        }
+        
+        // Create spawn position - Start much higher for visibility
+        const spawnPos = new THREE.Vector3(spawnX, 3.0, spawnZ);
+        
+        // Find floor beneath the position
+        if (this.collisionManager) {
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 2.0; // Position higher above floor
+                if (this.debug) console.log(`Found floor at y: ${floorHit.point.y}, positioning at ${spawnPos.y}`);
+            }
+        }
+        
+        // Always ensure minimum height
+        spawnPos.y = Math.max(spawnPos.y, 2.0);
+        
+        // Ensure position is valid
+        let validPosition = true;
+        if (this.collisionManager) {
+            const collision = this.collisionManager.checkCollision(spawnPos, 2.0);
+            if (collision.collides) {
+                // If collision, try raising the position
+                spawnPos.y += 2.0;
+                
+                // Check again
+                const newCollision = this.collisionManager.checkCollision(spawnPos, 2.0);
+                if (newCollision.collides) {
+                    validPosition = false;
+                    if (this.debug) console.log(`Could not find valid position for Shadow Crawler ${i}`);
+                }
+            }
+        }
+        
+        // Only spawn if position is valid
+        if (validPosition) {
+            if (this.debug) console.log(`Creating Shadow Crawler at position: ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`);
+            
+            try {
+                // Create the Shadow Crawler
+                const crawler = new ShadowCrawler(this.scene, spawnPos, this.collisionManager, this.player);
+                
+                // Set different patrol radius for each crawler
+                crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
+                
+                // Add to enemies array
+                const enemyIndex = this.enemies.push(crawler) - 1;
+                
+                // Add to collision system
+                this.addEnemyToCollisionSystem(crawler, enemyIndex);
+                
+                // Add to spawned array
+                spawned.push(crawler);
+                
+                // Set patrol center
+                crawler.patrolCenter = spawnPos.clone();
+                
+                if (this.debug) console.log(`Successfully created Shadow Crawler ${i}`);
+            } catch (error) {
+                console.error(`Error creating Shadow Crawler: ${error}`);
+            }
+        }
+    }
     
     if (this.debug) {
-        console.log(`Spawned ${spawned.length} Shadow Crawlers in central room`);
+        console.log(`Successfully spawned ${spawned.length} Shadow Crawlers in central room`);
     }
     
     return spawned;
