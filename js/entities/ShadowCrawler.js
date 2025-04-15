@@ -52,156 +52,171 @@ export class ShadowCrawler extends Enemy {
         console.log("Shadow Crawler created at position:", this.position);
     }
     
-    // Override createMesh to create a shadowy, low-profile crawler
-    createMesh() {
-        // Remove existing mesh if it exists
-        if (this.group) {
-            this.scene.remove(this.group);
-        }
-        
-        // Create a group to hold all enemy parts
-        this.group = new THREE.Group();
-        
-        // Create a flat, wide body - like a shadow on the ground
-        const bodyGeometry = new THREE.BoxGeometry(
-            1.2, // width - wider than tall
-            0.4, // height - very flat
-            1.8  // depth - longer than wide, like a bug
-        );
-        
-        // Dark material with slight transparency for shadowy look
-        const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0x111111, // Very dark base color
-            emissive: 0x111111,
-            emissiveIntensity: 0.2,
-            roughness: 0.9,
-            metalness: 0.2,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        this.bodyMesh.castShadow = true;
-        this.bodyMesh.receiveShadow = true;
-        
-        // Save body dimensions for collision detection
-        this.bodyWidth = 1.2;
-        this.bodyHeight = 0.4;
-        
-        // Add body to group
-        this.group.add(this.bodyMesh);
-        
-        // Create neon highlight edges
-        this.createHighlightEdges();
-        
-        // Create glowing eyes - smaller and more insect-like
-        const eyeGeometry = new THREE.SphereGeometry(0.07, 8, 8);
-        const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: this.currentHighlightColor,
-            emissive: this.currentHighlightColor,
-            emissiveIntensity: 1.0
-        });
-        
-        // Position eyes closer together and more forward
-        this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.leftEye.position.set(-0.15, 0.2, 0.7); // Positioned near the front
-        this.group.add(this.leftEye);
-        
-        this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        this.rightEye.position.set(0.15, 0.2, 0.7);
-        this.group.add(this.rightEye);
-        
-        // Create extending spike for attacks
-        this.createSpikeAttack();
-        
-        // Create legs
-        this.createLegs();
-        
-        // Position the entire group
-        this.group.position.copy(this.position);
-        
-        // Add to scene
-        this.scene.add(this.group);
-        
-        // Update collision radius - smaller for the crawler
-        this.collisionRadius = 0.6;
+
+
+    
+
+// Modify in ShadowCrawler.js, in the createMesh method
+
+createMesh() {
+    // Remove existing mesh if it exists
+    if (this.group) {
+        this.scene.remove(this.group);
     }
     
-    // Create highlight edges to give the crawler a neon effect
-    createHighlightEdges() {
-        // Create edge geometry for the body
-        const edgeGeometry = new THREE.EdgesGeometry(
-            new THREE.BoxGeometry(1.2, 0.4, 1.8)
-        );
-        
-        // Neon material that will change color based on state
-        const edgeMaterial = new THREE.LineBasicMaterial({
-            color: this.currentHighlightColor,
-            linewidth: 1
-        });
-        
-        this.highlightEdges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
-        this.highlightEdges.position.copy(this.bodyMesh.position);
-        this.group.add(this.highlightEdges);
-    }
+    // Create a group to hold all enemy parts
+    this.group = new THREE.Group();
     
-    // Create extending spike for attacks
-    createSpikeAttack() {
-        // Create retracted spike (hidden initially)
-        const spikeGeometry = new THREE.ConeGeometry(0.1, 0.8, 8);
-        const spikeMaterial = new THREE.MeshStandardMaterial({
-            color: 0xdddddd,
-            emissive: this.highlightColors.attack,
-            emissiveIntensity: 0.5,
-            metalness: 0.8,
-            roughness: 0.2
-        });
-        
-        // Rotate spike to point forward
-        spikeGeometry.rotateX(Math.PI / 2);
-        
-        this.spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
-        this.spike.position.set(0, 0.1, 0.9); // Position at front of body
-        this.spike.scale.set(1, 0.01, 1); // Initially retracted (almost invisible)
-        this.group.add(this.spike);
-    }
+    // Create a flat, wide body - LARGER like a shadow on the ground
+    const bodyGeometry = new THREE.BoxGeometry(
+        3.6, // width - 3x wider (was 1.2)
+        1.2, // height - 3x taller (was 0.4)
+        5.4  // depth - 3x longer (was 1.8)
+    );
     
-    // Create legs for the crawler
-    createLegs() {
-        const legGeometry = new THREE.CylinderGeometry(0.05, 0.02, 0.5, 8);
-        const legMaterial = new THREE.MeshStandardMaterial({
-            color: 0x222222,
-            roughness: 0.9
-        });
+    // Dark material with slight transparency for shadowy look
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x111111, // Very dark base color
+        emissive: 0x111111,
+        emissiveIntensity: 0.5, // Increased for visibility (was 0.2)
+        roughness: 0.9,
+        metalness: 0.2,
+        transparent: true,
+        opacity: 0.9
+    });
+    
+    this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    this.bodyMesh.castShadow = true;
+    this.bodyMesh.receiveShadow = true;
+    
+    // Save body dimensions for collision detection
+    this.bodyWidth = 3.6;
+    this.bodyHeight = 1.2;
+    
+    // Add body to group
+    this.group.add(this.bodyMesh);
+    
+    // Create neon highlight edges - BRIGHTER
+    this.createHighlightEdges();
+    
+    // Create glowing eyes - LARGER and more insect-like
+    const eyeGeometry = new THREE.SphereGeometry(0.3, 8, 8); // 4x larger (was 0.07)
+    const eyeMaterial = new THREE.MeshBasicMaterial({
+        color: this.currentHighlightColor,
+        emissive: this.currentHighlightColor,
+        emissiveIntensity: 2.0 // Twice as bright (was 1.0)
+    });
+    
+    // Position eyes closer together and more forward
+    this.leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    this.leftEye.position.set(-0.5, 0.5, 2.0); // Adjusted for larger body
+    this.group.add(this.leftEye);
+    
+    this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    this.rightEye.position.set(0.5, 0.5, 2.0); // Adjusted for larger body
+    this.group.add(this.rightEye);
+    
+    // Create extending spike for attacks - LARGER
+    this.createSpikeAttack();
+    
+    // Create legs - LARGER
+    this.createLegs();
+    
+    // Position the entire group
+    this.group.position.copy(this.position);
+    
+    // Add to scene
+    this.scene.add(this.group);
+    
+    // Update collision radius - LARGER for the crawler
+    this.collisionRadius = 1.8; // 3x larger (was 0.6)
+}
+
+// Also update the spike creation to be larger
+createSpikeAttack() {
+    // Create retracted spike (hidden initially) - LARGER
+    const spikeGeometry = new THREE.ConeGeometry(0.3, 2.4, 8); // 3x larger
+    const spikeMaterial = new THREE.MeshStandardMaterial({
+        color: 0xdddddd,
+        emissive: this.highlightColors.attack,
+        emissiveIntensity: 1.0, // Brighter (was 0.5)
+        metalness: 0.8,
+        roughness: 0.2
+    });
+    
+    // Rotate spike to point forward
+    spikeGeometry.rotateX(Math.PI / 2);
+    
+    this.spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+    this.spike.position.set(0, 0.3, 2.7); // Position at front of larger body
+    this.spike.scale.set(1, 0.01, 1); // Initially retracted (almost invisible)
+    this.group.add(this.spike);
+}
+
+// Update legs to be larger
+createLegs() {
+    const legGeometry = new THREE.CylinderGeometry(0.15, 0.06, 1.5, 8); // 3x larger
+    const legMaterial = new THREE.MeshStandardMaterial({
+        color: 0x222222,
+        roughness: 0.9
+    });
+    
+    // Position for 6 legs (3 on each side) - adjusted for larger body
+    const legPositions = [
+        // Left side
+        { x: -1.8, y: 0, z: 1.8 },  // Front left
+        { x: -1.8, y: 0, z: 0 },    // Middle left
+        { x: -1.8, y: 0, z: -1.8 }, // Back left
         
-        // Position for 6 legs (3 on each side)
-        const legPositions = [
-            // Left side
-            { x: -0.6, y: 0, z: 0.6 },  // Front left
-            { x: -0.6, y: 0, z: 0 },    // Middle left
-            { x: -0.6, y: 0, z: -0.6 }, // Back left
-            
-            // Right side
-            { x: 0.6, y: 0, z: 0.6 },   // Front right
-            { x: 0.6, y: 0, z: 0 },     // Middle right
-            { x: 0.6, y: 0, z: -0.6 }   // Back right
-        ];
+        // Right side
+        { x: 1.8, y: 0, z: 1.8 },   // Front right
+        { x: 1.8, y: 0, z: 0 },     // Middle right
+        { x: 1.8, y: 0, z: -1.8 }   // Back right
+    ];
+    
+    this.legs = [];
+    
+    for (const pos of legPositions) {
+        const leg = new THREE.Mesh(legGeometry, legMaterial);
         
-        this.legs = [];
+        // Rotate to be horizontal
+        leg.rotation.z = Math.PI / 2;
         
-        for (const pos of legPositions) {
-            const leg = new THREE.Mesh(legGeometry, legMaterial);
-            
-            // Rotate to be horizontal
-            leg.rotation.z = Math.PI / 2;
-            
-            // Position by the body, sticking out to the sides
-            leg.position.set(pos.x, pos.y, pos.z);
-            
-            this.group.add(leg);
-            this.legs.push(leg);
-        }
+        // Position by the body, sticking out to the sides
+        leg.position.set(pos.x, pos.y, pos.z);
+        
+        this.group.add(leg);
+        this.legs.push(leg);
     }
+}
+
+// Update the highlight edges to be more visible too
+createHighlightEdges() {
+    // Create edge geometry for the larger body
+    const edgeGeometry = new THREE.EdgesGeometry(
+        new THREE.BoxGeometry(3.6, 1.2, 5.4) // Match the body size
+    );
+    
+    // Neon material that will change color based on state - THICKER lines
+    const edgeMaterial = new THREE.LineBasicMaterial({
+        color: this.currentHighlightColor,
+        linewidth: 3 // Thicker lines (was 1)
+    });
+    
+    this.highlightEdges = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+    this.highlightEdges.position.copy(this.bodyMesh.position);
+    this.group.add(this.highlightEdges);
+}
+
+
+
+
+
+    
+    
+
+
+
     
     // Override update method to handle wall climbing and animations
     update(deltaTime, camera) {
