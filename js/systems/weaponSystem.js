@@ -39,6 +39,14 @@ export class WeaponSystem {
             staffCost: 10
         };
         
+        // Add stamina system properties
+        this.staminaSystem = {
+            current: 100,   // Start with full stamina
+            max: 100,       // Maximum stamina
+            swordCost: 20,  // Cost per sword attack
+            regenRate: 3    // Regeneration rate per second
+        };
+        
         // Add crosshair properties
         this.targetingRange = 30; // How far to check for targets (raycasting distance)
         this.currentTarget = null; // Currently targeted enemy
@@ -48,6 +56,9 @@ export class WeaponSystem {
         
         // Create or update mana display
         this.updateManaDisplay();
+        
+        // Create or update stamina display
+        this.createStaminaDisplay();
         
         // Bind methods
         this.update = this.update.bind(this);
@@ -64,6 +75,16 @@ export class WeaponSystem {
         
         if (this.attackCooldown.sword > 0) {
             this.attackCooldown.sword -= deltaTime;
+        }
+        
+        // Regenerate stamina over time
+        if (this.staminaSystem.current < this.staminaSystem.max) {
+            const regenAmount = this.staminaSystem.regenRate * deltaTime;
+            this.staminaSystem.current = Math.min(
+                this.staminaSystem.max,
+                this.staminaSystem.current + regenAmount
+            );
+            this.updateStaminaDisplay();
         }
         
         // Update the crosshair targeting
@@ -110,20 +131,46 @@ export class WeaponSystem {
             // Calculate distance to determine if any weapon is in range
             const distanceToTarget = this.player.camera.position.distanceTo(this.currentTarget.group.position);
             
+            // Check if we have enough resources for each weapon
+            const hasEnoughMana = this.manaSystem.current >= this.manaSystem.staffCost;
+            const hasEnoughStamina = this.staminaSystem.current >= this.staminaSystem.swordCost;
+            
             // In range of either weapon
             if (distanceToTarget <= this.attackRanges.sword) {
                 // In range of sword (and staff)
-                this.crosshair.classList.add('target-acquired', 'dual-target');
+                if (hasEnoughStamina && hasEnoughMana) {
+                    // Can use both weapons
+                    this.crosshair.classList.add('target-acquired', 'dual-target');
+                    this.crosshair.classList.remove('staff-target', 'sword-target');
+                } else if (hasEnoughStamina) {
+                    // Can only use sword
+                    this.crosshair.classList.add('target-acquired', 'sword-target');
+                    this.crosshair.classList.remove('dual-target', 'staff-target');
+                } else if (hasEnoughMana) {
+                    // Can only use staff
+                    this.crosshair.classList.add('target-acquired', 'staff-target');
+                    this.crosshair.classList.remove('dual-target', 'sword-target');
+                } else {
+                    // No resources for any weapon
+                    this.crosshair.classList.add('target-acquired');
+                    this.crosshair.classList.remove('dual-target', 'staff-target', 'sword-target');
+                }
             } else if (distanceToTarget <= this.attackRanges.staff) {
                 // Only in range of staff
-                this.crosshair.classList.add('target-acquired', 'staff-target');
-                this.crosshair.classList.remove('dual-target');
+                if (hasEnoughMana) {
+                    this.crosshair.classList.add('target-acquired', 'staff-target');
+                    this.crosshair.classList.remove('dual-target', 'sword-target');
+                } else {
+                    // In range but no mana
+                    this.crosshair.classList.add('target-acquired');
+                    this.crosshair.classList.remove('dual-target', 'staff-target', 'sword-target');
+                }
             } else {
                 // Target acquired but out of range
-                this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target');
+                this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target', 'sword-target');
             }
         } else {
-            this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target');
+            this.crosshair.classList.remove('target-acquired', 'staff-target', 'dual-target', 'sword-target');
         }
     }
     
@@ -276,6 +323,19 @@ export class WeaponSystem {
         // Check if attack is on cooldown
         if (this.attackCooldown.sword > 0) return false;
         
+        // Check if player has enough stamina for sword attack
+        if (this.staminaSystem.current < this.staminaSystem.swordCost) {
+            // Not enough stamina - show feedback to player
+            this.showLowStaminaEffect();
+            return false;
+        }
+        
+        // Deduct stamina cost
+        this.staminaSystem.current -= this.staminaSystem.swordCost;
+        
+        // Update the stamina display
+        this.updateStaminaDisplay();
+        
         // Set cooldown for sword - only sword cooldown, staff remains independent
         this.attackCooldown.sword = this.cooldownTimes.sword;
         this.lastUsedWeapon = "sword";
@@ -351,6 +411,63 @@ export class WeaponSystem {
         return hitEnemy;
     }
     
+    // Create stamina display DOM elements
+    createStaminaDisplay() {
+        // Create stamina display container
+        this.staminaDisplay = document.createElement('div');
+        this.staminaDisplay.id = 'stamina-display';
+        
+        // Create stamina bar background
+        this.staminaBar = document.createElement('div');
+        this.staminaBar.id = 'stamina-bar';
+        
+        // Create stamina bar fill
+        this.staminaBarFill = document.createElement('div');
+        this.staminaBarFill.id = 'stamina-bar-fill';
+        
+        // Add stamina bar fill to stamina bar
+        this.staminaBar.appendChild(this.staminaBarFill);
+        
+        // Create stamina text
+        this.staminaText = document.createElement('div');
+        this.staminaText.id = 'stamina-text';
+        this.staminaText.textContent = `${this.staminaSystem.current}/${this.staminaSystem.max}`;
+        
+        // Add stamina bar and text to stamina display
+        this.staminaDisplay.appendChild(this.staminaBar);
+        this.staminaDisplay.appendChild(this.staminaText);
+        
+        // Add stamina display to game container
+        document.getElementById('game-container').appendChild(this.staminaDisplay);
+        
+        // Update stamina display
+        this.updateStaminaDisplay();
+    }
+    
+    // Update stamina display with current values
+    updateStaminaDisplay() {
+        const staminaBarFill = document.getElementById('stamina-bar-fill');
+        const staminaText = document.getElementById('stamina-text');
+        
+        if (staminaBarFill && staminaText) {
+            // Update width percentage
+            const staminaPercent = (this.staminaSystem.current / this.staminaSystem.max) * 100;
+            staminaBarFill.style.width = `${staminaPercent}%`;
+            
+            // Update text
+            staminaText.textContent = `${Math.floor(this.staminaSystem.current)}/${this.staminaSystem.max}`;
+            
+            // Change color based on stamina level
+            if (staminaPercent < 25) {
+                staminaBarFill.style.background = 'linear-gradient(to right, #995500, #cc7700)';
+            } else if (staminaPercent < 50) {
+                staminaBarFill.style.background = 'linear-gradient(to right, #cc7700, #ee9900)';
+            } else {
+                staminaBarFill.style.background = 'linear-gradient(to right, #ffaa00, #ffcc66)';
+            }
+        }
+    }
+    
     showLowManaEffect() {
         // Create a visual feedback for low mana
         const message = document.createElement('div');
@@ -394,6 +511,54 @@ export class WeaponSystem {
             manaBar.classList.add('mana-pulse');
             setTimeout(() => {
                 manaBar.classList.remove('mana-pulse');
+            }, 1000);
+        }
+    }
+    
+    // Show low stamina effect
+    showLowStaminaEffect() {
+        // Create a visual feedback for low stamina
+        const message = document.createElement('div');
+        message.textContent = "Not enough stamina!";
+        message.style.position = 'absolute';
+        message.style.top = '50%';
+        message.style.left = '50%';
+        message.style.transform = 'translate(-50%, -50%)';
+        message.style.color = '#ffaa00';
+        message.style.fontFamily = 'Cinzel, serif';
+        message.style.fontSize = '1.5rem';
+        message.style.textShadow = '0 0 10px rgba(255, 170, 0, 0.7)';
+        message.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        message.style.padding = '10px 20px';
+        message.style.borderRadius = '5px';
+        message.style.zIndex = '1000';
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.2s ease-in-out';
+        
+        // Add to document
+        document.getElementById('game-container').appendChild(message);
+        
+        // Fade in
+        setTimeout(() => {
+            message.style.opacity = '1';
+        }, 10);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            message.style.opacity = '0';
+            setTimeout(() => {
+                if (message.parentNode) {
+                    message.parentNode.removeChild(message);
+                }
+            }, 200);
+        }, 2000);
+        
+        // Add a flash effect to the stamina bar
+        const staminaBar = document.getElementById('stamina-bar');
+        if (staminaBar) {
+            staminaBar.classList.add('stamina-pulse');
+            setTimeout(() => {
+                staminaBar.classList.remove('stamina-pulse');
             }, 1000);
         }
     }
@@ -616,7 +781,7 @@ export class WeaponSystem {
             particles.push(particle);
         }
         
-        // Add a flash light
+          // Add a flash light
         const flashLight = new THREE.PointLight(0xffcc00, 3, 3);
         flashLight.position.copy(position);
         this.scene.add(flashLight);
