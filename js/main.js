@@ -104,10 +104,6 @@ class Game {
             
             // NEW: Spawn King Cylindars in cardinal rooms
             this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
-// In your main.js init() method, add this code after the dungeon is generated
-
-// First spawn King Cylindars in cardinal rooms as before
-this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
 
 // IMPORTANT: Use our new method to spawn shadow crawlers in the CENTRAL room
 console.log("About to spawn Shadow Crawlers in central room...");
