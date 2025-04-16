@@ -111,7 +111,7 @@ this.enemyManager.spawnKingCylindarsInCardinalRooms(dungeon.rooms);
 
 // IMPORTANT: Use our new method to spawn shadow crawlers in the CENTRAL room
 console.log("About to spawn Shadow Crawlers in central room...");
-this.enemyManager.spawnShadowCrawlersInCentralRoom(dungeon.rooms, 5);
+this.enemyManager.spawnShadowCrawlersInCentralRoom(dungeon.rooms, 3);
 console.log("Called method to spawn Shadow Crawlers in central room");
 
 // Additional debugging
