@@ -735,7 +735,7 @@ export class KingCylindar extends Enemy {
                 if (flash.geometry) flash.geometry.dispose();
                 if (ring.material) ring.material.dispose();
                 if (ring.geometry) ring.geometry.dispose();
-}
+   }
 };
 
         animate();
@@ -914,5 +914,5 @@ animateManaOrb(orbMesh) {
     // Add to animated orbs
     window.animatedOrbs.push(orbMesh);
 }
-}
+
     
