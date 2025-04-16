@@ -127,11 +127,11 @@ export class Enemy {
                     opacity: 0.9
                 });
             } else {
-                // Metallic segments
+                // Brass/copper metallic segments
                 material = new THREE.MeshStandardMaterial({
-                    color: 0x888899, // Slightly bluish metal
+                    color: 0xac8e68, // Brass/copper color
                     metalness: 0.8,
-                    roughness: 0.2,
+                    roughness: 0.3,
                 });
             }
             
@@ -239,9 +239,9 @@ export class Enemy {
             // Shoulder joint
             const shoulderGeometry = new THREE.SphereGeometry(0.1, 8, 8);
             const shoulderMaterial = new THREE.MeshStandardMaterial({
-                color: 0x666677,
-                metalness: 0.8,
-                roughness: 0.2
+                color: 0x665544, // Darker brass color for joints
+                metalness: 0.9,
+                roughness: 0.3
             });
             
             const shoulder = new THREE.Mesh(shoulderGeometry, shoulderMaterial);
@@ -705,7 +705,7 @@ export class Enemy {
                 const direction = i % 2 === 0 ? 1 : -1;
                 const speed = baseSpeed * (1 + i * 0.1); // Increase speed for upper segments
                 
-                segment.rotation.y += deltaTime * speed * direction;
+                segment.rotation.y += 0.016 * speed * direction;
             }
         }
     }
@@ -1100,6 +1100,106 @@ export class Enemy {
         }
     }
     
+    // Create projectile hit effect
+    createProjectileHitEffect(position) {
+        // Create a flash effect
+        const flashGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
+        
+        // Create a light for the flash
+        const light = new THREE.PointLight(0xff3333, 2, 3);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Animate the flash
+        const duration = 0.3; // 300ms
+        const startTime = performance.now();
+        
+        const animateFlash = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Scale up and fade out
+            const scale = 1 + progress * 3;
+            flash.scale.set(scale, scale, scale);
+            flash.material.opacity = 0.8 * (1 - progress);
+            
+            // Fade out light
+            light.intensity = 2 * (1 - progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateFlash);
+            } else {
+                // Clean up
+                this.scene.remove(flash);
+                this.scene.remove(light);
+                if (flash.geometry) flash.geometry.dispose();
+                if (flash.material) flash.material.dispose();
+            }
+        };
+        
+        animateFlash();
+    }
+    
+    // Create firing effect for projectile
+    createProjectileFiringEffect(position) {
+        // Create a flash effect
+        const flashGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
+        
+        // Create a light for the flash
+        const light = new THREE.PointLight(0xff3333, 2, 2);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Animate the flash
+        const duration = 0.2; // 200ms
+        const startTime = performance.now();
+        
+        const animateFlash = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Scale up and fade out
+            const scale = 1 + progress * 2;
+            flash.scale.set(scale, scale, scale);
+            flash.material.opacity = 0.8 * (1 - progress);
+            
+            // Fade out light
+            light.intensity = 2 * (1 - progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateFlash);
+            } else {
+                // Clean up
+                this.scene.remove(flash);
+                this.scene.remove(light);
+                if (flash.geometry) flash.geometry.dispose();
+                if (flash.material) flash.material.dispose();
+            }
+        };
+        
+        animateFlash();
+    }
+    
     // State transition handler - checks proximity to player and changes state
     checkPlayerProximity() {
         if (!this.player || !this.player.camera) return;
@@ -1158,7 +1258,463 @@ export class Enemy {
         this.updateEyeAppearance(distanceToPlayer);
     }
     
-    // Enhanced performRangedAttack for robotic enemies
+    // Update eye appearance based on distance to player
+    updateEyeAppearance(distanceToPlayer) {
+        if (!this.sensors || this.sensors.length === 0) return;
+        
+        // Make eyes glow more intensely as player gets closer
+        const intensity = Math.max(0.7, 1 - (distanceToPlayer / this.detectionRange));
+        
+        // Apply to all sensors
+        for (const sensor of this.sensors) {
+            if (sensor && sensor.material) {
+                sensor.material.emissiveIntensity = intensity;
+            }
+        }
+    }
+    
+    // Play detection effect when first spotting player
+    playDetectionEffect() {
+        // Flash eyes bright red
+        if (this.sensors && this.sensors.length > 0) {
+            for (const sensor of this.sensors) {
+                if (sensor && sensor.material) {
+                    // Store original color and opacity
+                    const originalColor = sensor.material.color.clone();
+                    const originalOpacity = sensor.material.opacity;
+                    
+                    // Flash bright red
+                    sensor.material.color.set(0xff0000);
+                    sensor.material.opacity = 1;
+                    
+                    // Return to original after a delay
+                    setTimeout(() => {
+                        if (sensor && sensor.material) {
+                            sensor.material.color.copy(originalColor);
+                            sensor.material.opacity = originalOpacity;
+                        }
+                    }, 300);
+                }
+            }
+        }
+        
+        // Flash status lights
+        if (this.statusLights && this.statusLights.length > 0) {
+            for (const light of this.statusLights) {
+                if (light && light.material) {
+                    // Flash yellow
+                    light.material.color.set(0xffff00);
+                    light.material.opacity = 1;
+                    
+                    // Return to state-based color after a delay
+                    setTimeout(() => {
+                        this.updateStatusLights();
+                    }, 300);
+                }
+            }
+        }
+        
+        // Increase segment rotation speed temporarily
+        this.segmentSpeedMultiplier = 3;
+        setTimeout(() => {
+            this.segmentSpeedMultiplier = 1;
+        }, 1000);
+    }
+    
+    // State change helper
+    changeState(newState) {
+        // Skip if already in this state
+        if (this.state === newState) return;
+        
+        // Log state change for debugging
+        console.log(`Enemy state change: ${this.state} -> ${newState}`);
+        
+        // Store previous state
+        this.previousState = this.state;
+        
+        // Set new state
+        this.state = newState;
+        
+        // Reset state timer
+        this.stateTime = 0;
+        
+        // Handle state entry actions
+        switch(newState) {
+            case this.states.CHASE:
+                // Start with arms retracted, they'll extend based on distance
+                for (const arm of this.arms) {
+                    if (arm && arm.userData) {
+                        arm.userData.extended = false;
+                    }
+                }
+                break;
+                
+            case this.states.ATTACK:
+                // Extend both arms when entering attack state
+                for (const arm of this.arms) {
+                    if (arm && arm.userData) {
+                        arm.userData.extended = true;
+                    }
+                }
+                break;
+                
+            case this.states.PATROL:
+            case this.states.RETURN:
+                // Retract arms when returning to peaceful states
+                for (const arm of this.arms) {
+                    if (arm && arm.userData) {
+                        arm.userData.extended = false;
+                    }
+                }
+                break;
+        }
+    }
+    
+    // Patrol behavior - move in a circle around patrol center
+    executePatrolBehavior(deltaTime) {
+        if (!this.patrolActive) return;
+        
+        // Update patrol angle
+        this.patrolAngle += this.patrolSpeed * deltaTime;
+        if (this.patrolAngle > Math.PI * 2) {
+            this.patrolAngle -= Math.PI * 2;
+        }
+        
+        // Calculate new position
+        const newX = this.patrolCenter.x + Math.cos(this.patrolAngle) * this.patrolRadius;
+        const newZ = this.patrolCenter.z + Math.sin(this.patrolAngle) * this.patrolRadius;
+        
+        // Keep y position consistent (hover effect will modify this slightly)
+        const newPosition = new THREE.Vector3(newX, this.position.y, newZ);
+        
+        // Calculate direction to face
+        const direction = new THREE.Vector3();
+        direction.subVectors(newPosition, this.group.position).normalize();
+        
+        // Only rotate if we're moving a significant amount
+        if (direction.length() > 0.01) {
+            // Calculate target rotation
+            const targetRotation = Math.atan2(direction.x, direction.z);
+            
+            // Smoothly rotate towards target
+            const currentRotation = this.group.rotation.y;
+            let rotationDiff = targetRotation - currentRotation;
+            
+            // Normalize the rotation difference to (-PI, PI)
+            while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+            while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+            
+            // Apply smooth rotation
+            this.group.rotation.y += rotationDiff * this.turnSpeed.patrol;
+        }
+        
+        // Apply new position
+        this.group.position.copy(newPosition);
+    }
+    
+    // Chase behavior - move towards player
+    executeChaseBehavior(deltaTime) {
+        if (!this.player || !this.player.camera) return;
+        
+        // Get player position
+        const playerPos = this.player.camera.position.clone();
+        
+        // Calculate direction to player
+        const direction = new THREE.Vector3();
+        direction.subVectors(playerPos, this.group.position).normalize();
+        
+        // Calculate new position
+        const moveDistance = this.moveSpeed.chase * deltaTime;
+        const newPosition = new THREE.Vector3();
+        newPosition.copy(this.group.position);
+        newPosition.addScaledVector(direction, moveDistance);
+        
+        // Calculate target rotation
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        
+        // Smoothly rotate towards target
+        const currentRotation = this.group.rotation.y;
+        let rotationDiff = targetRotation - currentRotation;
+        
+        // Normalize the rotation difference to (-PI, PI)
+        while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+        while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+        
+        // Apply smooth rotation
+        this.group.rotation.y += rotationDiff * this.turnSpeed.chase;
+        
+        // Apply new position
+        this.group.position.copy(newPosition);
+    }
+    
+    // Return behavior - move back to patrol center
+    executeReturnBehavior(deltaTime) {
+        // Calculate direction to patrol center
+        const direction = new THREE.Vector3();
+        direction.subVectors(this.patrolCenter, this.group.position).normalize();
+        
+        // Calculate new position
+        const moveDistance = this.moveSpeed.patrol * deltaTime;
+        const newPosition = new THREE.Vector3();
+        newPosition.copy(this.group.position);
+        newPosition.addScaledVector(direction, moveDistance);
+        
+        // Calculate target rotation
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        
+        // Smoothly rotate towards target
+        const currentRotation = this.group.rotation.y;
+        let rotationDiff = targetRotation - currentRotation;
+        
+        // Normalize the rotation difference to (-PI, PI)
+        while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+        while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+        
+        // Apply smooth rotation
+        this.group.rotation.y += rotationDiff * this.turnSpeed.patrol;
+        
+        // Apply new position
+        this.group.position.copy(newPosition);
+        
+        // Check if we've reached the patrol center
+        if (this.group.position.distanceTo(this.patrolCenter) < 0.5) {
+            this.changeState(this.states.PATROL);
+        }
+    }
+    
+    // Idle behavior - just hover and look around occasionally
+    executeIdleBehavior(deltaTime) {
+        // Occasionally look around
+        if (Math.random() < 0.01) {
+            const randomRotation = Math.random() * Math.PI * 2;
+            this.targetRotation = randomRotation;
+        }
+        
+        // If we have a target rotation, turn towards it
+        if (this.targetRotation !== undefined) {
+            const currentRotation = this.group.rotation.y;
+            let rotationDiff = this.targetRotation - currentRotation;
+            
+            // Normalize the rotation difference to (-PI, PI)
+            while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+            while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+            
+            // Apply smooth rotation
+            this.group.rotation.y += rotationDiff * this.turnSpeed.patrol * 0.5;
+            
+            // Check if we've reached the target rotation
+            if (Math.abs(rotationDiff) < 0.05) {
+                this.targetRotation = undefined;
+            }
+        }
+    }
+    
+    // Attack behavior - face player and perform attack
+    executeAttackBehavior(deltaTime) {
+        if (!this.player || !this.player.camera) return;
+        
+        // Always face the player during attack
+        const playerPos = this.player.camera.position;
+        const direction = new THREE.Vector3();
+        direction.subVectors(playerPos, this.group.position).normalize();
+        
+        // Calculate target rotation
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        
+        // Smoothly rotate towards target (faster during attack)
+        const currentRotation = this.group.rotation.y;
+        let rotationDiff = targetRotation - currentRotation;
+        
+        // Normalize the rotation difference to (-PI, PI)
+        while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+        while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+        
+        // Apply smooth rotation
+        this.group.rotation.y += rotationDiff * this.turnSpeed.chase * 1.5;
+        
+        // If the attack is finished and cooldown is done, transition back to chase
+        if (!this.isAttacking && this.attackCooldown <= 0) {
+            this.changeState(this.states.CHASE);
+        }
+    }
+    
+    // Perform a melee attack
+    performAttack() {
+        if (this.isAttacking || !this.player) return;
+        
+        this.isAttacking = true;
+        this.attackCooldown = this.attackCooldownTime;
+        
+        // Find the closest arm to attack with
+        let attackArm = null;
+        let bestDistance = Infinity;
+        
+        // Get player position
+        const playerPos = this.player.camera.position;
+        
+        // Find the best arm to attack with
+        for (let i = 0; i < this.arms.length; i++) {
+            const arm = this.arms[i];
+            if (!arm || !arm.userData) continue;
+            
+            // Get arm position
+            const armPos = new THREE.Vector3();
+            if (arm.userData.weapon) {
+                arm.userData.weapon.getWorldPosition(armPos);
+            } else {
+                arm.getWorldPosition(armPos);
+            }
+            
+            // Calculate distance to player
+            const distance = armPos.distanceTo(playerPos);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                attackArm = arm;
+            }
+        }
+        
+        // If we found an arm, use it to attack
+        if (attackArm) {
+            // Force extend the arm
+            const armIndex = this.arms.indexOf(attackArm);
+            this.extendArm(attackArm, armIndex, 1.0);
+            
+            // Make the arm "strike" forward
+            const strikeAmount = 0.6;
+            let originalPosition = null;
+            
+            if (attackArm.userData.upperArm) {
+                originalPosition = attackArm.userData.upperArm.position.z;
+                
+                // Strike animation
+                const strikeDuration = this.attackDuration * 1000 * 0.4; // 40% of attack duration
+                
+                // Forward motion
+                attackArm.userData.upperArm.position.z += strikeAmount;
+                
+                // Return after delay
+                setTimeout(() => {
+                    if (attackArm.userData.upperArm) {
+                        attackArm.userData.upperArm.position.z = originalPosition;
+                    }
+                }, strikeDuration);
+            }
+            
+            // Make weapon glow brighter during attack
+            if (attackArm.userData.weaponGlow) {
+                const originalColor = attackArm.userData.weaponGlow.material.color.clone();
+                const originalOpacity = attackArm.userData.weaponGlow.material.opacity;
+                
+                attackArm.userData.weaponGlow.material.opacity = 1.0;
+                attackArm.userData.weaponGlow.material.color.set(0xff0000);
+                attackArm.userData.weaponGlow.scale.set(1.5, 1.5, 1.5);
+                
+                // Reset after attack completes
+                setTimeout(() => {
+                    if (attackArm.userData.weaponGlow) {
+                        attackArm.userData.weaponGlow.material.color.copy(originalColor);
+                        attackArm.userData.weaponGlow.material.opacity = originalOpacity;
+                        attackArm.userData.weaponGlow.scale.set(1, 1, 1);
+                    }
+                }, this.attackDuration * 1000);
+            }
+        }
+        
+        // Create attack effect
+        this.createMeleeAttackEffect();
+        
+        // Deal damage to player after a short delay
+        setTimeout(() => {
+            // Check if still in range before applying damage
+            if (this.player && this.player.camera) {
+                const currentDistanceToPlayer = this.group.position.distanceTo(this.player.camera.position);
+                if (currentDistanceToPlayer <= this.attackRange) {
+                    console.log(`Enemy hit player for ${this.attackDamage} damage!`);
+                    // Call the player's damage function
+                    if (this.player.damage) {
+                        this.player.damage(this.attackDamage);
+                    }
+                }
+            }
+            
+            // Reset attack state
+            this.isAttacking = false;
+            
+            // Return to chase state after attack
+            this.changeState(this.states.CHASE);
+        }, this.attackDuration * 1000);
+    }
+    
+    // Create melee attack effect
+    createMeleeAttackEffect() {
+        if (!this.player || !this.player.camera) return;
+        
+        // Calculate direction to player
+        const playerPosition = this.player.camera.position;
+        const direction = new THREE.Vector3().subVectors(playerPosition, this.group.position).normalize();
+        
+        // Calculate effect position (between enemy and player)
+        const effectPosition = new THREE.Vector3().copy(this.group.position);
+        effectPosition.addScaledVector(direction, this.attackRange * 0.7); // 70% of the way to the player
+        
+        // Create swipe effect with arc shape
+        const arcGeometry = new THREE.TorusGeometry(0.5, 0.05, 8, 12, Math.PI);
+        const arcMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff3333,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        
+        const arc = new THREE.Mesh(arcGeometry, arcMaterial);
+        
+        // Position and rotate to face player
+        arc.position.copy(effectPosition);
+        arc.lookAt(playerPosition);
+        arc.rotateX(Math.PI / 2); // Rotate to vertical
+        
+        this.scene.add(arc);
+        
+        // Add a flash light
+        const light = new THREE.PointLight(0xff3333, 2, 2);
+        light.position.copy(effectPosition);
+        this.scene.add(light);
+        
+        // Animate the effect
+        const duration = 0.3; // 300ms
+        const startTime = performance.now();
+        
+        const animateAttack = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Rotate the arc for a swipe effect
+            arc.rotation.z = progress * Math.PI;
+            
+            // Scale up slightly and fade out
+            const scale = 1 + progress * 0.5;
+            arc.scale.set(scale, scale, scale);
+            arc.material.opacity = 0.7 * (1 - progress);
+            
+            // Update light
+            light.intensity = 2 * (1 - progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateAttack);
+            } else {
+                // Clean up
+                this.scene.remove(arc);
+                this.scene.remove(light);
+                if (arc.geometry) arc.geometry.dispose();
+                if (arc.material) arc.material.dispose();
+            }
+        };
+        
+        animateAttack();
+    }
+    
+    // Ranged attack - shoot a projectile at the player
     performRangedAttack() {
         if (!this.player || this.rangedAttackCooldown > 0) return;
 
@@ -1283,81 +1839,273 @@ export class Enemy {
             }
         }
         
-        console.log("Robot enemy fired ranged attack!");
+        console.log("Enemy fired ranged attack!");
     }
     
-    // Enhanced attack behavior for robots
-    performAttack() {
-        if (this.isAttacking || !this.player) return;
+    // Take damage from player
+    takeDamage(amount) {
+        // Skip if already dead or invulnerable
+        if (this.state === 'dead' || this.isInvulnerable) return false;
         
-        this.isAttacking = true;
-        this.attackCooldown = this.attackCooldownTime;
+        // Reduce health
+        this.health -= amount;
         
-        // Find the closest arm to attack with
-        let attackArm = null;
-        let bestDistance = Infinity;
+        // Log damage
+        console.log(`Enemy took ${amount} damage, health: ${this.health}/${this.maxHealth}`);
         
-        // Get player position
-        const playerPos = this.player.camera.position;
+        // Visual effect for taking damage
+        this.isDamaged = true;
+        this.damageFlashTime = 0.3; // 300ms flash duration
         
-        // Find the best arm to attack with
-        for (let i = 0; i < this.arms.length; i++) {
-            const arm = this.arms[i];
-            if (!arm || !arm.userData) continue;
+        // Brief invulnerability
+        this.isInvulnerable = true;
+        this.invulnerabilityTime = 0.1; // 100ms invulnerability
+        
+        // Check if dead
+        if (this.health <= 0) {
+            this.die();
+            return true; // Return true if killed
+        }
+        
+        return false; // Return false if still alive
+    }
+    
+    // Death handling
+    die() {
+        if (this.state === 'dead') return; // Already dead
+        
+        console.log("Enemy died!");
+        this.state = 'dead';
+        
+        // Clean up projectiles
+        for (const projectile of this.projectiles) {
+            if (projectile.mesh) {
+                this.scene.remove(projectile.mesh);
+            }
+        }
+        this.projectiles = [];
+        
+        // Drop mana orb if not already dropped
+        if (!this.manaDrop.dropped) {
+            this.dropManaOrb();
+            this.manaDrop.dropped = true;
+        }
+        
+        // Simple death animation - shrink and fade out
+        const startScale = this.group.scale.clone();
+        const startPosition = this.group.position.clone();
+        
+        const duration = 1.0; // Death animation duration in seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
             
-            // Get arm position
-            const armPos = new THREE.Vector3();
-            if (arm.userData.weapon) {
-                arm.userData.weapon.getWorldPosition(armPos);
-            } else {
-                arm.getWorldPosition(armPos);
+            // Scale down
+            const scale = 1 - progress * 0.8;
+            this.group.scale.set(scale, scale * 0.5, scale); // Flatten as it shrinks
+            
+            // Sink into ground
+            this.group.position.y = startPosition.y - progress * 1.0;
+            
+            // Rotate slightly
+            this.group.rotation.y += 0.02;
+            
+            // Fade materials
+            this.segments.forEach(segment => {
+                if (segment && segment.material) {
+                    segment.material.opacity = 1 - progress;
+                    segment.material.transparent = true;
+                }
+            });
+            
+            if (this.coreSegment && this.coreSegment.material) {
+                this.coreSegment.material.emissiveIntensity = 0.8 * (1 - progress);
             }
             
-            // Calculate distance to player
-            const distance = armPos.distanceTo(playerPos);
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                attackArm = arm;
+            // Fade hover effects
+            if (this.hoverLight) {
+                this.hoverLight.intensity = 1.5 * (1 - progress);
+            }
+            
+            if (this.hoverGlow && this.hoverGlow.material) {
+                this.hoverGlow.material.opacity = 0.5 * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // After death animation completes, remove from scene
+                this.group.visible = false;
+                
+                // Disable collisions for this enemy
+                this.collisionEnabled = false;
+            }
+        };
+        
+        animate();
+    }
+    
+    // Drop a mana orb when killed
+    dropManaOrb() {
+        // Calculate mana amount
+        const manaAmount = Math.floor(Math.random() * 
+            (this.manaDrop.max - this.manaDrop.min + 1)) + this.manaDrop.min;
+        
+        // Create mana orb mesh
+        const orbGeometry = new THREE.SphereGeometry(0.4, 16, 16);
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3366ff,
+            emissive: 0x3366ff,
+            emissiveIntensity: 0.8,
+            metalness: 0.7,
+            roughness: 0.3,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
+        
+        // Position the orb at the enemy's death location, slightly elevated
+        orbMesh.position.copy(this.group.position);
+        orbMesh.position.y += 0.5;
+        
+        // Add glow effect
+        const glowGeometry = new THREE.SphereGeometry(0.6, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3366ff,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.BackSide
+        });
+        
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        orbMesh.add(glowMesh);
+        
+        // Add point light to make it glow
+        const orbLight = new THREE.PointLight(0x3366ff, 1.5, 3);
+        orbLight.position.set(0, 0, 0);
+        orbMesh.add(orbLight);
+        
+        // Add userData to identify this as a mana orb and store mana amount
+        orbMesh.userData = {
+            isManaOrb: true,
+            manaAmount: manaAmount
+        };
+        
+        // Add to scene
+        this.scene.add(orbMesh);
+        
+        // Add a collider for the orb
+        if (this.collisionManager) {
+            const colliderIndex = this.collisionManager.addCollider(orbMesh);
+            
+            // Tag this collider as a mana orb
+            if (this.collisionManager.colliders[colliderIndex]) {
+                this.collisionManager.colliders[colliderIndex].isManaOrb = true;
+                this.collisionManager.colliders[colliderIndex].manaAmount = manaAmount;
             }
         }
         
-        // If we found an arm, use it to attack
-        if (attackArm) {
-            // Force extend the arm
-            const armIndex = this.arms.indexOf(attackArm);
-            this.extendArm(attackArm, armIndex, 1.0);
+        // Animate the orb
+        this.animateManaOrb(orbMesh);
+        
+        console.log(`Dropped mana orb containing ${manaAmount} mana`);
+    }
+    
+    // Animate the mana orb
+    animateManaOrb(orbMesh) {
+        // Make the orb bob up and down
+        const startY = orbMesh.position.y;
+        const floatHeight = 0.3;
+        const floatSpeed = 1.5;
+        
+        // Make orb pulse
+        const pulseSpeed = 2;
+        
+        // If we already have an animation system, use it
+        if (!window.animatedOrbs) {
+            window.animatedOrbs = [];
             
-            // Make the arm "strike" forward
-            const strikeAmount = 0.6;
-            let originalPosition = null;
-            
-            if (attackArm.userData.upperArm) {
-                originalPosition = attackArm.userData.upperArm.position.z;
-                
-                // Strike animation
-                const strikeDuration = this.attackDuration * 1000 * 0.4; // 40% of attack duration
-                
-                // Forward motion
-                attackArm.userData.upperArm.position.z += strikeAmount;
-                
-                // Return after delay
-                setTimeout(() => {
-                    if (attackArm.userData.upperArm) {
-                        attackArm.userData.upperArm.position.z = originalPosition;
+            const animateOrbs = () => {
+                const orbs = window.animatedOrbs;
+                if (orbs && orbs.length > 0) {
+                    const time = performance.now() * 0.001;
+                    
+                    for (const orb of orbs) {
+                        if (!orb || !orb.userData) continue;
+                        
+                        // Bobbing motion
+                        orb.position.y = orb.userData.startY + 
+                            Math.sin(time * orb.userData.floatSpeed) * orb.userData.floatHeight;
+                        
+                        // Rotate slowly
+                        orb.rotation.y += 0.01;
+                        
+                        // Pulse glow
+                        if (orb.children && orb.children[0]) {
+                            const glow = orb.children[0];
+                            const pulseScale = 1 + Math.sin(time * orb.userData.pulseSpeed) * 0.2;
+                            glow.scale.set(pulseScale, pulseScale, pulseScale);
+                        }
+                        
+                        // Pulse light
+                        if (orb.children && orb.children[1]) {
+                            const light = orb.children[1];
+                            light.intensity = 1.5 + Math.sin(time * orb.userData.pulseSpeed) * 0.5;
+                        }
                     }
-                }, strikeDuration);
-            }
+                }
+                
+                requestAnimationFrame(animateOrbs);
+            };
             
-            // Make weapon glow brighter during attack
-            if (attackArm.userData.weaponGlow) {
-                const originalOpacity = attackArm.userData.weaponGlow.material.opacity;
-                attackArm.userData.weaponGlow.material.opacity = 1.0;
-                attackArm.userData.weaponGlow.material.color.set(0xff0000);
-                
-                // Add a subtle scale effect
-                attackArm.userData.weaponGlow.scale.set(1.5, 1.5, 1.5);
-                
-                // Reset after attack completes
-                setTimeout(() => {
-                    if (attackArm.userData.weaponGlow) {
-                        attackArm.userData.weaponGlow.material.opacity = originalOpacity;
+            animateOrbs();
+        }
+        
+        // Store animation parameters with the orb
+        orbMesh.userData.startY = startY;
+        orbMesh.userData.floatHeight = floatHeight;
+        orbMesh.userData.floatSpeed = floatSpeed;
+        orbMesh.userData.pulseSpeed = pulseSpeed;
+        
+        // Add to animated orbs
+        window.animatedOrbs.push(orbMesh);
+    }
+    
+    // Reset to last valid position if stuck
+    resetToLastValidPosition() {
+        if (this.lastValidPosition) {
+            this.group.position.copy(this.lastValidPosition);
+            console.log("Enemy reset to last valid position");
+        }
+    }
+    
+    // Clean up resources when removed
+    dispose() {
+        // Remove from scene
+        if (this.scene && this.group) {
+            this.scene.remove(this.group);
+        }
+        
+        // Clean up projectiles
+        for (const projectile of this.projectiles) {
+            if (this.scene && projectile.mesh) {
+                this.scene.remove(projectile.mesh);
+            }
+        }
+        
+        // Dispose geometries and materials
+        if (this.segments) {
+            for (const segment of this.segments) {
+                if (segment.geometry) segment.geometry.dispose();
+                if (segment.material) segment.material.dispose();
+            }
+        }
+        
+        // Dispose other resources...
+        console.log("Enemy resources disposed");
+    }
+                }
