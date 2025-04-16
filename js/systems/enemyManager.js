@@ -133,12 +133,7 @@ export class EnemyManager {
         // Spawn second enemy with a delay
         setTimeout(() => this.spawnEnemyNearPlayer(), 3000);
         
-        // Spawn a few more enemies around the map
-        setTimeout(() => {
-            // Try to spawn in different locations
-            this.spawnEnemyAtPosition(new THREE.Vector3(-10, 1, 10), 4, 0.4);
-            this.spawnEnemyAtPosition(new THREE.Vector3(10, 1, -10), 6, 0.3);
-        }, 5000);
+        
     }
     
     forceSpawnTestEnemy() {
