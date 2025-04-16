@@ -1140,8 +1140,10 @@ export class KingCylindar extends Enemy {
             );
             
             // Calculate target eye rotation
-            const targetEyeX = Math.clamp(localToPlayer.y * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
-            const targetEyeY = Math.clamp(localToPlayer.x * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
+        
+
+            const targetEyeX = THREE.MathUtils.clamp(localToPlayer.y * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
+            const targetEyeY = THREE.MathUtils.clamp(localToPlayer.x * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
             
             // Smoothly rotate eyes toward player
             this.leftEye.rotation.x += (targetEyeX - this.leftEye.rotation.x) * this.eyeAnimParams.lookSpeed * deltaTime;
