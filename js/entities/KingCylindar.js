@@ -2,917 +2,943 @@ import { Enemy } from './enemy.js';
 
 export class KingCylindar extends Enemy {
     constructor(scene, position, collisionManager, player) {
-        // Call parent constructor first
+        // Call parent Enemy constructor
         super(scene, position, collisionManager, player);
         
-        // Override key properties for King Cylindar
-        this.health = 500;
-        this.maxHealth = 500; 
-        this.detectionRange = 15;
-        this.chaseRange = 25;
-        this.attackRange = 2.5;
-        this.attackDamage = 30;
+        // Override default enemy settings
+        this.health = 300;
+        this.maxHealth = 300;
+        this.moveSpeed = 0.5;
+        this.turnSpeed = 1.0;
+        this.attackDamage = 25;
+        this.attackRange = 3;
+        this.detectionRange = 25;
+        this.collisionRadius = 1.5;
+        this.isRangedAttacker = true;
         
-        // Ranged attack properties
-        this.rangedAttackRange = 25;
-        this.rangedAttackCooldownTime = 5;
-        this.rangedAttackDamage = 15;
-        this.shotgunProjectileCount = 8;
-        this.shotgunSpreadAngle = Math.PI / 4;
+        // Special King Cylindar properties
+        this.isBoss = true;
+        this.hasDroppedOrb = false;
+        this.orbValue = 25; // Mana value when collected
         
-        // Mana drop properties - same as other enemies
-        this.manaDrop = {
-            min: 20,
-            max: 50,
-            dropped: false  
-        };
+        // State tracking
+        this.state = 'idle';
+        this.stateTime = 0;
+        this.attackCooldown = 0;
+        this.attackCooldownTime = 3; // Seconds between attacks
+        this.phaseChangeHealth = 150; // Health threshold for phase 2
+        this.currentPhase = 1;
         
-        // Movement speed adjustments
-        this.moveSpeed = { 
-            patrol: 0.3,
-            chase: 1.0
-        };
+        // Targeting properties
+        this.lastKnownPlayerPosition = new THREE.Vector3();
+        this.targetRotation = new THREE.Euler();
         
-        // King-sized patrol radius  
-        this.patrolRadius = 6;
+        // Create the 3D model
+        this.createModel();
         
-        // Create the mesh
-        this.createPsychedelicMesh();
+        // Initialize animations
+        this.setupAnimations();
         
-        console.log("King Cylindar created at:", this.position);
+        // Set initial position
+        this.group.position.copy(position);
         
-        // Animation parameters  
-        this.animationTime = 0;
-        this.pulseLayers = [];
-        this.colorCycle = 0;
-        this.colorCycleRate = 0.2;
+        // For debugging
+        this.debug = true;
+        if (this.debug) console.log("King Cylindar spawned at", position);
     }
     
-    createPsychedelicMesh() {
-        // Remove existing mesh if it exists
-        if (this.group) {
-            this.scene.remove(this.group);
-        }
-        
-        // Create a group to hold all enemy parts
+    createModel() {
+        // Create main group to hold all meshes
         this.group = new THREE.Group();
         
-        // Create a giant body with layered cylinders for vapor effect
-        const createVaporLayer = (radius, height, color, opacity, emissive = true) => {
-            const geometry = new THREE.CylinderGeometry(
-                radius, // top radius
-                radius * 0.9, // slightly narrower bottom for vapor effect
-                height, // height
-                16, // radial segments
-                4, // height segments
-                true // open-ended for vapor effect
-            );
-            
-            const material = new THREE.MeshStandardMaterial({
-                color: color,
-                transparent: true,
-                opacity: opacity,
-                roughness: 0.3,
-                metalness: 0.7,
-                side: THREE.DoubleSide
-            });
-            
-            if (emissive) {
-                material.emissive = new THREE.Color(color);
-                material.emissiveIntensity = 0.6;
-            }
-            
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.castShadow = false; // Vapor doesn't cast shadows
-            mesh.receiveShadow = false;
-            
-            return mesh;
-        };
+        // Create material loader
+        this.textureLoader = new THREE.TextureLoader();
         
-        // Create base body - solid core
-        const bodyGeometry = new THREE.CylinderGeometry(
-            2.0, // top radius (4x larger)
-            2.0, // bottom radius
-            9.0, // height (larger)
-            16, // more radial segments for better quality
-            3, // height segments
-            false // closed
-        );
+        // Create geometries and materials
+        this.createMainBody();
+        this.createOrbRing();
+        this.createEyes();
         
-        // Central body with metallic material and subtle pattern
-        const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0xD4AF37, // Gold base
-            emissive: 0xD4AF37,
-            emissiveIntensity: 0.2,
-            roughness: 0.4,
-            metalness: 0.9
-        });
-        
-        this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
-        this.bodyMesh.castShadow = true;
-        this.bodyMesh.receiveShadow = true;
-        this.bodyMesh.position.y = 9.0 / 2; // Center vertically based on height
-        
-        // Save body dimensions for collision detection
-        this.bodyWidth = 4.0; // Diameter
-        this.bodyHeight = 9.0;
-        
-        // Add body to group
-        this.group.add(this.bodyMesh);
-        
-        // Create vapor/steam layers with different colors
-        const vaporColors = [
-            0xFF3366, // Hot pink
-            0x66CCFF, // Cyan blue
-            0xFFCC33, // Amber
-            0xAA66FF  // Purple
-        ];
-        
-        // Create multiple vapor layers
-        for (let i = 0; i < 4; i++) {
-            const radius = 2.5 + (i * 0.4);
-            const height = 10.0 + (i * 0.5);
-            const color = vaporColors[i % vaporColors.length];
-            const opacity = 0.4 - (i * 0.05);
-            
-            const layer = createVaporLayer(radius, height, color, opacity);
-            layer.position.y = height / 2;
-            this.pulseLayers.push(layer);
-            this.group.add(layer);
-        }
-        
-        // Create heat distortion effect (inner ripple)
-        const heatDistortionGeometry = new THREE.SphereGeometry(2.8, 20, 20);
-        const heatDistortionMaterial = new THREE.MeshPhysicalMaterial({
-            color: 0xFFFFFF,
-            transparent: true,
-            opacity: 0.1,
-            roughness: 0.1,
-            metalness: 0,
-            clearcoat: 1.0,
-            clearcoatRoughness: 0.2,
-            side: THREE.DoubleSide
-        });
-        
-        this.heatDistortion = new THREE.Mesh(heatDistortionGeometry, heatDistortionMaterial);
-        this.heatDistortion.position.y = 5.0;
-        this.group.add(this.heatDistortion);
-        
-        // Add giant glowing eyes - with iris detail for more presence
-        this.createPsychedelicEyes();
-        
-        // Add swirling energy particles
-        this.createEnergyParticles();
-        
-        // Add a point light to make it glow
-        this.glowLight = new THREE.PointLight(0xFFCC33, 2.0, 15);
-        this.glowLight.position.y = 4.5;
-        this.group.add(this.glowLight);
-        
-        // Add secondary smaller lights for color variety
-        const createColorLight = (color, height, intensity, distance) => {
-            const light = new THREE.PointLight(color, intensity, distance);
-            light.position.y = height;
-            this.group.add(light);
-            return light;
-        };
-        
-        this.colorLights = [
-            createColorLight(0xFF3366, 7.0, 1.0, 8), // Pink light near top
-            createColorLight(0x66CCFF, 2.0, 1.0, 8)  // Blue light near bottom
-        ];
-        
-        // Position the entire group
-        this.group.position.copy(this.position);
+        // Add shadow casting
+        this.setShadowProperties(this.bodyMesh);
         
         // Add to scene
         this.scene.add(this.group);
-        
-        // Update collision radius for the larger entity
-        this.collisionRadius = 2.5; // 3x larger collision radius
     }
     
-    createPsychedelicEyes() {
-        // Create eye sockets - darker circular areas
-        const eyeSocketGeometry = new THREE.CircleGeometry(0.6, 16);
-        const eyeSocketMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            side: THREE.DoubleSide
+    createMainBody() {
+        // Main cylindrical body
+        const bodyGeometry = new THREE.CylinderGeometry(1.5, 1.5, 9, 32, 8);
+        
+        // Simpler material
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x885533, 
+            metalness: 0.3,
+            roughness: 0.7,
+            emissive: 0x331100,
+            emissiveIntensity: 0.2,
         });
         
-        // Create the eye with iris and pupil
-        const createEye = (x, z) => {
-            // Eye socket/base
-            const socket = new THREE.Mesh(eyeSocketGeometry, eyeSocketMaterial);
-            socket.position.set(x, 7.5, z); // High on cylinder
-            socket.rotation.y = Math.PI / 2; // Rotate to face outward
+        // Create the main body mesh
+        this.bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        this.bodyMesh.position.y = 4.5; // Offset to make bottom at y=0
+        this.group.add(this.bodyMesh);
+        
+        // Add metal bands around the cylinder
+        this.addMetalBands();
+    }
+    
+    addMetalBands() {
+        // Create metal band material
+        const metalMaterial = new THREE.MeshStandardMaterial({
+            color: 0xaa8866,
+            metalness: 0.8,
+            roughness: 0.3,
+        });
+        
+        // Add several metal bands at different heights
+        const bandHeights = [1, 3.5, 6, 8];
+        const bandWidth = 0.3;
+        
+        bandHeights.forEach(height => {
+            const bandGeometry = new THREE.TorusGeometry(1.55, bandWidth, 16, 32);
+            const band = new THREE.Mesh(bandGeometry, metalMaterial);
+            band.rotation.x = Math.PI / 2; // Rotate to wrap around cylinder
+            band.position.y = height;
+            this.bodyMesh.add(band);
             
-            // Iris (colorful part)
-            const irisGeometry = new THREE.CircleGeometry(0.5, 16);
-            const irisMaterial = new THREE.MeshBasicMaterial({
-                color: 0x66CCFF, // Bright blue base color
-                side: THREE.DoubleSide
+            // Add rivets to bands
+            this.addRivetsToBand(band, bandWidth);
+        });
+    }
+    
+    addRivetsToBand(band, bandWidth) {
+        const rivetMaterial = new THREE.MeshStandardMaterial({
+            color: 0xccbbaa,
+            metalness: 0.9,
+            roughness: 0.3
+        });
+        
+        // Add rivets around the band
+        const rivetCount = 8; // Reduced count
+        const rivetRadius = bandWidth * 0.4;
+        
+        for (let i = 0; i < rivetCount; i++) {
+            const angle = (i / rivetCount) * Math.PI * 2;
+            const rivetGeometry = new THREE.SphereGeometry(rivetRadius, 8, 8);
+            const rivet = new THREE.Mesh(rivetGeometry, rivetMaterial);
+            
+            // Position rivets on the band
+            rivet.position.x = Math.cos(angle) * 1.55;
+            rivet.position.z = Math.sin(angle) * 1.55;
+            rivet.position.y = 0;
+            
+            band.add(rivet);
+        }
+    }
+    
+    createOrbRing() {
+        // Create a ring of orbs around the center - simplified version
+        const orbCount = 6; // Reduced count
+        this.orbs = [];
+        this.orbGroup = new THREE.Group();
+        this.bodyMesh.add(this.orbGroup);
+        
+        // Position the orb group
+        this.orbGroup.position.y = 4; // Middle of the body
+        
+        for (let i = 0; i < orbCount; i++) {
+            const angle = (i / orbCount) * Math.PI * 2;
+            
+            // Create orb geometry
+            const orbGeometry = new THREE.SphereGeometry(0.35, 16, 16);
+            
+            // Generate color based on position
+            const hue = (i / orbCount) * 360;
+            const color = new THREE.Color(`hsl(${hue}, 100%, 60%)`);
+            
+            // Create orb material
+            const orbMaterial = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 0.8,
             });
             
-            const iris = new THREE.Mesh(irisGeometry, irisMaterial);
-            iris.position.set(0, 0, 0.01); // Slightly in front of socket
-            socket.add(iris);
+            // Create orb mesh
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
             
-            // Pupil (center black part)
-            const pupilGeometry = new THREE.CircleGeometry(0.2, 16);
-            const pupilMaterial = new THREE.MeshBasicMaterial({
-                color: 0x000000,
-                side: THREE.DoubleSide
-            });
+            // Position around in a circle
+            const orbDistance = 2.2;
+            orb.position.x = Math.cos(angle) * orbDistance;
+            orb.position.z = Math.sin(angle) * orbDistance;
             
-            const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-            pupil.position.set(0, 0, 0.02); // Slightly in front of iris
-            iris.add(pupil);
+            // Store orb data for animation
+            orb.userData.baseAngle = angle;
             
-            // Eye glow
-            const glowGeometry = new THREE.CircleGeometry(0.7, 16);
-            const glowMaterial = new THREE.MeshBasicMaterial({
-                color: 0x66FFFF,
-                transparent: true,
-                opacity: 0.5,
-                side: THREE.DoubleSide
-            });
+            // Add to group
+            this.orbGroup.add(orb);
+            this.orbs.push(orb);
             
-            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-            glow.position.set(0, 0, -0.02); // Slightly behind the socket
-            socket.add(glow);
-            
-            return {socket, iris, pupil, glow};
+            // Add a point light to each orb - using fewer lights for performance
+            if (i % 2 === 0) {
+                const orbLight = new THREE.PointLight(color, 1, 3);
+                orbLight.position.copy(orb.position);
+                orb.userData.light = orbLight;
+                this.orbGroup.add(orbLight);
+            }
+        }
+    }
+    
+    createEyes() {
+        // Create eye group to hold all eye components
+        this.eyeGroup = new THREE.Group();
+        this.bodyMesh.add(this.eyeGroup);
+        
+        // Position eyes near the top of the cylinder
+        this.eyeGroup.position.y = 7.5;
+        
+        // Create materials
+        const eyeSocketMaterial = new THREE.MeshStandardMaterial({
+            color: 0x222222,
+            metalness: 0.7,
+            roughness: 0.2,
+        });
+        
+        const eyeballMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            metalness: 0.1,
+            roughness: 0.3
+        });
+        
+        const irisMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff3300,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.8
+        });
+        
+        // Create left eye
+        this.leftEyeSocket = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.4, 0.4, 0.2, 16),
+            eyeSocketMaterial
+        );
+        this.leftEyeSocket.rotation.x = Math.PI / 2;
+        this.leftEyeSocket.position.set(-0.8, 0, 1.3);
+        this.eyeGroup.add(this.leftEyeSocket);
+        
+        this.leftEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 16, 16),
+            eyeballMaterial
+        );
+        this.leftEye.position.z = 0.1;
+        this.leftEyeSocket.add(this.leftEye);
+        
+        this.leftIris = new THREE.Mesh(
+            new THREE.SphereGeometry(0.15, 16, 16),
+            irisMaterial
+        );
+        this.leftIris.position.z = 0.2;
+        this.leftEye.add(this.leftIris);
+        
+        // Create right eye
+        this.rightEyeSocket = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.4, 0.4, 0.2, 16),
+            eyeSocketMaterial
+        );
+        this.rightEyeSocket.rotation.x = Math.PI / 2;
+        this.rightEyeSocket.position.set(0.8, 0, 1.3);
+        this.eyeGroup.add(this.rightEyeSocket);
+        
+        this.rightEye = new THREE.Mesh(
+            new THREE.SphereGeometry(0.3, 16, 16),
+            eyeballMaterial
+        );
+        this.rightEye.position.z = 0.1;
+        this.rightEyeSocket.add(this.rightEye);
+        
+        this.rightIris = new THREE.Mesh(
+            new THREE.SphereGeometry(0.15, 16, 16),
+            irisMaterial
+        );
+        this.rightIris.position.z = 0.2;
+        this.rightEye.add(this.rightIris);
+    }
+    
+    setupAnimations() {
+        // Set up animation parameters for various parts - greatly simplified
+        
+        // Set up orb ring animation
+        this.orbAnimParams = {
+            rotationSpeed: 0.2,
         };
         
-        // Create left and right eyes
-        this.leftEye = createEye(-1.8, -0.8);
-        this.rightEye = createEye(1.8, -0.8);
+        // Set up eye animation
+        this.eyeAnimParams = {
+            blinkInterval: 5, // seconds between blinks
+            blinkTime: 0, // current blink timer
+            blinkDuration: 0.2, // how long a blink lasts
+            isBlinking: false,
+            lookSpeed: 0.5, // how fast eyes track player
+            lookRange: 0.15 // how far eyes can rotate
+        };
         
-        // Add eyes to group
-        this.group.add(this.leftEye.socket);
-        this.group.add(this.rightEye.socket);
+        // Attack animation parameters
+        this.attackAnimParams = {
+            chargeTime: 1.0, // seconds to charge attack
+            fireTime: 0.5, // seconds for attack animation
+            cooldownTime: 2.0, // seconds after attack before next one
+            currentState: 'idle',
+            timer: 0
+        };
     }
     
-    createEnergyParticles() {
-        // Create small particles that orbit the King Cylindar
-        this.particles = new THREE.Group();
-        
-        const particleColors = [
-            0xFF3366, // Pink
-            0x66CCFF, // Blue
-            0xFFCC33, // Amber
-            0xAA66FF, // Purple
-            0x33FF66  // Green
-        ];
-        
-        for (let i = 0; i < 30; i++) {
-            // Create small glowing sphere
-            const size = 0.1 + Math.random() * 0.2;
-            const geometry = new THREE.SphereGeometry(size, 8, 8);
-            const color = particleColors[Math.floor(Math.random() * particleColors.length)];
-            
-            const material = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.7
-            });
-            
-            const particle = new THREE.Mesh(geometry, material);
-            
-            // Set random orbit parameters
-            const radius = 3 + Math.random() * 2; // Orbit radius
-            const angle = Math.random() * Math.PI * 2; // Starting angle
-            const height = Math.random() * 10; // Height along cylinder
-            const speed = 0.2 + Math.random() * 0.5; // Orbit speed
-            const direction = Math.random() > 0.5 ? 1 : -1; // Direction
-            
-            // Store orbit parameters with the particle
-            particle.userData = {
-                radius,
-                angle,
-                height,
-                speed: speed * direction,
-                verticalSpeed: (Math.random() - 0.5) * 0.1, // Movement up/down
-                sizePulse: Math.random() * 0.1 // Size variation
-            };
-            
-            // Position particle
-            particle.position.set(
-                Math.cos(angle) * radius,
-                height,
-                Math.sin(angle) * radius
-            );
-            
-            // Add to particles group
-            this.particles.add(particle);
-        }
-        
-        // Add particles group to main group
-        this.group.add(this.particles);
-    }
-    
-    // Override update method to add pulsing and psychedelic effects
     update(deltaTime, camera) {
-        // Call the parent update method first
+        if (!this.group) return;
+        
+        // Update the parent class behavior
         super.update(deltaTime, camera);
         
-        // Update animation time
-        this.animationTime += deltaTime;
+        // Update animations
+        this.updateAnimations(deltaTime);
         
-        // Update color cycle
-        this.colorCycle += deltaTime * this.colorCycleRate;
-        if (this.colorCycle > 1) this.colorCycle -= 1;
+        // Update AI state
+        this.updateState(deltaTime);
         
-        // Update vapor layers pulsation
-        this.updateVaporLayers();
-        
-        // Update eye colors
-        this.updateEyeEffects();
-        
-        // Update particle movements
-        this.updateParticles(deltaTime);
-        
-        // Update lights
-        this.updateLights();
+        // Check for phase change
+        this.checkPhaseChange();
     }
     
-    updateVaporLayers() {
-        if (!this.pulseLayers || this.pulseLayers.length === 0) return;
+    updateAnimations(deltaTime) {
+        // Update orb ring
+        this.updateOrbRing(deltaTime);
         
-        const time = this.animationTime;
+        // Update eyes
+        this.updateEyes(deltaTime);
+    }
+    
+    updateOrbRing(deltaTime) {
+        if (!this.orbGroup || !this.orbs) return;
         
-        // Calculate a base pulse value from time
-        const basePulse = (Math.sin(time * 1.5) * 0.5 + 0.5);
+        // Rotate the entire orb ring - simplified
+        this.orbGroup.rotation.y += this.orbAnimParams.rotationSpeed * deltaTime;
+    }
+    
+    updateEyes(deltaTime) {
+        if (!this.leftEye || !this.rightEye) return;
         
-        // Update each vapor layer
-        for (let i = 0; i < this.pulseLayers.length; i++) {
-            const layer = this.pulseLayers[i];
+        // Handle blinking
+        this.eyeAnimParams.blinkTime += deltaTime;
+        
+        if (!this.eyeAnimParams.isBlinking && 
+            this.eyeAnimParams.blinkTime >= this.eyeAnimParams.blinkInterval) {
+            // Start a blink
+            this.eyeAnimParams.isBlinking = true;
+            this.eyeAnimParams.blinkTime = 0;
             
-            // Create offset pulse for each layer
-            const layerPulse = Math.sin(time * (1.0 + i * 0.2) + i * 0.5) * 0.5 + 0.5;
+            // Scale eyes to simulate blink
+            this.leftEye.scale.y = 0.1;
+            this.rightEye.scale.y = 0.1;
+        } else if (this.eyeAnimParams.isBlinking && 
+                  this.eyeAnimParams.blinkTime >= this.eyeAnimParams.blinkDuration) {
+            // End blink
+            this.eyeAnimParams.isBlinking = false;
             
-            // Scale the layer based on pulse
-            const scaleValue = 1 + layerPulse * 0.1;
-            layer.scale.set(scaleValue, 1, scaleValue);
-            
-            // Rotate the layers at different speeds
-            const rotationSpeed = 0.2 - (i * 0.05);
-            layer.rotation.y += deltaTime * rotationSpeed * (i % 2 === 0 ? 1 : -1);
-            
-            // Update color based on color cycle with offset for each layer
-            if (layer.material) {
-                const hue = (this.colorCycle + (i * 0.25)) % 1;
-                const color = new THREE.Color().setHSL(hue, 0.8, 0.6);
-                
-                layer.material.color.set(color);
-                if (layer.material.emissive) {
-                    layer.material.emissive.set(color);
-                }
-                
-                // Adjust opacity with pulse
-                layer.material.opacity = 0.3 + (layerPulse * 0.1);
-            }
+            // Reset eye scale
+            this.leftEye.scale.y = 1;
+            this.rightEye.scale.y = 1;
         }
         
-        // Update heat distortion effect
-        if (this.heatDistortion) {
-            const distortPulse = Math.sin(time * 2.5) * 0.5 + 0.5;
-            this.heatDistortion.scale.set(
-                1 + distortPulse * 0.1,
-                1 + distortPulse * 0.1,
-                1 + distortPulse * 0.1
-            );
-        }
-    }
-    
-    updateEyeEffects() {
-        const time = this.animationTime;
-        
-        const updateEyePart = (eye) => {
-            if (!eye) return;
+        // Eye tracking - look at player if detected
+        if (this.playerDetected && this.player) {
+            // Calculate direction to player
+            const toPlayer = new THREE.Vector3().subVectors(
+                this.player.camera.position,
+                this.group.position
+            ).normalize();
             
-            // Make iris color cycle
-            if (eye.iris && eye.iris.material) {
-                // Smoother color cycle effect based on HSL
-            const hue = (this.colorCycle + 0.5) % 1; // Offset from body color
-                const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                eye.iris.material.color.set(color);
-            }
-            
-            // Make pupil pulse
-            if (eye.pupil) {
-                const pupilPulse = Math.sin(time * 3) * 0.5 + 0.5;
-                const pupilScale = 0.8 + pupilPulse * 0.4; // Pupil dilates and contracts
-                eye.pupil.scale.set(pupilScale, pupilScale, 1);
-            }
-            
-            // Make glow pulse
-            if (eye.glow && eye.glow.material) {
-                const glowPulse = Math.sin(time * 2) * 0.5 + 0.5;
-                eye.glow.material.opacity = 0.3 + glowPulse * 0.5;
-                
-                // Match glow color to iris with slight variation
-                if (eye.iris && eye.iris.material) {
-                    const irisColor = eye.iris.material.color.clone();
-                    // Brighten for glow
-                    irisColor.r = Math.min(1, irisColor.r * 1.5);
-                    irisColor.g = Math.min(1, irisColor.g * 1.5);
-                    irisColor.b = Math.min(1, irisColor.b * 1.5);
-                    eye.glow.material.color.copy(irisColor);
-                }
-            }
-        };
-        
-        // Update both eyes
-        updateEyePart(this.leftEye);
-        updateEyePart(this.rightEye);
-    }
-    
-    updateParticles(deltaTime) {
-        if (!this.particles) return;
-        
-        const time = this.animationTime;
-        
-        // Update each particle
-        this.particles.children.forEach(particle => {
-            if (!particle.userData) return;
-            
-            // Update angle based on speed
-            particle.userData.angle += particle.userData.speed * deltaTime;
-            
-            // Update height with bounds
-            particle.userData.height += particle.userData.verticalSpeed;
-            if (particle.userData.height > 10) {
-                particle.userData.height = 10;
-                particle.userData.verticalSpeed *= -1;
-            } else if (particle.userData.height < 0) {
-                particle.userData.height = 0;
-                particle.userData.verticalSpeed *= -1;
-            }
-            
-            // Update position based on orbit
-            particle.position.set(
-                Math.cos(particle.userData.angle) * particle.userData.radius,
-                particle.userData.height,
-                Math.sin(particle.userData.angle) * particle.userData.radius
+            // Transform to local space
+            const localToPlayer = toPlayer.clone().applyMatrix4(
+                new THREE.Matrix4().copy(this.group.matrixWorld).invert()
             );
             
-            // Pulse size
-            const sizePulse = 1 + Math.sin(time * 3 + particle.userData.angle) * particle.userData.sizePulse;
-            particle.scale.set(sizePulse, sizePulse, sizePulse);
+            // Calculate target eye rotation
+            const targetEyeX = THREE.MathUtils.clamp(localToPlayer.y * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
+            const targetEyeY = THREE.MathUtils.clamp(localToPlayer.x * 0.3, -this.eyeAnimParams.lookRange, this.eyeAnimParams.lookRange);
             
-            // Update color based on height (creates vertical color gradient effect)
-            if (particle.material) {
-                // Get hue from height
-                const hue = (this.colorCycle + (particle.userData.height / 10)) % 1;
-                const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                particle.material.color.set(color);
+            // Smoothly rotate eyes toward player
+            this.leftEye.rotation.x += (targetEyeX - this.leftEye.rotation.x) * this.eyeAnimParams.lookSpeed * deltaTime;
+            this.leftEye.rotation.y += (targetEyeY - this.leftEye.rotation.y) * this.eyeAnimParams.lookSpeed * deltaTime;
+            
+            this.rightEye.rotation.x += (targetEyeX - this.rightEye.rotation.x) * this.eyeAnimParams.lookSpeed * deltaTime;
+            this.rightEye.rotation.y += (targetEyeY - this.rightEye.rotation.y) * this.eyeAnimParams.lookSpeed * deltaTime;
+        } else {
+            // Random idle eye movement
+            const time = performance.now() * 0.001;
+            
+            this.leftEye.rotation.x = Math.sin(time * 0.5) * this.eyeAnimParams.lookRange * 0.3;
+            this.leftEye.rotation.y = Math.cos(time * 0.7) * this.eyeAnimParams.lookRange * 0.3;
+            
+            this.rightEye.rotation.x = Math.sin(time * 0.5) * this.eyeAnimParams.lookRange * 0.3;
+            this.rightEye.rotation.y = Math.cos(time * 0.7) * this.eyeAnimParams.lookRange * 0.3;
+        }
+    }
+    
+    updateState(deltaTime) {
+        // Update state time
+        this.stateTime += deltaTime;
+        
+        // Update attack cooldown
+        if (this.attackCooldown > 0) {
+            this.attackCooldown -= deltaTime;
+        }
+        
+        // Process current state
+        switch (this.state) {
+            case 'idle':
+                this.checkForPlayer();
+                break;
                 
-                // Pulse opacity
-                const opacityPulse = Math.sin(time * 2 + particle.userData.angle) * 0.2 + 0.7;
-                particle.material.opacity = opacityPulse;
+            case 'patrol':
+                this.patrolBehavior(deltaTime);
+                this.checkForPlayer();
+                break;
+                
+            case 'chase':
+                this.chaseBehavior(deltaTime);
+                this.tryAttack();
+                break;
+                
+            case 'attack':
+                this.attackBehavior(deltaTime);
+                break;
+                
+            case 'stunned':
+                if (this.stateTime > 3) {
+                    this.state = 'chase';
+                    this.stateTime = 0;
+                }
+                break;
+                
+            case 'dying':
+                this.dyingBehavior(deltaTime);
+                break;
+                
+            case 'dead':
+                // Do nothing when dead
+                break;
+        }
+    }
+    
+    checkForPlayer() {
+        // Check if player is in detection range
+        if (this.player && this.player.camera) {
+            const distanceToPlayer = this.group.position.distanceTo(this.player.camera.position);
+            
+            // Player is within detection range
+            if (distanceToPlayer < this.detectionRange) {
+                // Check if we have line of sight
+                if (this.hasLineOfSightToPlayer()) {
+                    // Player detected, chase them
+                    this.playerDetected = true;
+                    this.lastKnownPlayerPosition.copy(this.player.camera.position);
+                    
+                    if (this.state !== 'chase' && this.state !== 'attack') {
+                        this.state = 'chase';
+                        this.stateTime = 0;
+                    }
+                    
+                    return true;
+                }
             }
-        });
-    }
-    
-    updateLights() {
-        const time = this.animationTime;
-        
-        // Update main glow light
-        if (this.glowLight) {
-            // Pulsate intensity
-            const intensityPulse = Math.sin(time * 1.5) * 0.5 + 0.5;
-            this.glowLight.intensity = 1.5 + intensityPulse * 1.0;
             
-            // Update color based on color cycle
-            const hue = this.colorCycle;
-            const color = new THREE.Color().setHSL(hue, 0.8, 0.6);
-            this.glowLight.color.set(color);
+            // Player not detected
+            this.playerDetected = false;
+            
+            // If we were chasing but lost the player, patrol for a while
+            if (this.state === 'chase') {
+                this.state = 'patrol';
+                this.stateTime = 0;
+            }
         }
         
-        // Update color lights
-        if (this.colorLights && this.colorLights.length >= 2) {
-            // Update first light (pink/red range)
-            const hue1 = (this.colorCycle + 0.1) % 1;
-            const color1 = new THREE.Color().setHSL(hue1, 0.9, 0.6);
-            this.colorLights[0].color.set(color1);
-            this.colorLights[0].intensity = 1.0 + Math.sin(time * 2) * 0.5;
-            
-            // Update second light (blue/cyan range)
-            const hue2 = (this.colorCycle + 0.6) % 1;
-            const color2 = new THREE.Color().setHSL(hue2, 0.9, 0.6);
-            this.colorLights[1].color.set(color2);
-            this.colorLights[1].intensity = 1.0 + Math.sin(time * 2 + 1) * 0.5;
-        }
+        return false;
     }
     
-    // Override the performRangedAttack method to implement psychedelic shotgun-style attack
-    performRangedAttack() {
-        if (!this.player || this.rangedAttackCooldown > 0) return;
-
-        // Set cooldown
-        this.rangedAttackCooldown = this.rangedAttackCooldownTime;
+    hasLineOfSightToPlayer() {
+        if (!this.player || !this.player.camera || !this.collisionManager) return false;
         
-        // Get direction to player
-        const playerPos = this.player.camera.position;
-        const baseDirection = new THREE.Vector3()
-            .subVectors(playerPos, this.group.position)
-            .normalize();
-        
-        // Spawn position should be at the center of the cylinder, higher up
-        const spawnPos = this.group.position.clone();
-        spawnPos.y += this.bodyHeight * 0.7; // Higher spawn point
-        
-        // Create firing effect at the center point
-        this.createEnhancedFiringEffect(spawnPos.clone());
-        
-        // Calculate direction with player prediction
-        const playerVelocity = this.player.velocity || new THREE.Vector3(0, 0, 0);
-        const predictionTime = 0.8; // Predict where player will be in 0.8 seconds
-        const predictedPlayerPos = playerPos.clone().add(
-            playerVelocity.clone().multiplyScalar(predictionTime)
+        // Calculate direction to player
+        const playerPos = this.player.camera.position.clone();
+        const cylindarPos = new THREE.Vector3(
+            this.group.position.x,
+            this.group.position.y + 4.5, // Eye level
+            this.group.position.z
         );
+        const direction = new THREE.Vector3().subVectors(playerPos, cylindarPos).normalize();
         
-        // Calculate direction to the predicted position
-        const predictedDirection = new THREE.Vector3()
-            .subVectors(predictedPlayerPos, spawnPos)
-            .normalize();
+        // Set up raycaster
+        const raycaster = new THREE.Raycaster(cylindarPos, direction);
         
-        // Fire multiple projectiles in a spread pattern
-        for (let i = 0; i < this.shotgunProjectileCount; i++) {
-            // Skip a frame to prevent too many calculations at once
-            setTimeout(() => {
-                // Create a spread angle based on which projectile this is
-                const angleOffset = this.shotgunSpreadAngle * (i / (this.shotgunProjectileCount - 1) - 0.5);
-                
-                // Rotation around the Y axis (horizontal spread)
-                const horizontalRot = new THREE.Quaternion().setFromAxisAngle(
-                    new THREE.Vector3(0, 1, 0), 
-                    angleOffset
-                );
-                
-                // Apply the rotation to the base direction
-                const spreadDirection = predictedDirection.clone().applyQuaternion(horizontalRot);
-                
-                // Add a small vertical spread too
-                const verticalOffset = (Math.random() - 0.5) * 0.1;
-                spreadDirection.y += verticalOffset;
-                spreadDirection.normalize();
-                
-                // Get hue from color cycle with offset for each projectile
-                const hue = (this.colorCycle + (i / this.shotgunProjectileCount)) % 1;
-                const projectileColor = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                const projectileHex = projectileColor.getHex();
-                
-                // Create projectile with psychedelic color
-                const projectileGeometry = new THREE.SphereGeometry(0.4, 8, 8);
-                const projectileMaterial = new THREE.MeshBasicMaterial({
-                    color: projectileHex,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
-                projectileMesh.position.copy(spawnPos);
-                
-                // Add trail effect
-                const trailGeometry = new THREE.CylinderGeometry(0.1, 0.3, 0.8, 8, 1, true);
-                const trailMaterial = new THREE.MeshBasicMaterial({
-                    color: projectileHex,
-                    transparent: true,
-                    opacity: 0.5,
-                    side: THREE.DoubleSide
-                });
-                
-                const trail = new THREE.Mesh(trailGeometry, trailMaterial);
-                trail.rotation.x = Math.PI / 2; // Orient properly
-                trail.position.z = -0.4; // Behind the projectile
-                projectileMesh.add(trail);
-                
-                // Add glow effect
-                const glowGeometry = new THREE.SphereGeometry(0.7, 8, 8);
-                const glowMaterial = new THREE.MeshBasicMaterial({
-                    color: projectileHex,
-                    transparent: true,
-                    opacity: 0.4,
-                    side: THREE.BackSide
-                });
-                
-                const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-                projectileMesh.add(glowMesh);
-                
-                // Add to scene
-                this.scene.add(projectileMesh);
-                
-                // Calculate distance and speed
-                const distanceToPlayer = spawnPos.distanceTo(playerPos);
-                const projectileSpeed = Math.max(distanceToPlayer / 2.0, 5);
-                
-                // Create projectile data
-                const projectile = {
-                    mesh: projectileMesh,
-                    position: spawnPos.clone(),
-                    velocity: spreadDirection.multiplyScalar(projectileSpeed * 0.016),
-                    lifetime: 5.0, // 5 seconds lifetime
-                    color: projectileHex // Store color for trail effects
-                };
-                
-                // Add to projectiles array
-                this.projectiles.push(projectile);
-                
-                // Create small firing effect for some projectiles
-                if (i === 0 || i === this.shotgunProjectileCount - 1) {
-                    this.createProjectileFiringEffect(spawnPos.clone(), projectileHex);
-                }
-            }, i * 30); // Small delay between each projectile
+        // Get all scene colliders except the enemy's own colliders
+        const colliders = this.collisionManager.getColliderObjects().filter(obj => {
+            return obj !== this.bodyMesh && obj.parent !== this.group;
+        });
+        
+        // Cast ray
+        const intersects = raycaster.intersectObjects(colliders, true);
+        
+        if (intersects.length > 0) {
+            // Check if player is closer than the first hit
+            const distanceToPlayer = cylindarPos.distanceTo(playerPos);
+            const distanceToObstacle = intersects[0].distance;
+            
+            // Player is visible if they're closer than any obstacle
+            return distanceToPlayer < distanceToObstacle;
         }
         
-        // Eye flash effect for both eyes
-        if (this.leftEye && this.leftEye.iris) {
-            this.leftEye.iris.material.color.set(0xFFFFFF); // White flash
-            this.leftEye.glow.material.color.set(0xFFFFFF);
-            this.leftEye.glow.material.opacity = 1.0;
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.leftEye && this.leftEye.iris) {
-                    const hue = (this.colorCycle + 0.5) % 1;
-                    const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                    this.leftEye.iris.material.color.copy(color);
-                    this.leftEye.glow.material.opacity = 0.5;
-                }
-            }, 400);
+        // No obstacles between us and the player
+        return true;
+    }
+    
+    patrolBehavior(deltaTime) {
+        // Simple patrol behavior
+        // Move in a circle around the spawn point
+        const patrolRadius = 5;
+        const patrolSpeed = 0.5;
+        
+        // Calculate target position in patrol circle
+        const angle = this.stateTime * patrolSpeed;
+        const targetX = this.spawnPosition.x + Math.cos(angle) * patrolRadius;
+        const targetZ = this.spawnPosition.z + Math.sin(angle) * patrolRadius;
+        
+        const targetPosition = new THREE.Vector3(targetX, this.group.position.y, targetZ);
+        
+        // Move toward target
+        this.moveTowardPosition(targetPosition, deltaTime);
+    }
+    
+    chaseBehavior(deltaTime) {
+        // Chase the player
+        if (this.playerDetected && this.player && this.player.camera) {
+            // Update last known position
+            this.lastKnownPlayerPosition.copy(this.player.camera.position);
         }
         
-        if (this.rightEye && this.rightEye.iris) {
-            this.rightEye.iris.material.color.set(0xFFFFFF);
-            this.rightEye.glow.material.color.set(0xFFFFFF);
-            this.rightEye.glow.material.opacity = 1.0;
-            
-            // Reset after a short delay
-            setTimeout(() => {
-                if (this.rightEye && this.rightEye.iris) {
-                    const hue = (this.colorCycle + 0.5) % 1;
-                    const color = new THREE.Color().setHSL(hue, 0.9, 0.6);
-                    this.rightEye.iris.material.color.copy(color);
-                    this.rightEye.glow.material.opacity = 0.5;
-                }
-            }, 400);
+        // Move toward last known player position
+        this.moveTowardPosition(this.lastKnownPlayerPosition, deltaTime);
+        
+        // If we're close enough, try to attack
+        const distanceToTarget = this.group.position.distanceTo(this.lastKnownPlayerPosition);
+        
+        if (distanceToTarget <= this.attackRange) {
+            // In range, try to attack if cooldown is ready
+            if (this.attackCooldown <= 0) {
+                this.state = 'attack';
+                this.stateTime = 0;
+                this.attackAnimParams.currentState = 'charging';
+            }
         }
     }
     
-    // New enhanced firing effect for the psychedelic shotgun attack
-    createEnhancedFiringEffect(position) {
-        // Create a larger flash effect at the firing position
-        const flashGeometry = new THREE.SphereGeometry(1.5, 16, 16);
+    moveTowardPosition(position, deltaTime) {
+        // Calculate direction to target
+        const direction = new THREE.Vector3().subVectors(
+            position,
+            this.group.position
+        ).normalize();
         
-        // Use current color cycle for the flash
-        const hue = this.colorCycle;
-        const flashColor = new THREE.Color().setHSL(hue, 0.9, 0.7);
+        // Calculate target rotation based on direction
+        this.targetRotation = new THREE.Euler(0, Math.atan2(direction.x, direction.z), 0);
         
-        const flashMaterial = new THREE.MeshBasicMaterial({
-            color: flashColor,
+        // Smoothly rotate toward target
+        this.smoothRotate(deltaTime);
+        
+        // Move forward based on current rotation
+        const moveSpeed = this.moveSpeed * deltaTime;
+        const forward = new THREE.Vector3(0, 0, 1).applyEuler(this.group.rotation);
+        
+        // Apply movement
+        const newPosition = this.group.position.clone().addScaledVector(forward, moveSpeed);
+        
+        // Check for collision before moving
+        if (this.collisionManager) {
+            const collision = this.collisionManager.checkCollision(
+                newPosition, 
+                this.collisionRadius
+            );
+            
+            if (!collision.collides) {
+                // Move to new position if no collision
+                this.group.position.copy(newPosition);
+            }
+        } else {
+            // No collision manager, just move
+            this.group.position.copy(newPosition);
+        }
+    }
+    
+    smoothRotate(deltaTime) {
+        // Smoothly interpolate current rotation toward target rotation
+        const step = this.turnSpeed * deltaTime;
+        
+        // Get current y rotation
+        const currentY = this.group.rotation.y;
+        let targetY = this.targetRotation.y;
+        
+        // Handle the discontinuity at +/-PI
+        if (Math.abs(targetY - currentY) > Math.PI) {
+            if (targetY > currentY) {
+                targetY -= Math.PI * 2;
+            } else {
+                targetY += Math.PI * 2;
+            }
+        }
+        
+        // Interpolate
+        const newY = currentY + THREE.MathUtils.clamp(targetY - currentY, -step, step);
+
+        // Apply rotation
+        this.group.rotation.y = newY;
+    }
+    
+    tryAttack() {
+        // Try to attack the player if in range and cooldown is ready
+        if (this.attackCooldown <= 0 && this.playerDetected) {
+            const distanceToPlayer = this.group.position.distanceTo(this.player.camera.position);
+            
+            if (distanceToPlayer <= this.attackRange) {
+                this.state = 'attack';
+                this.stateTime = 0;
+                this.attackAnimParams.currentState = 'charging';
+            }
+        }
+    }
+    
+    attackBehavior(deltaTime) {
+        // Handle attack sequence
+        switch (this.attackAnimParams.currentState) {
+            case 'charging':
+                // Charging attack
+                if (this.stateTime >= this.attackAnimParams.chargeTime) {
+                    // Fire attack
+                    this.attackAnimParams.currentState = 'firing';
+                    this.stateTime = 0;
+                    this.fireAttack();
+                }
+                break;
+                
+            case 'firing':
+                // Attack is firing
+                if (this.stateTime >= this.attackAnimParams.fireTime) {
+                    // Attack finished, go to cooldown
+                    this.attackAnimParams.currentState = 'cooldown';
+                    this.stateTime = 0;
+                }
+                break;
+                
+            case 'cooldown':
+                // Cooldown after attack
+                if (this.stateTime >= this.attackAnimParams.cooldownTime) {
+                    // Cooldown finished, go back to chase
+                    this.state = 'chase';
+                    this.stateTime = 0;
+                    this.attackCooldown = this.attackCooldownTime;
+                }
+                break;
+        }
+    }
+    
+    fireAttack() {
+        // Fire the charged attack
+        if (!this.player || !this.player.camera) return;
+        
+        // Get the attack target position - the player's current position
+        const targetPosition = this.player.camera.position.clone();
+        
+        // Calculate direction to target
+        const startPosition = new THREE.Vector3();
+        this.bodyMesh.getWorldPosition(startPosition);
+        startPosition.y += 4.5; // Eye level
+        
+        // Create simple attack visual
+        this.createSimpleAttackEffect(startPosition, targetPosition);
+        
+        // Apply damage to player if in range
+        const distanceToPlayer = startPosition.distanceTo(targetPosition);
+        
+        if (distanceToPlayer <= this.attackRange * 1.5) { // Slightly generous range
+            // Deal damage to player
+            if (this.player.takeDamage) {
+                this.player.takeDamage(this.attackDamage);
+            }
+        }
+    }
+    
+    createSimpleAttackEffect(start, end) {
+        // Create simplified beam effect
+        const distance = start.distanceTo(end);
+        const beamGeometry = new THREE.CylinderGeometry(0.2, 0.5, distance, 8, 1);
+        
+        // Rotate to point from start to end
+        beamGeometry.rotateX(Math.PI / 2);
+        
+        // Create beam material
+        const beamMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3366ff,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.7
         });
         
-        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-        flash.position.copy(position);
-        this.scene.add(flash);
+        const beam = new THREE.Mesh(beamGeometry, beamMaterial);
         
-        // Create a point light for the flash
-        const flashLight = new THREE.PointLight(flashColor, 3, 10);
-        flashLight.position.copy(position);
-        this.scene.add(flashLight);
+        // Position beam
+        const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        beam.position.copy(midpoint);
         
-        // Add energy ring effect
-        const ringGeometry = new THREE.RingGeometry(0.5, 2.0, 32);
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: flashColor,
-            transparent: true,
-            opacity: 0.7,
-            side: THREE.DoubleSide
-        });
+        // Orient beam
+        beam.lookAt(end);
         
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.position.copy(position);
-        // Orient the ring facing outward
-        ring.lookAt(this.player.camera.position);
-        this.scene.add(ring);
+        // Add to scene
+        this.scene.add(beam);
         
-        // Animate the flash
-        const duration = 0.5; // 500ms
-        const startTime = performance.now();
+        // Simple fade out animation
+        const duration = 0.5;
+        const startTime = performance.now() * 0.001;
         
         const animate = () => {
-            const now = performance.now();
-            const elapsed = (now - startTime) / 1000;
+            const currentTime = performance.now() * 0.001;
+            const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
             
-            // Expand and fade out
-            const scale = 1 + progress * 4;
-            flash.scale.set(scale, scale, scale);
-            flash.material.opacity = 0.8 * (1 - progress);
-            
-            // Expand the ring
-            ring.scale.set(scale, scale, 1);
-            ring.material.opacity = 0.7 * (1 - progress);
-            
-            // Fade out light
-            if (flashLight) {
-                flashLight.intensity = 3 * (1 - progress);
-            }
+            // Fade out
+            beam.material.opacity = 0.7 * (1 - progress);
             
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                // Remove after animation completes
-                this.scene.remove(flash);
-                this.scene.remove(flashLight);
-                this.scene.remove(ring);
-                if (flash.material) flash.material.dispose();
-                if (flash.geometry) flash.geometry.dispose();
-                if (ring.material) ring.material.dispose();
-                if (ring.geometry) ring.geometry.dispose();
-   }
-};
-
-        animate();
-}
-
-// Override death method for a simpler death
-die() {
-    if (this.state === 'dead') return; // Already dead
-    
-    console.log("King Cylindar died!");
-    this.state = 'dead';
-    
-    // Clean up projectiles
-    this.cleanupProjectiles();
-    
-    // Drop mana orb if not already dropped
-    if (!this.manaDrop.dropped) {
-        this.dropManaOrb();
-        this.manaDrop.dropped = true;
-    }
-    
-    // Simple fade out animation
-    const duration = 1.0; // 1 second
-    const startTime = performance.now();
-    
-    const animate = () => {
-        const now = performance.now();
-        const elapsed = (now - startTime) / 1000; // to seconds
-        const progress = Math.min(elapsed / duration, 1);
-        
-        // Fade out all materials
-        this.group.traverse(child => {
-            if (child.material) {
-                child.material.opacity = 1 - progress;
-                child.material.transparent = true;
+                // Remove beam
+                this.scene.remove(beam);
+                beam.material.dispose();
+                beam.geometry.dispose();
             }
-        });
-        
-        if (progress < 1) {
-            requestAnimationFrame(animate);
-        } else {
-            // After animation, remove from scene
-            this.group.visible = false;
-            
-            // Disable collisions
-            this.collisionEnabled = false;
-        }
-    };
-    
-    animate();
-}
-
-// Use the same mana orb as other enemies
-dropManaOrb() {
-    // Calculate mana amount
-    const manaAmount = Math.floor(Math.random() * 
-        (this.manaDrop.max - this.manaDrop.min + 1)) + this.manaDrop.min;
-    
-    // Create mana orb mesh
-    const orbGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-    const orbMaterial = new THREE.MeshStandardMaterial({
-        color: 0x3366ff,
-        emissive: 0x3366ff,
-        emissiveIntensity: 0.8,
-        metalness: 0.7,
-        roughness: 0.3,
-        transparent: true,
-        opacity: 0.9
-    });
-    
-    const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
-    
-    // Position the orb at the enemy's death location, slightly elevated
-    orbMesh.position.copy(this.group.position);
-    orbMesh.position.y += 0.5;
-    
-    // Add glow effect
-    const glowGeometry = new THREE.SphereGeometry(0.6, 16, 16);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x3366ff,
-        transparent: true,
-        opacity: 0.4,
-        side: THREE.BackSide
-    });
-    
-    const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-    orbMesh.add(glowMesh);
-    
-    // Add point light to make it glow
-    const orbLight = new THREE.PointLight(0x3366ff, 1.5, 3);
-    orbLight.position.set(0, 0, 0);
-    orbMesh.add(orbLight);
-    
-    // Add userData to identify this as a mana orb and store mana amount
-    orbMesh.userData = {
-        isManaOrb: true,
-        manaAmount: manaAmount
-    };
-    
-    // Add to scene
-    this.scene.add(orbMesh);
-    
-    // Add a collider for the orb
-    if (this.collisionManager) {
-        const colliderIndex = this.collisionManager.addCollider(orbMesh);
-        
-        // Tag this collider as a mana orb
-        if (this.collisionManager.colliders[colliderIndex]) {
-            this.collisionManager.colliders[colliderIndex].isManaOrb = true;
-            this.collisionManager.colliders[colliderIndex].manaAmount = manaAmount;
-        }
-    }
-    
-    // Animate the orb
-    this.animateManaOrb(orbMesh);
-    
-    console.log(`Dropped mana orb containing ${manaAmount} mana`);
-}
-
-// Animate the mana orb
-animateManaOrb(orbMesh) {
-    // Make the orb bob up and down
-    const startY = orbMesh.position.y;
-    const floatHeight = 0.3;
-    const floatSpeed = 1.5;
-    
-    // Make orb pulse
-    const pulseSpeed = 2;
-    
-    // If we already have an animation system, use it
-    if (!window.animatedOrbs) {
-        window.animatedOrbs = [];
-        
-        const animateOrbs = () => {
-            const orbs = window.animatedOrbs;
-            if (orbs && orbs.length > 0) {
-                const time = performance.now() * 0.001;
-                
-                for (const orb of orbs) {
-                    if (!orb || !orb.userData) continue;
-                    
-                    // Bobbing motion
-                    orb.position.y = orb.userData.startY + 
-                        Math.sin(time * orb.userData.floatSpeed) * orb.userData.floatHeight;
-                    
-                    // Rotate slowly
-                    orb.rotation.y += 0.01;
-                    
-                    // Pulse glow
-                    if (orb.children && orb.children[0]) {
-                        const glow = orb.children[0];
-                        const pulseScale = 1 + Math.sin(time * orb.userData.pulseSpeed) * 0.2;
-                        glow.scale.set(pulseScale, pulseScale, pulseScale);
-                    }
-                    
-                    // Pulse light
-                    if (orb.children && orb.children[1]) {
-                        const light = orb.children[1];
-                        light.intensity = 1.5 + Math.sin(time * orb.userData.pulseSpeed) * 0.5;
-                    }
-                }
-            }
-            
-            requestAnimationFrame(animateOrbs);
         };
         
-        animateOrbs();
+        animate();
     }
     
-    // Store animation parameters with the orb
-    orbMesh.userData.startY = startY;
-    orbMesh.userData.floatHeight = floatHeight;
-    orbMesh.userData.floatSpeed = floatSpeed;
-    orbMesh.userData.pulseSpeed = pulseSpeed;
+    checkPhaseChange() {
+        // Check for phase transition based on health
+        if (this.currentPhase === 1 && this.health <= this.phaseChangeHealth) {
+            this.currentPhase = 2;
+            this.transitionToPhaseTwo();
+        }
+    }
     
-    // Add to animated orbs
-    window.animatedOrbs.push(orbMesh);
+    transitionToPhaseTwo() {
+        // Transition to more aggressive second phase
+        if (this.debug) console.log("King Cylindar transitioning to phase two!");
+        
+        // Increase attributes
+        this.moveSpeed *= 1.3;
+        this.attackRange *= 1.2;
+        this.attackDamage *= 1.25;
+        this.attackCooldownTime *= 0.7; // Faster attacks
+        
+        // Visual changes
+        this.applyPhaseTwoVisuals();
+        
+        // Force attack after phase change
+        this.state = 'attack';
+        this.stateTime = 0;
+        this.attackAnimParams.currentState = 'charging';
+    }
+    
+    applyPhaseTwoVisuals() {
+        // Change eye color to red
+        if (this.leftIris && this.rightIris) {
+            this.leftIris.material.color.setHex(0xff0000);
+            this.leftIris.material.emissive.setHex(0xff0000);
+            this.rightIris.material.color.setHex(0xff0000);
+            this.rightIris.material.emissive.setHex(0xff0000);
+        }
+        
+        // Change orb colors to more intense
+        if (this.orbs) {
+            this.orbs.forEach(orb => {
+                // Get current HSL
+                const color = orb.material.color;
+                const hsl = {};
+                color.getHSL(hsl);
+                
+                // Increase saturation and brightness
+                color.setHSL(hsl.h, 1.0, 0.7);
+                
+                // Update color for light too
+                if (orb.userData.light) {
+                    orb.userData.light.color = color.clone();
+                }
+            });
+        }
+    }
+    
+    // Called when the enemy is damaged
+    takeDamage(amount) {
+        if (this.state === 'dead') return false;
+        
+        // Apply damage
+        this.health -= amount;
+        
+        // Check for death
+        if (this.health <= 0) {
+            this.health = 0;
+            this.state = 'dying';
+            this.stateTime = 0;
+            if (this.debug) console.log("King Cylindar killed!");
+            return true;
+        }
+        
+        // Apply simple hit effect
+        this.createSimpleHitEffect();
+        
+        // Check for phase change
+        this.checkPhaseChange();
+        
+        return false; // Not killed
+    }
+    
+    createSimpleHitEffect() {
+        // Visual effect for taking damage
+        
+        // Flash the whole body
+        if (this.bodyMesh && this.bodyMesh.material) {
+            const originalColor = this.bodyMesh.material.color.clone();
+            const originalEmissive = this.bodyMesh.material.emissive.clone();
+            
+            // Flash white
+            this.bodyMesh.material.color.setHex(0xffffff);
+            this.bodyMesh.material.emissive.setHex(0xffffff);
+            this.bodyMesh.material.emissiveIntensity = 0.5;
+            
+            // Return to original after short delay
+            setTimeout(() => {
+                if (this.bodyMesh && this.bodyMesh.material) {
+                    this.bodyMesh.material.color.copy(originalColor);
+                    this.bodyMesh.material.emissive.copy(originalEmissive);
+                    this.bodyMesh.material.emissiveIntensity = 0.2;
+                }
+            }, 100);
+        }
+    }
+    
+    dyingBehavior(deltaTime) {
+        // Handle death animation - simplified
+        if (this.stateTime > 3) {
+            // After 3 seconds, transition to dead state
+            this.state = 'dead';
+            
+            // Drop orb if not already dropped
+            if (!this.hasDroppedOrb) {
+                this.dropOrb();
+            }
+            
+            // Remove from scene after some time
+            setTimeout(() => {
+                if (this.scene && this.group) {
+                    this.scene.remove(this.group);
+                }
+            }, 5000);
+            
+            return;
+        }
+        
+        // Simple death animation
+        // Make cylinder wobble/shake
+        this.group.position.x += (Math.random() - 0.5) * 0.1;
+        this.group.position.z += (Math.random() - 0.5) * 0.1;
+    }
+    
+    dropOrb() {
+        if (this.hasDroppedOrb) return;
+        this.hasDroppedOrb = true;
+        
+        // Create a collectible orb
+        const orbGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3366ff,
+            emissive: 0x3366ff,
+            emissiveIntensity: 1.0,
+            metalness: 0.3,
+            roughness: 0.4
+        });
+        
+        this.droppedOrb = new THREE.Mesh(orbGeometry, orbMaterial);
+        
+        // Position at center of body
+        const centerPosition = new THREE.Vector3();
+        this.bodyMesh.getWorldPosition(centerPosition);
+        
+        this.droppedOrb.position.copy(centerPosition);
+        
+        // Add glow effect
+        const glowGeometry = new THREE.SphereGeometry(0.7, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3366ff,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.BackSide
+        });
+        
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.droppedOrb.add(glow);
+        
+        // Add light
+        const orbLight = new THREE.PointLight(0x3366ff, 1.5, 5);
+        this.droppedOrb.add(orbLight);
+        
+        // Add to scene
+        this.scene.add(this.droppedOrb);
+        
+        // Store orb data
+        this.droppedOrb.userData = {
+            type: 'manaOrb',
+            value: this.orbValue,
+            floatHeight: 0,
+            floatSpeed: 1.0,
+            rotationSpeed: 0.5,
+            glowPulseSpeed: 0.7
+        };
+        
+        // Make orb float with simple animation
+        const startTime = performance.now() * 0.001;
+        
+        const animateOrb = () => {
+            if (!this.droppedOrb) return;
+            
+            const time = performance.now() * 0.001;
+            const elapsed = time - startTime;
+            
+            // Float up and down
+            this.droppedOrb.position.y = centerPosition.y + Math.sin(elapsed * this.droppedOrb.userData.floatSpeed) * 0.3 + 0.5;
+            
+            // Rotate
+            this.droppedOrb.rotation.y += this.droppedOrb.userData.rotationSpeed * 0.01;
+            
+            requestAnimationFrame(animateOrb);
+        };
+        
+        animateOrb();
+    }
+    
+    // Helper method to set shadow properties for a mesh
+    setShadowProperties(mesh) {
+        if (!mesh) return;
+        
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        
+        // Also apply to children
+        mesh.children.forEach(child => {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        });
+    }
 }
-
-    
