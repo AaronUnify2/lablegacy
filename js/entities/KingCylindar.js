@@ -812,7 +812,6 @@ export class KingCylindar extends Enemy {
         if (this.bodyMesh && this.bodyMesh.material) {
             const originalColor = this.bodyMesh.material.color.clone();
             const originalEmissive = this.bodyMesh.material.emissive.clone();
-            
             // Flash white
             this.bodyMesh.material.color.setHex(0xffffff);
             this.bodyMesh.material.emissive.setHex(0xffffff);
