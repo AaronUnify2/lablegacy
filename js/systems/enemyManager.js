@@ -255,6 +255,97 @@ export class EnemyManager {
     }
     
     //=============================================================================
+    // GENERIC ENEMY METHODS
+    //=============================================================================
+    
+    // New method to spawn a generic enemy at a specific position
+    spawnGenericEnemy(position) {
+        if (this.debug) console.log(`Spawning generic enemy at position (${position.x}, ${position.y}, ${position.z})`);
+        
+        // Create an enemy instance
+        const enemy = new Enemy(this.scene, position, this.collisionManager, this.player);
+        
+        // Set patrol parameters
+        enemy.patrolCenter = position.clone();
+        enemy.patrolRadius = 3; // Default patrol radius
+        
+        // Add to enemies array
+        const enemyIndex = this.enemies.push(enemy) - 1;
+        
+        // Add to collision system
+        this.addEnemyToCollisionSystem(enemy, enemyIndex);
+        
+        // Show spawn effect
+        this.showSimpleSpawnEffect(position);
+        
+        return enemy;
+    }
+    
+    // Method to spawn generic enemies in a room
+    spawnGenericEnemiesInRoom(room, count = 3) {
+        if (this.debug) console.log(`Spawning ${count} generic enemies in ${room.type} room`);
+        
+        const spawned = [];
+        const roomCenterX = room.x + room.width / 2;
+        const roomCenterZ = room.y + room.height / 2;
+        
+        for (let i = 0; i < count; i++) {
+            // Calculate spawn position with some randomness
+            const spawnX = roomCenterX + (Math.random() - 0.5) * room.width * 0.6;
+            const spawnZ = roomCenterZ + (Math.random() - 0.5) * room.height * 0.6;
+            
+            // Create spawn position vector
+            const spawnPos = new THREE.Vector3(spawnX, 1.0, spawnZ);
+            
+            // Find floor beneath
+            if (this.collisionManager) {
+                const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+                if (floorHit && floorHit.point) {
+                    spawnPos.y = floorHit.point.y + 1.0; // Position at proper height
+                }
+            }
+            
+            // Check for collision at spawn point
+            let validPosition = true;
+            if (this.collisionManager) {
+                const collision = this.collisionManager.checkCollision(spawnPos, 0.7);
+                if (collision.collides) {
+                    // Try to find a better position
+                    for (let attempt = 0; attempt < 5; attempt++) {
+                        // Adjust position randomly
+                        spawnPos.x = roomCenterX + (Math.random() - 0.5) * room.width * 0.6;
+                        spawnPos.z = roomCenterZ + (Math.random() - 0.5) * room.height * 0.6;
+                        
+                        // Check again
+                        const newCollision = this.collisionManager.checkCollision(spawnPos, 0.7);
+                        if (!newCollision.collides) {
+                            validPosition = true;
+                            break;
+                        }
+                    }
+                    
+                    if (collision.collides) {
+                        validPosition = false;
+                        if (this.debug) console.log(`Could not find valid position for generic enemy ${i}`);
+                    }
+                }
+            }
+            
+            // Only spawn if position is valid
+            if (validPosition) {
+                const enemy = this.spawnGenericEnemy(spawnPos);
+                spawned.push(enemy);
+            }
+        }
+        
+        if (this.debug) {
+            console.log(`Successfully spawned ${spawned.length} generic enemies in ${room.type} room`);
+        }
+        
+        return spawned;
+    }
+    
+    //=============================================================================
     // KING CYLINDAR METHODS
     //=============================================================================
     
@@ -479,6 +570,152 @@ export class EnemyManager {
     // SHADOW CRAWLER METHODS
     //=============================================================================
     
+    // Method to spawn a single Shadow Crawler at a specific position
+    spawnShadowCrawler(position) {
+        if (this.debug) console.log(`Spawning Shadow Crawler at position (${position.x}, ${position.y}, ${position.z})`);
+        
+        // Create Shadow Crawler instance
+        const crawler = new ShadowCrawler(this.scene, position, this.collisionManager, this.player);
+        
+        // Set patrol parameters
+        crawler.patrolCenter = position.clone();
+        crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
+        
+        // Add to enemies array
+        const enemyIndex = this.enemies.push(crawler) - 1;
+        
+        // Add to collision system
+        this.addEnemyToCollisionSystem(crawler, enemyIndex);
+        
+        // Show spawn effect - using a different color for shadow crawlers
+        this.showShadowCrawlerSpawnEffect(position);
+        
+        return crawler;
+    }
+    
+    // Custom spawn effect for Shadow Crawlers
+    showShadowCrawlerSpawnEffect(position) {
+        // Create a shadow formation effect
+        const effectGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const effectMaterial = new THREE.MeshBasicMaterial({
+            color: 0x330033,
+            transparent: true,
+            opacity: 0.9,
+            wireframe: true
+        });
+        
+        const effect = new THREE.Mesh(effectGeometry, effectMaterial);
+        effect.position.copy(position);
+        this.scene.add(effect);
+        
+        // Add a dim purple light
+        const light = new THREE.PointLight(0x660066, 1, 5);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Shadow particles that swirl and converge
+        const particles = [];
+        const particleCount = 12;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particleGeometry = new THREE.SphereGeometry(0.1, 6, 6);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0x330033,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position in a swirl pattern
+            const angle = (i / particleCount) * Math.PI * 2;
+            const radius = 2 + Math.random();
+            const height = Math.random() * 1.5;
+            
+            particle.position.set(
+                position.x + Math.cos(angle) * radius,
+                position.y + height,
+                position.z + Math.sin(angle) * radius
+            );
+            
+            // Set movement properties
+            particle.speed = 0.03 + Math.random() * 0.02;
+            particle.angle = angle;
+            particle.radius = radius;
+            particle.height = height;
+            particle.spinSpeed = 0.05 + Math.random() * 0.05;
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Animate the spawn effect
+        const duration = 2000; // 2 seconds
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Update particles - make them spiral in
+            for (let i = 0; i < particles.length; i++) {
+                const particle = particles[i];
+                
+                // Spiral movement
+                particle.angle += particle.spinSpeed;
+                
+                // Decrease radius as we progress
+                const currentRadius = particle.radius * (1 - progress * 0.9);
+                
+                // Lower height as we progress
+                const currentHeight = particle.height * (1 - progress * 0.9);
+                
+                // Update position
+                particle.position.set(
+                    position.x + Math.cos(particle.angle) * currentRadius,
+                    position.y + currentHeight,
+                    position.z + Math.sin(particle.angle) * currentRadius
+                );
+                
+                // Decrease size
+                const scale = 1 - progress * 0.7;
+                particle.scale.set(scale, scale, scale);
+            }
+            
+            // Main effect grows then shrinks
+            const effectScale = 1 + progress * 2;
+            effect.scale.set(effectScale, effectScale, effectScale);
+            
+            // Fade out at the end
+            effect.material.opacity = 0.9 * (1 - Math.pow(progress, 2));
+            
+            // Pulse the light
+            if (light) {
+                light.intensity = 1 + Math.sin(progress * Math.PI * 5) * (1 - progress);
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up
+                this.scene.remove(effect);
+                this.scene.remove(light);
+                
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                    if (particle.material) particle.material.dispose();
+                    if (particle.geometry) particle.geometry.dispose();
+                }
+                
+                if (effect.material) effect.material.dispose();
+                if (effect.geometry) effect.geometry.dispose();
+            }
+        };
+        
+        animate();
+    }
+    
     // Method to spawn Shadow Crawlers in a room
     spawnShadowCrawlersInRoom(room, count = 5) {
         if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in ${room.type} room`);
@@ -548,23 +785,11 @@ export class EnemyManager {
             
             // Only spawn if position is valid
             if (validPosition) {
-                // Create the Shadow Crawler
-                const crawler = new ShadowCrawler(this.scene, spawnPos, this.collisionManager, this.player);
-                
-                // Set different patrol radius for each crawler
-                crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
-                
-                // Add to enemies array
-                const enemyIndex = this.enemies.push(crawler) - 1;
-                
-                // Add to collision system
-                this.addEnemyToCollisionSystem(crawler, enemyIndex);
+                // Spawn the Shadow Crawler
+                const crawler = this.spawnShadowCrawler(spawnPos);
                 
                 // Add to spawned array
                 spawned.push(crawler);
-                
-                // Set patrol center
-                crawler.patrolCenter = spawnPos.clone();
             }
         }
         
