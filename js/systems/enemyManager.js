@@ -30,10 +30,7 @@ export class EnemyManager {
         this.timeSinceLastCheck = 0;
         
         // Force spawn test enemies after a short delay
-        if (this.debug) console.log("Enemy Manager initialized - will spawn test enemies in a few seconds");
-        
-        // Spawn multiple enemies for testing
-        this.spawnTestEnemies();
+        if (this.debug) console.log("Enemy Manager initialized");
     }
     
     update(deltaTime, camera) {
@@ -126,156 +123,6 @@ export class EnemyManager {
         return false;
     }
     
-    spawnTestEnemies() {
-        // Spawn first test enemy immediately
-        setTimeout(() => this.forceSpawnTestEnemy(), 1000);
-        
-        // Spawn second enemy with a delay
-        setTimeout(() => this.spawnEnemyNearPlayer(), 3000);
-        
-        
-    }
-    
-    forceSpawnTestEnemy() {
-        if (this.debug) console.log("Attempting to spawn test enemy...");
-        
-        // Try to spawn at a fixed position relative to origin
-        const testPosition = new THREE.Vector3(10, 1, 0); // 10 units to the right of origin
-        
-        // Try to find floor beneath
-        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(testPosition, 10);
-            if (floorHit && floorHit.point) {
-                testPosition.y = floorHit.point.y + 0.9; // Just above floor
-                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
-            }
-        }
-        
-        // Check for collision at spawn point
-        if (this.collisionManager) {
-            const collision = this.collisionManager.checkCollision(testPosition, 0.5);
-            if (collision.collides) {
-                if (this.debug) console.log("Spawn point has collision, adjusting position");
-                // Try to find a nearby valid position
-                testPosition.x += 2;
-                testPosition.z += 2;
-            }
-        }
-        
-        // Create enemy
-        const enemy = new Enemy(this.scene, testPosition, this.collisionManager, this.player);
-        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
-        
-        // Add enemy to collision system
-        this.addEnemyToCollisionSystem(enemy, enemyIndex);
-        
-        // Show some visual effect
-        this.showSimpleSpawnEffect(testPosition);
-        
-        if (this.debug) console.log(`Spawned test enemy at (${testPosition.x}, ${testPosition.y}, ${testPosition.z})`);
-    }
-    
-    spawnEnemyNearPlayer() {
-        if (this.debug) console.log("Attempting to spawn enemy near player...");
-        
-        // Get player position
-        const playerPos = this.player.camera.position;
-        
-        // Spawn position a bit off from player
-        const spawnPos = new THREE.Vector3(
-            playerPos.x + 8, // 8 units to the right
-            playerPos.y, // Same height as player
-            playerPos.z + 8  // 8 units in front
-        );
-        
-        // Try to find floor beneath
-        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
-            if (floorHit && floorHit.point) {
-                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
-                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
-            }
-        }
-        
-        // Check for collision at spawn point
-        if (this.collisionManager) {
-            const collision = this.collisionManager.checkCollision(spawnPos, 0.5);
-            if (collision.collides) {
-                if (this.debug) console.log("Spawn point has collision, adjusting position");
-                // Try to find a nearby valid position
-                spawnPos.x += 2;
-                spawnPos.z += 2;
-            }
-        }
-        
-        // Create enemy
-        const enemy = new Enemy(this.scene, spawnPos, this.collisionManager, this.player);
-        
-        // Set different patrol radius for this enemy
-        enemy.patrolRadius = 5; // Larger patrol radius
-        enemy.patrolSpeed = 0.7; // Faster patrol speed
-        
-        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
-        
-        // Add enemy to collision system
-        this.addEnemyToCollisionSystem(enemy, enemyIndex);
-        
-        // Show some visual effect
-        this.showSimpleSpawnEffect(spawnPos);
-        
-        if (this.debug) console.log(`Spawned enemy near player at (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
-    }
-    
-    spawnEnemyAtPosition(position, patrolRadius, patrolSpeed) {
-        if (this.debug) console.log(`Attempting to spawn enemy at position: (${position.x}, ${position.y}, ${position.z})`);
-        
-        const spawnPos = position.clone();
-        
-        // Try to find floor beneath
-        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
-            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
-            if (floorHit && floorHit.point) {
-                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
-                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
-            }
-        }
-        
-        // Check for collision at spawn point
-        if (this.collisionManager) {
-            const collision = this.collisionManager.checkCollision(spawnPos, 0.5);
-            if (collision.collides) {
-                if (this.debug) console.log("Spawn point has collision, adjusting position");
-                // Try to find a nearby valid position
-                spawnPos.x += 2;
-                spawnPos.z += 2;
-            }
-        }
-        
-        // Create enemy
-        const enemy = new Enemy(this.scene, spawnPos, this.collisionManager, this.player);
-        
-        // Set patrol parameters if provided
-        if (patrolRadius !== undefined) {
-            enemy.patrolRadius = patrolRadius;
-        }
-        
-        if (patrolSpeed !== undefined) {
-            enemy.patrolSpeed = patrolSpeed;
-        }
-        
-        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
-        
-        // Add enemy to collision system
-        this.addEnemyToCollisionSystem(enemy, enemyIndex);
-        
-        // Show some visual effect
-        this.showSimpleSpawnEffect(spawnPos);
-        
-        if (this.debug) console.log(`Spawned enemy at custom position (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
-        
-        return enemy; // Return the enemy for further configuration
-    }
-    
     // Add an enemy to the collision system
     addEnemyToCollisionSystem(enemy, enemyIndex) {
         if (!this.collisionManager || !enemy || !enemy.group) return;
@@ -294,6 +141,7 @@ export class EnemyManager {
         return colliderIndex;
     }
     
+    // Simple spawn effect
     showSimpleSpawnEffect(position) {
         // Create a simple sphere that expands and fades out
         const effectGeometry = new THREE.SphereGeometry(0.5, 16, 16);
@@ -666,15 +514,19 @@ export class EnemyManager {
             }
             
             // Create spawn position
-            const spawnPos = new THREE.Vector3(spawnX, 0.2, spawnZ); // Start just above the floor
+            const spawnPos = new THREE.Vector3(spawnX, 0.8, spawnZ); // Start lower - just above the floor
             
             // Find floor beneath the position
             if (this.collisionManager) {
                 const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
                 if (floorHit && floorHit.point) {
-                    spawnPos.y = floorHit.point.y + 0.2; // Position just above floor
+                    spawnPos.y = floorHit.point.y + 0.5; // Position just above floor
+                    if (this.debug) console.log(`Found floor at y: ${floorHit.point.y}, positioning at ${spawnPos.y}`);
                 }
             }
+            
+            // Always ensure minimum height
+            spawnPos.y = Math.max(spawnPos.y, 0.5);
             
             // Check for collision at spawn point
             let validPosition = true;
@@ -733,6 +585,11 @@ export class EnemyManager {
             room.type === 'west'
         );
         
+        if (cardinalRooms.length === 0) {
+            console.log("No cardinal rooms found for Shadow Crawler spawning");
+            return 0;
+        }
+        
         // Total crawlers spawned
         let totalSpawned = 0;
         
@@ -747,118 +604,19 @@ export class EnemyManager {
         }
         
         return totalSpawned;
-
     }
 
-// Method to spawn Shadow Crawlers in the central room
-spawnShadowCrawlersInCentralRoom(rooms, count = 5) {
-    // Find the central room
-    const centralRoom = rooms.find(room => room.type === 'central');
-    
-    if (!centralRoom) {
-        console.log("No central room found!");
-        return [];
+    // Method to spawn Shadow Crawlers in the central room
+    spawnShadowCrawlersInCentralRoom(rooms, count = 5) {
+        // Find the central room
+        const centralRoom = rooms.find(room => room.type === 'central');
+        
+        if (!centralRoom) {
+            console.log("No central room found for Shadow Crawler spawning!");
+            return [];
+        }
+        
+        // Use the generic room spawning method to spawn in the central room
+        return this.spawnShadowCrawlersInRoom(centralRoom, count);
     }
-    
-    if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in central room at ${new Date().toISOString()}`);
-    
-    const spawned = [];
-    
-    // Calculate room center
-    const roomCenterX = centralRoom.x + centralRoom.width / 2;
-    const roomCenterZ = centralRoom.y + centralRoom.height / 2;
-    
-    // Spawn Shadow Crawlers in a pattern around the central room
-    for (let i = 0; i < count; i++) {
-        // Calculate spawn position
-        let spawnX, spawnZ;
-        
-        // For first crawler, use room center
-        if (i === 0) {
-            spawnX = roomCenterX;
-            spawnZ = roomCenterZ;
-        } 
-        // For others, distribute around the room
-        else {
-            // Calculate angle for circular distribution
-            const angle = (i / count) * Math.PI * 2;
-            
-            // Distance from center (50% of the way to the walls)
-            const distance = Math.min(centralRoom.width, centralRoom.height) * 0.25;
-            
-            // Calculate position
-            spawnX = roomCenterX + Math.cos(angle) * distance;
-            spawnZ = roomCenterZ + Math.sin(angle) * distance;
-        }
-        
-        // Create spawn position - Start much higher for visibility
-        const spawnPos = new THREE.Vector3(spawnX, 3.0, spawnZ);
-        
-        // Find floor beneath the position
-        if (this.collisionManager) {
-            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
-            if (floorHit && floorHit.point) {
-                spawnPos.y = floorHit.point.y + 2.0; // Position higher above floor
-                if (this.debug) console.log(`Found floor at y: ${floorHit.point.y}, positioning at ${spawnPos.y}`);
-            }
-        }
-        
-        // Always ensure minimum height
-        spawnPos.y = Math.max(spawnPos.y, 2.0);
-        
-        // Ensure position is valid
-        let validPosition = true;
-        if (this.collisionManager) {
-            const collision = this.collisionManager.checkCollision(spawnPos, 2.0);
-            if (collision.collides) {
-                // If collision, try raising the position
-                spawnPos.y += 2.0;
-                
-                // Check again
-                const newCollision = this.collisionManager.checkCollision(spawnPos, 2.0);
-                if (newCollision.collides) {
-                    validPosition = false;
-                    if (this.debug) console.log(`Could not find valid position for Shadow Crawler ${i}`);
-                }
-            }
-        }
-        
-        // Only spawn if position is valid
-        if (validPosition) {
-            if (this.debug) console.log(`Creating Shadow Crawler at position: ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`);
-            
-            try {
-                // Create the Shadow Crawler
-                const crawler = new ShadowCrawler(this.scene, spawnPos, this.collisionManager, this.player);
-                
-                // Set different patrol radius for each crawler
-                crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
-                
-                // Add to enemies array
-                const enemyIndex = this.enemies.push(crawler) - 1;
-                
-                // Add to collision system
-                this.addEnemyToCollisionSystem(crawler, enemyIndex);
-                
-                // Add to spawned array
-                spawned.push(crawler);
-                
-                // Set patrol center
-                crawler.patrolCenter = spawnPos.clone();
-                
-                if (this.debug) console.log(`Successfully created Shadow Crawler ${i}`);
-            } catch (error) {
-                console.error(`Error creating Shadow Crawler: ${error}`);
-            }
-        }
-    }
-    
-    if (this.debug) {
-        console.log(`Successfully spawned ${spawned.length} Shadow Crawlers in central room`);
-    }
-    
-    return spawned;
-}
-
-
 }
