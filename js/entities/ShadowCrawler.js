@@ -1,4 +1,4 @@
-import { Enemy } from './enemy.js';
+import { Enemy } from './robotEnemy.js';
 
 export class ShadowCrawler extends Enemy {
     constructor(scene, position, collisionManager, player) {
