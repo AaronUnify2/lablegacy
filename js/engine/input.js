@@ -52,7 +52,7 @@ export class InputManager {
         this.originalButtonSizes = {};
         this.hasAdjustedButtons = false;
         
-        // Swipe camera controls - improved properties
+        // Swipe camera controls
         this.cameraSwipe = {
             active: false,
             startX: 0,
@@ -161,7 +161,7 @@ export class InputManager {
         // Add event listeners for button touches
         this.setupButtonEventListeners();
         
-        // Add swipe camera controls - improved implementation
+        // Add swipe camera controls
         this.initSwipeCameraControls();
     }
     
@@ -251,7 +251,7 @@ export class InputManager {
                     this.cameraSwipe.lastX = touch.clientX;
                     this.cameraSwipe.lastY = touch.clientY;
                     
-                    // Apply camera rotation - smoother movement
+                    // Apply camera rotation
                     this.rotateCamera(-moveX * this.cameraSwipe.sensitivity, -moveY * this.cameraSwipe.sensitivity);
                 }
             }
@@ -294,13 +294,13 @@ export class InputManager {
         gameContainer.addEventListener('touchcancel', endTouchHandler);
     }
     
-    // New helper method to get the element at a touch point
+    // Helper method to get the element at a touch point
     getTouchedElement(touch) {
         const element = document.elementFromPoint(touch.clientX, touch.clientY);
         return element;
     }
     
-    // New helper to handle button touches
+    // Helper to handle button touches
     handleButtonTouch(touch) {
         const element = this.getTouchedElement(touch);
         if (!element) return;
@@ -326,7 +326,7 @@ export class InputManager {
         }
     }
     
-    // New helper to handle button release
+    // Helper to handle button release
     handleButtonRelease(touch) {
         // Check all buttons to see if this touch was pressing any of them
         for (const buttonId in this.buttons) {
@@ -373,7 +373,6 @@ export class InputManager {
         const controlsRect = controlsElement.getBoundingClientRect();
         
         // Consider controls area to start slightly above the actual element
-        // This gives a larger area for camera swiping
         const controlsTop = controlsRect.top - 50; // 50px buffer above controls
         
         // Check if touch is in controls area
@@ -434,10 +433,10 @@ export class InputManager {
             'camera-left': '←',
             'camera-right': '→',
             'jump': 'Jump',
-            'zoom-out': 'Sword', // Changed from '-' to 'Sword'
+            'zoom-out': 'Sword',
             'toggle-light': 'L',
             'camera-down': '↓',
-            'attack': 'Staff' // Changed from 'Atk' to 'Staff'
+            'attack': 'Staff'
         };
         
         // Create buttons according to layout
@@ -486,7 +485,7 @@ export class InputManager {
         window.addEventListener('resize', this.adjustButtonSizes.bind(this));
     }
     
-    // Improved method to set up joystick controls
+    // Method to set up joystick controls
     setupJoystickControls() {
         const joystickBase = document.getElementById('joystick-base');
         const joystickHandle = document.getElementById('joystick-handle');
@@ -503,7 +502,7 @@ export class InputManager {
         };
     }
     
-    // Improved handler for joystick movement
+    // Handler for joystick movement
     handleJoystickMove(clientX, clientY) {
         if (!this.joystick.active) return;
         
@@ -695,7 +694,7 @@ export class InputManager {
             true // Single press (don't repeat)
         );
         
-        // Change zoom-out button to be sword attack button
+        // Sword attack button
         this.setupButtonTouch('zoom-out',
             () => {
                 // Dispatch sword attack event
@@ -704,7 +703,7 @@ export class InputManager {
             },
             null,
             false,
-            true // Change to single press
+            true // Single press
         );
     }
     
@@ -719,7 +718,7 @@ export class InputManager {
         const startPress = (e) => {
             if (e) {
                 e.preventDefault(); // Prevent default behavior
-                e.stopPropagation(); // Stop event propagation - THIS IS IMPORTANT
+                e.stopPropagation(); // Stop event propagation
             }
             
             // For single press buttons, only trigger once per press
@@ -750,7 +749,7 @@ export class InputManager {
         const endPress = (e) => {
             if (e) {
                 e.preventDefault(); // Prevent default behavior
-                e.stopPropagation(); // Stop event propagation - THIS IS IMPORTANT
+                e.stopPropagation(); // Stop event propagation
             }
             
             button.classList.remove('active');
@@ -802,7 +801,6 @@ export class InputManager {
             this.camera.quaternion.premultiply(quaternion);
             
             // Constrain up/down rotation to prevent flipping
-            // This is a simple way to limit vertical rotation
             const lookDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
             const verticalAngle = Math.asin(lookDirection.y);
             
@@ -1046,39 +1044,6 @@ export class InputManager {
                 const floorHeight = feetCollision.collider.box.max.y + this.playerHeight / 2;
                 if (floorHeight > verticalPosition.y) {
                     verticalPosition.y = floorHeight + 0.1; // Small gap to prevent stuck
-                }
-            }
-            
-            // Do an additional raycast check directly down to accurately find floor height
-            // This helps prevent "walking on air" bugs
-            if (this.isGrounded) {
-                const rayOrigin = this.camera.position.clone();
-                rayOrigin.y -= this.playerHeight / 2 - 0.1;  // Just above feet level
-                
-                const floorHit = collisionManager.findFloorBelow(rayOrigin, 1.0);
-                if (floorHit) {
-                    // Position precisely above the hit point
-                    const exactFloorHeight = floorHit.point.y + this.playerHeight / 2;
-                    // Only adjust if we're slightly floating above the ground
-                    if (exactFloorHeight > verticalPosition.y && 
-                        exactFloorHeight - verticalPosition.y < 0.5) {
-                        verticalPosition.y = exactFloorHeight;
-                    }
-                }
-            }
-            
-            // Check for enemy collisions at the new vertical position
-            const bodyPosition = verticalPosition.clone();
-            const bodyCollision = collisionManager.checkCollision(bodyPosition, playerRadius, false);
-            
-            if (bodyCollision.collides && bodyCollision.isEnemy) {
-                // Use the collision manager to resolve the collision
-                const resolvedPosition = collisionManager.resolveCollision(bodyPosition, previousPosition, playerRadius);
-                
-                // Apply the resolved position, but preserve our calculated Y if it's better
-                // This prevents enemy collisions from pushing player through floor
-                if (resolvedPosition.y >= previousPosition.y) {
-                    verticalPosition.y = resolvedPosition.y;
                 }
             }
             
