@@ -252,6 +252,9 @@ export class ShadowCrawler extends Enemy {
         // Position the entire group
         this.group.position.copy(this.position);
         
+        // Add to scene
+        this.scene.add(this.group);
+        
         // Set collision radius to match visual size
         this.collisionRadius = 0.8;
     }
@@ -511,7 +514,6 @@ export class ShadowCrawler extends Enemy {
             
             // Make it face the player
             slash.lookAt(this.player.camera.position);
-            slash.rotateX(Math.PI / 2); // Adjust rotation to point forward
             
             // Rotate for slashing effect
             slash.rotation.z += progress * Math.PI;
@@ -553,9 +555,9 @@ export class ShadowCrawler extends Enemy {
         }
     }
     
-    // SIMPLIFIED: Use the standard Enemy death effect instead of the complex one
+    // Enhance the death effect
     die() {
-        if (this.state === 'dead') return; // Already dead
+        if (this.state === 'dead') return;
         
         console.log("Shadow Crawler died!");
         this.state = 'dead';
@@ -566,11 +568,119 @@ export class ShadowCrawler extends Enemy {
             this.manaDrop.dropped = true;
         }
         
-        // Simple death animation - shrink and fade out
-        const startScale = this.group.scale.clone();
-        const startPosition = this.group.position.clone();
+        // Create enhanced death effect
+        this.createEnhancedDeathEffect();
         
-        const duration = 1.0; // Death animation duration in seconds
+        // Disable collisions
+        this.collisionEnabled = false;
+        
+        // Hide the original mesh after a delay
+        setTimeout(() => {
+            if (this.group) {
+                this.group.visible = false;
+            }
+        }, 1000);
+    }
+    
+    // Create an enhanced death effect with particles
+    createEnhancedDeathEffect() {
+        if (!this.scene || !this.group) return;
+        
+        // Get position
+        const position = this.group.position.clone();
+        
+        // Create particles
+        const particleCount = 20;
+        const particles = [];
+        
+        // Particle colors
+        const colors = [0x33ff66, 0xff3366, 0x3366ff];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Random size
+            const size = Math.random() * 0.15 + 0.05;
+            
+            // Random geometry type
+            let geometry;
+            const geomType = Math.floor(Math.random() * 3);
+            
+            switch (geomType) {
+                case 0:
+                    geometry = new THREE.SphereGeometry(size, 8, 8);
+                    break;
+                case 1:
+                    geometry = new THREE.TetrahedronGeometry(size, 0);
+                    break;
+                case 2:
+                default:
+                    geometry = new THREE.BoxGeometry(size, size, size);
+                    break;
+            }
+            
+            // Random color from palette
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            
+            const material = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            
+            // Position at crawler location with slight randomization
+            particle.position.set(
+                position.x + (Math.random() - 0.5) * 0.5,
+                position.y + Math.random() * 0.5,
+                position.z + (Math.random() - 0.5) * 0.5
+            );
+            
+            // Random velocity
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 0.01 + Math.random() * 0.03;
+            particle.velocity = new THREE.Vector3(
+                Math.cos(angle) * speed,
+                0.03 + Math.random() * 0.03, // Upward bias
+                Math.sin(angle) * speed
+            );
+            
+            // Random rotation
+            particle.rotation.set(
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+            );
+            
+            // Random rotation velocity
+            particle.rotationVelocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.2,
+                (Math.random() - 0.5) * 0.2,
+                (Math.random() - 0.5) * 0.2
+            );
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Add a flash effect
+        const flashGeometry = new THREE.SphereGeometry(1.5, 16, 16);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0x33ff66, // Green flash
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
+        
+        // Add a point light
+        const light = new THREE.PointLight(0x33ff66, 3, 8);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Animate particles and effects
+        const duration = 1.5; // seconds
         const startTime = performance.now();
         
         const animate = () => {
@@ -578,42 +688,65 @@ export class ShadowCrawler extends Enemy {
             const elapsed = (now - startTime) / 1000; // to seconds
             const progress = Math.min(elapsed / duration, 1);
             
-            // Scale down
-            const scale = 1 - progress * 0.8;
-            this.group.scale.set(scale, scale * 0.5, scale); // Flatten as it shrinks
-            
-            // Sink into ground
-            this.group.position.y = startPosition.y - progress * 1.0;
-            
-            // Fade materials
-            if (this.bodyMesh && this.bodyMesh.material) {
-                this.bodyMesh.material.opacity = 1 - progress;
-                this.bodyMesh.material.transparent = true;
+            // Update particles
+            for (const particle of particles) {
+                // Move particle
+                particle.position.add(particle.velocity);
+                
+                // Apply gravity
+                particle.velocity.y -= 0.001;
+                
+                // Rotate particle
+                particle.rotation.x += particle.rotationVelocity.x;
+                particle.rotation.y += particle.rotationVelocity.y;
+                particle.rotation.z += particle.rotationVelocity.z;
+                
+                // Fade out
+                if (particle.material) {
+                    particle.material.opacity = 0.8 * (1 - progress);
+                }
             }
             
-            if (this.leftEye && this.leftEye.material) {
-                this.leftEye.material.opacity = 1 - progress;
-                this.leftEye.material.transparent = true;
+            // Update flash
+            if (flash) {
+                // Expand
+                flash.scale.set(1 + progress * 2, 1 + progress * 2, 1 + progress * 2);
+                // Fade out
+                flash.material.opacity = 0.7 * (1 - progress);
             }
             
-            if (this.rightEye && this.rightEye.material) {
-                this.rightEye.material.opacity = 1 - progress;
-                this.rightEye.material.transparent = true;
+            // Update light
+            if (light) {
+                light.intensity = 3 * (1 - progress);
             }
             
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                // After death animation completes, remove from scene
-                // Don't actually remove - just make invisible to avoid Three.js issues
-                this.group.visible = false;
+                // Clean up
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                    if (particle.material) particle.material.dispose();
+                    if (particle.geometry) particle.geometry.dispose();
+                }
                 
-                // Disable collisions for this enemy
-                this.collisionEnabled = false;
+                this.scene.remove(flash);
+                this.scene.remove(light);
+                if (flash.material) flash.material.dispose();
+                if (flash.geometry) flash.geometry.dispose();
             }
         };
         
         animate();
+        
+        // Play death sound
+        try {
+            const deathSound = new Audio('sounds/crawler_death.mp3');
+            deathSound.volume = 0.5;
+            deathSound.play().catch(err => console.log('Could not play death sound', err));
+        } catch (e) {
+            console.log('Error playing death sound', e);
+        }
     }
     
     // Custom mana orb with neon styling
@@ -768,5 +901,4 @@ export class ShadowCrawler extends Enemy {
         // Add to animated shadow orbs
         window.animatedShadowOrbs.push(orbMesh);
     }
-
 }
