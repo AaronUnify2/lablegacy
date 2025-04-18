@@ -1,37 +1,109 @@
-/* ===================== Base styles ===================== */
-* {
+/* Base styles */
+body {
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
-}
-
-body, html {
-    width: 100%;
-    height: 100%;
     overflow: hidden;
-    touch-action: none;
-    font-family: 'Cinzel', serif; 
     background-color: #000;
-}
-
-@font-face {
-    font-family: 'Cinzel';
-    src: url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap');
+    font-family: 'Arial', sans-serif;
 }
 
 #game-container {
     position: relative;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
 }
 
 canvas {
     display: block;
-    width: 100%;
-    height: 100%;
 }
 
-/* ===================== Loading Screen ===================== */
+/* UI Elements */
+#ui-container {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    color: white;
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    user-select: none;
+    min-width: 200px;
+}
+
+.stat-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: #aaa;
+}
+
+#health-bar {
+    width: 100%;
+    height: 18px;
+    background-color: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+#health-fill {
+    height: 100%;
+    background-color: #f04040;
+    border-radius: 4px;
+    width: 100%;
+    transition: width 0.3s;
+}
+
+#floor-info {
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.weapon-name {
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.weapon-durability {
+    font-size: 14px;
+    color: #ccc;
+}
+
+/* Minimap */
+#minimap-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#minimap-canvas {
+    width: 150px;
+    height: 150px;
+    display: block;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+}
+
+/* Control hints - display on screen during gameplay */
+#control-hints {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    color: white;
+    font-size: 12px;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    user-select: none;
+}
+
+/* Loading screen */
 #loading-screen {
     position: absolute;
     width: 100%;
@@ -39,441 +111,30 @@ canvas {
     background-color: #000;
     z-index: 100;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     color: white;
-    transition: opacity 1s ease-out;
+    transition: opacity 1s;
 }
 
-#loading-screen.fade-out {
-    opacity: 0;
+#loading-screen h1 {
+    font-size: 3em;
+    margin-bottom: 20px;
 }
 
-.loading-content {
-    text-align: center;
-    max-width: 80%;
-}
-
-.loading-content h1 {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    letter-spacing: 0.2em;
-    color: #9ab;
-    text-shadow: 0 0 10px #3366ff, 0 0 20px #3366ff;
-}
-
-.lore-text {
-    margin: 2rem 0;
-    line-height: 1.6;
-    color: #aaa;
-    font-family: 'Times New Roman', serif;
-    max-width: 600px;
-    margin: 0 auto 2rem auto;
-}
-
-.lore-text p {
-    margin-bottom: 0.8rem;
-    font-style: italic;
-    opacity: 0.8;
-}
-
-.spinner {
-    width: 50px;
-    height: 50px;
-    border: 3px solid rgba(100, 100, 180, 0.2);
-    border-radius: 50%;
-    border-top-color: #3366ff;
-    border-left-color: #3366ff;
-    animation: spin 1.5s ease-in-out infinite;
-    margin: 20px auto;
-    box-shadow: 0 0 20px #3366ff;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-/* Flicker text effect */
-.flicker-text {
-    margin-top: 1rem;
-    color: #889;
-    font-family: monospace;
-    letter-spacing: 0.1em;
-    animation: textFlicker 4s infinite alternate;
-}
-
-@keyframes textFlicker {
-    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-        opacity: 0.8;
-        text-shadow: 0 0 4px #aaa;
-    }
-    20%, 22%, 24%, 55% {
-        opacity: 0.2;
-        text-shadow: none;
-    }
-}
-
-/* ===================== HUD Elements ===================== */
-#hud {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    color: #7a90cc;
-    font-size: 14px;
-    font-family: 'Courier New', monospace;
-    text-shadow: 0 0 5px #3366ff;
-    pointer-events: none;
-    z-index: 10;
-    opacity: 0.7;
-    transition: opacity 0.3s ease;
-}
-
-#hud:hover {
-    opacity: 1;
-}
-
-#fps-counter, #position-info {
-    margin-bottom: 8px;
-    background-color: rgba(0, 0, 0, 0.7);
-    padding: 8px 12px;
-    border-radius: 4px;
-    border-left: 2px solid #3366ff;
-    letter-spacing: 1px;
-}
-
-/* ===================== Health Display ===================== */
-#health-display {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    display: flex;
-    align-items: center;
-    z-index: 10;
-    transition: transform 0.3s ease;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 8px 12px;
-    border-radius: 6px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    border-right: 3px solid #ff3333;
-}
-
-#health-display:hover {
-    transform: scale(1.05);
-    background: rgba(0, 0, 0, 0.6);
-}
-
-#health-bar {
-    width: 200px;
-    height: 15px;
-    background: rgba(20, 20, 20, 0.7);
-    border-radius: 3px;
+#loading-bar-container {
+    width: 300px;
+    height: 20px;
+    background-color: #333;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 20px;
 }
 
-#health-bar-fill {
-    width: 100%;
+#loading-bar {
     height: 100%;
-    background: linear-gradient(to right, #ff3333, #ff6666);
-    transition: width 0.3s ease;
-    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+    width: 0;
+    background-color: #f04040;
+    transition: width 0.5s;
 }
-
-#health-text {
-    margin-left: 10px;
-    color: #fff;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 1);
-    font-family: 'Cinzel', serif;
-    font-size: 1rem;
-    min-width: 60px;
-    text-align: center;
-}
-
-/* Pulse animation for low health */
-@keyframes pulse {
-    0% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
-    50% { opacity: 1; box-shadow: 0 0 15px rgba(255, 0, 0, 0.8); }
-    100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
-}
-
-/* ===================== Mana Display ===================== */
-#mana-display {
-    position: absolute;
-    top: 60px; /* Position below health display */
-    right: 20px;
-    display: flex;
-    align-items: center;
-    z-index: 10;
-    transition: transform 0.3s ease;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 8px 12px;
-    border-radius: 6px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    border-right: 3px solid #3366ff;
-}
-
-#mana-display:hover {
-    transform: scale(1.05);
-    background: rgba(0, 0, 0, 0.6);
-}
-
-#mana-bar {
-    width: 200px;
-    height: 15px;
-    background: rgba(20, 20, 20, 0.7);
-    border-radius: 3px;
-    overflow: hidden;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#mana-bar-fill {
-    width: 0%; /* Start with 0 mana */
-    height: 100%;
-    background: linear-gradient(to right, #3366ff, #66aaff);
-    transition: width 0.3s ease;
-    box-shadow: 0 0 8px rgba(51, 102, 255, 0.5);
-}
-
-#mana-text {
-    margin-left: 10px;
-    color: #fff;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 1);
-    font-family: 'Cinzel', serif;
-    font-size: 1rem;
-    min-width: 60px;
-    text-align: center;
-}
-
-/* Pulse animation for low mana */
-@keyframes mana-pulse {
-    0% { 
-        opacity: 0.8; 
-        box-shadow: 0 0 5px rgba(51, 102, 255, 0.5); 
-        background: linear-gradient(to right, #3366ff, #66aaff);
-    }
-    50% { 
-        opacity: 1; 
-        box-shadow: 0 0 15px rgba(51, 102, 255, 0.8); 
-        background: linear-gradient(to right, #5588ff, #88ccff);
-    }
-    100% { 
-        opacity: 0.8; 
-        box-shadow: 0 0 5px rgba(51, 102, 255, 0.5); 
-        background: linear-gradient(to right, #3366ff, #66aaff);
-    }
-}
-
-.mana-pulse {
-    animation: mana-pulse 0.5s infinite alternate !important;
-}
-
-/* ===================== Stamina Display ===================== */
-#stamina-display {
-    position: absolute;
-    top: 100px; /* Position below health and mana displays */
-    right: 20px;
-    display: flex;
-    align-items: center;
-    z-index: 10;
-    transition: transform 0.3s ease;
-    background: rgba(0, 0, 0, 0.4);
-    padding: 8px 12px;
-    border-radius: 6px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    border-right: 3px solid #ffaa00; /* Orange for stamina */
-}
-
-#stamina-display:hover {
-    transform: scale(1.05);
-    background: rgba(0, 0, 0, 0.6);
-}
-
-#stamina-bar {
-    width: 200px;
-    height: 15px;
-    background: rgba(20, 20, 20, 0.7);
-    border-radius: 3px;
-    overflow: hidden;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5), inset 0 0 3px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#stamina-bar-fill {
-    width: 100%; /* Start with full stamina */
-    height: 100%;
-    background: linear-gradient(to right, #ffaa00, #ffcc66); /* Orange gradient for stamina */
-    transition: width 0.3s ease;
-    box-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
-}
-
-#stamina-text {
-    margin-left: 10px;
-    color: #fff;
-    text-shadow: 0 0 3px rgba(0, 0, 0, 1);
-    font-family: 'Cinzel', serif;
-    font-size: 1rem;
-    min-width: 60px;
-    text-align: center;
-}
-
-/* Pulse animation for low stamina */
-@keyframes stamina-pulse {
-    0% { 
-        opacity: 0.8; 
-        box-shadow: 0 0 5px rgba(255, 170, 0, 0.5); 
-        background: linear-gradient(to right, #ffaa00, #ffcc66);
-    }
-    50% { 
-        opacity: 1; 
-        box-shadow: 0 0 15px rgba(255, 170, 0, 0.8); 
-        background: linear-gradient(to right, #ffcc66, #ffe066);
-    }
-    100% { 
-        opacity: 0.8; 
-        box-shadow: 0 0 5px rgba(255, 170, 0, 0.5); 
-        background: linear-gradient(to right, #ffaa00, #ffcc66);
-    }
-}
-
-.stamina-pulse {
-    animation: stamina-pulse 0.5s infinite alternate !important;
-}
-
-/* ===================== Touch Controls ===================== */
-#touch-controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    padding: 10px;
-    z-index: 20;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    pointer-events: none; /* This allows touches to pass through to the game */
-}
-
-/* Controls container to hold both joystick and buttons */
-.controls-container {
-    display: flex;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 800px; /* Limit width on larger screens */
-    margin: 0 auto;
-    pointer-events: none;
-}
-
-/* Joystick container - positioned on the left side */
-.joystick-container {
-    position: relative;
-    bottom: 20px;
-    width: 130px;
-    height: 130px;
-    z-index: 1000;
-    pointer-events: none;
-}
-
-/* Control grid - positioned on the right side */
-.control-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, 1fr);
-    gap: 6px;
-    width: 130px;
-    height: 130px;
-    position: relative;
-    bottom: 20px;
-    right: 20px; /* Shift 20px to the left */
-    pointer-events: none;
-}
-
-/* Button positioning within grid */
-#toggle-light { grid-row: 1; grid-column: 1; }
-#camera-up { grid-row: 1; grid-column: 2; }
-#attack { grid-row: 1; grid-column: 3; }
-#camera-left { grid-row: 2; grid-column: 1; }
-#jump { grid-row: 2; grid-column: 2; }
-#camera-right { grid-row: 2; grid-column: 3; }
-#zoom-out { grid-row: 3; grid-column: 1; }
-#camera-down { grid-row: 3; grid-column: 2; }
-
-/* Base button style - Cursed look */
-.control-button {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #ccc;
-    font-size: 22px;
-    font-weight: bold;
-    text-shadow: 0 0 5px rgba(100, 120, 255, 0.7);
-    pointer-events: auto;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    margin: 0 auto;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(50, 100, 255, 0.2);
-    position: relative;
-    transition: all 0.07s ease-out;
-    border: 1px solid rgba(100, 100, 255, 0.3);
-    background: radial-gradient(circle at 30% 30%, #222, #111);
-}
-
-/* Camera buttons - red theme */
-.control-button[id^="camera"] {
-    background: radial-gradient(circle at 30% 30%, #331818, #180909);
-    border-color: #aa3333;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(255, 50, 50, 0.3);
-}
-
-/* Jump button - green theme */
-.jump-button {
-    background: radial-gradient(circle at 30% 30%, #182818, #091809) !important;
-    border-color: #22aa33 !important;
-    font-size: 16px !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    animation: pulse 2s infinite;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(50, 255, 100, 0.3) !important;
-}
-
-/* Staff attack button - purple theme */
-#attack {
-    background: radial-gradient(circle at 30% 30%, #330033, #220022) !important;
-    border-color: #aa33aa !important;
-    color: #ffaaff;
-    font-size: 18px !important;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(255, 170, 255, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(255, 100, 255, 0.4) !important;
-    animation: pulse-attack 2s infinite alternate;
-}
-
-@keyframes pulse-attack {
-    0% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(255, 100, 255, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 15px rgba(255, 100, 255, 0.6);
-    }
