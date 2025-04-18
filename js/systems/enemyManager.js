@@ -254,95 +254,55 @@ export class EnemyManager {
         if (this.debug) console.log("Cleared all enemies");
     }
     
-    //=============================================================================
-    // GENERIC ENEMY METHODS
-    //=============================================================================
-    
-    // New method to spawn a generic enemy at a specific position
-    spawnGenericEnemy(position) {
-        if (this.debug) console.log(`Spawning generic enemy at position (${position.x}, ${position.y}, ${position.z})`);
+    // Spawn a generic enemy at a specified position
+    spawnEnemyAtPosition(position, patrolRadius, patrolSpeed) {
+        if (this.debug) console.log(`Attempting to spawn enemy at position: (${position.x}, ${position.y}, ${position.z})`);
         
-        // Create an enemy instance
-        const enemy = new Enemy(this.scene, position, this.collisionManager, this.player);
+        const spawnPos = position.clone();
         
-        // Set patrol parameters
-        enemy.patrolCenter = position.clone();
-        enemy.patrolRadius = 3; // Default patrol radius
+        // Try to find floor beneath
+        if (this.collisionManager && typeof this.collisionManager.findFloorBelow === 'function') {
+            const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
+            if (floorHit && floorHit.point) {
+                spawnPos.y = floorHit.point.y + 0.9; // Just above floor
+                if (this.debug) console.log("Found floor at y:", floorHit.point.y);
+            }
+        }
         
-        // Add to enemies array
-        const enemyIndex = this.enemies.push(enemy) - 1;
+        // Check for collision at spawn point
+        if (this.collisionManager) {
+            const collision = this.collisionManager.checkCollision(spawnPos, 0.5);
+            if (collision.collides) {
+                if (this.debug) console.log("Spawn point has collision, adjusting position");
+                // Try to find a nearby valid position
+                spawnPos.x += 2;
+                spawnPos.z += 2;
+            }
+        }
         
-        // Add to collision system
+        // Create enemy
+        const enemy = new Enemy(this.scene, spawnPos, this.collisionManager, this.player);
+        
+        // Set patrol parameters if provided
+        if (patrolRadius !== undefined) {
+            enemy.patrolRadius = patrolRadius;
+        }
+        
+        if (patrolSpeed !== undefined) {
+            enemy.patrolSpeed = patrolSpeed;
+        }
+        
+        const enemyIndex = this.enemies.push(enemy) - 1; // Add to enemies array and get index
+        
+        // Add enemy to collision system
         this.addEnemyToCollisionSystem(enemy, enemyIndex);
         
-        // Show spawn effect
-        this.showSimpleSpawnEffect(position);
+        // Show some visual effect
+        this.showSimpleSpawnEffect(spawnPos);
         
-        return enemy;
-    }
-    
-    // Method to spawn generic enemies in a room
-    spawnGenericEnemiesInRoom(room, count = 3) {
-        if (this.debug) console.log(`Spawning ${count} generic enemies in ${room.type} room`);
+        if (this.debug) console.log(`Spawned enemy at custom position (${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z})`);
         
-        const spawned = [];
-        const roomCenterX = room.x + room.width / 2;
-        const roomCenterZ = room.y + room.height / 2;
-        
-        for (let i = 0; i < count; i++) {
-            // Calculate spawn position with some randomness
-            const spawnX = roomCenterX + (Math.random() - 0.5) * room.width * 0.6;
-            const spawnZ = roomCenterZ + (Math.random() - 0.5) * room.height * 0.6;
-            
-            // Create spawn position vector
-            const spawnPos = new THREE.Vector3(spawnX, 1.0, spawnZ);
-            
-            // Find floor beneath
-            if (this.collisionManager) {
-                const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
-                if (floorHit && floorHit.point) {
-                    spawnPos.y = floorHit.point.y + 1.0; // Position at proper height
-                }
-            }
-            
-            // Check for collision at spawn point
-            let validPosition = true;
-            if (this.collisionManager) {
-                const collision = this.collisionManager.checkCollision(spawnPos, 0.7);
-                if (collision.collides) {
-                    // Try to find a better position
-                    for (let attempt = 0; attempt < 5; attempt++) {
-                        // Adjust position randomly
-                        spawnPos.x = roomCenterX + (Math.random() - 0.5) * room.width * 0.6;
-                        spawnPos.z = roomCenterZ + (Math.random() - 0.5) * room.height * 0.6;
-                        
-                        // Check again
-                        const newCollision = this.collisionManager.checkCollision(spawnPos, 0.7);
-                        if (!newCollision.collides) {
-                            validPosition = true;
-                            break;
-                        }
-                    }
-                    
-                    if (collision.collides) {
-                        validPosition = false;
-                        if (this.debug) console.log(`Could not find valid position for generic enemy ${i}`);
-                    }
-                }
-            }
-            
-            // Only spawn if position is valid
-            if (validPosition) {
-                const enemy = this.spawnGenericEnemy(spawnPos);
-                spawned.push(enemy);
-            }
-        }
-        
-        if (this.debug) {
-            console.log(`Successfully spawned ${spawned.length} generic enemies in ${room.type} room`);
-        }
-        
-        return spawned;
+        return enemy; // Return the enemy for further configuration
     }
     
     //=============================================================================
@@ -570,155 +530,9 @@ export class EnemyManager {
     // SHADOW CRAWLER METHODS
     //=============================================================================
     
-    // Method to spawn a single Shadow Crawler at a specific position
-    spawnShadowCrawler(position) {
-        if (this.debug) console.log(`Spawning Shadow Crawler at position (${position.x}, ${position.y}, ${position.z})`);
-        
-        // Create Shadow Crawler instance
-        const crawler = new ShadowCrawler(this.scene, position, this.collisionManager, this.player);
-        
-        // Set patrol parameters
-        crawler.patrolCenter = position.clone();
-        crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
-        
-        // Add to enemies array
-        const enemyIndex = this.enemies.push(crawler) - 1;
-        
-        // Add to collision system
-        this.addEnemyToCollisionSystem(crawler, enemyIndex);
-        
-        // Show spawn effect - using a different color for shadow crawlers
-        this.showShadowCrawlerSpawnEffect(position);
-        
-        return crawler;
-    }
-    
-    // Custom spawn effect for Shadow Crawlers
-    showShadowCrawlerSpawnEffect(position) {
-        // Create a shadow formation effect
-        const effectGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-        const effectMaterial = new THREE.MeshBasicMaterial({
-            color: 0x330033,
-            transparent: true,
-            opacity: 0.9,
-            wireframe: true
-        });
-        
-        const effect = new THREE.Mesh(effectGeometry, effectMaterial);
-        effect.position.copy(position);
-        this.scene.add(effect);
-        
-        // Add a dim purple light
-        const light = new THREE.PointLight(0x660066, 1, 5);
-        light.position.copy(position);
-        this.scene.add(light);
-        
-        // Shadow particles that swirl and converge
-        const particles = [];
-        const particleCount = 12;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.1, 6, 6);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x330033,
-                transparent: true,
-                opacity: 0.7
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position in a swirl pattern
-            const angle = (i / particleCount) * Math.PI * 2;
-            const radius = 2 + Math.random();
-            const height = Math.random() * 1.5;
-            
-            particle.position.set(
-                position.x + Math.cos(angle) * radius,
-                position.y + height,
-                position.z + Math.sin(angle) * radius
-            );
-            
-            // Set movement properties
-            particle.speed = 0.03 + Math.random() * 0.02;
-            particle.angle = angle;
-            particle.radius = radius;
-            particle.height = height;
-            particle.spinSpeed = 0.05 + Math.random() * 0.05;
-            
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        // Animate the spawn effect
-        const duration = 2000; // 2 seconds
-        const startTime = performance.now();
-        
-        const animate = () => {
-            const now = performance.now();
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Update particles - make them spiral in
-            for (let i = 0; i < particles.length; i++) {
-                const particle = particles[i];
-                
-                // Spiral movement
-                particle.angle += particle.spinSpeed;
-                
-                // Decrease radius as we progress
-                const currentRadius = particle.radius * (1 - progress * 0.9);
-                
-                // Lower height as we progress
-                const currentHeight = particle.height * (1 - progress * 0.9);
-                
-                // Update position
-                particle.position.set(
-                    position.x + Math.cos(particle.angle) * currentRadius,
-                    position.y + currentHeight,
-                    position.z + Math.sin(particle.angle) * currentRadius
-                );
-                
-                // Decrease size
-                const scale = 1 - progress * 0.7;
-                particle.scale.set(scale, scale, scale);
-            }
-            
-            // Main effect grows then shrinks
-            const effectScale = 1 + progress * 2;
-            effect.scale.set(effectScale, effectScale, effectScale);
-            
-            // Fade out at the end
-            effect.material.opacity = 0.9 * (1 - Math.pow(progress, 2));
-            
-            // Pulse the light
-            if (light) {
-                light.intensity = 1 + Math.sin(progress * Math.PI * 5) * (1 - progress);
-            }
-            
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                // Clean up
-                this.scene.remove(effect);
-                this.scene.remove(light);
-                
-                for (const particle of particles) {
-                    this.scene.remove(particle);
-                    if (particle.material) particle.material.dispose();
-                    if (particle.geometry) particle.geometry.dispose();
-                }
-                
-                if (effect.material) effect.material.dispose();
-                if (effect.geometry) effect.geometry.dispose();
-            }
-        };
-        
-        animate();
-    }
-    
-    // Method to spawn Shadow Crawlers in a room
+    // Modified method to spawn Shadow Crawlers in a room - similar to how the central room works
     spawnShadowCrawlersInRoom(room, count = 5) {
-        if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in ${room.type} room`);
+        if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in ${room.type} room at ${new Date().toISOString()}`);
         
         const spawned = [];
         
@@ -729,7 +543,6 @@ export class EnemyManager {
         // Spawn Shadow Crawlers in a pattern around the room
         for (let i = 0; i < count; i++) {
             // Calculate spawn position
-            // Use different positions based on the index to spread them out
             let spawnX, spawnZ;
             
             // For first crawler, use room center
@@ -742,40 +555,39 @@ export class EnemyManager {
                 // Calculate angle for circular distribution
                 const angle = (i / count) * Math.PI * 2;
                 
-                // Distance from center (60% of the way to the walls)
-                const distance = Math.min(room.width, room.height) * 0.3;
+                // Distance from center (25% of the way to the walls)
+                const distance = Math.min(room.width, room.height) * 0.25;
                 
                 // Calculate position
                 spawnX = roomCenterX + Math.cos(angle) * distance;
                 spawnZ = roomCenterZ + Math.sin(angle) * distance;
             }
             
-            // Create spawn position
-            const spawnPos = new THREE.Vector3(spawnX, 0.8, spawnZ); // Start lower - just above the floor
+            // Create spawn position - Start higher for better visibility and collision avoidance
+            const spawnPos = new THREE.Vector3(spawnX, 1.5, spawnZ);
             
             // Find floor beneath the position
             if (this.collisionManager) {
                 const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
                 if (floorHit && floorHit.point) {
-                    spawnPos.y = floorHit.point.y + 0.5; // Position just above floor
+                    spawnPos.y = floorHit.point.y + 1.0; // Position above floor
                     if (this.debug) console.log(`Found floor at y: ${floorHit.point.y}, positioning at ${spawnPos.y}`);
                 }
             }
             
             // Always ensure minimum height
-            spawnPos.y = Math.max(spawnPos.y, 0.5);
+            spawnPos.y = Math.max(spawnPos.y, 1.0);
             
-            // Check for collision at spawn point
+            // Ensure position is valid
             let validPosition = true;
             if (this.collisionManager) {
-                const collision = this.collisionManager.checkCollision(spawnPos, 0.6);
+                const collision = this.collisionManager.checkCollision(spawnPos, 1.0);
                 if (collision.collides) {
-                    // Try adjusting the position
-                    spawnPos.x += (Math.random() - 0.5) * 2;
-                    spawnPos.z += (Math.random() - 0.5) * 2;
+                    // If collision, try raising the position
+                    spawnPos.y += 1.0;
                     
                     // Check again
-                    const newCollision = this.collisionManager.checkCollision(spawnPos, 0.6);
+                    const newCollision = this.collisionManager.checkCollision(spawnPos, 1.0);
                     if (newCollision.collides) {
                         validPosition = false;
                         if (this.debug) console.log(`Could not find valid position for Shadow Crawler ${i}`);
@@ -785,11 +597,34 @@ export class EnemyManager {
             
             // Only spawn if position is valid
             if (validPosition) {
-                // Spawn the Shadow Crawler
-                const crawler = this.spawnShadowCrawler(spawnPos);
+                if (this.debug) console.log(`Creating Shadow Crawler at position: ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`);
                 
-                // Add to spawned array
-                spawned.push(crawler);
+                try {
+                    // Create the Shadow Crawler
+                    const crawler = new ShadowCrawler(this.scene, spawnPos, this.collisionManager, this.player);
+                    
+                    // Set different patrol radius for each crawler
+                    crawler.patrolRadius = 2 + Math.random() * 3; // Random patrol radius between 2-5
+                    
+                    // Add to enemies array
+                    const enemyIndex = this.enemies.push(crawler) - 1;
+                    
+                    // Add to collision system
+                    this.addEnemyToCollisionSystem(crawler, enemyIndex);
+                    
+                    // Add to spawned array
+                    spawned.push(crawler);
+                    
+                    // Set patrol center
+                    crawler.patrolCenter = spawnPos.clone();
+                    
+                    // Show a spawn effect
+                    this.showSimpleSpawnEffect(spawnPos);
+                    
+                    if (this.debug) console.log(`Successfully created Shadow Crawler ${i}`);
+                } catch (error) {
+                    console.error(`Error creating Shadow Crawler: ${error}`);
+                }
             }
         }
         
@@ -800,7 +635,7 @@ export class EnemyManager {
         return spawned;
     }
     
-    // Method to spawn Shadow Crawlers in all cardinal rooms
+    // Method to spawn Shadow Crawlers in all cardinal rooms using the improved spawning method
     spawnShadowCrawlersInCardinalRooms(rooms, countPerRoom = 5) {
         // Find all cardinal rooms
         const cardinalRooms = rooms.filter(room => 
@@ -837,11 +672,11 @@ export class EnemyManager {
         const centralRoom = rooms.find(room => room.type === 'central');
         
         if (!centralRoom) {
-            console.log("No central room found for Shadow Crawler spawning!");
+            console.log("No central room found!");
             return [];
         }
         
-        // Use the generic room spawning method to spawn in the central room
+        // Use the same room spawning method for consistent behavior
         return this.spawnShadowCrawlersInRoom(centralRoom, count);
     }
 }
