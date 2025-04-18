@@ -972,3 +972,4 @@ export class KingCylindar extends Enemy {
         });
         document.dispatchEvent(event);
         }
+}
