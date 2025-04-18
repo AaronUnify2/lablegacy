@@ -20,6 +20,21 @@ export class KingCylindar extends Enemy {
         this.shotgunProjectileCount = 8; // Number of projectiles in shotgun blast
         this.shotgunSpreadAngle = Math.PI / 4; // 45-degree spread
         
+        // NEW: King-specific movement properties
+        this.kingMovement = {
+            active: true,
+            currentAngle: Math.random() * Math.PI * 2, // Random starting angle
+            angleSpeed: 0.2, // How fast it rotates around its center
+            radius: 6, // Patrol radius
+            timeInPlace: 0, // Time spent hovering in one spot
+            maxTimeInPlace: 5, // Max time to hover before moving again
+            movingState: 'patrol', // 'patrol' or 'hover'
+            hoverHeight: 0, // Current hover height variation
+            hoverDirection: 1, // Up or down
+            hoverSpeed: 0.5, // Speed of hover movement
+            lastMoveTime: performance.now()
+        };
+        
         // NEW: Mana drop properties - much more generous
         this.manaDrop = {
             min: 100,
@@ -39,10 +54,13 @@ export class KingCylindar extends Enemy {
         // Create the mesh to replace the default one
         this.createMesh();
         
+        // Initialize power core (hidden by default)
+        this.createPowerCore();
+        
         console.log("King Cylindar created at position:", this.position);
     }
     
-    // Override createMesh to make a much larger, blue glowing enemy
+    // Override createMesh to make a more visually interesting boss
     createMesh() {
         // Remove existing mesh if it exists
         if (this.group) {
@@ -52,19 +70,19 @@ export class KingCylindar extends Enemy {
         // Create a group to hold all enemy parts
         this.group = new THREE.Group();
         
-        // Create a giant body - blue glowing cylinder
+        // Create main body - blue cylinder but with more details
         const bodyGeometry = new THREE.CylinderGeometry(
-            2.5, // top radius (5x larger)
+            2.5, // top radius
             2.5, // bottom radius
-            9.0, // height (5x larger)
-            16,   // more radial segments for better quality
-            3,    // height segments
+            9.0, // height
+            16,  // radial segments
+            3,   // height segments
             false // open-ended
         );
         
-        // Blue glowing material
+        // Main body material - blue with patterns
         const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3366ff, // Blue color
+            color: 0x3366ff, // Base blue color
             emissive: 0x0033aa, // Blue glow
             emissiveIntensity: 0.5, // Stronger glow
             roughness: 0.4,
@@ -84,7 +102,7 @@ export class KingCylindar extends Enemy {
         this.group.add(this.bodyMesh);
         
         // Add giant glowing eyes - much larger and more intense
-        const eyeGeometry = new THREE.SphereGeometry(0.5, 12, 12); // 5x larger eyes
+        const eyeGeometry = new THREE.SphereGeometry(0.5, 12, 12); // Large eyes
         const eyeMaterial = new THREE.MeshBasicMaterial({
             color: 0x66ccff, // Bright blue eyes
             emissive: 0x66ccff,
@@ -100,6 +118,13 @@ export class KingCylindar extends Enemy {
         this.rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
         this.rightEye.position.set(1.0, 7.5, -1.5);
         this.group.add(this.rightEye);
+        
+        // NEW: Add decorative rings that orbit the body
+        this.rings = [];
+        this.createOrbitalRings();
+        
+        // NEW: Add decorative patterns on the body
+        this.createBodyPatterns();
         
         // Add a glowing aura/halo effect
         const auraGeometry = new THREE.SphereGeometry(3.0, 16, 16);
@@ -129,26 +154,348 @@ export class KingCylindar extends Enemy {
         this.collisionRadius = 2.5; // 3x larger collision radius
     }
     
-    // Override update method to add pulsing glow effect
-    update(deltaTime, camera) {
-        // Call the parent update method first
-        super.update(deltaTime, camera);
+    // NEW: Create orbital rings
+    createOrbitalRings() {
+        // Different colored rings
+        const ringColors = [
+            0x66ccff, // Light blue
+            0xff3366, // Pink
+            0x33ff66  // Green
+        ];
         
-        // Add pulsing glow effect
-        if (this.glowLight && this.aura) {
-            const time = performance.now() * 0.001;
-            const pulse = (Math.sin(time * 2) * 0.3) + 0.7; // Pulsing between 0.4 and 1.0
+        for (let i = 0; i < ringColors.length; i++) {
+            // Create ring geometry
+            const ringGeometry = new THREE.TorusGeometry(
+                2.8 + i * 0.4, // Radius gets larger with each ring
+                0.1,           // Tube radius (thickness)
+                16,            // Tubular segments
+                32             // Radial segments
+            );
             
-            this.glowLight.intensity = pulse * 1.5;
-            this.aura.material.opacity = pulse * 0.2;
+            // Create emissive material
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: ringColors[i],
+                transparent: true,
+                opacity: 0.7
+            });
             
-            // Also make the eyes pulse
-            if (this.leftEye && this.leftEye.material && this.rightEye && this.rightEye.material) {
-                const eyePulse = (Math.sin(time * 3) * 0.3) + 0.7;
-                this.leftEye.material.emissiveIntensity = eyePulse;
-                this.rightEye.material.emissiveIntensity = eyePulse;
+            // Create ring mesh
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            
+            // Create a container for the ring to enable separate rotation
+            const ringContainer = new THREE.Object3D();
+            ringContainer.add(ring);
+            
+            // Position in the middle of the body
+            ringContainer.position.y = 4.5;
+            
+            // Rotate the ring container to a different starting angle
+            ringContainer.rotation.x = Math.PI/2; // Make it horizontal
+            ringContainer.rotation.y = i * (Math.PI / 3); // Spread starting angles
+            
+            // Add the ring to our rings array and to the group
+            this.rings.push({
+                container: ringContainer,
+                mesh: ring,
+                rotationSpeed: 0.2 + i * 0.1, // Different speeds
+                wobblePhase: Math.random() * Math.PI * 2, // Random phase
+                wobbleSpeed: 0.5 + Math.random() * 0.5   // Random wobble speed
+            });
+            
+            this.group.add(ringContainer);
+        }
+    }
+    
+    // NEW: Create body patterns/details
+    createBodyPatterns() {
+        // Add glowing lines/panels to the body
+        const addBodyDetail = (height, angle, width, color) => {
+            const panelGeometry = new THREE.PlaneGeometry(width, 0.4);
+            const panelMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide
+            });
+            
+            const panel = new THREE.Mesh(panelGeometry, panelMaterial);
+            
+            // Position the panel on the body surface
+            const radius = 2.5; // Body radius
+            panel.position.set(
+                Math.sin(angle) * radius,
+                height,
+                Math.cos(angle) * radius
+            );
+            
+            // Rotate to face outward
+            panel.lookAt(
+                panel.position.x * 2,
+                panel.position.y,
+                panel.position.z * 2
+            );
+            
+            return panel;
+        };
+        
+        // Add various details around the body
+        const bodyDetails = [];
+        
+        // Create vertical stripes/lines
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const color = i % 2 === 0 ? 0x66ccff : 0x3366ff; // Alternate colors
+            
+            for (let h = 1; h < 9; h += 2) {
+                const detail = addBodyDetail(h, angle, 0.5, color);
+                this.bodyMesh.add(detail);
+                bodyDetails.push(detail);
             }
         }
+        
+        // Create horizontal rings around body
+        for (let h = 2; h < 9; h += 3) {
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const detail = addBodyDetail(h, angle, 0.7, 0xff3366); // Pink
+                this.bodyMesh.add(detail);
+                bodyDetails.push(detail);
+            }
+        }
+        
+        // Store details for animation
+        this.bodyDetails = bodyDetails;
+    }
+    
+    // NEW: Create power core that becomes visible when damaged
+    createPowerCore() {
+        // Core geometry
+        const coreGeometry = new THREE.SphereGeometry(1.0, 16, 16);
+        
+        // Core material - will pulse when visible
+        const coreMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffcc00, // Yellow/gold energy
+            transparent: true,
+            opacity: 0.0 // Start invisible
+        });
+        
+        // Create core mesh
+        this.powerCore = new THREE.Mesh(coreGeometry, coreMaterial);
+        this.powerCore.position.y = 4.5; // Center of cylinder
+        
+        // Add to group
+        this.group.add(this.powerCore);
+        
+        // Core light
+        this.coreLight = new THREE.PointLight(0xffcc00, 0, 5); // Start with 0 intensity
+        this.coreLight.position.copy(this.powerCore.position);
+        this.group.add(this.coreLight);
+    }
+    
+    // Override update method to add custom king movement and animations
+    update(deltaTime, camera) {
+        // Skip if dead
+        if (this.state === 'dead') return;
+        
+        // Calculate movement based on state
+        if (this.state === 'patrol') {
+            // Use custom king movement instead of standard patrol
+            this.updateKingMovement(deltaTime);
+        } else {
+            // For other states, use parent class behavior
+            super.update(deltaTime, camera);
+        }
+        
+        // Animation effects
+        this.updateVisualEffects(deltaTime);
+    }
+    
+    // NEW: Custom movement pattern for King Cylindar
+    updateKingMovement(deltaTime) {
+        if (!this.kingMovement.active) return;
+        
+        const now = performance.now();
+        const timeSinceLastMove = (now - this.kingMovement.lastMoveTime) / 1000;
+        this.kingMovement.lastMoveTime = now;
+        
+        // If in hover state, stay in place and bob up and down
+        if (this.kingMovement.movingState === 'hover') {
+            // Increment time in place
+            this.kingMovement.timeInPlace += deltaTime;
+            
+            // Update hover height
+            this.kingMovement.hoverHeight += this.kingMovement.hoverDirection * this.kingMovement.hoverSpeed * deltaTime;
+            
+            // Reverse direction if reached limits
+            if (Math.abs(this.kingMovement.hoverHeight) > 1) {
+                this.kingMovement.hoverDirection *= -1;
+            }
+            
+            // Apply hover height
+            this.group.position.y += this.kingMovement.hoverDirection * this.kingMovement.hoverSpeed * deltaTime;
+            
+            // Change to patrol state if hovered long enough
+            if (this.kingMovement.timeInPlace > this.kingMovement.maxTimeInPlace) {
+                this.kingMovement.movingState = 'patrol';
+                this.kingMovement.timeInPlace = 0;
+            }
+        } 
+        // If in patrol state, move in a circle around patrol center
+        else if (this.kingMovement.movingState === 'patrol') {
+            // Update angle
+            this.kingMovement.currentAngle += this.kingMovement.angleSpeed * deltaTime;
+            
+            // Calculate new position
+            const newX = this.patrolCenter.x + Math.cos(this.kingMovement.currentAngle) * this.kingMovement.radius;
+            const newZ = this.patrolCenter.z + Math.sin(this.kingMovement.currentAngle) * this.kingMovement.radius;
+            
+            // Get current position
+            const currentPos = this.group.position.clone();
+            
+            // Create movement vector
+            const moveVector = new THREE.Vector3(newX - currentPos.x, 0, newZ - currentPos.z);
+            
+            // Normalize and scale by speed
+            if (moveVector.lengthSq() > 0) {
+                moveVector.normalize().multiplyScalar(this.moveSpeed.patrol);
+            }
+            
+            // Calculate new position
+            const newPosition = currentPos.clone().add(moveVector);
+            
+            // Move with collision checking
+            if (this.collisionManager) {
+                // Check if new position has collision
+                const collision = this.collisionManager.checkCollision(newPosition, this.collisionRadius);
+                
+                if (!collision.collides) {
+                    // No collision, update position
+                    this.group.position.x = newPosition.x;
+                    this.group.position.z = newPosition.z;
+                }
+            } else {
+                // No collision manager, just move
+                this.group.position.x = newPosition.x;
+                this.group.position.z = newPosition.z;
+            }
+            
+            // Make the king face the direction of movement
+            if (moveVector.lengthSq() > 0.0001) {
+                // Calculate target rotation
+                const targetRotation = Math.atan2(moveVector.x, moveVector.z);
+                
+                // Smoothly rotate toward target
+                let currentRotation = this.group.rotation.y;
+                const rotationDifference = targetRotation - currentRotation;
+                
+                // Normalize difference to be between -PI and PI
+                let normalizedDifference = rotationDifference;
+                while (normalizedDifference > Math.PI) normalizedDifference -= Math.PI * 2;
+                while (normalizedDifference < -Math.PI) normalizedDifference += Math.PI * 2;
+                
+                // Apply rotation with smoothing
+                this.group.rotation.y += normalizedDifference * 0.1;
+            }
+            
+            // Occasionally change to hover state
+            if (Math.random() < 0.005) {
+                this.kingMovement.movingState = 'hover';
+                this.kingMovement.timeInPlace = 0;
+            }
+        }
+    }
+    
+    // NEW: Update visual effects
+    updateVisualEffects(deltaTime) {
+        const time = performance.now() * 0.001;
+        
+        // Animate rings
+        if (this.rings) {
+            for (const ring of this.rings) {
+                // Rotate around its own axis
+                ring.mesh.rotation.z += ring.rotationSpeed * deltaTime;
+                
+                // Wobble the container
+                const wobble = Math.sin(time * ring.wobbleSpeed + ring.wobblePhase) * 0.1;
+                ring.container.rotation.x = Math.PI/2 + wobble;
+                ring.container.rotation.z = wobble * 0.5;
+            }
+        }
+        
+        // Animate body details
+        if (this.bodyDetails) {
+            for (let i = 0; i < this.bodyDetails.length; i++) {
+                const detail = this.bodyDetails[i];
+                // Pulse opacity based on position
+                const pulse = 0.5 + Math.sin(time * 2 + i * 0.2) * 0.3;
+                if (detail.material) {
+                    detail.material.opacity = pulse;
+                }
+            }
+        }
+        
+        // Pulse eyes
+        if (this.leftEye && this.leftEye.material) {
+            const eyePulse = 0.7 + Math.sin(time * 3) * 0.3;
+            this.leftEye.material.emissiveIntensity = eyePulse;
+        }
+        
+        if (this.rightEye && this.rightEye.material) {
+            const eyePulse = 0.7 + Math.sin(time * 3 + 0.5) * 0.3;
+            this.rightEye.material.emissiveIntensity = eyePulse;
+        }
+        
+        // Animate power core if visible
+        if (this.powerCore && this.powerCore.material.opacity > 0) {
+            // Pulse core
+            const corePulse = 0.5 + Math.sin(time * 5) * 0.3;
+            this.powerCore.material.opacity = this.coreVisibility * corePulse;
+            
+            // Pulse core light
+            if (this.coreLight) {
+                this.coreLight.intensity = this.coreVisibility * 2 * corePulse;
+            }
+        }
+        
+        // Pulse main glow light
+        if (this.glowLight) {
+            const glowPulse = 0.7 + Math.sin(time * 1.5) * 0.3;
+            this.glowLight.intensity = glowPulse;
+        }
+    }
+    
+    // Override takeDamage to reveal power core when damaged
+    takeDamage(amount) {
+        // Call parent method first
+        const died = super.takeDamage(amount);
+        
+        // Calculate health percentage
+        const healthPercent = this.health / this.maxHealth;
+        
+        // Set visibility of power core based on damage
+        // The more damaged, the more visible
+        this.coreVisibility = 1 - healthPercent;
+        
+        // Update power core visibility
+        if (this.powerCore && this.powerCore.material) {
+            this.powerCore.material.opacity = this.coreVisibility * 0.7; // Base opacity
+            
+            // Update core light
+            if (this.coreLight) {
+                this.coreLight.intensity = this.coreVisibility * 2;
+            }
+        }
+        
+        // Make body material more transparent as damage increases
+        if (this.bodyMesh && this.bodyMesh.material) {
+            // Make body semi-transparent when very damaged
+            if (healthPercent < 0.3) {
+                this.bodyMesh.material.transparent = true;
+                this.bodyMesh.material.opacity = 0.3 + healthPercent * 0.7;
+            }
+        }
+        
+        return died;
     }
     
     // Override the performRangedAttack method to implement shotgun-style attack
@@ -342,6 +689,47 @@ export class KingCylindar extends Enemy {
         animate();
     }
     
+    // Create a simple firing effect for individual projectiles
+    createProjectileFiringEffect(position) {
+        // Simple effect to avoid creating too many objects
+        const flashGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({
+            color: 0x66ccff,
+            transparent: true,
+            opacity: 0.6
+        });
+        
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
+        
+        // Simple animation
+        const duration = 0.2; // 200ms
+        const startTime = performance.now();
+        
+        const animate = () => {
+            const now = performance.now();
+            const elapsed = (now - startTime) / 1000; // to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Expand and fade
+            const scale = 1 + progress * 2;
+            flash.scale.set(scale, scale, scale);
+            flash.material.opacity = 0.6 * (1 - progress);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Clean up
+                this.scene.remove(flash);
+                if (flash.material) flash.material.dispose();
+                if (flash.geometry) flash.geometry.dispose();
+            }
+        };
+        
+        animate();
+    }
+    
     // Enhanced ranged attack sound
     playEnhancedRangedAttackSound() {
         try {
@@ -424,6 +812,17 @@ export class KingCylindar extends Enemy {
             // Update glow light
             if (this.glowLight) {
                 this.glowLight.intensity = (1 - progress) * 2;
+            }
+            
+            // Update power core - make it pulse faster before exploding
+            if (this.powerCore && this.powerCore.material) {
+                const corePulse = 1 + Math.sin(progress * Math.PI * 20) * (1 - progress) * 0.5;
+                this.powerCore.material.opacity = (1 - progress * 0.5) * corePulse;
+            }
+            
+            if (this.coreLight) {
+                const coreLightPulse = 2 + Math.sin(progress * Math.PI * 20) * (1 - progress);
+                this.coreLight.intensity = (1 - progress * 0.7) * coreLightPulse;
             }
             
             if (progress < 1) {
@@ -572,141 +971,4 @@ export class KingCylindar extends Enemy {
             }
         });
         document.dispatchEvent(event);
-    }
-    
-    // Override the drop mana orb method for a more impressive orb
-    dropManaOrb() {
-        // Calculate mana amount - always high for King Cylindar
-        const manaAmount = Math.floor(Math.random() * 
-            (this.manaDrop.max - this.manaDrop.min + 1)) + this.manaDrop.min;
-        
-        // Create larger mana orb mesh
-        const orbGeometry = new THREE.SphereGeometry(0.8, 16, 16); // Twice as large
-        const orbMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3366ff,
-            emissive: 0x3366ff,
-            emissiveIntensity: 0.8, // Brighter
-            metalness: 0.7,
-            roughness: 0.3,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
-        
-        // Position the orb at the enemy's death location, slightly elevated
-        orbMesh.position.copy(this.group.position);
-        orbMesh.position.y = 1.0; // Higher floating position
-        
-        // Add enhanced glow effect
-        const glowGeometry = new THREE.SphereGeometry(1.2, 16, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: 0x3366ff,
-            transparent: true,
-            opacity: 0.4,
-            side: THREE.BackSide
-        });
-        
-        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        orbMesh.add(glowMesh);
-        
-        // Add stronger point light to make it glow more
-        const orbLight = new THREE.PointLight(0x3366ff, 2.5, 6);
-        orbLight.position.set(0, 0, 0);
-        orbMesh.add(orbLight);
-        
-        // Add userData to identify this as a mana orb and store mana amount
-        orbMesh.userData = {
-            isManaOrb: true,
-            manaAmount: manaAmount,
-            isKingOrb: true // Flag to identify this as a special orb
-        };
-        
-        // Add to scene
-        this.scene.add(orbMesh);
-        
-        // Add a collider for the orb
-        if (this.collisionManager) {
-            const colliderIndex = this.collisionManager.addCollider(orbMesh);
-            
-            // Tag this collider as a mana orb
-            if (this.collisionManager.colliders[colliderIndex]) {
-                this.collisionManager.colliders[colliderIndex].isManaOrb = true;
-                this.collisionManager.colliders[colliderIndex].manaAmount = manaAmount;
-                this.collisionManager.colliders[colliderIndex].isKingOrb = true;
-            }
         }
-        
-        // Add enhanced animation for the king's orb
-        this.animateKingManaOrb(orbMesh);
-        
-        console.log(`Dropped king mana orb containing ${manaAmount} mana`);
-    }
-    
-    // Enhanced animation for king's mana orb
-    animateKingManaOrb(orbMesh) {
-        // Make the orb bob up and down with more dramatic movement
-        const startY = orbMesh.position.y;
-        const floatHeight = 0.5; // More vertical movement
-        const floatSpeed = 1.0; // Slower, more majestic movement
-        
-        // Make orb pulse
-        const pulseSpeed = 1.5;
-        
-        // If we already have an animation system, use it
-        if (!window.animatedKingOrbs) {
-            window.animatedKingOrbs = [];
-            
-            const animateKingOrbs = () => {
-                const orbs = window.animatedKingOrbs;
-                if (orbs && orbs.length > 0) {
-                    const time = performance.now() * 0.001;
-                    
-                    for (const orb of orbs) {
-                        // Enhanced bobbing motion
-                        orb.position.y = orb.userData.startY + 
-                            Math.sin(time * orb.userData.floatSpeed) * orb.userData.floatHeight;
-                        
-                        // Rotate slowly with fluctuations
-                        orb.rotation.y += 0.01 + Math.sin(time * 0.5) * 0.005;
-                        orb.rotation.x = Math.sin(time * 0.3) * 0.1;
-                        
-                        // Pulse glow with composite wave for more interesting effect
-                        if (orb.children && orb.children[0]) {
-                            const glow = orb.children[0];
-                            const pulseScale = 1 + (
-                                Math.sin(time * orb.userData.pulseSpeed) * 0.2 + 
-                                Math.sin(time * orb.userData.pulseSpeed * 1.3) * 0.1
-                            );
-                            glow.scale.set(pulseScale, pulseScale, pulseScale);
-                        }
-                        
-                        // Pulse light with different pattern
-                        if (orb.children && orb.children[1]) {
-                            const light = orb.children[1];
-                            light.intensity = 2.5 + 
-                                Math.sin(time * orb.userData.pulseSpeed * 0.8) * 0.8 + 
-                                Math.sin(time * orb.userData.pulseSpeed * 1.2) * 0.4;
-                        }
-                    }
-                }
-                
-                requestAnimationFrame(animateKingOrbs);
-            };
-            
-            animateKingOrbs();
-        }
-        
-        // Store animation parameters with the orb
-        orbMesh.userData.startY = startY;
-        orbMesh.userData.floatHeight = floatHeight;
-        orbMesh.userData.floatSpeed = floatSpeed;
-        orbMesh.userData.pulseSpeed = pulseSpeed;
-        
-        // Add to animated king orbs
-        window.animatedKingOrbs.push(orbMesh);
-    }
-}
-
-
-            
