@@ -768,3 +768,5 @@ export class ShadowCrawler extends Enemy {
         // Add to animated shadow orbs
         window.animatedShadowOrbs.push(orbMesh);
     }
+
+}
