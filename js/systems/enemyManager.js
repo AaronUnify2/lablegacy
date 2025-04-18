@@ -530,7 +530,7 @@ export class EnemyManager {
     // SHADOW CRAWLER METHODS
     //=============================================================================
     
-    // Modified method to spawn Shadow Crawlers in a room - similar to how the central room works
+    // Method to handle Shadow Crawler spawning, with separate handling for central and cardinal rooms
     spawnShadowCrawlersInRoom(room, count = 5) {
         if (this.debug) console.log(`Spawning ${count} Shadow Crawlers in ${room.type} room at ${new Date().toISOString()}`);
         
@@ -539,6 +539,12 @@ export class EnemyManager {
         // Calculate room center
         const roomCenterX = room.x + room.width / 2;
         const roomCenterZ = room.y + room.height / 2;
+        
+        // Different spawn heights based on room type
+        const isCentralRoom = room.type === 'central';
+        // In central room, spawn them higher off the ground
+        const baseSpawnHeight = isCentralRoom ? 3.0 : 0.5;
+        const heightAboveFloor = isCentralRoom ? 2.0 : 0.5;
         
         // Spawn Shadow Crawlers in a pattern around the room
         for (let i = 0; i < count; i++) {
@@ -555,39 +561,47 @@ export class EnemyManager {
                 // Calculate angle for circular distribution
                 const angle = (i / count) * Math.PI * 2;
                 
-                // Distance from center (25% of the way to the walls)
-                const distance = Math.min(room.width, room.height) * 0.25;
+                // Distance from center (different percentages for central vs cardinal)
+                const distancePercent = isCentralRoom ? 0.25 : 0.3; // 25% for central, 30% for cardinal
+                const distance = Math.min(room.width, room.height) * distancePercent;
                 
                 // Calculate position
                 spawnX = roomCenterX + Math.cos(angle) * distance;
                 spawnZ = roomCenterZ + Math.sin(angle) * distance;
             }
             
-            // Create spawn position - Start higher for better visibility and collision avoidance
-            const spawnPos = new THREE.Vector3(spawnX, 1.5, spawnZ);
+            // Create spawn position with appropriate starting height
+            const spawnPos = new THREE.Vector3(spawnX, baseSpawnHeight, spawnZ);
             
             // Find floor beneath the position
             if (this.collisionManager) {
                 const floorHit = this.collisionManager.findFloorBelow(spawnPos, 10);
                 if (floorHit && floorHit.point) {
-                    spawnPos.y = floorHit.point.y + 1.0; // Position above floor
+                    spawnPos.y = floorHit.point.y + heightAboveFloor; // Position above floor
                     if (this.debug) console.log(`Found floor at y: ${floorHit.point.y}, positioning at ${spawnPos.y}`);
                 }
             }
             
             // Always ensure minimum height
-            spawnPos.y = Math.max(spawnPos.y, 1.0);
+            spawnPos.y = Math.max(spawnPos.y, heightAboveFloor);
             
-            // Ensure position is valid
+            // Ensure position is valid - larger collision check for central room
             let validPosition = true;
             if (this.collisionManager) {
-                const collision = this.collisionManager.checkCollision(spawnPos, 1.0);
+                const collisionRadius = isCentralRoom ? 2.0 : 0.6;
+                const collision = this.collisionManager.checkCollision(spawnPos, collisionRadius);
                 if (collision.collides) {
-                    // If collision, try raising the position
-                    spawnPos.y += 1.0;
+                    // If collision, try adjusting the position
+                    spawnPos.x += (Math.random() - 0.5) * 2;
+                    spawnPos.z += (Math.random() - 0.5) * 2;
+                    
+                    if (isCentralRoom) {
+                        // In central room, also try raising higher
+                        spawnPos.y += 1.0;
+                    }
                     
                     // Check again
-                    const newCollision = this.collisionManager.checkCollision(spawnPos, 1.0);
+                    const newCollision = this.collisionManager.checkCollision(spawnPos, collisionRadius);
                     if (newCollision.collides) {
                         validPosition = false;
                         if (this.debug) console.log(`Could not find valid position for Shadow Crawler ${i}`);
