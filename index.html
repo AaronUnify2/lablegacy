@@ -2,39 +2,35 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Labyrinth Legacy</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles/main.css">
 </head>
 <body>
     <div id="game-container">
-        <div id="loading-screen">
-            <div class="loading-content">
-                <h1>Labyrinth Legacy</h1>
-                <div class="spinner"></div>
-                <p>Loading...</p>
+        <canvas id="game-canvas"></canvas>
+        <div id="ui-container">
+            <div id="health-container">
+                <div class="stat-label">HEALTH</div>
+                <div id="health-bar">
+                    <div id="health-fill"></div>
+                </div>
+            </div>
+            <div id="floor-info">Floor: <span id="floor-number">1</span></div>
+            <div id="weapon-info">
+                <div class="weapon-name">Sword</div>
+                <div class="weapon-durability">Durability: <span id="durability-value">100</span>%</div>
             </div>
         </div>
-        <div id="hud">
-            <div id="fps-counter">FPS: 60</div>
-            <div id="position-info">Position: X: 0, Y: 0, Z: 0</div>
-        </div>
-        <div id="touch-controls">
-            <!-- Touch controls will be generated dynamically -->
+        <div id="minimap-container">
+            <canvas id="minimap-canvas"></canvas>
         </div>
     </div>
 
-    <!-- Third-party libraries -->
+    <!-- Import Three.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <!-- Engine modules -->
-    <script src="js/engine/renderer.js" type="module"></script>
-    <script src="js/engine/input.js" type="module"></script>
-    
-    <!-- Game systems -->
-    <script src="js/systems/dungeonGenerator.js" type="module"></script>
-    
-    <!-- Main game -->
-    <script src="js/main.js" type="module"></script>
+    <!-- Main script - type module enables ES6 import/export -->
+    <script type="module" src="src/main.js"></script>
 </body>
 </html>
