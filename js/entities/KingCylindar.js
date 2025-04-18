@@ -971,5 +971,182 @@ export class KingCylindar extends Enemy {
             }
         });
         document.dispatchEvent(event);
+    }
+    
+    // Override the drop mana orb method for a more impressive orb
+    dropManaOrb() {
+        // Calculate mana amount - always high for King Cylindar
+        const manaAmount = Math.floor(Math.random() * 
+            (this.manaDrop.max - this.manaDrop.min + 1)) + this.manaDrop.min;
+        
+        // Create larger mana orb mesh
+        const orbGeometry = new THREE.SphereGeometry(0.8, 16, 16); // Twice as large
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3366ff,
+            emissive: 0x3366ff,
+            emissiveIntensity: 0.8, // Brighter
+            metalness: 0.7,
+            roughness: 0.3,
+            transparent: true,
+            opacity: 0.9
+        });
+        
+        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
+        
+        // Position the orb at the enemy's death location, slightly elevated
+        orbMesh.position.copy(this.group.position);
+        orbMesh.position.y = 1.0; // Higher floating position
+        
+        // Add enhanced glow effect
+        const glowGeometry = new THREE.SphereGeometry(1.2, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3366ff,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.BackSide
+        });
+        
+        const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        orbMesh.add(glowMesh);
+        
+        // Add stronger point light to make it glow more
+        const orbLight = new THREE.PointLight(0x3366ff, 2.5, 6);
+        orbLight.position.set(0, 0, 0);
+        orbMesh.add(orbLight);
+        
+        // NEW: Add multi-colored orbiting particles
+        const particleCount = 5;
+        const particleColors = [0xff3366, 0x33ff66, 0x66ccff];
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particleSize = 0.1 + Math.random() * 0.1;
+            const particleGeometry = new THREE.SphereGeometry(particleSize, 8, 8);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: particleColors[i % particleColors.length],
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Create orbit container
+            const orbitContainer = new THREE.Object3D();
+            orbitContainer.add(particle);
+            
+            // Position particle away from center
+            particle.position.set(0.5 + i * 0.1, 0, 0);
+            
+            // Set random rotation for orbit container
+            orbitContainer.rotation.x = Math.random() * Math.PI;
+            orbitContainer.rotation.y = Math.random() * Math.PI;
+            
+            // Add to orb
+            orbMesh.add(orbitContainer);
+            
+            // Store animation data
+            orbitContainer.userData = {
+                rotationSpeed: 0.5 + Math.random() * 1.0
+            };
         }
+        
+        // Add userData to identify this as a mana orb and store mana amount
+        orbMesh.userData = {
+            isManaOrb: true,
+            manaAmount: manaAmount,
+            isKingOrb: true // Flag to identify this as a special orb
+        };
+        
+        // Add to scene
+        this.scene.add(orbMesh);
+        
+        // Add a collider for the orb
+        if (this.collisionManager) {
+            const colliderIndex = this.collisionManager.addCollider(orbMesh);
+            
+            // Tag this collider as a mana orb
+            if (this.collisionManager.colliders[colliderIndex]) {
+                this.collisionManager.colliders[colliderIndex].isManaOrb = true;
+                this.collisionManager.colliders[colliderIndex].manaAmount = manaAmount;
+                this.collisionManager.colliders[colliderIndex].isKingOrb = true;
+            }
+        }
+        
+        // Add enhanced animation for the king's orb
+        this.animateKingManaOrb(orbMesh);
+        
+        console.log(`Dropped king mana orb containing ${manaAmount} mana`);
+    }
+    
+    // Enhanced animation for king's mana orb
+    animateKingManaOrb(orbMesh) {
+        // Make the orb bob up and down with more dramatic movement
+        const startY = orbMesh.position.y;
+        const floatHeight = 0.5; // More vertical movement
+        const floatSpeed = 1.0; // Slower, more majestic movement
+        
+        // Make orb pulse
+        const pulseSpeed = 1.5;
+        
+        // If we already have an animation system, use it
+        if (!window.animatedKingOrbs) {
+            window.animatedKingOrbs = [];
+            
+            const animateKingOrbs = () => {
+                const orbs = window.animatedKingOrbs;
+                if (orbs && orbs.length > 0) {
+                    const time = performance.now() * 0.001;
+                    
+                    for (const orb of orbs) {
+                        // Enhanced bobbing motion
+                        orb.position.y = orb.userData.startY + 
+                            Math.sin(time * orb.userData.floatSpeed) * orb.userData.floatHeight;
+                        
+                        // Rotate slowly with fluctuations
+                        orb.rotation.y += 0.01 + Math.sin(time * 0.5) * 0.005;
+                        orb.rotation.x = Math.sin(time * 0.3) * 0.1;
+                        
+                        // Pulse glow with composite wave for more interesting effect
+                        if (orb.children && orb.children[0]) {
+                            const glow = orb.children[0];
+                            const pulseScale = 1 + (
+                                Math.sin(time * orb.userData.pulseSpeed) * 0.2 + 
+                                Math.sin(time * orb.userData.pulseSpeed * 1.3) * 0.1
+                            );
+                            glow.scale.set(pulseScale, pulseScale, pulseScale);
+                        }
+                        
+                        // Pulse light with different pattern
+                        if (orb.children && orb.children[1]) {
+                            const light = orb.children[1];
+                            light.intensity = 2.5 + 
+                                Math.sin(time * orb.userData.pulseSpeed * 0.8) * 0.8 + 
+                                Math.sin(time * orb.userData.pulseSpeed * 1.2) * 0.4;
+                        }
+                        
+                        // Animate orbiting particles
+                        for (let i = 2; i < orb.children.length; i++) {
+                            const orbitContainer = orb.children[i];
+                            if (orbitContainer && orbitContainer.userData) {
+                                orbitContainer.rotation.y += orbitContainer.userData.rotationSpeed * 0.01;
+                                orbitContainer.rotation.x += orbitContainer.userData.rotationSpeed * 0.005;
+                            }
+                        }
+                    }
+                }
+                
+                requestAnimationFrame(animateKingOrbs);
+            };
+            
+            animateKingOrbs();
+        }
+        
+        // Store animation parameters with the orb
+        orbMesh.userData.startY = startY;
+        orbMesh.userData.floatHeight = floatHeight;
+        orbMesh.userData.floatSpeed = floatSpeed;
+        orbMesh.userData.pulseSpeed = pulseSpeed;
+        
+        // Add to animated king orbs
+        window.animatedKingOrbs.push(orbMesh);
+    }
 }
