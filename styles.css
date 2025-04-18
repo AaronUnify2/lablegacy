@@ -1,4 +1,4 @@
-/* Correct body and html styles */
+/* ===================== Base styles ===================== */
 * {
     margin: 0;
     padding: 0;
@@ -13,7 +13,6 @@ body, html {
     font-family: 'Cinzel', serif; 
     background-color: #000;
 }
-
 
 @font-face {
     font-family: 'Cinzel';
@@ -32,7 +31,7 @@ canvas {
     height: 100%;
 }
 
-/* Enhanced Loading Screen */
+/* ===================== Loading Screen ===================== */
 #loading-screen {
     position: absolute;
     width: 100%;
@@ -114,7 +113,7 @@ canvas {
     }
 }
 
-/* HUD with atmospheric styling */
+/* ===================== HUD Elements ===================== */
 #hud {
     position: absolute;
     top: 20px;
@@ -142,7 +141,7 @@ canvas {
     letter-spacing: 1px;
 }
 
-/* Health Display - Moved to top of screen with enhanced visibility */
+/* ===================== Health Display ===================== */
 #health-display {
     position: absolute;
     top: 20px;
@@ -163,7 +162,6 @@ canvas {
     background: rgba(0, 0, 0, 0.6);
 }
 
-/* Health bar styling */
 #health-bar {
     width: 200px;
     height: 15px;
@@ -199,9 +197,7 @@ canvas {
     100% { opacity: 0.8; box-shadow: 0 0 5px rgba(255, 0, 0, 0.5); }
 }
 
-/* Add these styles to your styles.css file */
-
-/* Mana Display */
+/* ===================== Mana Display ===================== */
 #mana-display {
     position: absolute;
     top: 60px; /* Position below health display */
@@ -222,7 +218,6 @@ canvas {
     background: rgba(0, 0, 0, 0.6);
 }
 
-/* Mana bar styling */
 #mana-bar {
     width: 200px;
     height: 15px;
@@ -274,61 +269,7 @@ canvas {
     animation: mana-pulse 0.5s infinite alternate !important;
 }
 
-/* Low mana message styling */
-.low-mana-message {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: #3366ff;
-    font-family: 'Cinzel', serif;
-    font-size: 1.5rem;
-    text-shadow: 0 0 10px rgba(51, 102, 255, 0.7);
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 10px 20px;
-    border-radius: 5px;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-}
-
-/* Mana collection message styling */
-.mana-collect-message {
-    color: #66aaff;
-    text-shadow: 0 0 8px rgba(51, 102, 255, 0.8);
-    font-weight: bold;
-}
-
-/* Responsive adjustments */
-@media (max-width: 800px) {
-    #mana-bar {
-        width: 150px;
-    }
-}
-
-@media (max-width: 600px) {
-    #mana-bar {
-        width: 120px;
-    }
-    
-    #mana-text {
-        font-size: 0.9rem;
-        min-width: 50px;
-    }
-}
-
-@media (max-width: 400px) {
-    #mana-bar {
-        width: 100px;
-    }
-    
-    #mana-text {
-        font-size: 0.8rem;
-        min-width: 45px;
-    }
-}
-
-/* Stamina Display */
+/* ===================== Stamina Display ===================== */
 #stamina-display {
     position: absolute;
     top: 100px; /* Position below health and mana displays */
@@ -349,7 +290,6 @@ canvas {
     background: rgba(0, 0, 0, 0.6);
 }
 
-/* Stamina bar styling */
 #stamina-bar {
     width: 200px;
     height: 15px;
@@ -401,45 +341,7 @@ canvas {
     animation: stamina-pulse 0.5s infinite alternate !important;
 }
 
-/* Responsive adjustments */
-@media (max-width: 800px) {
-    #stamina-bar {
-        width: 150px;
-    }
-}
-
-@media (max-width: 600px) {
-    #stamina-bar {
-        width: 120px;
-    }
-    
-    #stamina-text {
-        font-size: 0.9rem;
-        min-width: 50px;
-    }
-    
-    #stamina-display {
-        top: 95px;
-    }
-}
-
-@media (max-width: 400px) {
-    #stamina-bar {
-        width: 100px;
-    }
-    
-    #stamina-text {
-        font-size: 0.8rem;
-        min-width: 45px;
-    }
-    
-    #stamina-display {
-        top: 90px;
-    }
-}
-
-
-/* Touch Controls - Container styling */
+/* ===================== Touch Controls ===================== */
 #touch-controls {
     position: fixed;
     bottom: 0;
@@ -473,7 +375,7 @@ canvas {
     pointer-events: none;
 }
 
-/* Control grid - positioned on the right side and shifted 20px left */
+/* Control grid - positioned on the right side */
 .control-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -483,7 +385,7 @@ canvas {
     height: 130px;
     position: relative;
     bottom: 20px;
-    right: 20px; /* Shift 20px to the left (by adding negative right offset) */
+    right: 20px; /* Shift 20px to the left */
     pointer-events: none;
 }
 
@@ -523,16 +425,6 @@ canvas {
     background: radial-gradient(circle at 30% 30%, #222, #111);
 }
 
-/* Movement buttons - blue theme */
-.control-button[id^="move"] {
-    background: radial-gradient(circle at 30% 30%, #161833, #090918);
-    border-color: #3344aa;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(50, 100, 255, 0.3);
-}
-
 /* Camera buttons - red theme */
 .control-button[id^="camera"] {
     background: radial-gradient(circle at 30% 30%, #331818, #180909);
@@ -541,16 +433,6 @@ canvas {
                 0 4px 0 rgba(0, 0, 0, 0.8),
                 inset 0 0 10px rgba(0, 0, 0, 0.5),
                 0 0 15px rgba(255, 50, 50, 0.3);
-}
-
-/* Zoom buttons - purple theme */
-.control-button[id^="zoom"] {
-    background: radial-gradient(circle at 30% 30%, #231833, #13091d);
-    border-color: #7722aa;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(150, 50, 255, 0.3);
 }
 
 /* Jump button - green theme */
@@ -567,7 +449,7 @@ canvas {
                 0 0 15px rgba(50, 255, 100, 0.3) !important;
 }
 
-/* Attack button - purple fire theme */
+/* Staff attack button - purple theme */
 #attack {
     background: radial-gradient(circle at 30% 30%, #330033, #220022) !important;
     border-color: #aa33aa !important;
@@ -580,14 +462,6 @@ canvas {
                 inset 0 0 10px rgba(0, 0, 0, 0.5),
                 0 0 15px rgba(255, 100, 255, 0.4) !important;
     animation: pulse-attack 2s infinite alternate;
-}
-
-#attack.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(255, 100, 255, 0.7) !important;
 }
 
 @keyframes pulse-attack {
@@ -603,655 +477,3 @@ canvas {
                     inset 0 0 10px rgba(0, 0, 0, 0.5),
                     0 0 15px rgba(255, 100, 255, 0.6);
     }
-    100% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(255, 100, 255, 0.4);
-    }
-}
-
-/* Active state for buttons - glowing effect */
-.control-button.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(100, 150, 255, 0.5);
-    filter: brightness(1.5);
-}
-
-/* Glow effect for buttons when hovered/touched */
-.control-button:hover {
-    filter: brightness(1.2);
-}
-
-/* Joystick base styling */
-.joystick-base {
-    position: absolute;
-    width: 130px;
-    height: 130px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(30, 50, 120, 0.6), rgba(10, 20, 50, 0.8));
-    border: 2px solid rgba(100, 150, 255, 0.4);
-    box-shadow: 0 0 10px rgba(0, 30, 100, 0.8) inset, 0 0 15px rgba(50, 100, 255, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    pointer-events: auto;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-    user-select: none;
-}
-
-.joystick-handle {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, rgba(80, 100, 200, 0.7), rgba(40, 60, 150, 0.9));
-    border: 2px solid rgba(150, 200, 255, 0.6);
-    box-shadow: 0 0 5px rgba(100, 150, 255, 0.8), 0 0 10px rgba(0, 50, 200, 0.5) inset;
-    transform: translate(0, 0);
-    transition: transform 0.1s ease-out;
-    pointer-events: none;
-    animation: pulse-handle 2s infinite;
-}
-
-/* Active state for the joystick */
-.joystick-base:active .joystick-handle {
-    box-shadow: 0 0 10px rgba(150, 200, 255, 0.9), 0 0 15px rgba(0, 80, 255, 0.8) inset;
-    background: radial-gradient(circle at 30% 30%, rgba(100, 150, 255, 0.8), rgba(60, 100, 200, 0.9));
-    animation: none;
-}
-
-/* Add pulsing effect to joystick handle when not active */
-@keyframes pulse-handle {
-    0% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-    50% { box-shadow: 0 0 8px rgba(100, 150, 255, 0.8), 0 0 12px rgba(0, 50, 200, 0.6) inset; }
-    100% { box-shadow: 0 0 5px rgba(100, 150, 255, 0.6), 0 0 8px rgba(0, 50, 200, 0.4) inset; }
-}
-
-/* Light toggle button styling */
-#toggle-light {
-    background: radial-gradient(circle at 30% 30%, #334466, #141833) !important;
-    border-color: #557799 !important;
-    color: #aaccff;
-    font-size: 24px !important;
-    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(51, 102, 255, 0.4) !important;
-    animation: pulse-light 3s infinite alternate;
-}
-
-#toggle-light.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(100, 150, 255, 0.7) !important;
-}
-
-@keyframes pulse-light {
-    0% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(51, 102, 255, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 15px rgba(51, 102, 255, 0.6);
-    }
-    100% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(51, 102, 255, 0.4);
-    }
-}
-
-/* Sword button styling */
-.sword-button {
-    background: radial-gradient(circle at 30% 30%, #664433, #442211) !important;
-    border-color: #aa7755 !important;
-    color: #ffddbb;
-    font-size: 14px !important;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(255, 221, 187, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(170, 119, 85, 0.4) !important;
-    animation: pulse-sword 2s infinite alternate;
-}
-
-.sword-button.active {
-    transform: translateY(3px);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 1px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.7),
-                0 0 20px rgba(170, 119, 85, 0.7) !important;
-}
-
-@keyframes pulse-sword {
-    0% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(170, 119, 85, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 15px rgba(170, 119, 85, 0.6);
-    }
-    100% {
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 4px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 10px rgba(0, 0, 0, 0.5),
-                    0 0 8px rgba(170, 119, 85, 0.4);
-    }
-}
-
-/* Staff button styling */
-.staff-button {
-    background: radial-gradient(circle at 30% 30%, #334466, #112244) !important;
-    border-color: #3366aa !important;
-    color: #aaccff;
-    font-size: 14px !important;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(170, 204, 255, 0.8);
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                0 4px 0 rgba(0, 0, 0, 0.8),
-                inset 0 0 10px rgba(0, 0, 0, 0.5),
-                0 0 15px rgba(51, 102, 255, 0.4) !important;
-}
-
-/* Improved responsive adjustments */
-@media (max-width: 800px) {
-    .control-button {
-        width: 65px;
-        height: 65px;
-        font-size: 20px;
-    }
-    
-    .control-grid {
-        width: 150px;
-        height: 150px;
-    }
-    
-    .loading-content h1 {
-        font-size: 2.5rem;
-    }
-    
-    #health-bar {
-        width: 150px;
-    }
-}
-
-@media (max-width: 600px) {
-    .joystick-container {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .joystick-base {
-        width: 110px;
-        height: 110px;
-    }
-    
-    .control-grid {
-        width: 140px;
-        height: 140px;
-    }
-    
-    .control-button {
-        width: 55px;
-        height: 55px;
-        font-size: 18px;
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 3px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 8px rgba(0, 0, 0, 0.5);
-    }
-    
-    .jump-button {
-        font-size: 14px !important;
-    }
-    
-    .control-button.active {
-        transform: translateY(2px);
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 1px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 8px rgba(0, 0, 0, 0.7);
-    }
-    
-    #health-bar {
-        width: 120px;
-    }
-    
-    #health-text {
-        font-size: 0.9rem;
-        min-width: 50px;
-    }
-}
-
-@media (max-width: 400px) {
-    .controls-container {
-        padding: 5px;
-    }
-    
-    .joystick-container {
-        width: 90px;
-        height: 90px;
-        bottom: 15px;
-    }
-    
-    .joystick-base {
-        width: 90px;
-        height: 90px;
-    }
-    
-    .joystick-handle {
-        width: 40px;
-        height: 40px;
-    }
-    
-    .control-grid {
-        width: 130px;
-        height: 130px;
-        bottom: 15px;
-    }
-    
-    .control-button {
-        width: 45px;
-        height: 45px;
-        font-size: 14px;
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 3px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 6px rgba(0, 0, 0, 0.5);
-    }
-    
-    .jump-button {
-        font-size: 12px !important;
-    }
-    
-    .control-button.active {
-        transform: translateY(2px);
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.8), 
-                    0 1px 0 rgba(0, 0, 0, 0.8),
-                    inset 0 0 6px rgba(0, 0, 0, 0.7);
-    }
-    
-    .loading-content h1 {
-        font-size: 1.8rem;
-    }
-    
-    .lore-text {
-        font-size: 0.9rem;
-    }
-    
-    #health-bar {
-        width: 100px;
-    }
-    
-    #health-text {
-        font-size: 0.8rem;
-        min-width: 45px;
-    }
-}
-
-/* Show touch controls on mobile devices */
-@media (max-width: 1024px), (pointer: coarse) {
-    #touch-controls {
-        display: flex;
-    }
-}
-
-/* Custom animation for the cursed atmosphere */
-.curse-pulse {
-    animation: cursePulse 4s infinite alternate ease-in-out;
-}
-
-@keyframes cursePulse {
-    0% { filter: brightness(1) blur(0); }
-    50% { filter: brightness(0.7) blur(1px); }
-    100% { filter: brightness(1) blur(0); }
-}
-
-/* Visual curse effect overlay */
-.curse-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 5;
-    background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 40, 0.3) 100%);
-    opacity: 0.4;
-    mix-blend-mode: multiply;
-}
-
-
-/* Scanlines effect for retro/cursed feel */
-.scanlines {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-        to bottom,
-        transparent 50%,
-        rgba(0, 0, 0, 0.1) 50%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0.1;
-    mix-blend-mode: overlay
-    mix-blend-mode: overlay;
-}
-
-/* Death Screen */
-#death-screen {
-    background: radial-gradient(circle at center, rgba(50, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%);
-}
-
-#death-screen button {
-    transition: all 0.3s ease;
-}
-
-#death-screen button:hover {
-    background-color: #500;
-    transform: scale(1.05);
-    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-/* Enemy styles */
-.enemy-health-bar {
-    transition: opacity 0.3s ease;
-}
-
-/* Staff attack effect */
-.attack-effect {
-    pointer-events: none;
-}
-
-/* Damage flash effect */
-.damage-flash {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 0, 0, 0.3);
-    pointer-events: none;
-    z-index: 9;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.damage-flash.active {
-    opacity: 0.8;
-    animation: damageFlash 0.5s forwards;
-}
-
-@keyframes damageFlash {
-    0% { opacity: 0.8; }
-    100% { opacity: 0; }
-}
-
-/* Enemy spawn effect */
-.spawn-effect {
-    pointer-events: none;
-}
-
-/* Crosshair styles */
-.crosshair {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 20px;
-    height: 20px;
-    pointer-events: none;
-    z-index: 100;
-    transition: all 0.1s ease;
-}
-
-.crosshair-circle {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: 2px solid rgba(255, 255, 255, 0.7);
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
-}
-
-.crosshair-dot {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 4px;
-    height: 4px;
-    background-color: rgba(255, 255, 255, 0.9);
-    border-radius: 50%;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
-}
-
-.crosshair.target-acquired .crosshair-circle {
-    border-color: rgba(255, 100, 100, 0.9);
-    box-shadow: 0 0 5px rgba(255, 0, 0, 0.5);
-}
-
-.crosshair.target-acquired .crosshair-dot {
-    background-color: rgba(255, 100, 100, 0.9);
-    box-shadow: 0 0 2px rgba(255, 0, 0, 0.7);
-}
-
-/* Crosshair styles for different weapon targets */
-.crosshair.sword-target .crosshair-circle {
-    border-color: rgba(255, 200, 100, 0.9);
-    box-shadow: 0 0 5px rgba(255, 150, 0, 0.5);
-}
-
-.crosshair.sword-target .crosshair-dot {
-    background-color: rgba(255, 200, 100, 0.9);
-    box-shadow: 0 0 2px rgba(255, 150, 0, 0.7);
-}
-
-.crosshair.staff-target .crosshair-circle {
-    border-color: rgba(100, 150, 255, 0.9);
-    box-shadow: 0 0 5px rgba(0, 100, 255, 0.5);
-}
-
-.crosshair.staff-target .crosshair-dot {
-    background-color: rgba(100, 150, 255, 0.9);
-    box-shadow: 0 0 2px rgba(0, 100, 255, 0.7);
-}
-
-/* Swipe indicator - only shown when swipe is active */
-.swipe-indicator {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 10px rgba(51, 102, 255, 0.3);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    z-index: 15;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.swipe-indicator::after {
-    content: "";
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(51, 102, 255, 0.5), rgba(100, 150, 255, 0.8));
-    box-shadow: 0 0 8px rgba(51, 102, 255, 0.6);
-}
-
-.swipe-indicator.active {
-    opacity: 0.7;
-}
-
-/* Instructions message for first-time users */
-.swipe-instructions {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.7);
-    border: 1px solid rgba(51, 102, 255, 0.5);
-    border-radius: 8px;
-    padding: 12px 20px;
-    color: white;
-    font-family: 'Cinzel', serif;
-    text-align: center;
-    max-width: 80%;
-    box-shadow: 0 0 15px rgba(0, 0, 30, 0.8);
-    pointer-events: none;
-    z-index: 90;
-    opacity: 0;
-    transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-.swipe-instructions.show {
-    opacity: 1;
-    animation: fadeInstructions 5s forwards;
-}
-
-@keyframes fadeInstructions {
-    0%, 70% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
-/* Highlight touch area - helps users know where to swipe */
-.touch-area-highlight {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 70%; /* Only cover the top portion of the screen, leaving controls free */
-    background: linear-gradient(to bottom, 
-                rgba(51, 102, 255, 0.05) 0%,
-                rgba(51, 102, 255, 0.02) 70%,
-                rgba(51, 102, 255, 0) 100%);
-    pointer-events: none;
-    z-index: 5;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-}
-
-.touch-area-highlight.show {
-    opacity: 1;
-    animation: pulseHighlight 2s ease-in-out 2, fadeOut 1s ease-in-out 4s forwards;
-}
-
-@keyframes pulseHighlight {
-    0%, 100% { opacity: 0.1; }
-    50% { opacity: 0.3; }
-}
-
-@keyframes fadeOut {
-    0% { opacity: 0.1; }
-    100% { opacity: 0; }
-}
-
-/* Add these styles to styles.css to enhance Shadow Crawler effects */
-
-/* Shadow Crawler specific effects */
-.shadow-attack-effect {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at center, transparent 70%, rgba(102, 255, 153, 0.1) 100%);
-    pointer-events: none;
-    z-index: 7;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.shadow-attack-effect.active {
-    opacity: 1;
-    animation: shadowAttackPulse 0.3s forwards;
-}
-
-@keyframes shadowAttackPulse {
-    0% { opacity: 0.3; }
-    50% { opacity: 0.5; }
-    100% { opacity: 0; }
-}
-
-/* Enhanced enemy hit effect for the new enemy type */
-.enemy-hit-flash {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 0.1);
-    pointer-events: none;
-    z-index: 8;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.enemy-hit-flash.active {
-    opacity: 1;
-    animation: enemyHitFlash 0.2s forwards;
-}
-
-@keyframes enemyHitFlash {
-    0% { opacity: 0.1; }
-    50% { opacity: 0.2; }
-    100% { opacity: 0; }
-}
-
-/* Enhance neon highlight effect of the Shadow Crawlers */
-.neon-glow {
-    filter: drop-shadow(0 0 2px #66ff99);
-}
-
-.neon-glow.attack {
-    filter: drop-shadow(0 0 5px #ff00ff);
-    animation: attackFlicker 0.5s infinite alternate;
-}
-
-.neon-glow.chase {
-    filter: drop-shadow(0 0 3px #ff3366);
-}
-
-.neon-glow.climb {
-    filter: drop-shadow(0 0 4px #ffff00);
-}
-
-@keyframes attackFlicker {
-    0% { filter: drop-shadow(0 0 3px #ff00ff); }
-    100% { filter: drop-shadow(0 0 6px #ff00ff); }
-}
-
-/* Enhanced mana collection effect for shadow orbs */
-.shadow-mana-collect {
-    color: #66ff99 !important;
-    text-shadow: 0 0 8px rgba(102, 255, 153, 0.8) !important;
-}
