@@ -18,20 +18,21 @@ export function generateDungeon(floorNumber) {
     // Create empty dungeon
     const dungeon = new Dungeon(floorNumber, size, theme);
     
-    // Generate rooms using BSP (Binary Space Partitioning)
-    generateRoomsBSP(dungeon, size);
+    // Generate rooms using our new radial pattern instead of BSP
+    const centerRoom = generateRadialRooms(dungeon, size);
     
     // Assign heights to rooms
     assignRoomHeights(dungeon, floorNumber);
-    
-    // Create corridors to connect rooms
-    connectRooms(dungeon);
     
     // Place key and exit
     placeKeyAndExit(dungeon);
     
     // Add decorative elements
     addDecorations(dungeon, theme);
+    
+    // Set player spawn in the center room
+    const spawnPosition = centerRoom.getCenter();
+    dungeon.setPlayerSpawnPosition(spawnPosition.x, spawnPosition.y + 0.5, spawnPosition.z);
     
     // Build the dungeon mesh
     dungeon.buildMesh();
@@ -64,112 +65,318 @@ function determineDungeonSize(floorNumber) {
     }
 }
 
-// Generate rooms using Binary Space Partitioning algorithm
-function generateRoomsBSP(dungeon, size) {
-    // Start with a single area covering the entire dungeon
-    const areas = [{
-        x: 0,
-        z: 0,
-        width: size.width,
-        height: size.height
-    }];
+// New function to replace the BSP room generation
+// This creates a more predictable layout with a central room and radial/cardinal rooms
+function generateRadialRooms(dungeon, size) {
+    const centerX = size.width / 2;
+    const centerZ = size.height / 2;
     
-    // Split areas until we have enough for our rooms
-    while (areas.length < size.roomCount) {
-        // Find the largest area to split
-        let largestAreaIndex = 0;
-        let largestSize = 0;
+    // Room size ranges
+    const centerRoomSize = {
+        width: 12,
+        height: 12
+    };
+    
+    const radialRoomSize = {
+        minWidth: 8,
+        maxWidth: 12,
+        minHeight: 8,
+        maxHeight: 12
+    };
+    
+    const cardinalRoomSize = {
+        minWidth: 6,
+        maxWidth: 10,
+        minHeight: 6,
+        maxHeight: 10
+    };
+    
+    // Corridor sizes
+    const corridorWidth = 3;
+    
+    // Spacing between rooms
+    const roomSpacing = 6;
+    
+    // Create center room
+    const centerRoom = new Room(
+        centerX - centerRoomSize.width / 2,
+        0, // Height will be assigned later
+        centerZ - centerRoomSize.height / 2,
+        centerRoomSize.width,
+        centerRoomSize.height
+    );
+    
+    // Set this as the spawn room
+    centerRoom.isSpawnRoom = true;
+    dungeon.addRoom(centerRoom);
+    
+    // Define the positions for the radial rooms (N, S, E, W) and potential cardinal rooms (NW, NE, SW, SE)
+    const roomPositions = {
+        // Radial rooms
+        north: {
+            dirX: 0,
+            dirZ: -1,
+            angle: 0,
+            isRadial: true,
+            connected: false,
+            room: null
+        },
+        east: {
+            dirX: 1,
+            dirZ: 0,
+            angle: Math.PI / 2,
+            isRadial: true,
+            connected: false,
+            room: null
+        },
+        south: {
+            dirX: 0,
+            dirZ: 1,
+            angle: Math.PI,
+            isRadial: true,
+            connected: false,
+            room: null
+        },
+        west: {
+            dirX: -1,
+            dirZ: 0,
+            angle: Math.PI * 3 / 2,
+            isRadial: true,
+            connected: false,
+            room: null
+        },
         
-        for (let i = 0; i < areas.length; i++) {
-            const area = areas[i];
-            const areaSize = area.width * area.height;
-            
-            if (areaSize > largestSize) {
-                largestSize = areaSize;
-                largestAreaIndex = i;
-            }
+        // Cardinal rooms
+        northeast: {
+            dirX: 1,
+            dirZ: -1,
+            angle: Math.PI / 4,
+            isRadial: false,
+            connectedTo: 'north', // This room connects to the north radial room
+            connected: false,
+            room: null
+        },
+        southeast: {
+            dirX: 1,
+            dirZ: 1,
+            angle: Math.PI * 3 / 4,
+            isRadial: false,
+            connectedTo: 'east', // This room connects to the east radial room
+            connected: false,
+            room: null
+        },
+        southwest: {
+            dirX: -1,
+            dirZ: 1,
+            angle: Math.PI * 5 / 4,
+            isRadial: false,
+            connectedTo: 'south', // This room connects to the south radial room
+            connected: false,
+            room: null
+        },
+        northwest: {
+            dirX: -1,
+            dirZ: -1,
+            angle: Math.PI * 7 / 4,
+            isRadial: false,
+            connectedTo: 'west', // This room connects to the west radial room
+            connected: false,
+            room: null
         }
+    };
+    
+    // Create and place rooms
+    for (const [name, position] of Object.entries(roomPositions)) {
+        // For radial rooms, 80% chance of spawning
+        // For cardinal rooms, 50% chance of spawning if the connected radial room exists
+        let shouldSpawn = false;
         
-        const areaToSplit = areas[largestAreaIndex];
-        
-        // Decide whether to split horizontally or vertically
-        const splitHorizontally = areaToSplit.width >= areaToSplit.height;
-        
-        // Determine split position (with some randomness)
-        let splitPosition;
-        
-        if (splitHorizontally) {
-            // Split along x-axis
-            const minSplit = Math.max(areaToSplit.width * 0.3, 10);
-            const maxSplit = Math.min(areaToSplit.width * 0.7, areaToSplit.width - 10);
-            splitPosition = Math.floor(areaToSplit.x + minSplit + Math.random() * (maxSplit - minSplit));
-            
-            // Create two new areas
-            const area1 = {
-                x: areaToSplit.x,
-                z: areaToSplit.z,
-                width: splitPosition - areaToSplit.x,
-                height: areaToSplit.height
-            };
-            
-            const area2 = {
-                x: splitPosition,
-                z: areaToSplit.z,
-                width: areaToSplit.width - (splitPosition - areaToSplit.x),
-                height: areaToSplit.height
-            };
-            
-            // Replace the split area with the two new ones
-            areas.splice(largestAreaIndex, 1, area1, area2);
+        if (position.isRadial) {
+            shouldSpawn = Math.random() < 0.8; // 80% chance for radial rooms
         } else {
-            // Split along z-axis
-            const minSplit = Math.max(areaToSplit.height * 0.3, 10);
-            const maxSplit = Math.min(areaToSplit.height * 0.7, areaToSplit.height - 10);
-            splitPosition = Math.floor(areaToSplit.z + minSplit + Math.random() * (maxSplit - minSplit));
-            
-            // Create two new areas
-            const area1 = {
-                x: areaToSplit.x,
-                z: areaToSplit.z,
-                width: areaToSplit.width,
-                height: splitPosition - areaToSplit.z
-            };
-            
-            const area2 = {
-                x: areaToSplit.x,
-                z: splitPosition,
-                width: areaToSplit.width,
-                height: areaToSplit.height - (splitPosition - areaToSplit.z)
-            };
-            
-            // Replace the split area with the two new ones
-            areas.splice(largestAreaIndex, 1, area1, area2);
-        }
-    }
-    
-    // Create rooms within each area (smaller than the area to create walls)
-    areas.forEach(area => {
-        // Room is slightly smaller than the area to ensure walls between rooms
-        const padding = 2;
-        const minRoomSize = 6;
-        
-        // Ensure room isn't too small
-        if (area.width < minRoomSize + padding * 2 || area.height < minRoomSize + padding * 2) {
-            return;
+            // Check if the connected radial room exists
+            const connectedRadialRoom = roomPositions[position.connectedTo].room;
+            shouldSpawn = connectedRadialRoom && Math.random() < 0.5; // 50% chance if connected radial exists
         }
         
-        // Determine random room dimensions within the area
-        const roomWidth = Math.max(minRoomSize, Math.floor(area.width * (0.6 + Math.random() * 0.3)));
-        const roomHeight = Math.max(minRoomSize, Math.floor(area.height * (0.6 + Math.random() * 0.3)));
+        if (!shouldSpawn) continue;
         
-        // Determine room position within the area
-        const roomX = area.x + Math.floor((area.width - roomWidth) * 0.5);
-        const roomZ = area.z + Math.floor((area.height - roomHeight) * 0.5);
+        // Determine room size
+        const sizeTemplate = position.isRadial ? radialRoomSize : cardinalRoomSize;
+        const roomWidth = Math.floor(sizeTemplate.minWidth + Math.random() * (sizeTemplate.maxWidth - sizeTemplate.minWidth));
+        const roomHeight = Math.floor(sizeTemplate.minHeight + Math.random() * (sizeTemplate.maxHeight - sizeTemplate.minHeight));
+        
+        // Calculate room position based on direction and distance from center
+        let roomDistance;
+        if (position.isRadial) {
+            roomDistance = centerRoomSize.width / 2 + roomSpacing + roomWidth / 2;
+        } else {
+            roomDistance = centerRoomSize.width / 2 + roomSpacing * 2 + roomWidth / 2;
+        }
+        
+        const roomX = centerX + position.dirX * roomDistance - roomWidth / 2;
+        const roomZ = centerZ + position.dirZ * roomDistance - roomHeight / 2;
         
         // Create room
         const room = new Room(roomX, 0, roomZ, roomWidth, roomHeight);
+        room.roomType = position.isRadial ? 'radial' : 'cardinal';
         dungeon.addRoom(room);
-    });
+        
+        // Store room in position data
+        position.room = room;
+        
+        // Connect room to center room or its connected radial room
+        if (position.isRadial) {
+            // Connect radial room to center room
+            connectRoomsWithCorridor(dungeon, centerRoom, room);
+            position.connected = true;
+        } else {
+            // Connect cardinal room to its radial room
+            const connectedRadialRoom = roomPositions[position.connectedTo].room;
+            if (connectedRadialRoom) {
+                connectRoomsWithCorridor(dungeon, connectedRadialRoom, room);
+                position.connected = true;
+            }
+        }
+    }
+    
+    // Make sure we have at least one radial room
+    const hasAnyRadialRoom = Object.values(roomPositions).some(p => p.isRadial && p.connected);
+    
+    if (!hasAnyRadialRoom) {
+        // Force create a random radial room
+        const radialPositions = ['north', 'east', 'south', 'west'];
+        const randomRadial = radialPositions[Math.floor(Math.random() * radialPositions.length)];
+        const position = roomPositions[randomRadial];
+        
+        // Determine room size
+        const roomWidth = Math.floor(radialRoomSize.minWidth + Math.random() * (radialRoomSize.maxWidth - radialRoomSize.minWidth));
+        const roomHeight = Math.floor(radialRoomSize.minHeight + Math.random() * (radialRoomSize.maxHeight - radialRoomSize.minHeight));
+        
+        // Calculate room position
+        const roomDistance = centerRoomSize.width / 2 + roomSpacing + roomWidth / 2;
+        const roomX = centerX + position.dirX * roomDistance - roomWidth / 2;
+        const roomZ = centerZ + position.dirZ * roomDistance - roomHeight / 2;
+        
+        // Create room
+        const room = new Room(roomX, 0, roomZ, roomWidth, roomHeight);
+        room.roomType = 'radial';
+        dungeon.addRoom(room);
+        
+        // Store room in position data
+        position.room = room;
+        
+        // Connect room to center room
+        connectRoomsWithCorridor(dungeon, centerRoom, room);
+        position.connected = true;
+    }
+    
+    // Return the center room for player spawn point
+    return centerRoom;
+}
+
+// Helper function to connect two rooms with a corridor
+function connectRoomsWithCorridor(dungeon, room1, room2) {
+    // Get center points of rooms
+    const center1 = {
+        x: room1.x + room1.width / 2,
+        z: room1.z + room1.height / 2
+    };
+    
+    const center2 = {
+        x: room2.x + room2.width / 2,
+        z: room2.z + room2.height / 2
+    };
+    
+    // Check if rooms are at different heights
+    const heightDifference = room2.floorHeight - room1.floorHeight;
+    const hasDifferentHeights = Math.abs(heightDifference) > 0.1;
+    
+    // Create a simple L-shaped corridor
+    const corridorWidth = 3;
+    
+    // Decide if we go horizontally first or vertically first
+    if (Math.random() < 0.5) {
+        // Horizontal then vertical
+        // Create horizontal corridor
+        const minX = Math.min(center1.x, center2.x);
+        const maxX = Math.max(center1.x, center2.x);
+        
+        const horizontalCorridor = new Room(
+            minX - corridorWidth / 2,
+            room1.floorHeight,
+            center1.z - corridorWidth / 2,
+            maxX - minX + corridorWidth,
+            corridorWidth
+        );
+        
+        horizontalCorridor.isCorridor = true;
+        horizontalCorridor.setFloorHeight(room1.floorHeight);
+        dungeon.addCorridor(horizontalCorridor);
+        
+        // Create vertical corridor
+        const minZ = Math.min(center1.z, center2.z);
+        const maxZ = Math.max(center1.z, center2.z);
+        
+        const verticalCorridor = new Room(
+            center2.x - corridorWidth / 2,
+            hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight,
+            minZ - corridorWidth / 2,
+            corridorWidth,
+            maxZ - minZ + corridorWidth
+        );
+        
+        verticalCorridor.isCorridor = true;
+        
+        if (hasDifferentHeights) {
+            verticalCorridor.isSloped = true;
+            verticalCorridor.startHeight = room1.floorHeight;
+            verticalCorridor.endHeight = room2.floorHeight;
+        }
+        
+        verticalCorridor.setFloorHeight(hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight);
+        dungeon.addCorridor(verticalCorridor);
+    } else {
+        // Vertical then horizontal
+        // Create vertical corridor
+        const minZ = Math.min(center1.z, center2.z);
+        const maxZ = Math.max(center1.z, center2.z);
+        
+        const verticalCorridor = new Room(
+            center1.x - corridorWidth / 2,
+            hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight,
+            minZ - corridorWidth / 2,
+            corridorWidth,
+            maxZ - minZ + corridorWidth
+        );
+        
+        verticalCorridor.isCorridor = true;
+        
+        if (hasDifferentHeights) {
+            verticalCorridor.isSloped = true;
+            verticalCorridor.startHeight = room1.floorHeight;
+            verticalCorridor.endHeight = room2.floorHeight;
+        }
+        
+        verticalCorridor.setFloorHeight(hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight);
+        dungeon.addCorridor(verticalCorridor);
+        
+        // Create horizontal corridor
+        const minX = Math.min(center1.x, center2.x);
+        const maxX = Math.max(center1.x, center2.x);
+        
+        const horizontalCorridor = new Room(
+            minX - corridorWidth / 2,
+            room2.floorHeight,
+            center2.z - corridorWidth / 2,
+            maxX - minX + corridorWidth,
+            corridorWidth
+        );
+        
+        horizontalCorridor.isCorridor = true;
+        horizontalCorridor.setFloorHeight(room2.floorHeight);
+        dungeon.addCorridor(horizontalCorridor);
+    }
 }
 
 // Assign different heights to rooms for vertical variety
@@ -257,73 +464,6 @@ function smoothHeightTransitions(dungeon, rooms) {
     }
 }
 
-// Connect rooms with corridors
-function connectRooms(dungeon) {
-    const rooms = dungeon.getRooms();
-    
-    // If no rooms, return early
-    if (rooms.length === 0) return;
-    
-    // First, create a minimum spanning tree to ensure all rooms are connected
-    // We'll use Prim's algorithm
-    
-    // Start with first room
-    const connectedRooms = [rooms[0]];
-    const unconnectedRooms = rooms.slice(1);
-    
-    // Connect all rooms
-    while (unconnectedRooms.length > 0) {
-        let shortestDistance = Infinity;
-        let bestConnection = null;
-        
-        // Find the closest unconnected room to any connected room
-        for (const connectedRoom of connectedRooms) {
-            for (let i = 0; i < unconnectedRooms.length; i++) {
-                const unconnectedRoom = unconnectedRooms[i];
-                const distance = calculateDistance(connectedRoom, unconnectedRoom);
-                
-                if (distance < shortestDistance) {
-                    shortestDistance = distance;
-                    bestConnection = {
-                        from: connectedRoom,
-                        to: unconnectedRoom,
-                        index: i
-                    };
-                }
-            }
-        }
-        
-        // Connect the rooms with a corridor
-        if (bestConnection) {
-            createCorridor(dungeon, bestConnection.from, bestConnection.to);
-            
-            // Move the room from unconnected to connected
-            connectedRooms.push(bestConnection.to);
-            unconnectedRooms.splice(bestConnection.index, 1);
-        } else {
-            // Something went wrong, break to avoid infinite loop
-            console.error("Could not connect all rooms");
-            break;
-        }
-    }
-    
-    // Add a few additional connections for loops (about 20% of the number of rooms)
-    const additionalConnections = Math.max(1, Math.floor(rooms.length * 0.2));
-    
-    for (let i = 0; i < additionalConnections; i++) {
-        // Pick two random rooms
-        const roomIndex1 = Math.floor(Math.random() * rooms.length);
-        let roomIndex2 = Math.floor(Math.random() * rooms.length);
-        
-        // Make sure they're different rooms
-        while (roomIndex2 === roomIndex1) {
-            roomIndex2 = Math.floor(Math.random() * rooms.length);
-        }
-        
-        createCorridor(dungeon, rooms[roomIndex1], rooms[roomIndex2]);
-    }
-}
-
 // Calculate distance between room centers
 function calculateDistance(room1, room2) {
     const centerX1 = room1.x + room1.width / 2;
@@ -337,146 +477,117 @@ function calculateDistance(room1, room2) {
     );
 }
 
-// Create a corridor between two rooms
-function createCorridor(dungeon, room1, room2) {
-    // Get center points of rooms
-    const centerX1 = room1.x + room1.width / 2;
-    const centerZ1 = room1.z + room1.height / 2;
-    const centerX2 = room2.x + room2.width / 2;
-    const centerZ2 = room2.z + room2.height / 2;
-    
-    // Check if rooms are at different heights
-    const heightDifference = room2.floorHeight - room1.floorHeight;
-    const hasDifferentHeights = Math.abs(heightDifference) > 0.1;
-    
-    // Decide if we go horizontally first or vertically first
-    // This creates an L-shaped corridor
-    if (Math.random() < 0.5) {
-        // Horizontal then vertical
-        const horizontalCorridor = createHorizontalCorridor(dungeon, centerX1, centerX2, centerZ1, room1.floorHeight, hasDifferentHeights);
-        
-        // If heights differ, we need a sloped corridor for the vertical section
-        if (hasDifferentHeights) {
-            createSlopedVerticalCorridor(dungeon, centerZ1, centerZ2, centerX2, room1.floorHeight, room2.floorHeight);
-        } else {
-            createVerticalCorridor(dungeon, centerZ1, centerZ2, centerX2, room1.floorHeight);
-        }
-    } else {
-        // Vertical then horizontal
-        // If heights differ, we need a sloped corridor for the vertical section
-        if (hasDifferentHeights) {
-            createSlopedVerticalCorridor(dungeon, centerZ1, centerZ2, centerX1, room1.floorHeight, room2.floorHeight);
-        } else {
-            createVerticalCorridor(dungeon, centerZ1, centerZ2, centerX1, room1.floorHeight);
-        }
-        
-        createHorizontalCorridor(dungeon, centerX1, centerX2, centerZ2, room2.floorHeight, false);
-    }
-}
-
-// Create a horizontal corridor segment
-function createHorizontalCorridor(dungeon, startX, endX, z, floorHeight, willConnect) {
-    const corridorWidth = 3; // Width of the corridor
-    const minX = Math.min(startX, endX);
-    const maxX = Math.max(startX, endX);
-    
-    // Create a room to represent the corridor
-    const corridor = new Room(
-        minX - corridorWidth / 2,
-        floorHeight,
-        z - corridorWidth / 2,
-        maxX - minX + corridorWidth,
-        corridorWidth
-    );
-    
-    corridor.isCorridor = true;
-    corridor.setFloorHeight(floorHeight);
-    dungeon.addCorridor(corridor);
-    
-    return corridor;
-}
-
-// Create a vertical corridor segment
-function createVerticalCorridor(dungeon, startZ, endZ, x, floorHeight) {
-    const corridorWidth = 3; // Width of the corridor
-    const minZ = Math.min(startZ, endZ);
-    const maxZ = Math.max(startZ, endZ);
-    
-    // Create a room to represent the corridor
-    const corridor = new Room(
-        x - corridorWidth / 2,
-        floorHeight,
-        minZ - corridorWidth / 2,
-        corridorWidth,
-        maxZ - minZ + corridorWidth
-    );
-    
-    corridor.isCorridor = true;
-    corridor.setFloorHeight(floorHeight);
-    dungeon.addCorridor(corridor);
-    
-    return corridor;
-}
-
-// Create a sloped corridor to connect rooms at different heights
-function createSlopedVerticalCorridor(dungeon, startZ, endZ, x, startHeight, endHeight) {
-    const corridorWidth = 3; // Width of the corridor
-    const minZ = Math.min(startZ, endZ);
-    const maxZ = Math.max(startZ, endZ);
-    
-    // Create a room to represent the corridor
-    const corridor = new Room(
-        x - corridorWidth / 2,
-        Math.min(startHeight, endHeight), // Start at lower floor height
-        minZ - corridorWidth / 2,
-        corridorWidth,
-        maxZ - minZ + corridorWidth
-    );
-    
-    corridor.isCorridor = true;
-    corridor.isSloped = true; // Mark as a sloped corridor
-    
-    // Store height information for proper rendering
-    corridor.startHeight = startHeight;
-    corridor.endHeight = endHeight;
-    
-    if (startZ > endZ) {
-        // If we're going from south to north, swap heights
-        corridor.startHeight = endHeight;
-        corridor.endHeight = startHeight;
-    }
-    
-    corridor.setFloorHeight(Math.min(startHeight, endHeight));
-    dungeon.addCorridor(corridor);
-    
-    return corridor;
-}
-
-// Place the key and exit in the dungeon
+// Place the key and exit in the dungeon in a more strategic way
 function placeKeyAndExit(dungeon) {
     const rooms = dungeon.getRooms();
     
     // Need at least 2 rooms
     if (rooms.length < 2) return;
     
-    // Find two rooms that are far apart
-    let maxDistance = 0;
-    let farthestRooms = [0, 1];
+    // Find spawn room (center room)
+    const spawnRoom = rooms.find(room => room.isSpawnRoom);
     
-    for (let i = 0; i < rooms.length; i++) {
-        for (let j = i + 1; j < rooms.length; j++) {
-            const distance = calculateDistance(rooms[i], rooms[j]);
+    // Find rooms by type
+    const radialRooms = rooms.filter(room => room.roomType === 'radial');
+    const cardinalRooms = rooms.filter(room => room.roomType === 'cardinal');
+    const normalRooms = rooms.filter(room => !room.roomType && !room.isSpawnRoom);
+    
+    let keyRoom, exitRoom;
+    
+    // Optimal placement strategy:
+    // 1. If we have cardinal rooms, put key in a cardinal room and exit in the opposite side
+    // 2. Otherwise, if we have radial rooms, put key in a radial room and exit in another
+    // 3. As a fallback, find two rooms that are far apart
+    
+    if (cardinalRooms.length >= 1) {
+        // Place key in a cardinal room
+        keyRoom = cardinalRooms[Math.floor(Math.random() * cardinalRooms.length)];
+        
+        // Find another room as far as possible for exit (preferably another cardinal or radial)
+        const potentialExitRooms = [...cardinalRooms, ...radialRooms].filter(room => room !== keyRoom);
+        
+        if (potentialExitRooms.length > 0) {
+            // Find the room that's farthest from the key room
+            exitRoom = findFarthestRoom(keyRoom, potentialExitRooms);
+        } else if (normalRooms.length > 0) {
+            // Fall back to normal rooms if no cardinal/radial options
+            exitRoom = findFarthestRoom(keyRoom, normalRooms);
+        } else {
+            // If we have no other options, use another cardinal room or any other room
+            const otherRooms = rooms.filter(room => room !== keyRoom && room !== spawnRoom);
+            exitRoom = findFarthestRoom(keyRoom, otherRooms);
+        }
+    } else if (radialRooms.length >= 2) {
+        // Try to place key and exit in opposite radial rooms
+        const directions = radialRooms.map(room => {
+            const centerX = spawnRoom ? spawnRoom.x + spawnRoom.width / 2 : dungeon.size.width / 2;
+            const centerZ = spawnRoom ? spawnRoom.z + spawnRoom.height / 2 : dungeon.size.height / 2;
+            const roomCenterX = room.x + room.width / 2;
+            const roomCenterZ = room.z + room.height / 2;
             
-            if (distance > maxDistance) {
-                maxDistance = distance;
-                farthestRooms = [i, j];
+            return {
+                room,
+                direction: Math.atan2(roomCenterZ - centerZ, roomCenterX - centerX)
+            };
+        });
+        
+        // Sort by direction angle
+        directions.sort((a, b) => a.direction - b.direction);
+        
+        // Try to find opposite rooms
+        if (directions.length >= 2) {
+            // Place key in a random radial room
+            const keyIndex = Math.floor(Math.random() * directions.length);
+            keyRoom = directions[keyIndex].room;
+            
+            // Place exit in the most opposite room
+            let maxAngleDiff = 0;
+            let bestExitRoomIndex = 0;
+            
+            for (let i = 0; i < directions.length; i++) {
+                if (i === keyIndex) continue;
+                
+                let angleDiff = Math.abs(directions[i].direction - directions[keyIndex].direction);
+                // Normalize to [0, PI]
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                
+                if (angleDiff > maxAngleDiff) {
+                    maxAngleDiff = angleDiff;
+                    bestExitRoomIndex = i;
+                }
+            }
+            
+            exitRoom = directions[bestExitRoomIndex].room;
+        } else {
+            // Shouldn't happen but just in case
+            keyRoom = radialRooms[0];
+            exitRoom = radialRooms[1];
+        }
+    } else {
+        // Fall back to the original approach - find two rooms that are far apart
+        let maxDistance = 0;
+        let farthestRooms = [0, 1];
+        
+        for (let i = 0; i < rooms.length; i++) {
+            // Skip spawn room
+            if (rooms[i] === spawnRoom) continue;
+            
+            for (let j = i + 1; j < rooms.length; j++) {
+                // Skip spawn room
+                if (rooms[j] === spawnRoom) continue;
+                
+                const distance = calculateDistance(rooms[i], rooms[j]);
+                
+                if (distance > maxDistance) {
+                    maxDistance = distance;
+                    farthestRooms = [i, j];
+                }
             }
         }
+        
+        keyRoom = rooms[farthestRooms[0]];
+        exitRoom = rooms[farthestRooms[1]];
     }
-    
-    // Place key in one room and exit in the other
-    const keyRoom = rooms[farthestRooms[0]];
-    const exitRoom = rooms[farthestRooms[1]];
     
     // Place key in center of key room
     dungeon.placeKey(
@@ -492,19 +603,41 @@ function placeKeyAndExit(dungeon) {
         exitRoom.z + exitRoom.height / 2
     );
     
-    // Mark spawn point as the center of a random room (not key or exit room)
-    let spawnRoomIndex;
-    do {
-        spawnRoomIndex = Math.floor(Math.random() * rooms.length);
-    } while (spawnRoomIndex === farthestRooms[0] || spawnRoomIndex === farthestRooms[1]);
+    // If we don't have a designated spawn room, choose a random one
+    if (!spawnRoom) {
+        // Get any room that isn't key or exit room
+        let spawnRoomOptions = rooms.filter(room => room !== keyRoom && room !== exitRoom);
+        
+        // If no other rooms, use a room anyway
+        if (spawnRoomOptions.length === 0) {
+            spawnRoomOptions = [keyRoom]; // Prefer key room over exit room
+        }
+        
+        const spawnRoom = spawnRoomOptions[Math.floor(Math.random() * spawnRoomOptions.length)];
+        
+        dungeon.setPlayerSpawnPosition(
+            spawnRoom.x + spawnRoom.width / 2,
+            spawnRoom.floorHeight + 0.5, // Slightly above floor
+            spawnRoom.z + spawnRoom.height / 2
+        );
+    }
+}
+
+// Helper function to find the farthest room from a source room
+function findFarthestRoom(sourceRoom, roomOptions) {
+    let maxDistance = 0;
+    let farthestRoom = roomOptions[0];
     
-    const spawnRoom = rooms[spawnRoomIndex];
+    for (const room of roomOptions) {
+        const distance = calculateDistance(sourceRoom, room);
+        
+        if (distance > maxDistance) {
+            maxDistance = distance;
+            farthestRoom = room;
+        }
+    }
     
-    dungeon.setPlayerSpawnPosition(
-        spawnRoom.x + spawnRoom.width / 2,
-        spawnRoom.floorHeight + 0.5, // Slightly above floor
-        spawnRoom.z + spawnRoom.height / 2
-    );
+    return farthestRoom;
 }
 
 // Add decorative elements to the dungeon
@@ -516,9 +649,13 @@ function addDecorations(dungeon, theme) {
         // Skip small rooms and corridors
         if (room.isCorridor || room.width < 8 || room.height < 8) continue;
         
-        // Decide how many decorations to add based on room size
+        // Add more decorations to special room types
+        const decorationMultiplier = getDecorationMultiplier(room);
+        
+        // Decide how many decorations to add based on room size and type
         const roomArea = room.width * room.height;
-        const decorationCount = Math.floor(roomArea / 40) + 1;
+        const baseDecorationCount = Math.floor(roomArea / 40) + 1;
+        const decorationCount = Math.floor(baseDecorationCount * decorationMultiplier);
         
         for (let i = 0; i < decorationCount; i++) {
             // Random position within the room (not too close to walls)
@@ -529,5 +666,18 @@ function addDecorations(dungeon, theme) {
             // Add decoration based on theme
             dungeon.addDecoration(x, room.floorHeight, z, theme);
         }
+    }
+}
+
+// Get decoration multiplier based on room type
+function getDecorationMultiplier(room) {
+    if (room.isSpawnRoom) {
+        return 1.5; // More decorations in spawn room
+    } else if (room.roomType === 'radial') {
+        return 1.2; // Slightly more in radial rooms
+    } else if (room.roomType === 'cardinal') {
+        return 1.0; // Normal amount in cardinal rooms
+    } else {
+        return 0.8; // Fewer in other rooms
     }
 }
