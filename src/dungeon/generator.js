@@ -32,7 +32,7 @@ export function generateDungeon(floorNumber) {
     
     // Set player spawn in the center room
     const spawnPosition = centerRoom.getCenter();
-    dungeon.setPlayerSpawnPosition(spawnPosition.x, 1, spawnPosition.z);
+    dungeon.setPlayerSpawnPosition(spawnPosition.x, 2, spawnPosition.z);
     
     // Build the dungeon mesh
     dungeon.buildMesh();
