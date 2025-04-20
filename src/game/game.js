@@ -177,16 +177,24 @@ export class Game {
     // Update camera position to follow player
     updateCamera(deltaTime) {
         const playerPosition = this.player.getPosition();
+        const isPlayerInAir = this.player.isInAir();
         
         // Calculate target camera position
+        // Adjust camera height based on whether player is jumping
+        const cameraHeight = isPlayerInAir ? 
+            playerPosition.y + 9 : // Higher camera when jumping
+            playerPosition.y + 8;  // Normal camera height
+        
         const targetPosition = new THREE.Vector3(
             playerPosition.x,
-            playerPosition.y + 8, // Camera height above player
+            cameraHeight,
             playerPosition.z + 10 // Camera distance behind player
         );
         
         // Smoothly move camera to target position
-        this.camera.position.lerp(targetPosition, 5 * deltaTime);
+        // Use faster lerp when player is jumping for more responsive camera
+        const lerpFactor = isPlayerInAir ? 8 * deltaTime : 5 * deltaTime;
+        this.camera.position.lerp(targetPosition, lerpFactor);
         
         // Look at player
         this.camera.lookAt(playerPosition);
