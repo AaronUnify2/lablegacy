@@ -1,4 +1,4 @@
-// src/engine/physics.js - Simple physics and collision detection system
+// src/engine/physics.js - Modified physics system with vertical movement
 import * as THREE from 'three';
 
 
@@ -23,7 +23,6 @@ export class Physics {
     
     // Update physics (apply gravity, etc.)
     update(deltaTime) {
-        // Update all physics objects
         // This is a simplified physics system - we'll primarily use it for collision detection
     }
     
@@ -52,6 +51,9 @@ export class Physics {
         const playerCollider = player.getCollider();
         const dungeonColliders = dungeon.getColliders();
         
+        // Determine current ground level for the player
+        this.determineGroundLevel(player, dungeon);
+        
         for (const wallCollider of dungeonColliders) {
             if (this.checkCollision(playerCollider, wallCollider)) {
                 // Resolve collision by pushing player away from wall
@@ -70,6 +72,47 @@ export class Physics {
         if (keyCollider && !dungeon.isKeyCollected() && this.checkCollision(playerCollider, keyCollider)) {
             dungeon.collectKey();
         }
+    }
+    
+    // Determine the ground level for the player based on what room they're in
+    determineGroundLevel(player, dungeon) {
+        const playerPos = player.getPosition();
+        const rooms = dungeon.getRooms();
+        const corridors = dungeon.corridors;
+        
+        // Check all rooms and corridors to find which one contains the player
+        for (const space of [...rooms, ...corridors]) {
+            if (playerPos.x >= space.x && playerPos.x <= space.x + space.width &&
+                playerPos.z >= space.z && playerPos.z <= space.z + space.height) {
+                
+                // Found the room/corridor player is in
+                // For corridors with slopes, we need to interpolate the height
+                if (space.isSloped) {
+                    // Calculate the ground level based on player's position in the corridor
+                    let groundLevel;
+                    
+                    if (space.width > space.height) {
+                        // Horizontal corridor - interpolate along x-axis
+                        const progress = (playerPos.x - space.x) / space.width;
+                        groundLevel = space.startHeight + (space.endHeight - space.startHeight) * progress;
+                    } else {
+                        // Vertical corridor - interpolate along z-axis
+                        const progress = (playerPos.z - space.z) / space.height;
+                        groundLevel = space.startHeight + (space.endHeight - space.startHeight) * progress;
+                    }
+                    
+                    player.setGroundLevel(groundLevel);
+                    return;
+                } else {
+                    // Regular flat room or corridor
+                    player.setGroundLevel(space.floorHeight);
+                    return;
+                }
+            }
+        }
+        
+        // If player is not in any room, use a default ground level
+        player.setGroundLevel(0);
     }
     
     // Check collision between two box colliders
@@ -97,13 +140,21 @@ export class Physics {
             wallCollider.max.x - playerCollider.min.x
         );
         
+        const overlapY = Math.min(
+            playerCollider.max.y - wallCollider.min.y,
+            wallCollider.max.y - playerCollider.min.y
+        );
+        
         const overlapZ = Math.min(
             playerCollider.max.z - wallCollider.min.z,
             wallCollider.max.z - playerCollider.min.z
         );
         
-        // Determine which axis has the smallest penetration
-        if (overlapX < overlapZ) {
+        // Find the minimum overlap
+        const minOverlap = Math.min(overlapX, overlapY, overlapZ);
+        
+        // Resolve along the axis with the smallest penetration
+        if (minOverlap === overlapX) {
             // Resolve X-axis collision
             if (playerPosition.x < wallCollider.min.x + (wallCollider.max.x - wallCollider.min.x) / 2) {
                 // Player is to the left of the wall
@@ -114,7 +165,29 @@ export class Physics {
             }
             // Stop velocity in X direction
             playerVelocity.x = 0;
-        } else {
+        } else if (minOverlap === overlapY && !player.isJumping) {
+            // Only resolve Y-axis when not in the middle of a jump
+            if (playerPosition.y < wallCollider.min.y + (wallCollider.max.y - wallCollider.min.y) / 2) {
+                // Player is below the wall (ceiling collision)
+                playerPosition.y = wallCollider.min.y - (playerCollider.max.y - playerCollider.min.y);
+                
+                // If player was jumping, stop the jump
+                if (player.isJumping || player.isFalling) {
+                    player.isFalling = true;
+                    playerVelocity.y = -0.1; // Start falling
+                }
+            } else {
+                // Player is above the wall (floor collision)
+                playerPosition.y = wallCollider.max.y;
+                
+                // If player was falling, they've landed
+                if (player.isFalling) {
+                    player.isFalling = false;
+                    playerVelocity.y = 0;
+                    player.setGroundLevel(playerPosition.y);
+                }
+            }
+        } else if (minOverlap === overlapZ) {
             // Resolve Z-axis collision
             if (playerPosition.z < wallCollider.min.z + (wallCollider.max.z - wallCollider.min.z) / 2) {
                 // Player is in front of the wall
@@ -179,4 +252,3 @@ export class Physics {
         
         return { hit: false };
     }
-}
