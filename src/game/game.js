@@ -1,4 +1,6 @@
 // src/game/game.js - Main game class and loop
+import * as THREE from 'three';
+
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
 import { generateDungeon } from '../dungeon/generator.js';
