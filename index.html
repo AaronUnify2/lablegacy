@@ -27,9 +27,17 @@
         </div>
     </div>
 
-    <!-- Import Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
+<!-- Change this: -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<!-- To this (load it as a module): -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"
+  }
+}
+</script>
     <!-- Main script - type module enables ES6 import/export -->
     <script type="module" src="src/main.js"></script>
 </body>
