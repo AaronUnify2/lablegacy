@@ -1,8 +1,8 @@
-// src/main.js - Entry point for Labyrinth Legacy
-
+// src/main.js - Updated to initialize jump functionality
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
+import { createControlHints } from './game/ui.js';
 
 // Main game instance
 let game;
@@ -18,6 +18,9 @@ function init() {
     // Create and initialize the game
     game = new Game();
     game.init();
+    
+    // Show control hints
+    createControlHints();
     
     // Start the game loop
     requestAnimationFrame(gameLoop);
