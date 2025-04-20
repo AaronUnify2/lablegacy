@@ -1,4 +1,6 @@
 // src/dungeon/floor.js - Dungeon floor class
+import * as THREE from 'three';
+
 
 export class Dungeon {
     constructor(floorNumber, size, theme) {
