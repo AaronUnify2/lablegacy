@@ -1,4 +1,4 @@
-// src/dungeon/room.js - Room class for dungeon floor
+// src/dungeon/room.js - Modified Room class with support for new room types
 
 import * as THREE from 'three';
 
@@ -12,7 +12,14 @@ export class Room {
         this.isCorridor = false;
         this.isSloped = false;
         this.isSpecial = false;
-        this.roomType = 'normal'; // normal, treasure, boss, challenge
+        
+        // New properties for radial dungeon layout
+        this.isSpawnRoom = false;
+        this.roomType = null; // null for normal, 'radial', 'cardinal', or special types below
+        
+        // Original room type property (now secondary)
+        this.specialType = 'normal'; // normal, treasure, boss, challenge
+        
         this.entities = [];
         this.items = [];
         this.decorations = [];
@@ -75,8 +82,19 @@ export class Room {
     
     // Set room as a special type
     setRoomType(type) {
-        this.roomType = type;
-        this.isSpecial = type !== 'normal';
+        // For backward compatibility, map old room types to the specialType property
+        if (['normal', 'treasure', 'boss', 'challenge'].includes(type)) {
+            this.specialType = type;
+            this.isSpecial = type !== 'normal';
+        } else {
+            // For new room types (radial, cardinal), set the new roomType property
+            this.roomType = type;
+        }
+    }
+    
+    // Set this room as the spawn room
+    setAsSpawnRoom() {
+        this.isSpawnRoom = true;
     }
     
     // Create a collider for the room's walls
