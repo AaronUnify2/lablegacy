@@ -1,5 +1,266 @@
 // src/engine/input.js - Input handling system with mobile controller support (Continued)
 
+// Input state object
+const inputState = {
+    // Movement
+    moveForward: false,
+    moveBackward: false,
+    moveLeft: false,
+    moveRight: false,
+    
+    // Actions
+    attack: false,
+    chargeAttack: false,
+    interact: false,
+    dash: false,
+    jump: false,  // Add jump input
+    
+    // UI controls
+    inventory: false,
+    map: false,
+    pause: false,
+    
+    // Mouse data
+    mouse: {
+        x: 0,
+        y: 0,
+        leftButton: false,
+        rightButton: false
+    },
+    
+    // For actions that should only trigger once per press
+    justPressed: {
+        attack: false,
+        interact: false,
+        inventory: false,
+        map: false,
+        pause: false,
+        dash: false,
+        jump: false  // Add jump to justPressed tracking
+    },
+    
+    // Keep track of keys that were down in the previous frame
+    previouslyPressed: {
+        attack: false,
+        interact: false,
+        inventory: false,
+        map: false,
+        pause: false,
+        dash: false,
+        jump: false  // Add jump to previouslyPressed tracking
+    },
+    
+    // For analog input (gamepad or touch joystick)
+    axes: {
+        leftStickX: 0,
+        leftStickY: 0,
+        rightStickX: 0,
+        rightStickY: 0
+    },
+    
+    // Mobile-specific
+    isMobile: false,
+    touchId: null
+};
+
+// Mobile controller elements
+let joystickElement;
+let joystickKnob;
+let actionButtons;
+let mobileControls;
+
+// Set up input event listeners
+export function setupInput() {
+    // Detect if using mobile device
+    inputState.isMobile = isMobileDevice();
+    
+    // Keyboard events (for desktop)
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    
+    // Mouse events (for desktop)
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    // Prevent context menu on right click
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+    
+    // If mobile, set up touch controls
+    if (inputState.isMobile) {
+        setupMobileControls();
+    }
+    
+    console.log('Input system initialized', inputState.isMobile ? 'with mobile controls' : 'with desktop controls');
+}
+
+// Detect if using a mobile device
+function isMobileDevice() {
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 800 && window.innerHeight <= 600)
+    );
+}
+
+// Set up mobile controls
+function setupMobileControls() {
+    // Create container for mobile controls
+    mobileControls = document.createElement('div');
+    mobileControls.id = 'mobile-controls';
+    mobileControls.style.position = 'absolute';
+    mobileControls.style.left = '0';
+    mobileControls.style.bottom = '0';
+    mobileControls.style.width = '100%';
+    mobileControls.style.height = '40%';
+    mobileControls.style.zIndex = '1000';
+    mobileControls.style.pointerEvents = 'none'; // Allow clicks to pass through by default
+    document.body.appendChild(mobileControls);
+    
+    // Create joystick
+    createJoystick();
+    
+    // Create action buttons
+    createActionButtons();
+    
+    // Add touch event listeners
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+}
+
+// Create joystick control
+function createJoystick() {
+    // Joystick container
+    joystickElement = document.createElement('div');
+    joystickElement.id = 'joystick';
+    joystickElement.style.position = 'absolute';
+    joystickElement.style.left = '20%';
+    joystickElement.style.bottom = '30%';
+    joystickElement.style.transform = 'translate(-50%, 50%)';
+    joystickElement.style.width = '120px';
+    joystickElement.style.height = '120px';
+    joystickElement.style.borderRadius = '50%';
+    joystickElement.style.border = '2px solid rgba(100, 149, 237, 0.8)';
+    joystickElement.style.backgroundColor = 'rgba(65, 105, 225, 0.3)';
+    joystickElement.style.pointerEvents = 'auto';
+    joystickElement.style.boxShadow = '0 0 15px rgba(100, 149, 237, 0.8)';
+    mobileControls.appendChild(joystickElement);
+    
+    // Joystick knob
+    joystickKnob = document.createElement('div');
+    joystickKnob.id = 'joystick-knob';
+    joystickKnob.style.position = 'absolute';
+    joystickKnob.style.left = '50%';
+    joystickKnob.style.top = '50%';
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+    joystickKnob.style.width = '60px';
+    joystickKnob.style.height = '60px';
+    joystickKnob.style.borderRadius = '50%';
+    joystickKnob.style.backgroundColor = 'rgba(65, 105, 225, 0.8)';
+    joystickKnob.style.pointerEvents = 'none';
+    joystickElement.appendChild(joystickKnob);
+}
+
+// Create action buttons
+function createActionButtons() {
+    // Button container for right side
+    const buttonContainer = document.createElement('div');
+    buttonContainer.id = 'action-buttons';
+    buttonContainer.style.position = 'absolute';
+    buttonContainer.style.right = '10%';
+    buttonContainer.style.bottom = '20%';
+    buttonContainer.style.display = 'grid';
+    buttonContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    buttonContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
+    buttonContainer.style.gap = '10px';
+    buttonContainer.style.pointerEvents = 'auto';
+    mobileControls.appendChild(buttonContainer);
+    
+    // Button definitions: [id, label, color, row, col, action]
+    const buttons = [
+        ['button-interact', 'L', 'rgba(100, 149, 237, 0.8)', 0, 0, 'interact'],
+        ['button-up', '↑', 'rgba(220, 20, 60, 0.8)', 0, 1, 'moveForward'],
+        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'switchWeapon'],
+        ['button-left', '←', 'rgba(220, 20, 60, 0.8)', 1, 0, 'moveLeft'],
+        ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'jump'],  // Changed to jump
+        ['button-right', '→', 'rgba(220, 20, 60, 0.8)', 1, 2, 'moveRight'],
+        ['button-attack', 'Sword', 'rgba(205, 133, 63, 0.8)', 2, 0, 'attack'],
+        ['button-down', '↓', 'rgba(220, 20, 60, 0.8)', 2, 1, 'moveBackward'],
+        ['button-dash', 'DASH', 'rgba(255, 150, 50, 0.8)', 2, 2, 'dash']  // Added dash button
+    ];
+    
+    // Create each button
+    actionButtons = {};
+    buttons.forEach(([id, label, color, row, col, action]) => {
+        const button = document.createElement('div');
+        button.id = id;
+        button.className = 'control-button';
+        button.dataset.action = action;
+        
+        button.style.width = '60px';
+        button.style.height = '60px';
+        button.style.borderRadius = '50%';
+        button.style.backgroundColor = color;
+        button.style.border = `2px solid ${color.replace('0.8', '1')}`;
+        button.style.boxShadow = `0 0 10px ${color}`;
+        button.style.display = 'flex';
+        button.style.justifyContent = 'center';
+        button.style.alignItems = 'center';
+        button.style.color = 'white';
+        button.style.fontFamily = 'Arial, sans-serif';
+        button.style.fontWeight = 'bold';
+        button.style.userSelect = 'none';
+        button.style.gridRow = row + 1;
+        button.style.gridColumn = col + 1;
+        
+        button.textContent = label;
+        
+        buttonContainer.appendChild(button);
+        actionButtons[id] = button;
+    });
+}
+
+// Handle touch start for mobile controls
+function handleTouchStart(event) {
+    event.preventDefault();
+    
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        const target = touch.target;
+        
+        // Check if touch is on joystick
+        if (target.id === 'joystick' || target.id === 'joystick-knob') {
+            // Save touch identifier for tracking this touch
+            inputState.touchId = touch.identifier;
+            updateJoystickPosition(touch);
+        }
+        
+        // Check if touch is on action button
+        if (target.classList && target.classList.contains('control-button')) {
+            const action = target.dataset.action;
+            
+            // Highlight button
+            target.style.transform = 'scale(0.9)';
+            
+            // Set input state
+            handleButtonPress(action, true);
+        }
+    }
+}
+
+// Handle touch move for mobile controls
+function handleTouchMove(event) {
+    event.preventDefault();
+    
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        
+        // Check if this is the joystick touch
+        if (touch.identifier === inputState.touchId) {
+            updateJoystickPosition(touch);
+        }
+    }
+}
 // Handle touch end for mobile controls
 function handleTouchEnd(event) {
     event.preventDefault();
