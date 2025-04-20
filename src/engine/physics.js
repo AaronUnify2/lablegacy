@@ -1,7 +1,6 @@
 // src/engine/physics.js - Simple physics and collision detection system
 import * as THREE from 'three';
 
-
 export class Physics {
     constructor() {
         this.gravity = -9.8; // Gravity constant
@@ -51,8 +50,8 @@ export class Physics {
         const playerCollider = player.getCollider();
         const dungeonColliders = dungeon.getColliders();
         
-        // Determine current ground level for the player
-        this.determineGroundLevel(player, dungeon);
+        // For a flat dungeon, we always use ground level 0
+        player.setGroundLevel(0);
         
         for (const wallCollider of dungeonColliders) {
             if (this.checkCollision(playerCollider, wallCollider)) {
@@ -72,47 +71,6 @@ export class Physics {
         if (keyCollider && !dungeon.isKeyCollected() && this.checkCollision(playerCollider, keyCollider)) {
             dungeon.collectKey();
         }
-    }
-    
-    // Determine the ground level for the player based on what room they're in
-    determineGroundLevel(player, dungeon) {
-        const playerPos = player.getPosition();
-        const rooms = dungeon.getRooms();
-        const corridors = dungeon.corridors;
-        
-        // Check all rooms and corridors to find which one contains the player
-        for (const space of [...rooms, ...corridors]) {
-            if (playerPos.x >= space.x && playerPos.x <= space.x + space.width &&
-                playerPos.z >= space.z && playerPos.z <= space.z + space.height) {
-                
-                // Found the room/corridor player is in
-                // For corridors with slopes, we need to interpolate the height
-                if (space.isSloped) {
-                    // Calculate the ground level based on player's position in the corridor
-                    let groundLevel;
-                    
-                    if (space.width > space.height) {
-                        // Horizontal corridor - interpolate along x-axis
-                        const progress = (playerPos.x - space.x) / space.width;
-                        groundLevel = space.startHeight + (space.endHeight - space.startHeight) * progress;
-                    } else {
-                        // Vertical corridor - interpolate along z-axis
-                        const progress = (playerPos.z - space.z) / space.height;
-                        groundLevel = space.startHeight + (space.endHeight - space.startHeight) * progress;
-                    }
-                    
-                    player.setGroundLevel(groundLevel);
-                    return;
-                } else {
-                    // Regular flat room or corridor
-                    player.setGroundLevel(space.floorHeight);
-                    return;
-                }
-            }
-        }
-        
-        // If player is not in any room, use a default ground level
-        player.setGroundLevel(0);
     }
     
     // Check collision between two box colliders
