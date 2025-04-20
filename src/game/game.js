@@ -1,12 +1,12 @@
 // src/game/game.js - Main game class and loop
 import * as THREE from 'three';
 
-
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
 import { generateDungeon } from '../dungeon/generator.js';
 import { Player } from '../entities/player.js';
 import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
+import { initMinimap, updateMinimap } from './minimap.js'; // Add this import at the top
 
 // Game states
 const GameState = {
@@ -37,6 +37,9 @@ export class Game {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
+        
+        // Minimap context
+        this.minimapContext = null;
     }
     
     // Initialize the game
@@ -51,6 +54,9 @@ export class Game {
         
         // Initialize physics
         this.physics = new Physics();
+        
+        // Initialize minimap
+        this.minimapContext = initMinimap();
         
         // Create player
         this.player = new Player();
@@ -156,6 +162,11 @@ export class Game {
         // Update UI
         updateUI(this.player, this.currentFloor);
         
+        // Update minimap
+        if (this.minimapContext) {
+            updateMinimap(this.minimapContext, this.currentDungeon, this.player);
+        }
+        
         // Check for floor progression
         if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
             this.currentFloor++;
@@ -208,21 +219,4 @@ export class Game {
     onResize() {
         // Any additional resize handling can go here
     }
-
-    // Updates to src/game/game.js to integrate the enhanced minimap
-
-import { initMinimap, updateMinimap } from './minimap.js';
-
-// Add this to the Game class constructor
-this.minimapContext = null;
-
-// Add this to the Game.init() method after other initialization
-// Initialize minimap
-this.minimapContext = initMinimap();
-
-// Update the Game.updatePlaying method to include minimap updates
-// Add this line near the end of the updatePlaying method
-if (this.minimapContext) {
-    updateMinimap(this.minimapContext, this.currentDungeon, this.player);
-}
 }
