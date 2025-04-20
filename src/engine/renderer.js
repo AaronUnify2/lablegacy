@@ -1,5 +1,8 @@
+
 // src/engine/renderer.js - Three.js renderer setup and management
 
+
+import * as THREE from 'three';
 // Global renderer variables
 let scene, camera, renderer;
 let canvas;
