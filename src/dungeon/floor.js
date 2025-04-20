@@ -184,7 +184,7 @@ export class Dungeon {
             const floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.position.set(
                 room.x + room.width / 2,
-                room.floorHeight - 0.1, // Slightly below to avoid z-fighting
+                -0.1, // Slightly below zero to avoid z-fighting
                 room.z + room.height / 2
             );
             
@@ -200,7 +200,7 @@ export class Dungeon {
         
         // For each room, create four walls
         [...this.rooms, ...this.corridors].forEach(room => {
-            // Skip corridors if they are part of a sloped connection
+            // Skip corridors if they are marked as sloped (shouldn't happen anymore, but just in case)
             if (room.isCorridor && room.isSloped) return;
             
             const wallHeight = 3; // Standard wall height
@@ -237,19 +237,17 @@ export class Dungeon {
                 });
             };
             
-            // Calculate wall positions
+            // Calculate wall positions - y is always 0 for a flat dungeon
+            const floorHeight = 0;
             const northWallZ = room.z;
             const southWallZ = room.z + room.height;
             const westWallX = room.x;
             const eastWallX = room.x + room.width;
-            const wallY = room.floorHeight + wallHeight / 2;
+            const wallY = floorHeight + wallHeight / 2;
             
             const wallThickness = 0.5;
             
             // Check if there's a corridor or connected room in each direction
-            // We'll need to check adjacency to avoid building walls where corridors connect
-            
-            // Check each neighboring position to see if there's a passage
             const hasNorthPassage = this.hasPassageAt(room, 'north');
             const hasSouthPassage = this.hasPassageAt(room, 'south');
             const hasEastPassage = this.hasPassageAt(room, 'east');
@@ -308,171 +306,6 @@ export class Dungeon {
                 );
             }
         });
-        
-        // Build ramps or stairs for elevation changes
-        this.buildElevationConnectors();
-    }
-    
-    // Build ramps or stairs to connect different elevations
-    buildElevationConnectors() {
-        // Find corridors that connect rooms at different heights
-        this.corridors.forEach(corridor => {
-            if (!corridor.isSloped) return;
-            
-            // Get connected rooms
-            const connectedRooms = this.findConnectedRooms(corridor);
-            if (connectedRooms.length !== 2) return;
-            
-            const [room1, room2] = connectedRooms;
-            
-            // Calculate slope
-            const heightDifference = room2.floorHeight - room1.floorHeight;
-            
-            // Skip if no height difference (shouldn't happen for isSloped corridors)
-            if (Math.abs(heightDifference) < 0.1) return;
-            
-            // Determine if corridor is horizontal or vertical
-            const isHorizontal = corridor.width > corridor.height;
-            
-            // Create ramp geometry
-            const rampLength = isHorizontal ? corridor.width : corridor.height;
-            const rampWidth = isHorizontal ? corridor.height : corridor.width;
-            const rampHeight = Math.abs(heightDifference);
-            
-            const rampGeometry = new THREE.BoxGeometry(
-                isHorizontal ? rampLength : rampWidth,
-                0.2, // Thickness
-                isHorizontal ? rampWidth : rampLength
-            );
-            
-            const rampMaterial = new THREE.MeshLambertMaterial({ 
-                color: this.theme.floorColor || 0x555555,
-                map: this.theme.floorTexture
-            });
-            
-            const ramp = new THREE.Mesh(rampGeometry, rampMaterial);
-            
-            // Position ramp
-            ramp.position.set(
-                corridor.x + corridor.width / 2,
-                (room1.floorHeight + room2.floorHeight) / 2,
-                corridor.z + corridor.height / 2
-            );
-            
-            // Rotate to create slope
-            if (isHorizontal) {
-                // Rotate around Z axis for horizontal corridors
-                ramp.rotation.z = Math.atan2(heightDifference, rampLength);
-            } else {
-                // Rotate around X axis for vertical corridors
-                ramp.rotation.x = Math.atan2(-heightDifference, rampLength);
-            }
-            
-            ramp.receiveShadow = true;
-            this.object.add(ramp);
-            this.meshes.push(ramp);
-            
-            // Add handrails/walls along sides of the ramp
-            this.buildRampHandrails(corridor, room1.floorHeight, room2.floorHeight, isHorizontal);
-        });
-    }
-    
-    // Build handrails (walls) along the sides of ramps
-    buildRampHandrails(corridor, startHeight, endHeight, isHorizontal) {
-        const wallThickness = 0.5;
-        const wallHeight = 1.5; // Lower than regular walls
-        const wallMaterial = new THREE.MeshLambertMaterial({ 
-            color: this.theme.wallColor || 0x333333,
-            map: this.theme.wallTexture 
-        });
-        
-        // Calculate positions based on corridor orientation
-        if (isHorizontal) {
-            // For horizontal corridors, railings go on north and south sides
-            const rampLength = corridor.width;
-            const rampSlope = Math.atan2(endHeight - startHeight, rampLength);
-            const avgHeight = (startHeight + endHeight) / 2;
-            
-            // North railing
-            const northRailingGeometry = new THREE.BoxGeometry(
-                rampLength,
-                wallHeight * Math.cos(rampSlope), // Adjust height for slope
-                wallThickness
-            );
-            const northRailing = new THREE.Mesh(northRailingGeometry, wallMaterial);
-            
-            northRailing.position.set(
-                corridor.x + rampLength / 2,
-                avgHeight + wallHeight / 2 * Math.cos(rampSlope),
-                corridor.z + wallThickness / 2
-            );
-            
-            northRailing.rotation.z = rampSlope;
-            
-            // South railing
-            const southRailingGeometry = new THREE.BoxGeometry(
-                rampLength,
-                wallHeight * Math.cos(rampSlope),
-                wallThickness
-            );
-            const southRailing = new THREE.Mesh(southRailingGeometry, wallMaterial);
-            
-            southRailing.position.set(
-                corridor.x + rampLength / 2,
-                avgHeight + wallHeight / 2 * Math.cos(rampSlope),
-                corridor.z + corridor.height - wallThickness / 2
-            );
-            
-            southRailing.rotation.z = rampSlope;
-            
-            // Add railings to scene
-            this.object.add(northRailing);
-            this.object.add(southRailing);
-            this.meshes.push(northRailing, southRailing);
-            
-        } else {
-            // For vertical corridors, railings go on east and west sides
-            const rampLength = corridor.height;
-            const rampSlope = Math.atan2(endHeight - startHeight, rampLength);
-            const avgHeight = (startHeight + endHeight) / 2;
-            
-            // East railing
-            const eastRailingGeometry = new THREE.BoxGeometry(
-                wallThickness,
-                wallHeight * Math.cos(rampSlope),
-                rampLength
-            );
-            const eastRailing = new THREE.Mesh(eastRailingGeometry, wallMaterial);
-            
-            eastRailing.position.set(
-                corridor.x + corridor.width - wallThickness / 2,
-                avgHeight + wallHeight / 2 * Math.cos(rampSlope),
-                corridor.z + rampLength / 2
-            );
-            
-            eastRailing.rotation.x = -rampSlope;
-            
-            // West railing
-            const westRailingGeometry = new THREE.BoxGeometry(
-                wallThickness,
-                wallHeight * Math.cos(rampSlope),
-                rampLength
-            );
-            const westRailing = new THREE.Mesh(westRailingGeometry, wallMaterial);
-            
-            westRailing.position.set(
-                corridor.x + wallThickness / 2,
-                avgHeight + wallHeight / 2 * Math.cos(rampSlope),
-                corridor.z + rampLength / 2
-            );
-            
-            westRailing.rotation.x = -rampSlope;
-            
-            // Add railings to scene
-            this.object.add(eastRailing);
-            this.object.add(westRailing);
-            this.meshes.push(eastRailing, westRailing);
-        }
     }
     
     // Check if there's a passage in a given direction from a room
