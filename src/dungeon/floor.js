@@ -108,7 +108,7 @@ export class Dungeon {
     
     // Get player spawn position
     getPlayerSpawnPosition() {
-        return this.playerSpawnPosition ? this.playerSpawnPosition : { x: 0, y: 0.5, z: 0 };
+        return this.playerSpawnPosition ? this.playerSpawnPosition : { x: 0, y: 1.0, z: 0 }; // Raised from 0.5 to 1.0
     }
     
     // Get colliders for all walls
@@ -191,13 +191,25 @@ export class Dungeon {
             floor.receiveShadow = true;
             this.object.add(floor);
             this.meshes.push(floor);
+            
+            // Add floor collider
+            this.colliders.push({
+                min: new THREE.Vector3(
+                    room.x,
+                    -0.2, // Below floor level to ensure solid collision
+                    room.z
+                ),
+                max: new THREE.Vector3(
+                    room.x + room.width,
+                    0.01, // Slightly above floor level
+                    room.z + room.height
+                )
+            });
         });
     }
     
     // Build wall meshes
     buildWalls() {
-        this.colliders = [];
-        
         // For each room, create four walls
         [...this.rooms, ...this.corridors].forEach(room => {
             // Skip corridors if they are marked as sloped (shouldn't happen anymore, but just in case)
