@@ -1,4 +1,4 @@
-// src/entities/player.js - Player character implementation
+// src/entities/player.js - Player character implementation with jump functionality
 import * as THREE from 'three';
 
 
@@ -21,6 +21,18 @@ export class Player {
         this.isDashing = false;
         this.dashTimer = 0;
         this.dashCooldownTimer = 0;
+        
+        // Jump mechanics
+        this.isJumping = false;
+        this.isFalling = false;
+        this.jumpVelocity = 8;      // Initial upward velocity
+        this.jumpHeight = 2;        // Maximum jump height
+        this.jumpTimer = 0;
+        this.jumpDuration = 0.5;    // Time to reach peak of jump
+        this.jumpCooldown = 0.2;    // Cooldown between jumps
+        this.jumpCooldownTimer = 0;
+        this.gravity = 15;          // Gravity force pulling player down
+        this.groundLevel = 0;       // Current ground level
         
         // Rotation
         this.rotation = 0;
@@ -134,6 +146,9 @@ export class Player {
         // Handle movement
         this.updateMovement(deltaTime, input);
         
+        // Handle jumping and gravity
+        this.updateJumping(deltaTime, input);
+        
         // Handle attacking
         this.updateAttack(deltaTime, input);
         
@@ -159,7 +174,7 @@ export class Player {
     
     // Handle player movement
     updateMovement(deltaTime, input) {
-        // Reset velocity
+        // Reset horizontal velocity
         this.velocity.x = 0;
         this.velocity.z = 0;
         
@@ -181,7 +196,9 @@ export class Player {
         
         // Normalize velocity for consistent diagonal movement
         if (this.velocity.x !== 0 && this.velocity.z !== 0) {
-            this.velocity.normalize().multiplyScalar(moveSpeed);
+            const normalized = new THREE.Vector2(this.velocity.x, this.velocity.z).normalize();
+            this.velocity.x = normalized.x * moveSpeed;
+            this.velocity.z = normalized.y * moveSpeed;
         }
         
         // Update position
@@ -209,6 +226,57 @@ export class Player {
             );
             
             this.object.rotation.y = this.rotation;
+        }
+    }
+    
+    // Handle jumping and gravity
+    updateJumping(deltaTime, input) {
+        // Update jump cooldown
+        if (this.jumpCooldownTimer > 0) {
+            this.jumpCooldownTimer -= deltaTime;
+        }
+        
+        // Check if we should start a jump
+        if (input.justPressed.jump && !this.isJumping && !this.isFalling && this.jumpCooldownTimer <= 0) {
+            this.isJumping = true;
+            this.jumpTimer = 0;
+            // Play jump sound or animation here if needed
+        }
+        
+        // Apply gravity when in air
+        if (this.isJumping || this.isFalling) {
+            if (this.isJumping) {
+                // In jump phase - going upward
+                this.jumpTimer += deltaTime;
+                
+                // Calculate jump height based on jump curve
+                const jumpProgress = this.jumpTimer / this.jumpDuration;
+                
+                if (jumpProgress < 1.0) {
+                    // Still in jump phase
+                    // Using a simple ease-out function for jump height
+                    const jumpFactor = 1 - Math.pow(1 - jumpProgress, 2);
+                    this.position.y = this.groundLevel + (this.jumpHeight * jumpFactor);
+                } else {
+                    // Reached peak of jump, start falling
+                    this.isJumping = false;
+                    this.isFalling = true;
+                    this.velocity.y = 0;
+                }
+            } else {
+                // In falling phase
+                this.velocity.y -= this.gravity * deltaTime;
+                this.position.y += this.velocity.y * deltaTime;
+                
+                // Check if we've landed
+                if (this.position.y <= this.groundLevel) {
+                    this.position.y = this.groundLevel;
+                    this.isFalling = false;
+                    this.velocity.y = 0;
+                    this.jumpCooldownTimer = this.jumpCooldown;
+                    // Play landing sound or animation here if needed
+                }
+            }
         }
     }
     
@@ -303,6 +371,16 @@ export class Player {
         }
     }
     
+    // Set the ground level for the player
+    setGroundLevel(level) {
+        this.groundLevel = level;
+        
+        // If not jumping or falling, snap to ground
+        if (!this.isJumping && !this.isFalling) {
+            this.position.y = this.groundLevel;
+        }
+    }
+    
     // Apply knockback to player (used when taking damage)
     applyKnockback(direction, force) {
         this.position.x += direction.x * force;
@@ -364,6 +442,9 @@ export class Player {
     setPosition(x, y, z) {
         this.position.set(x, y, z);
         this.object.position.set(x, y, z);
+        
+        // Update ground level if setting a new position
+        this.groundLevel = y;
     }
     
     // Get player velocity
@@ -384,5 +465,10 @@ export class Player {
     // Get player attack damage
     getAttackDamage() {
         return this.attackDamage;
+    }
+    
+    // Check if player is in air (jumping or falling)
+    isInAir() {
+        return this.isJumping || this.isFalling;
     }
 }
