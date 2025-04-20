@@ -12,7 +12,7 @@ export class Player {
         this.experienceToNextLevel = 100;
         
         // Movement and position
-        this.position = new THREE.Vector3(0, 1, 0);
+        this.position = new THREE.Vector3(0, 1.0, 0); // Raised starting position
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.moveSpeed = 5;
         this.dashSpeed = 15;
@@ -32,7 +32,7 @@ export class Player {
         this.jumpCooldown = 0.2;    // Cooldown between jumps
         this.jumpCooldownTimer = 0;
         this.gravity = 15;          // Gravity force pulling player down
-        this.groundLevel = 0;       // Current ground level
+        this.groundLevel = 1.0;     // Current ground level, raised to 1.0
         
         // Rotation
         this.rotation = 0;
@@ -130,12 +130,12 @@ export class Player {
         this.collider = {
             min: new THREE.Vector3(
                 this.position.x - width/2,
-                this.position.y,
+                this.position.y, // Bottom of player is at position.y
                 this.position.z - depth/2
             ),
             max: new THREE.Vector3(
                 this.position.x + width/2,
-                this.position.y + height,
+                this.position.y + height, // Top of player
                 this.position.z + depth/2
             )
         };
@@ -270,13 +270,16 @@ export class Player {
                 
                 // Check if we've landed
                 if (this.position.y <= this.groundLevel) {
-                    this.position.y = this.groundLevel;
+                    this.position.y = Math.max(this.groundLevel, 0); // Ensure we don't go below ground
                     this.isFalling = false;
                     this.velocity.y = 0;
                     this.jumpCooldownTimer = this.jumpCooldown;
                     // Play landing sound or animation here if needed
                 }
             }
+        } else if (this.position.y < this.groundLevel) {
+            // Safety check - if we're somehow below ground level but not falling, correct it
+            this.position.y = Math.max(this.groundLevel, 0);
         }
     }
     
@@ -373,12 +376,17 @@ export class Player {
     
     // Set the ground level for the player
     setGroundLevel(level) {
-        this.groundLevel = level;
+        this.groundLevel = Math.max(level, 0); // Ensure ground level is never below 0
         
         // If not jumping or falling, snap to ground
         if (!this.isJumping && !this.isFalling) {
             this.position.y = this.groundLevel;
         }
+    }
+    
+    // Get the current ground level
+    getGroundLevel() {
+        return this.groundLevel;
     }
     
     // Apply knockback to player (used when taking damage)
@@ -440,11 +448,8 @@ export class Player {
     
     // Set player position
     setPosition(x, y, z) {
-        this.position.set(x, y, z);
-        this.object.position.set(x, y, z);
-        
-        // Update ground level if setting a new position
-        this.groundLevel = y;
+        this.position.set(x, Math.max(y, 0), z); // Ensure y is never below 0
+        this.object.position.set(x, Math.max(y, 0), z);
     }
     
     // Get player velocity
