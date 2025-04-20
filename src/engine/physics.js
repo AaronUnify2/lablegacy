@@ -1,4 +1,6 @@
 // src/engine/physics.js - Simple physics and collision detection system
+import * as THREE from 'three';
+
 
 export class Physics {
     constructor() {
