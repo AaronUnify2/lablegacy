@@ -1,4 +1,4 @@
-// src/engine/physics.js - Modified physics system with vertical movement
+// src/engine/physics.js - Simple physics and collision detection system
 import * as THREE from 'three';
 
 
@@ -252,3 +252,4 @@ export class Physics {
         
         return { hit: false };
     }
+}
