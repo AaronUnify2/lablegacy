@@ -21,8 +21,8 @@ export function generateDungeon(floorNumber) {
     // Generate rooms using our new radial pattern instead of BSP
     const centerRoom = generateRadialRooms(dungeon, size);
     
-    // Assign heights to rooms
-    assignRoomHeights(dungeon, floorNumber);
+    // Set all rooms to a flat height of 0
+    setFlatRoomHeights(dungeon);
     
     // Place key and exit
     placeKeyAndExit(dungeon);
@@ -32,7 +32,7 @@ export function generateDungeon(floorNumber) {
     
     // Set player spawn in the center room
     const spawnPosition = centerRoom.getCenter();
-    dungeon.setPlayerSpawnPosition(spawnPosition.x, spawnPosition.y + 0.5, spawnPosition.z);
+    dungeon.setPlayerSpawnPosition(spawnPosition.x, 0.5, spawnPosition.z);
     
     // Build the dungeon mesh
     dungeon.buildMesh();
@@ -100,7 +100,7 @@ function generateRadialRooms(dungeon, size) {
     // Create center room
     const centerRoom = new Room(
         centerX - centerRoomSize.width / 2,
-        0, // Height will be assigned later
+        0, // Height is now always 0
         centerZ - centerRoomSize.height / 2,
         centerRoomSize.width,
         centerRoomSize.height
@@ -288,9 +288,8 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
         z: room2.z + room2.height / 2
     };
     
-    // Check if rooms are at different heights
-    const heightDifference = room2.floorHeight - room1.floorHeight;
-    const hasDifferentHeights = Math.abs(heightDifference) > 0.1;
+    // All rooms have the same flat height of 0
+    const floorHeight = 0;
     
     // Create a simple L-shaped corridor
     const corridorWidth = 3;
@@ -304,14 +303,14 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
         
         const horizontalCorridor = new Room(
             minX - corridorWidth / 2,
-            room1.floorHeight,
+            floorHeight,
             center1.z - corridorWidth / 2,
             maxX - minX + corridorWidth,
             corridorWidth
         );
         
         horizontalCorridor.isCorridor = true;
-        horizontalCorridor.setFloorHeight(room1.floorHeight);
+        horizontalCorridor.setFloorHeight(floorHeight);
         dungeon.addCorridor(horizontalCorridor);
         
         // Create vertical corridor
@@ -320,21 +319,14 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
         
         const verticalCorridor = new Room(
             center2.x - corridorWidth / 2,
-            hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight,
+            floorHeight,
             minZ - corridorWidth / 2,
             corridorWidth,
             maxZ - minZ + corridorWidth
         );
         
         verticalCorridor.isCorridor = true;
-        
-        if (hasDifferentHeights) {
-            verticalCorridor.isSloped = true;
-            verticalCorridor.startHeight = room1.floorHeight;
-            verticalCorridor.endHeight = room2.floorHeight;
-        }
-        
-        verticalCorridor.setFloorHeight(hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight);
+        verticalCorridor.setFloorHeight(floorHeight);
         dungeon.addCorridor(verticalCorridor);
     } else {
         // Vertical then horizontal
@@ -344,21 +336,14 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
         
         const verticalCorridor = new Room(
             center1.x - corridorWidth / 2,
-            hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight,
+            floorHeight,
             minZ - corridorWidth / 2,
             corridorWidth,
             maxZ - minZ + corridorWidth
         );
         
         verticalCorridor.isCorridor = true;
-        
-        if (hasDifferentHeights) {
-            verticalCorridor.isSloped = true;
-            verticalCorridor.startHeight = room1.floorHeight;
-            verticalCorridor.endHeight = room2.floorHeight;
-        }
-        
-        verticalCorridor.setFloorHeight(hasDifferentHeights ? Math.min(room1.floorHeight, room2.floorHeight) : room1.floorHeight);
+        verticalCorridor.setFloorHeight(floorHeight);
         dungeon.addCorridor(verticalCorridor);
         
         // Create horizontal corridor
@@ -367,101 +352,33 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
         
         const horizontalCorridor = new Room(
             minX - corridorWidth / 2,
-            room2.floorHeight,
+            floorHeight,
             center2.z - corridorWidth / 2,
             maxX - minX + corridorWidth,
             corridorWidth
         );
         
         horizontalCorridor.isCorridor = true;
-        horizontalCorridor.setFloorHeight(room2.floorHeight);
+        horizontalCorridor.setFloorHeight(floorHeight);
         dungeon.addCorridor(horizontalCorridor);
     }
 }
 
-// Assign different heights to rooms for vertical variety
-function assignRoomHeights(dungeon, floorNumber) {
+// New function to set all rooms to a flat height
+function setFlatRoomHeights(dungeon) {
     const rooms = dungeon.getRooms();
+    const corridors = dungeon.corridors;
     
-    // Determine if this floor should have height variations
-    // More complex height variations on deeper floors
-    const maxHeightVariation = Math.min(3, Math.floor(floorNumber / 2));
-    
-    if (maxHeightVariation <= 0) {
-        // No height variation on early floors
-        return;
-    }
-    
-    // Create a height map to cluster rooms at similar heights
-    const heightMap = {};
-    
-    // Assign each room to a "region" based on its position
-    const regionSize = 20; // Size of each region
-    
-    rooms.forEach((room, index) => {
-        // Get center of room
-        const centerX = Math.floor((room.x + room.width / 2) / regionSize);
-        const centerZ = Math.floor((room.z + room.height / 2) / regionSize);
-        const regionKey = `${centerX},${centerZ}`;
-        
-        // Create region if it doesn't exist
-        if (!heightMap[regionKey]) {
-            // Random height offset for this region
-            const heightOffset = Math.floor(Math.random() * (maxHeightVariation + 1)) * 3;
-            heightMap[regionKey] = heightOffset;
-        }
-        
-        // Assign height to room based on region
-        room.setFloorHeight(heightMap[regionKey]);
+    // Set all rooms to a height of 0
+    rooms.forEach(room => {
+        room.setFloorHeight(0);
     });
     
-    // Make sure at least one path exists through the dungeon without excessive height changes
-    smoothHeightTransitions(dungeon, rooms);
-}
-
-// Smooth out height transitions to avoid inaccessible areas
-function smoothHeightTransitions(dungeon, rooms) {
-    // Create a graph of room connections based on proximity
-    const roomGraph = {};
-    
-    // Initialize graph
-    rooms.forEach((room, index) => {
-        roomGraph[index] = [];
+    // Set all corridors to a height of 0
+    corridors.forEach(corridor => {
+        corridor.setFloorHeight(0);
+        corridor.isSloped = false; // Make sure no corridors are sloped
     });
-    
-    // Connect nearby rooms in the graph
-    for (let i = 0; i < rooms.length; i++) {
-        for (let j = i + 1; j < rooms.length; j++) {
-            const distance = calculateDistance(rooms[i], rooms[j]);
-            
-            // Connect rooms that are close enough to be connected by a corridor
-            if (distance < 30) {
-                roomGraph[i].push({ roomIndex: j, distance });
-                roomGraph[j].push({ roomIndex: i, distance });
-            }
-        }
-    }
-    
-    // Find paths through the dungeon
-    // We'll ensure that height differences between connected rooms are manageable
-    for (let i = 0; i < rooms.length; i++) {
-        for (const connection of roomGraph[i]) {
-            const j = connection.roomIndex;
-            
-            // Get height difference between rooms
-            const heightDiff = Math.abs(rooms[i].floorHeight - rooms[j].floorHeight);
-            
-            // If height difference is too large, add intermediate steps
-            if (heightDiff > 3) {
-                // Adjust the higher room's height to be at most 3 units higher
-                if (rooms[i].floorHeight > rooms[j].floorHeight) {
-                    rooms[i].setFloorHeight(rooms[j].floorHeight + 3);
-                } else {
-                    rooms[j].setFloorHeight(rooms[i].floorHeight + 3);
-                }
-            }
-        }
-    }
 }
 
 // Calculate distance between room centers
