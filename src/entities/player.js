@@ -1,4 +1,6 @@
 // src/entities/player.js - Player character implementation
+import * as THREE from 'three';
+
 
 export class Player {
     constructor() {
