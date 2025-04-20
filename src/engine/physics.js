@@ -1,6 +1,7 @@
 // src/engine/physics.js - Simple physics and collision detection system
 import * as THREE from 'three';
 
+
 export class Physics {
     constructor() {
         this.gravity = -9.8; // Gravity constant
@@ -36,7 +37,72 @@ export class Physics {
                 // Handle collision based on entity type
                 if (entity.type === 'enemy') {
                     this.handleEnemyCollision(player, entity);
-                } else if (entity.type === 'item') {
+                }
+        } else if (minOverlap === overlapZ) {
+            // Resolve Z-axis collision
+            if (playerPosition.z < wallCollider.min.z + (wallCollider.max.z - wallCollider.min.z) / 2) {
+                // Player is in front of the wall
+                playerPosition.z = wallCollider.min.z - playerCollider.max.z + playerPosition.z;
+            } else {
+                // Player is behind the wall
+                playerPosition.z = wallCollider.max.z - playerCollider.min.z + playerPosition.z;
+            }
+            // Stop velocity in Z direction
+            playerVelocity.z = 0;
+        }
+        
+        // Update player position
+        player.setPosition(playerPosition.x, playerPosition.y, playerPosition.z);
+    }
+    
+    // Handle collision with enemy
+    handleEnemyCollision(player, enemy) {
+        // If player is attacking, damage enemy
+        if (player.isAttacking()) {
+            enemy.takeDamage(player.getAttackDamage());
+        } else {
+            // Otherwise, player takes damage (with cooldown)
+            player.takeDamage(enemy.getDamage());
+        }
+        
+        // Push player away from enemy slightly (knockback)
+        const playerPos = player.getPosition();
+        const enemyPos = enemy.getPosition();
+        
+        const direction = new THREE.Vector3(
+            playerPos.x - enemyPos.x,
+            0,
+            playerPos.z - enemyPos.z
+        ).normalize();
+        
+        player.applyKnockback(direction, 2); // Knockback force of 2
+    }
+    
+    // Handle collision with item
+    handleItemCollision(player, item) {
+        // Collect the item
+        player.collectItem(item);
+        
+        // Remove item from the game
+        item.collect();
+    }
+    
+    // Cast a ray and check for intersection
+    raycast(origin, direction, maxDistance, objects) {
+        const raycaster = new THREE.Raycaster(origin, direction, 0, maxDistance);
+        const intersects = raycaster.intersectObjects(objects, true);
+        
+        if (intersects.length > 0) {
+            return {
+                hit: true,
+                point: intersects[0].point,
+                distance: intersects[0].distance,
+                object: intersects[0].object
+            };
+        }
+        
+        return { hit: false };
+    } else if (entity.type === 'item') {
                     this.handleItemCollision(player, entity);
                 }
             }
@@ -50,8 +116,9 @@ export class Physics {
         const playerCollider = player.getCollider();
         const dungeonColliders = dungeon.getColliders();
         
-        // For a flat dungeon, we always use ground level 0
-        player.setGroundLevel(0);
+        // Set a minimum ground level to ensure the player doesn't fall through floors
+        const minGroundLevel = 0;
+        player.setGroundLevel(Math.max(player.getGroundLevel(), minGroundLevel));
         
         for (const wallCollider of dungeonColliders) {
             if (this.checkCollision(playerCollider, wallCollider)) {
@@ -71,6 +138,30 @@ export class Physics {
         if (keyCollider && !dungeon.isKeyCollected() && this.checkCollision(playerCollider, keyCollider)) {
             dungeon.collectKey();
         }
+    }
+    
+    // Determine the ground level for the player based on what room they're in
+    determineGroundLevel(player, dungeon) {
+        const playerPos = player.getPosition();
+        const rooms = dungeon.getRooms();
+        const corridors = dungeon.corridors || [];
+        
+        // For flat dungeon, always use ground level 0 as minimum
+        let groundLevel = 0;
+        
+        // Check all rooms and corridors to find which one contains the player
+        for (const space of [...rooms, ...corridors]) {
+            if (playerPos.x >= space.x && playerPos.x <= space.x + space.width &&
+                playerPos.z >= space.z && playerPos.z <= space.z + space.height) {
+                
+                // Found the room/corridor player is in
+                groundLevel = 0; // Always use 0 for a flat dungeon
+                break;
+            }
+        }
+        
+        // Ensure the ground level is at least 0
+        player.setGroundLevel(Math.max(groundLevel, 0));
     }
     
     // Check collision between two box colliders
@@ -142,72 +233,6 @@ export class Physics {
                 if (player.isFalling) {
                     player.isFalling = false;
                     playerVelocity.y = 0;
-                    player.setGroundLevel(playerPosition.y);
+                    player.setGroundLevel(Math.max(playerPosition.y, 0)); // Ensure ground level is at least 0
                 }
             }
-        } else if (minOverlap === overlapZ) {
-            // Resolve Z-axis collision
-            if (playerPosition.z < wallCollider.min.z + (wallCollider.max.z - wallCollider.min.z) / 2) {
-                // Player is in front of the wall
-                playerPosition.z = wallCollider.min.z - playerCollider.max.z + playerPosition.z;
-            } else {
-                // Player is behind the wall
-                playerPosition.z = wallCollider.max.z - playerCollider.min.z + playerPosition.z;
-            }
-            // Stop velocity in Z direction
-            playerVelocity.z = 0;
-        }
-        
-        // Update player position
-        player.setPosition(playerPosition.x, playerPosition.y, playerPosition.z);
-    }
-    
-    // Handle collision with enemy
-    handleEnemyCollision(player, enemy) {
-        // If player is attacking, damage enemy
-        if (player.isAttacking()) {
-            enemy.takeDamage(player.getAttackDamage());
-        } else {
-            // Otherwise, player takes damage (with cooldown)
-            player.takeDamage(enemy.getDamage());
-        }
-        
-        // Push player away from enemy slightly (knockback)
-        const playerPos = player.getPosition();
-        const enemyPos = enemy.getPosition();
-        
-        const direction = new THREE.Vector3(
-            playerPos.x - enemyPos.x,
-            0,
-            playerPos.z - enemyPos.z
-        ).normalize();
-        
-        player.applyKnockback(direction, 2); // Knockback force of 2
-    }
-    
-    // Handle collision with item
-    handleItemCollision(player, item) {
-        // Collect the item
-        player.collectItem(item);
-        
-        // Remove item from the game
-        item.collect();
-    }
-    
-    // Cast a ray and check for intersection
-    raycast(origin, direction, maxDistance, objects) {
-        const raycaster = new THREE.Raycaster(origin, direction, 0, maxDistance);
-        const intersects = raycaster.intersectObjects(objects, true);
-        
-        if (intersects.length > 0) {
-            return {
-                hit: true,
-                point: intersects[0].point,
-                distance: intersects[0].distance,
-                object: intersects[0].object
-            };
-        }
-        
-        return { hit: false };
-    }
-}
