@@ -208,4 +208,21 @@ export class Game {
     onResize() {
         // Any additional resize handling can go here
     }
+
+    // Updates to src/game/game.js to integrate the enhanced minimap
+
+import { initMinimap, updateMinimap } from './minimap.js';
+
+// Add this to the Game class constructor
+this.minimapContext = null;
+
+// Add this to the Game.init() method after other initialization
+// Initialize minimap
+this.minimapContext = initMinimap();
+
+// Update the Game.updatePlaying method to include minimap updates
+// Add this line near the end of the updatePlaying method
+if (this.minimapContext) {
+    updateMinimap(this.minimapContext, this.currentDungeon, this.player);
+}
 }
