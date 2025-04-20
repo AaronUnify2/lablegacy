@@ -1,4 +1,4 @@
-// src/engine/input.js - Input handling system
+// src/engine/input.js - Input handling system with mobile controller support
 
 // Input state object
 const inputState = {
@@ -47,22 +47,35 @@ const inputState = {
         dash: false
     },
     
-    // For analog input (gamepad)
+    // For analog input (gamepad or touch joystick)
     axes: {
         leftStickX: 0,
         leftStickY: 0,
         rightStickX: 0,
         rightStickY: 0
-    }
+    },
+    
+    // Mobile-specific
+    isMobile: false,
+    touchId: null
 };
+
+// Mobile controller elements
+let joystickElement;
+let joystickKnob;
+let actionButtons;
+let mobileControls;
 
 // Set up input event listeners
 export function setupInput() {
-    // Keyboard events
+    // Detect if using mobile device
+    inputState.isMobile = isMobileDevice();
+    
+    // Keyboard events (for desktop)
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
     
-    // Mouse events
+    // Mouse events (for desktop)
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
@@ -70,14 +83,308 @@ export function setupInput() {
     // Prevent context menu on right click
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     
-    // Add gamepad support later
-    // window.addEventListener('gamepadconnected', handleGamepadConnected);
-    // window.addEventListener('gamepaddisconnected', handleGamepadDisconnected);
+    // If mobile, set up touch controls
+    if (inputState.isMobile) {
+        setupMobileControls();
+    }
     
-    console.log('Input system initialized');
+    console.log('Input system initialized', inputState.isMobile ? 'with mobile controls' : 'with desktop controls');
 }
 
-// Handle keydown events
+// Detect if using a mobile device
+function isMobileDevice() {
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 800 && window.innerHeight <= 600)
+    );
+}
+
+// Set up mobile controls
+function setupMobileControls() {
+    // Create container for mobile controls
+    mobileControls = document.createElement('div');
+    mobileControls.id = 'mobile-controls';
+    mobileControls.style.position = 'absolute';
+    mobileControls.style.left = '0';
+    mobileControls.style.bottom = '0';
+    mobileControls.style.width = '100%';
+    mobileControls.style.height = '40%';
+    mobileControls.style.zIndex = '1000';
+    mobileControls.style.pointerEvents = 'none'; // Allow clicks to pass through by default
+    document.body.appendChild(mobileControls);
+    
+    // Create joystick
+    createJoystick();
+    
+    // Create action buttons
+    createActionButtons();
+    
+    // Add touch event listeners
+    document.addEventListener('touchstart', handleTouchStart, { passive: false });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+}
+
+// Create joystick control
+function createJoystick() {
+    // Joystick container
+    joystickElement = document.createElement('div');
+    joystickElement.id = 'joystick';
+    joystickElement.style.position = 'absolute';
+    joystickElement.style.left = '20%';
+    joystickElement.style.bottom = '30%';
+    joystickElement.style.transform = 'translate(-50%, 50%)';
+    joystickElement.style.width = '120px';
+    joystickElement.style.height = '120px';
+    joystickElement.style.borderRadius = '50%';
+    joystickElement.style.border = '2px solid rgba(100, 149, 237, 0.8)';
+    joystickElement.style.backgroundColor = 'rgba(65, 105, 225, 0.3)';
+    joystickElement.style.pointerEvents = 'auto';
+    joystickElement.style.boxShadow = '0 0 15px rgba(100, 149, 237, 0.8)';
+    mobileControls.appendChild(joystickElement);
+    
+    // Joystick knob
+    joystickKnob = document.createElement('div');
+    joystickKnob.id = 'joystick-knob';
+    joystickKnob.style.position = 'absolute';
+    joystickKnob.style.left = '50%';
+    joystickKnob.style.top = '50%';
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+    joystickKnob.style.width = '60px';
+    joystickKnob.style.height = '60px';
+    joystickKnob.style.borderRadius = '50%';
+    joystickKnob.style.backgroundColor = 'rgba(65, 105, 225, 0.8)';
+    joystickKnob.style.pointerEvents = 'none';
+    joystickElement.appendChild(joystickKnob);
+}
+
+// Create action buttons
+function createActionButtons() {
+    // Button container for right side
+    const buttonContainer = document.createElement('div');
+    buttonContainer.id = 'action-buttons';
+    buttonContainer.style.position = 'absolute';
+    buttonContainer.style.right = '10%';
+    buttonContainer.style.bottom = '20%';
+    buttonContainer.style.display = 'grid';
+    buttonContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    buttonContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
+    buttonContainer.style.gap = '10px';
+    buttonContainer.style.pointerEvents = 'auto';
+    mobileControls.appendChild(buttonContainer);
+    
+    // Button definitions: [id, label, color, row, col, action]
+    const buttons = [
+        ['button-interact', 'L', 'rgba(100, 149, 237, 0.8)', 0, 0, 'interact'],
+        ['button-up', '↑', 'rgba(220, 20, 60, 0.8)', 0, 1, 'moveForward'],
+        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'switchWeapon'],
+        ['button-left', '←', 'rgba(220, 20, 60, 0.8)', 1, 0, 'moveLeft'],
+        ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'dash'],
+        ['button-right', '→', 'rgba(220, 20, 60, 0.8)', 1, 2, 'moveRight'],
+        ['button-attack', 'Sword', 'rgba(205, 133, 63, 0.8)', 2, 0, 'attack'],
+        ['button-down', '↓', 'rgba(220, 20, 60, 0.8)', 2, 1, 'moveBackward'],
+        ['button-inventory', 'I', 'rgba(220, 20, 60, 0.8)', 2, 2, 'inventory']
+    ];
+    
+    // Create each button
+    actionButtons = {};
+    buttons.forEach(([id, label, color, row, col, action]) => {
+        const button = document.createElement('div');
+        button.id = id;
+        button.className = 'control-button';
+        button.dataset.action = action;
+        
+        button.style.width = '60px';
+        button.style.height = '60px';
+        button.style.borderRadius = '50%';
+        button.style.backgroundColor = color;
+        button.style.border = `2px solid ${color.replace('0.8', '1')}`;
+        button.style.boxShadow = `0 0 10px ${color}`;
+        button.style.display = 'flex';
+        button.style.justifyContent = 'center';
+        button.style.alignItems = 'center';
+        button.style.color = 'white';
+        button.style.fontFamily = 'Arial, sans-serif';
+        button.style.fontWeight = 'bold';
+        button.style.userSelect = 'none';
+        button.style.gridRow = row + 1;
+        button.style.gridColumn = col + 1;
+        
+        button.textContent = label;
+        
+        buttonContainer.appendChild(button);
+        actionButtons[id] = button;
+    });
+}
+
+// Handle touch start for mobile controls
+function handleTouchStart(event) {
+    event.preventDefault();
+    
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        const target = touch.target;
+        
+        // Check if touch is on joystick
+        if (target.id === 'joystick' || target.id === 'joystick-knob') {
+            // Save touch identifier for tracking this touch
+            inputState.touchId = touch.identifier;
+            updateJoystickPosition(touch);
+        }
+        
+        // Check if touch is on action button
+        if (target.classList && target.classList.contains('control-button')) {
+            const action = target.dataset.action;
+            
+            // Highlight button
+            target.style.transform = 'scale(0.9)';
+            
+            // Set input state
+            handleButtonPress(action, true);
+        }
+    }
+}
+
+// Handle touch move for mobile controls
+function handleTouchMove(event) {
+    event.preventDefault();
+    
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        
+        // Check if this is the joystick touch
+        if (touch.identifier === inputState.touchId) {
+            updateJoystickPosition(touch);
+        }
+    }
+}
+
+// Handle touch end for mobile controls
+function handleTouchEnd(event) {
+    event.preventDefault();
+    
+    for (let i = 0; i < event.changedTouches.length; i++) {
+        const touch = event.changedTouches[i];
+        
+        // Check if joystick touch ended
+        if (touch.identifier === inputState.touchId) {
+            // Reset joystick position and input state
+            resetJoystick();
+            inputState.touchId = null;
+        }
+        
+        // Find if touch was on an action button
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (target && target.classList && target.classList.contains('control-button')) {
+            const action = target.dataset.action;
+            
+            // Reset button appearance
+            target.style.transform = 'scale(1)';
+            
+            // Reset input state
+            handleButtonPress(action, false);
+        }
+    }
+}
+
+// Update joystick position and input values
+function updateJoystickPosition(touch) {
+    const joystickRect = joystickElement.getBoundingClientRect();
+    const centerX = joystickRect.left + joystickRect.width / 2;
+    const centerY = joystickRect.top + joystickRect.height / 2;
+    
+    // Calculate distance from center
+    let deltaX = touch.clientX - centerX;
+    let deltaY = touch.clientY - centerY;
+    
+    // Calculate distance from center
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    // Limit to joystick radius
+    const maxRadius = joystickRect.width / 2 - joystickKnob.offsetWidth / 2;
+    if (distance > maxRadius) {
+        deltaX = deltaX * maxRadius / distance;
+        deltaY = deltaY * maxRadius / distance;
+    }
+    
+    // Move joystick knob
+    joystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    
+    // Update input state with normalized values (-1 to 1)
+    const normalizedX = deltaX / maxRadius;
+    const normalizedY = deltaY / maxRadius;
+    
+    inputState.axes.leftStickX = normalizedX;
+    inputState.axes.leftStickY = normalizedY;
+    
+    // Convert joystick position to directional input
+    if (Math.abs(normalizedX) > 0.5) {
+        inputState.moveLeft = normalizedX < 0;
+        inputState.moveRight = normalizedX > 0;
+    } else {
+        inputState.moveLeft = false;
+        inputState.moveRight = false;
+    }
+    
+    if (Math.abs(normalizedY) > 0.5) {
+        inputState.moveForward = normalizedY < 0;
+        inputState.moveBackward = normalizedY > 0;
+    } else {
+        inputState.moveForward = false;
+        inputState.moveBackward = false;
+    }
+}
+
+// Reset joystick position and related input states
+function resetJoystick() {
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+    
+    inputState.axes.leftStickX = 0;
+    inputState.axes.leftStickY = 0;
+    
+    inputState.moveForward = false;
+    inputState.moveBackward = false;
+    inputState.moveLeft = false;
+    inputState.moveRight = false;
+}
+
+// Handle button press/release
+function handleButtonPress(action, isPressed) {
+    switch (action) {
+        case 'moveForward':
+            inputState.moveForward = isPressed;
+            break;
+        case 'moveBackward':
+            inputState.moveBackward = isPressed;
+            break;
+        case 'moveLeft':
+            inputState.moveLeft = isPressed;
+            break;
+        case 'moveRight':
+            inputState.moveRight = isPressed;
+            break;
+        case 'attack':
+            inputState.attack = isPressed;
+            break;
+        case 'dash':
+            inputState.dash = isPressed;
+            break;
+        case 'interact':
+            inputState.interact = isPressed;
+            break;
+        case 'inventory':
+            inputState.inventory = isPressed;
+            break;
+        case 'switchWeapon':
+            // This would need to be implemented in your game logic
+            if (isPressed) {
+                console.log("Switch weapon pressed");
+            }
+            break;
+    }
+}
+
+// Handle keydown events (for desktop)
 function handleKeyDown(event) {
     updateInputState(event.code, true);
     
@@ -87,12 +394,12 @@ function handleKeyDown(event) {
     }
 }
 
-// Handle keyup events
+// Handle keyup events (for desktop)
 function handleKeyUp(event) {
     updateInputState(event.code, false);
 }
 
-// Update input state based on key code
+// Update input state based on key code (for desktop)
 function updateInputState(code, isPressed) {
     switch (code) {
         // Movement
@@ -132,13 +439,13 @@ function updateInputState(code, isPressed) {
     }
 }
 
-// Handle mouse movement
+// Handle mouse movement (for desktop)
 function handleMouseMove(event) {
     inputState.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     inputState.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
 
-// Handle mouse button down
+// Handle mouse button down (for desktop)
 function handleMouseDown(event) {
     switch (event.button) {
         case 0: // Left button
@@ -152,7 +459,7 @@ function handleMouseDown(event) {
     }
 }
 
-// Handle mouse button up
+// Handle mouse button up (for desktop)
 function handleMouseUp(event) {
     switch (event.button) {
         case 0: // Left button
@@ -191,6 +498,11 @@ export function getInput() {
 
 // Lock/unlock cursor for gameplay (called when entering/exiting game)
 export function setCursorLock(locked) {
+    if (inputState.isMobile) {
+        // No cursor lock needed for mobile
+        return;
+    }
+    
     if (locked) {
         document.body.requestPointerLock = document.body.requestPointerLock || 
                                            document.body.mozRequestPointerLock ||
@@ -201,5 +513,12 @@ export function setCursorLock(locked) {
                                    document.mozExitPointerLock ||
                                    document.webkitExitPointerLock;
         document.exitPointerLock();
+    }
+}
+
+// Show/hide mobile controls
+export function toggleMobileControls(show) {
+    if (mobileControls) {
+        mobileControls.style.display = show ? 'block' : 'none';
     }
 }
