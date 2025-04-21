@@ -6,7 +6,8 @@ import { generateDungeon } from '../dungeon/generator.js';
 import { Player } from '../entities/player.js';
 import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
-import { initMinimap, updateMinimap } from './minimap.js'; // Add this import at the top
+import { initMinimap, updateMinimap } from './minimap.js'; // Add this import
+import { initPauseMenu, togglePauseMenu } from './pauseMenu.js'; // Add pause menu import
 
 // Game states
 const GameState = {
@@ -57,6 +58,9 @@ export class Game {
         
         // Initialize minimap
         this.minimapContext = initMinimap();
+        
+        // Initialize pause menu
+        initPauseMenu();
         
         // Create player
         this.player = new Player();
@@ -143,7 +147,7 @@ export class Game {
     updatePlaying(deltaTime, inputState) {
         // Handle pause input
         if (inputState.justPressed.pause) {
-            this.state = GameState.PAUSED;
+            this.togglePause();
             return;
         }
         
@@ -182,6 +186,12 @@ export class Game {
         }
     }
     
+    // Toggle between paused and playing states
+    togglePause() {
+        const isPaused = togglePauseMenu();
+        this.state = isPaused ? GameState.PAUSED : GameState.PLAYING;
+    }
+    
     // Update camera position to follow player
     updateCamera(deltaTime) {
         const playerPosition = this.player.getPosition();
@@ -212,8 +222,11 @@ export class Game {
     updatePaused(inputState) {
         // Handle unpause input
         if (inputState.justPressed.pause) {
-            this.state = GameState.PLAYING;
+            this.togglePause();
         }
+        
+        // While paused, we still render the scene but don't update game logic
+        // This allows the pause menu to be displayed over the frozen game
     }
     
     // Update menu state
