@@ -13,7 +13,7 @@ export class Room {
         this.isSloped = false;
         this.isSpecial = false;
         
-        // Properties for radial dungeon layout
+        // New properties for radial dungeon layout
         this.isSpawnRoom = false;
         this.roomType = null; // null for normal, 'radial', 'cardinal', 'cardinalPlus', or special types below
         
