@@ -18,19 +18,17 @@
             </div>
             <div id="floor-info">Floor: <span id="floor-number">1</span></div>
             <div id="weapon-info">
-                <div class="weapon-name">Sword</div>
-                <div class="weapon-durability">Durability: <span id="durability-value">100</span>%</div>
+                <div class="weapon-name">Sword & Staff</div>
+                <div class="weapon-durability">Durability: <span id="durability-value">100/100</span>%</div>
             </div>
         </div>
         <div id="minimap-container">
             <canvas id="minimap-canvas"></canvas>
         </div>
+        <!-- Crosshair for first-person view (hidden until implemented) -->
+        <div id="crosshair" style="display: none;"></div>
     </div>
 
-<!-- Change this: -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-<!-- To this (load it as a module): -->
 <script type="importmap">
 {
   "imports": {
