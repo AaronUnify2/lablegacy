@@ -96,6 +96,9 @@ export function updateMinimap(ctx, dungeon, player) {
         if (room.isSpawnRoom) {
             // Center/spawn room
             fillColor = 'rgba(50, 180, 255, 0.8)';
+        } else if (room.roomType === 'alcove') {
+            // Alcoves - use a distinct color to make them stand out
+            fillColor = 'rgba(255, 102, 204, 0.8)'; // Pink color for alcoves
         } else if (room.roomType === 'cardinalPlus') {
             // CardinalPlus rooms - use a purple color to make them stand out
             fillColor = 'rgba(180, 100, 220, 0.8)';
@@ -123,6 +126,35 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x, z, width, height);
+        
+        // Add a special marker for alcoves
+        if (room.roomType === 'alcove') {
+            const centerX = x + width / 2;
+            const centerZ = z + height / 2;
+            
+            // Draw a small star or diamond in alcoves to highlight them
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            
+            // Draw a five-point star (simplified)
+            ctx.beginPath();
+            for (let i = 0; i < 5; i++) {
+                const angleA = Math.PI / 2 + i * Math.PI * 2 / 5;
+                const angleB = Math.PI / 2 + (i + 0.5) * Math.PI * 2 / 5;
+                const x1 = centerX + Math.cos(angleA) * 3;
+                const y1 = centerZ + Math.sin(angleA) * 3;
+                const x2 = centerX + Math.cos(angleB) * 1.5;
+                const y2 = centerZ + Math.sin(angleB) * 1.5;
+                
+                if (i === 0) {
+                    ctx.moveTo(x1, y1);
+                } else {
+                    ctx.lineTo(x1, y1);
+                }
+                ctx.lineTo(x2, y2);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
         
         // Add a special marker for cardinalPlus rooms to highlight them
         if (room.roomType === 'cardinalPlus') {
