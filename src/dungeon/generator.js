@@ -47,20 +47,20 @@ function determineDungeonSize(floorNumber) {
     if (floorNumber <= 3) {
         return {
             roomCount: 5 + Math.floor(Math.random() * 3), // 5-7 rooms
-            width: 50,
-            height: 50
+            width: 200,  // Increased from 50 to accommodate larger rooms
+            height: 200  // Increased from 50 to accommodate larger rooms
         };
     } else if (floorNumber <= 7) {
         return {
             roomCount: 8 + Math.floor(Math.random() * 4), // 8-11 rooms
-            width: 70,
-            height: 70
+            width: 280,  // Increased from 70 to accommodate larger rooms
+            height: 280  // Increased from 70 to accommodate larger rooms
         };
     } else {
         return {
             roomCount: 12 + Math.floor(Math.random() * 9), // 12-20 rooms
-            width: 100,
-            height: 100
+            width: 400,  // Increased from 100 to accommodate larger rooms
+            height: 400  // Increased from 100 to accommodate larger rooms
         };
     }
 }
@@ -71,39 +71,39 @@ function generateRadialRooms(dungeon, size) {
     const centerX = size.width / 2;
     const centerZ = size.height / 2;
     
-    // Room size ranges
+    // Room size ranges - increased to take 4-12 seconds to cross with player speed of 5
     const centerRoomSize = {
-        width: 12,
-        height: 12
+        width: 30,       // Was 12, now larger center room 
+        height: 30       // Was 12, now larger center room
     };
     
     const radialRoomSize = {
-        minWidth: 8,
-        maxWidth: 12,
-        minHeight: 8,
-        maxHeight: 12
+        minWidth: 20,    // Was 8, now minimum of 4 seconds to cross
+        maxWidth: 40,    // Was 12, now larger for variety
+        minHeight: 20,   // Was 8, now minimum of 4 seconds to cross
+        maxHeight: 40    // Was 12, now larger for variety
     };
     
     const cardinalRoomSize = {
-        minWidth: 6,
-        maxWidth: 10,
-        minHeight: 6,
-        maxHeight: 10
+        minWidth: 25,    // Was 6, now larger
+        maxWidth: 45,    // Was 10, now larger 
+        minHeight: 25,   // Was 6, now larger
+        maxHeight: 45    // Was 10, now larger
     };
     
     // New size for cardinalPlus rooms
     const cardinalPlusRoomSize = {
-        minWidth: 7,
-        maxWidth: 11,
-        minHeight: 7,
-        maxHeight: 11
+        minWidth: 30,    // Was 7, now larger
+        maxWidth: 60,    // Was 11, now larger (up to 12 seconds to cross)
+        minHeight: 30,    // Was 7, now larger
+        maxHeight: 60    // Was 11, now larger (up to 12 seconds to cross) 
     };
     
-    // Corridor sizes
-    const corridorWidth = 3;
+    // Corridor sizes - increased to match larger rooms
+    const corridorWidth = 6;  // Was 3, now wider corridors
     
-    // Spacing between rooms
-    const roomSpacing = 6;
+    // Spacing between rooms - increased to match larger rooms
+    const roomSpacing = 16;   // Was 6, increased for larger rooms
     
     // Create center room
     const centerRoom = new Room(
@@ -336,12 +336,84 @@ function generateRadialRooms(dungeon, size) {
         position.connected = true;
     }
     
+    // Add alcoves to room edges that don't have corridors
+    addAlcovesToRooms(dungeon);
+    
     // Return the center room for player spawn point
     return centerRoom;
 }
 
+// New function to add alcoves to rooms
+function addAlcovesToRooms(dungeon) {
+    const rooms = dungeon.getRooms();
+    
+    for (const room of rooms) {
+        // Skip corridors
+        if (room.isCorridor) continue;
+        
+        // For each room, check all four sides
+        const sides = ['north', 'east', 'south', 'west'];
+        
+        for (const side of sides) {
+            // 70% chance to add an alcove if there's no passage on this side
+            if (!dungeon.hasPassageAt(room, side) && Math.random() < 0.7) {
+                // Determine alcove dimensions
+                const longestEdge = Math.max(room.width, room.height);
+                const alcoveLength = Math.floor(longestEdge * (0.4 + Math.random() * 0.4)); // 40-80% of longest edge
+                const alcoveWidth = Math.floor(longestEdge * (0.2 + Math.random() * 0.1));  // 20-30% of longest edge
+                
+                // Calculate alcove position based on the side of the room
+                let alcoveX, alcoveZ, alcoveWidth2, alcoveHeight2;
+                
+                switch (side) {
+                    case 'north':
+                        // Alcove extends from north side
+                        alcoveWidth2 = alcoveLength;
+                        alcoveHeight2 = alcoveWidth;
+                        // Random position along north wall, ensuring alcove doesn't extend past room width
+                        alcoveX = room.x + Math.max(0, Math.min(room.width - alcoveWidth2, Math.floor(Math.random() * (room.width - alcoveWidth2))));
+                        alcoveZ = room.z - alcoveHeight2;
+                        break;
+                    case 'east':
+                        // Alcove extends from east side
+                        alcoveWidth2 = alcoveWidth;
+                        alcoveHeight2 = alcoveLength;
+                        alcoveX = room.x + room.width;
+                        // Random position along east wall, ensuring alcove doesn't extend past room height
+                        alcoveZ = room.z + Math.max(0, Math.min(room.height - alcoveHeight2, Math.floor(Math.random() * (room.height - alcoveHeight2))));
+                        break;
+                    case 'south':
+                        // Alcove extends from south side
+                        alcoveWidth2 = alcoveLength;
+                        alcoveHeight2 = alcoveWidth;
+                        // Random position along south wall, ensuring alcove doesn't extend past room width
+                        alcoveX = room.x + Math.max(0, Math.min(room.width - alcoveWidth2, Math.floor(Math.random() * (room.width - alcoveWidth2))));
+                        alcoveZ = room.z + room.height;
+                        break;
+                    case 'west':
+                        // Alcove extends from west side
+                        alcoveWidth2 = alcoveWidth;
+                        alcoveHeight2 = alcoveLength;
+                        alcoveX = room.x - alcoveWidth2;
+                        // Random position along west wall, ensuring alcove doesn't extend past room height
+                        alcoveZ = room.z + Math.max(0, Math.min(room.height - alcoveHeight2, Math.floor(Math.random() * (room.height - alcoveHeight2))));
+                        break;
+                }
+                
+                // Create alcove as a small room
+                const alcove = new Room(alcoveX, 0, alcoveZ, alcoveWidth2, alcoveHeight2);
+                alcove.roomType = 'alcove';
+                dungeon.addRoom(alcove);
+                
+                // Create a corridor to connect the alcove to the main room (very short one)
+                connectRoomsWithCorridor(dungeon, room, alcove, true);
+            }
+        }
+    }
+}
+
 // Helper function to connect two rooms with a corridor
-function connectRoomsWithCorridor(dungeon, room1, room2) {
+function connectRoomsWithCorridor(dungeon, room1, room2, isAlcoveConnection = false) {
     // Get center points of rooms
     const center1 = {
         x: room1.x + room1.width / 2,
@@ -357,8 +429,51 @@ function connectRoomsWithCorridor(dungeon, room1, room2) {
     const floorHeight = 0;
     
     // Create a simple L-shaped corridor
-    const corridorWidth = 3;
+    const corridorWidth = 6;  // Increased from 3 to match larger rooms
     
+    // For alcove connections, use a shorter, direct corridor approach
+    if (isAlcoveConnection) {
+        // Determine if this is a horizontal or vertical connection
+        const isHorizontalConnection = Math.abs(center1.x - center2.x) > Math.abs(center1.z - center2.z);
+        
+        if (isHorizontalConnection) {
+            // Create horizontal corridor
+            const minX = Math.min(center1.x, center2.x);
+            const maxX = Math.max(center1.x, center2.x);
+            
+            const horizontalCorridor = new Room(
+                minX - corridorWidth / 2,
+                floorHeight,
+                center1.z - corridorWidth / 2,
+                maxX - minX + corridorWidth,
+                corridorWidth
+            );
+            
+            horizontalCorridor.isCorridor = true;
+            horizontalCorridor.setFloorHeight(floorHeight);
+            dungeon.addCorridor(horizontalCorridor);
+        } else {
+            // Create vertical corridor
+            const minZ = Math.min(center1.z, center2.z);
+            const maxZ = Math.max(center1.z, center2.z);
+            
+            const verticalCorridor = new Room(
+                center1.x - corridorWidth / 2,
+                floorHeight,
+                minZ - corridorWidth / 2,
+                corridorWidth,
+                maxZ - minZ + corridorWidth
+            );
+            
+            verticalCorridor.isCorridor = true;
+            verticalCorridor.setFloorHeight(floorHeight);
+            dungeon.addCorridor(verticalCorridor);
+        }
+        
+        return;
+    }
+    
+    // Standard L-shaped corridor for normal connections
     // Decide if we go horizontally first or vertically first
     if (Math.random() < 0.5) {
         // Horizontal then vertical
@@ -473,6 +588,7 @@ function placeKeyAndExit(dungeon) {
     const radialRooms = rooms.filter(room => room.roomType === 'radial');
     const cardinalRooms = rooms.filter(room => room.roomType === 'cardinal');
     const cardinalPlusRooms = rooms.filter(room => room.roomType === 'cardinalPlus');
+    const alcoveRooms = rooms.filter(room => room.roomType === 'alcove');
     const normalRooms = rooms.filter(room => !room.roomType && !room.isSpawnRoom);
     
     let keyRoom, exitRoom;
@@ -483,7 +599,21 @@ function placeKeyAndExit(dungeon) {
     // 3. Otherwise, if we have radial rooms, put key in a radial room and exit in another
     // 4. As a fallback, find two rooms that are far apart
     
-    if (cardinalPlusRooms.length >= 1) {
+    // Consider alcoves for key placement with a 30% chance, if alcoves exist
+    if (alcoveRooms.length >= 1 && Math.random() < 0.3) {
+        // Place key in a random alcove
+        keyRoom = alcoveRooms[Math.floor(Math.random() * alcoveRooms.length)];
+        
+        // Find another room as far as possible for exit (preferably a cardinalPlus or cardinal room)
+        const potentialExitRooms = [...cardinalPlusRooms, ...cardinalRooms, ...radialRooms].filter(room => room !== keyRoom);
+        
+        if (potentialExitRooms.length > 0) {
+            exitRoom = findFarthestRoom(keyRoom, potentialExitRooms);
+        } else {
+            const otherRooms = rooms.filter(room => room !== keyRoom && room !== spawnRoom && room.roomType !== 'alcove');
+            exitRoom = findFarthestRoom(keyRoom, otherRooms);
+        }
+    } else if (cardinalPlusRooms.length >= 1) {
         // Place key in a cardinalPlus room
         keyRoom = cardinalPlusRooms[Math.floor(Math.random() * cardinalPlusRooms.length)];
         
@@ -675,8 +805,10 @@ function addDecorations(dungeon, theme) {
 function getDecorationMultiplier(room) {
     if (room.isSpawnRoom) {
         return 1.5; // More decorations in spawn room
+    } else if (room.roomType === 'alcove') {
+        return 2.0; // Most decorations in alcoves (they're special places)
     } else if (room.roomType === 'cardinalPlus') {
-        return 1.4; // Most decorations in cardinalPlus rooms (they're special!)
+        return 1.4; // Many decorations in cardinalPlus rooms
     } else if (room.roomType === 'radial') {
         return 1.2; // Slightly more in radial rooms
     } else if (room.roomType === 'cardinal') {
