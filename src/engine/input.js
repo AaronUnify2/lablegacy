@@ -180,7 +180,7 @@ function createActionButtons() {
     const buttons = [
         ['button-interact', 'L', 'rgba(100, 149, 237, 0.8)', 0, 0, 'interact'],
         ['button-up', '↑', 'rgba(220, 20, 60, 0.8)', 0, 1, 'moveForward'],
-        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'switchWeapon'],
+        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'chargeAttack'],
         ['button-left', '←', 'rgba(220, 20, 60, 0.8)', 1, 0, 'moveLeft'],
         ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'jump'],  // Changed to jump
         ['button-right', '→', 'rgba(220, 20, 60, 0.8)', 1, 2, 'moveRight'],
