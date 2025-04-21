@@ -78,6 +78,26 @@ export class Player {
         this.inventory = [];
         this.maxInventorySize = 20;
         
+        // Add some starting items for testing
+        this.inventory.push({
+            id: 'smallHealthPotion',
+            name: 'Small Health Potion',
+            type: 'healthPotion',
+            description: 'Restores 20 health points.',
+            healAmount: 20,
+            stackable: true,
+            count: 3
+        });
+        
+        this.inventory.push({
+            id: 'smallStaminaPotion',
+            name: 'Small Stamina Potion',
+            type: 'staminaPotion',
+            description: 'Instantly recharges dash ability.',
+            stackable: true,
+            count: 2
+        });
+        
         // Three.js objects
         this.object = null;
         this.collider = null;
@@ -638,11 +658,107 @@ export class Player {
     
     // Collect an item
     collectItem(item) {
+        // Check if we have room in inventory
         if (this.inventory.length < this.maxInventorySize) {
-            this.inventory.push(item);
+            // Get item data for inventory
+            const itemData = item.getItemData();
+            
+            // Add to inventory
+            this.addToInventory(itemData);
+            
+            // Mark item as collected
+            item.collect();
+            
+            // Notify player
+            console.log(`Collected item: ${itemData.name}`);
+            
             return true;
         }
         return false;
+    }
+    
+    // Add item to inventory
+    addToInventory(itemData) {
+        // Check if similar item already exists and is stackable
+        const existingItem = this.inventory.find(i => i.id === itemData.id && i.stackable);
+        
+        if (existingItem) {
+            // Increase stack count
+            existingItem.count += itemData.count || 1;
+        } else {
+            // Add as new item
+            this.inventory.push({
+                ...itemData,
+                count: itemData.count || 1
+            });
+        }
+        
+        // Update pause menu inventory if it exists
+        if (window.updatePauseMenuInventory) {
+            window.updatePauseMenuInventory(this.inventory);
+        }
+        
+        return true;
+    }
+    
+    // Get entire inventory
+    getInventory() {
+        return [...this.inventory];
+    }
+    
+    // Use an item from inventory
+    useItem(itemIndex) {
+        if (itemIndex < 0 || itemIndex >= this.inventory.length) return false;
+        
+        const item = this.inventory[itemIndex];
+        
+        // Apply item effects based on type
+        switch (item.type) {
+            case 'healthPotion':
+                // Only use if not at full health
+                if (this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + (item.healAmount || 30));
+                    
+                    // Remove item or reduce count
+                    this.removeFromInventory(itemIndex);
+                    return true;
+                }
+                return false;
+                
+            case 'staminaPotion':
+                // Reset dash cooldown
+                this.dashCooldownTimer = 0;
+                
+                // Remove item or reduce count
+                this.removeFromInventory(itemIndex);
+                return true;
+                
+            // Handle other item types here
+            default:
+                return false;
+        }
+    }
+    
+    // Remove item from inventory
+    removeFromInventory(index) {
+        if (index < 0 || index >= this.inventory.length) return false;
+        
+        const item = this.inventory[index];
+        
+        if (item.count > 1) {
+            // Reduce count
+            item.count--;
+        } else {
+            // Remove entirely
+            this.inventory.splice(index, 1);
+        }
+        
+        // Update pause menu inventory if it exists
+        if (window.updatePauseMenuInventory) {
+            window.updatePauseMenuInventory(this.inventory);
+        }
+        
+        return true;
     }
     
     // Get player object (for Three.js)
@@ -684,5 +800,24 @@ export class Player {
     // Check if player is in air (jumping or falling)
     isInAir() {
         return this.isJumping || this.isFalling;
+    }
+    
+    // Apply stamina boost effect (for stamina potions)
+    applyStaminaBoost(duration) {
+        // Reset dash cooldown
+        this.dashCooldownTimer = 0;
+        
+        // TODO: Implement continuous jumping effect for duration
+        console.log(`Applied stamina boost for ${duration} seconds`);
+        
+        return true;
+    }
+    
+    // Unlock new staff ability
+    unlockStaffAbility(abilityType) {
+        // TODO: Implement staff abilities
+        console.log(`Unlocked staff ability: ${abilityType}`);
+        
+        return true;
     }
 }
