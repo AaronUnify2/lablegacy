@@ -1,4 +1,4 @@
-// src/game/ui.js - Enhanced user interface with three status bars
+// src/game/ui.js - Enhanced user interface with three status bars positioned at top-left
 
 // Update UI elements with current game state
 export function updateUI(player, floorNumber) {
