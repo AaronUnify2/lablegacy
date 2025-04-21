@@ -19,8 +19,8 @@ function init() {
     game = new Game();
     game.init();
     
-    // Show control hints
-    createControlHints();
+    // Removed control hints
+    // createControlHints();
     
     // Start the game loop
     requestAnimationFrame(gameLoop);
