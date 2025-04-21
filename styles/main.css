@@ -24,38 +24,66 @@ canvas {
     left: 20px;
     color: white;
     padding: 15px;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     user-select: none;
-    min-width: 200px;
+    min-width: 250px;
+    z-index: 100;
+}
+
+.stat-bar-container {
+    width: 100%;
+    margin-bottom: 8px;
 }
 
 .stat-label {
     font-size: 12px;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     color: #aaa;
+    display: flex;
+    justify-content: space-between;
 }
 
-#health-bar {
+.stat-value {
+    font-size: 12px;
+    color: #fff;
+}
+
+.stat-bar {
     width: 100%;
-    height: 18px;
+    height: 14px;
     background-color: #333;
     border-radius: 4px;
     overflow: hidden;
-    margin-bottom: 10px;
+    position: relative;
 }
 
-#health-fill {
+.stat-fill {
     height: 100%;
-    background-color: #f04040;
     border-radius: 4px;
     width: 100%;
     transition: width 0.3s;
 }
 
+/* Health bar - red */
+#health-fill {
+    background-color: #f04040;
+}
+
+/* Mana bar - blue */
+#mana-fill {
+    background-color: #4080f0;
+}
+
+/* Stamina bar - green */
+#stamina-fill {
+    background-color: #40f080;
+}
+
 #floor-info {
-    margin-bottom: 10px;
+    margin-top: 12px;
+    margin-bottom: 8px;
     font-size: 14px;
 }
 
