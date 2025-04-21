@@ -165,39 +165,10 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.fillStyle = fillColor;
         ctx.fillRect(x, z, width, height);
         
-        // Add border
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.lineWidth = 1;
+        // Add thinner border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 0.5; // Reduced from 1 to make borders lighter
         ctx.strokeRect(x, z, width, height);
-        
-        // Add a small star marker for alcoves only
-        if (room.roomType === 'alcove') {
-            const centerX = x + width / 2;
-            const centerZ = z + height / 2;
-            
-            // Draw a small star to highlight alcoves
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            
-            // Draw a five-point star (simplified)
-            ctx.beginPath();
-            for (let i = 0; i < 5; i++) {
-                const angleA = Math.PI / 2 + i * Math.PI * 2 / 5;
-                const angleB = Math.PI / 2 + (i + 0.5) * Math.PI * 2 / 5;
-                const x1 = centerX + Math.cos(angleA) * 3;
-                const y1 = centerZ + Math.sin(angleA) * 3;
-                const x2 = centerX + Math.cos(angleB) * 1.5;
-                const y2 = centerZ + Math.sin(angleB) * 1.5;
-                
-                if (i === 0) {
-                    ctx.moveTo(x1, y1);
-                } else {
-                    ctx.lineTo(x1, y1);
-                }
-                ctx.lineTo(x2, y2);
-            }
-            ctx.closePath();
-            ctx.fill();
-        }
     });
     
     // Draw key and exit if they exist
