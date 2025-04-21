@@ -1,6 +1,5 @@
-// src/entities/player.js - Player character implementation with jump functionality
+// src/entities/player.js - Player character implementation with dual weapons
 import * as THREE from 'three';
-
 
 export class Player {
     constructor() {
@@ -29,7 +28,7 @@ export class Player {
         this.jumpHeight = 2;        // Maximum jump height
         this.jumpTimer = 0;
         this.jumpDuration = 0.5;    // Time to reach peak of jump
-        this.jumpCooldown = 0.05;    // Cooldown between jumps
+        this.jumpCooldown = 0.05;   // Cooldown between jumps
         this.jumpCooldownTimer = 0;
         this.gravity = 15;          // Gravity force pulling player down
         this.groundLevel = 2.0;     // Current ground level, raised to 1.0
@@ -46,15 +45,34 @@ export class Player {
         this.attackHitbox = null;
         this.invulnerabilityTime = 0;
         
-        // Current weapon
-        this.currentWeapon = {
-            type: 'sword',
-            damage: 10,
-            durability: 100,
-            maxDurability: 100,
-            range: 2,
-            attackSpeed: 1.0
+        // Weapons
+        this.weapons = {
+            sword: {
+                type: 'sword',
+                damage: 10,
+                durability: 100,
+                maxDurability: 100,
+                range: 2,
+                attackSpeed: 1.0,
+                mesh: null
+            },
+            staff: {
+                type: 'staff',
+                damage: 8,
+                durability: 100,
+                maxDurability: 100,
+                range: 15,
+                attackSpeed: 0.8,
+                cooldown: 0.7,
+                cooldownTimer: 0,
+                projectileSpeed: 15,
+                mesh: null
+            }
         };
+        
+        // Ranged attack properties
+        this.projectiles = [];
+        this.maxProjectiles = 10; // Maximum number of projectiles active at once
         
         // Inventory
         this.inventory = [];
@@ -80,16 +98,16 @@ export class Player {
         this.object.position.set(this.position.x, this.position.y, this.position.z);
         this.object.add(this.mesh);
         
-        // Add weapon model
-        this.createWeaponModel();
+        // Add weapon models
+        this.createWeaponModels();
         
         // Create collider
         this.updateCollider();
     }
     
-    // Create a visual representation of the player's weapon
-    createWeaponModel() {
-        // Simple sword model
+    // Create visual representations of the player's weapons
+    createWeaponModels() {
+        // Create sword model for right hand
         const swordGeometry = new THREE.BoxGeometry(0.1, 0.8, 0.1);
         const handleGeometry = new THREE.BoxGeometry(0.15, 0.2, 0.15);
         const guardGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.1);
@@ -107,17 +125,153 @@ export class Player {
         handle.position.set(0, -0.2, 0);
         guard.position.set(0, 0, 0);
         
-        // Create weapon container
-        this.weaponMesh = new THREE.Object3D();
-        this.weaponMesh.add(blade);
-        this.weaponMesh.add(handle);
-        this.weaponMesh.add(guard);
+        // Create sword container
+        this.weapons.sword.mesh = new THREE.Object3D();
+        this.weapons.sword.mesh.add(blade);
+        this.weapons.sword.mesh.add(handle);
+        this.weapons.sword.mesh.add(guard);
         
-        // Position weapon in player's hand
-        this.weaponMesh.position.set(0.5, 0.3, 0.5);
-        this.weaponMesh.rotation.z = -Math.PI / 4;
+        // Position sword in player's right hand
+        this.weapons.sword.mesh.position.set(0.5, 0.3, 0.5);
+        this.weapons.sword.mesh.rotation.z = -Math.PI / 4;
         
-        this.object.add(this.weaponMesh);
+        this.object.add(this.weapons.sword.mesh);
+        
+        // Create staff model for left hand
+        const staffPoleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 1.2, 8);
+        const staffTopGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+        
+        const staffPoleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const staffTopMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x4040ff,
+            emissive: 0x0000ff,
+            emissiveIntensity: 0.5
+        });
+        
+        const staffPole = new THREE.Mesh(staffPoleGeometry, staffPoleMaterial);
+        const staffTop = new THREE.Mesh(staffTopGeometry, staffTopMaterial);
+        
+        // Position parts
+        staffPole.position.set(0, 0, 0);
+        staffTop.position.set(0, 0.65, 0);
+        
+        // Create staff container
+        this.weapons.staff.mesh = new THREE.Object3D();
+        this.weapons.staff.mesh.add(staffPole);
+        this.weapons.staff.mesh.add(staffTop);
+        
+        // Position staff in player's left hand
+        this.weapons.staff.mesh.position.set(-0.5, 0.3, 0.5);
+        this.weapons.staff.mesh.rotation.z = Math.PI / 10;
+        
+        // Add a small light to the staff top
+        const staffLight = new THREE.PointLight(0x4040ff, 0.5, 3);
+        staffLight.position.set(0, 0.65, 0);
+        this.weapons.staff.mesh.add(staffLight);
+        
+        this.object.add(this.weapons.staff.mesh);
+    }
+    
+    // Create a magic projectile from the staff
+    createProjectile() {
+        // Create projectile geometry and material
+        const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const projectileMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x4040ff,
+            emissive: 0x0000ff,
+            emissiveIntensity: 1.0
+        });
+        
+        // Create projectile mesh
+        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        
+        // Create a light for the projectile
+        const projectileLight = new THREE.PointLight(0x4040ff, 1, 5);
+        projectileLight.position.set(0, 0, 0);
+        projectileMesh.add(projectileLight);
+        
+        // Get staff position and player facing direction
+        const staffWorldPosition = new THREE.Vector3();
+        this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
+        
+        // Set initial position slightly in front of the staff
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotation);
+        
+        const startPosition = new THREE.Vector3(
+            staffWorldPosition.x + direction.x * 0.7,
+            staffWorldPosition.y + 0.65, // Position at the staff top
+            staffWorldPosition.z + direction.z * 0.7
+        );
+        
+        projectileMesh.position.copy(startPosition);
+        
+        // Create projectile object with necessary properties
+        const projectile = {
+            mesh: projectileMesh,
+            direction: direction,
+            speed: this.weapons.staff.projectileSpeed,
+            damage: this.weapons.staff.damage,
+            lifeTime: 3.0, // Seconds before projectile disappears
+            timeAlive: 0
+        };
+        
+        this.projectiles.push(projectile);
+        
+        // Add projectile to scene
+        return projectileMesh;
+    }
+    
+    // Update projectiles
+    updateProjectiles(deltaTime, scene) {
+        // Process each projectile
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const projectile = this.projectiles[i];
+            
+            // Move projectile in its direction
+            projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+            projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
+            
+            // Update lifetime
+            projectile.timeAlive += deltaTime;
+            
+            // Remove projectile if it's existed too long
+            if (projectile.timeAlive >= projectile.lifeTime) {
+                scene.remove(projectile.mesh);
+                this.projectiles.splice(i, 1);
+            }
+        }
+    }
+    
+    // Check projectile collisions with enemies
+    checkProjectileCollisions(enemies) {
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const projectile = this.projectiles[i];
+            const projectilePos = projectile.mesh.position;
+            
+            // Check collision with each enemy
+            for (const enemy of enemies) {
+                const enemyPos = enemy.getPosition();
+                const distance = Math.sqrt(
+                    Math.pow(projectilePos.x - enemyPos.x, 2) +
+                    Math.pow(projectilePos.z - enemyPos.z, 2)
+                );
+                
+                // If collision detected
+                if (distance < 1.0) { // Assuming enemy has ~1 unit radius
+                    // Damage the enemy
+                    enemy.takeDamage(projectile.damage);
+                    
+                    // Remove the projectile
+                    this.projectiles.splice(i, 1);
+                    
+                    // Return true to indicate a hit
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
     
     // Update the player's bounding box (collider)
@@ -142,7 +296,7 @@ export class Player {
     }
     
     // Update player state based on input
-    update(deltaTime, input, dungeon) {
+    update(deltaTime, input, dungeon, scene) {
         // Handle movement
         this.updateMovement(deltaTime, input);
         
@@ -150,10 +304,18 @@ export class Player {
         this.updateJumping(deltaTime, input);
         
         // Handle attacking
-        this.updateAttack(deltaTime, input);
+        this.updateAttack(deltaTime, input, scene);
         
         // Handle dash ability
         this.updateDash(deltaTime, input);
+        
+        // Update projectiles
+        this.updateProjectiles(deltaTime, scene);
+        
+        // Update cooldown timers
+        if (this.weapons.staff.cooldownTimer > 0) {
+            this.weapons.staff.cooldownTimer -= deltaTime;
+        }
         
         // Update invulnerability timer
         if (this.invulnerabilityTime > 0) {
@@ -284,15 +446,20 @@ export class Player {
     }
     
     // Handle player attack
-    updateAttack(deltaTime, input) {
+    updateAttack(deltaTime, input, scene) {
         // Update attack cooldown
         if (this.attackTimer > 0) {
             this.attackTimer -= deltaTime;
         }
         
-        // Start attack if input is pressed and not on cooldown
+        // Handle melee attack (left mouse button)
         if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
-            this.startAttack();
+            this.startMeleeAttack();
+        }
+        
+        // Handle ranged attack (right mouse button)
+        if (input.chargeAttack && this.weapons.staff.cooldownTimer <= 0) {
+            this.fireStaffProjectile(scene);
         }
         
         // Update attack animation if currently attacking
@@ -301,16 +468,16 @@ export class Player {
         }
     }
     
-    // Start an attack
-    startAttack() {
+    // Start a melee attack with the sword
+    startMeleeAttack() {
         this.isAttacking = true;
         this.attackTimer = this.attackCooldown;
         
         // Reduce weapon durability
-        this.currentWeapon.durability -= 1;
-        if (this.currentWeapon.durability <= 0) {
+        this.weapons.sword.durability -= 1;
+        if (this.weapons.sword.durability <= 0) {
             // Weapon broke!
-            console.log('Weapon broke!');
+            console.log('Sword broke!');
             // TODO: Handle weapon breaking
         }
         
@@ -319,28 +486,61 @@ export class Player {
         this.attackAnimationDuration = 0.3;
         
         // Store original weapon rotation for animation
-        this.weaponOrigRotation = this.weaponMesh.rotation.z;
+        this.swordOrigRotation = this.weapons.sword.mesh.rotation.z;
+    }
+    
+    // Fire a projectile from the staff
+    fireStaffProjectile(scene) {
+        // Set cooldown
+        this.weapons.staff.cooldownTimer = this.weapons.staff.cooldown;
+        
+        // Create projectile
+        const projectileMesh = this.createProjectile();
+        
+        // Add projectile to scene
+        scene.add(projectileMesh);
+        
+        // Reduce staff durability
+        this.weapons.staff.durability -= 0.5; // Less durability use than sword
+        
+        // Do staff animation
+        this.animateStaffCast();
+    }
+    
+    // Animate staff casting
+    animateStaffCast() {
+        // Quick pulse animation for staff
+        const staffTop = this.weapons.staff.mesh.children[1]; // The glowing orb at top of staff
+        const originalScale = staffTop.scale.clone();
+        
+        // Scale up quickly
+        staffTop.scale.set(1.5, 1.5, 1.5);
+        
+        // Then return to normal scale
+        setTimeout(() => {
+            staffTop.scale.copy(originalScale);
+        }, 150);
     }
     
     // Update attack animation
     updateAttackAnimation(deltaTime) {
         this.attackAnimationTime += deltaTime;
         
-        // Simple attack animation - swing the weapon
+        // Simple attack animation - swing the sword
         const progress = this.attackAnimationTime / this.attackAnimationDuration;
         
         if (progress < 0.5) {
             // First half of animation - swing back
             const swingBackAmount = Math.PI / 2;
-            this.weaponMesh.rotation.z = this.weaponOrigRotation + progress * 2 * swingBackAmount;
+            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation + progress * 2 * swingBackAmount;
         } else if (progress < 1) {
             // Second half - swing forward
             const swingForwardAmount = Math.PI;
-            this.weaponMesh.rotation.z = this.weaponOrigRotation + 
+            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation + 
                 Math.PI / 2 - (progress - 0.5) * 2 * swingForwardAmount;
         } else {
             // End animation
-            this.weaponMesh.rotation.z = this.weaponOrigRotation;
+            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation;
             this.isAttacking = false;
         }
     }
@@ -372,6 +572,14 @@ export class Player {
                 this.dashCooldownTimer = this.dashCooldown;
             }
         }
+    }
+    
+    // Clean up all projectiles
+    cleanupProjectiles(scene) {
+        for (const projectile of this.projectiles) {
+            scene.remove(projectile.mesh);
+        }
+        this.projectiles = [];
     }
     
     // Set the ground level for the player
