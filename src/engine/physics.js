@@ -54,7 +54,7 @@ export class Physics {
         this.determineGroundLevel(player, dungeon);
         
         // Set a minimum ground level to ensure the player doesn't fall through floors
-        const minGroundLevel = 2.0; // Raised minimum ground level
+        const minGroundLevel = 1.0; // Raised minimum ground level
         if (player.getGroundLevel() < minGroundLevel) {
             player.setGroundLevel(minGroundLevel);
         }
