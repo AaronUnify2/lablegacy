@@ -1,9 +1,9 @@
-// src/main.js - Updated to initialize jump functionality
+// src/main.js - Updated to initialize jump functionality and pause menu
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
 import { createControlHints } from './game/ui.js';
-
+import { initPauseMenu } from './game/pauseMenu.js';
 // Main game instance
 let game;
 
