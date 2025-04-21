@@ -54,7 +54,7 @@ export class Physics {
         this.determineGroundLevel(player, dungeon);
         
         // Set a minimum ground level to ensure the player doesn't fall through floors
-        const minGroundLevel = 1.0; // Raised minimum ground level
+        const minGroundLevel = 0.02; // Raised minimum ground level
         if (player.getGroundLevel() < minGroundLevel) {
             player.setGroundLevel(minGroundLevel);
         }
@@ -87,7 +87,7 @@ export class Physics {
         const corridors = dungeon.corridors || [];
         
         // For flat dungeon, always use ground level 2.0 as minimum
-        let groundLevel = 0.01;
+        let groundLevel = 0.02;
         
         // Check all rooms and corridors to find which one contains the player
         for (const space of [...rooms, ...corridors]) {
@@ -101,7 +101,7 @@ export class Physics {
         }
         
         // Ensure the ground level is at least 2.0
-        player.setGroundLevel(Math.max(groundLevel, 2.0));
+        player.setGroundLevel(Math.max(groundLevel, 0.02));
     }
     
     // Check collision between two box colliders
