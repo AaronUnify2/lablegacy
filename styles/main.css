@@ -70,6 +70,56 @@ canvas {
     color: #ccc;
 }
 
+/* Cooldown container and indicators */
+#cooldown-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.cooldown-indicator {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.cooldown-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.3);
+    transition: height 0.1s linear;
+}
+
+/* Sword cooldown */
+#sword-cooldown {
+    border: 2px solid #cc8822;
+}
+
+#sword-cooldown-overlay {
+    background-color: rgba(204, 136, 34, 0.5);
+}
+
+/* Staff cooldown */
+#staff-cooldown {
+    border: 2px solid #4040ff;
+}
+
+#staff-cooldown-overlay {
+    background-color: rgba(64, 64, 255, 0.5);
+}
+
 /* Minimap */
 #minimap-container {
     position: absolute;
@@ -137,4 +187,54 @@ canvas {
     width: 0;
     background-color: #f04040;
     transition: width 0.5s;
+}
+
+/* Animation for critical effects */
+@keyframes pulse {
+    0% {
+        opacity: 0.8;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.8;
+    }
+}
+
+.pulse {
+    animation: pulse 0.8s infinite;
+}
+
+/* Crosshair (for future first-person view) */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    display: none; /* Hidden until first-person mode is implemented */
+}
+
+#crosshair::before,
+#crosshair::after {
+    content: '';
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.8);
+}
+
+#crosshair::before {
+    top: 9px;
+    left: 0;
+    width: 20px;
+    height: 2px;
+}
+
+#crosshair::after {
+    top: 0;
+    left: 9px;
+    width: 2px;
+    height: 20px;
 }
