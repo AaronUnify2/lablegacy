@@ -108,7 +108,7 @@ export class Dungeon {
     
     // Get player spawn position
     getPlayerSpawnPosition() {
-        return this.playerSpawnPosition ? this.playerSpawnPosition : { x: 0, y: 2.0, z: 0 }; // Raised from 0.5 to 1.0
+        return this.playerSpawnPosition ? this.playerSpawnPosition : { x: 0, y: 1.0, z: 0 }; // Raised from 0.5 to 1.0
     }
     
     // Get colliders for all walls
