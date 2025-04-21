@@ -72,6 +72,31 @@ export function updateMinimap(ctx, dungeon, player) {
         return offsetZ + (worldZ - minZ) * scale;
     }
     
+    // First pass: Map alcoves to their parent room types
+    // We'll create a map of alcove rooms to their parent room colors
+    const alcoveColors = new Map();
+    
+    // Find non-alcove rooms first to establish their colors
+    const roomColors = new Map();
+    rooms.forEach(room => {
+        if (room.isCorridor || room.roomType === 'alcove') return;
+        
+        let color;
+        if (room.isSpawnRoom) {
+            color = 'rgba(50, 180, 255, 0.8)'; // Blue for spawn room
+        } else if (room.roomType === 'cardinalPlus') {
+            color = 'rgba(180, 100, 220, 0.8)'; // Purple for cardinalPlus
+        } else if (room.roomType === 'radial') {
+            color = 'rgba(100, 200, 100, 0.8)'; // Green for radial
+        } else if (room.roomType === 'cardinal') {
+            color = 'rgba(200, 150, 50, 0.8)'; // Orange/gold for cardinal
+        } else {
+            color = 'rgba(200, 200, 200, 0.7)'; // Gray for normal rooms
+        }
+        
+        roomColors.set(room, color);
+    });
+    
     // Draw corridors first (so they appear behind rooms)
     corridors.forEach(corridor => {
         // Different color for sloped corridors
@@ -85,7 +110,38 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.fillRect(x, z, width, height);
     });
     
-    // Draw rooms
+    // Find parent room for each alcove by checking which non-alcove room it's closest to
+    // This is a simple approximation - ideally we'd use the actual connection data
+    const alcoveRooms = rooms.filter(room => room.roomType === 'alcove');
+    const nonAlcoveRooms = rooms.filter(room => !room.isCorridor && room.roomType !== 'alcove');
+    
+    alcoveRooms.forEach(alcove => {
+        let closestRoom = null;
+        let minDistance = Infinity;
+        
+        // Find the closest non-alcove room
+        for (const room of nonAlcoveRooms) {
+            const distance = calculateDistance(alcove, room);
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestRoom = room;
+            }
+        }
+        
+        if (closestRoom) {
+            const parentColor = roomColors.get(closestRoom);
+            if (parentColor) {
+                // Make alcove color slightly brighter than parent room
+                const brighterColor = makeColorBrighter(parentColor);
+                alcoveColors.set(alcove, brighterColor);
+            } else {
+                // Fallback color if parent room color not found
+                alcoveColors.set(alcove, 'rgba(220, 220, 220, 0.7)');
+            }
+        }
+    });
+    
+    // Now draw all rooms
     rooms.forEach(room => {
         // Skip corridors since we already drew them
         if (room.isCorridor) return;
@@ -93,24 +149,11 @@ export function updateMinimap(ctx, dungeon, player) {
         // Choose color based on room type
         let fillColor;
         
-        if (room.isSpawnRoom) {
-            // Center/spawn room
-            fillColor = 'rgba(50, 180, 255, 0.8)';
-        } else if (room.roomType === 'alcove') {
-            // Alcoves - use a distinct color to make them stand out
-            fillColor = 'rgba(255, 102, 204, 0.8)'; // Pink color for alcoves
-        } else if (room.roomType === 'cardinalPlus') {
-            // CardinalPlus rooms - use a purple color to make them stand out
-            fillColor = 'rgba(180, 100, 220, 0.8)';
-        } else if (room.roomType === 'radial') {
-            // Radial rooms
-            fillColor = 'rgba(100, 200, 100, 0.8)';
-        } else if (room.roomType === 'cardinal') {
-            // Cardinal rooms
-            fillColor = 'rgba(200, 150, 50, 0.8)';
+        if (room.roomType === 'alcove') {
+            // Use the parent room color we determined earlier
+            fillColor = alcoveColors.get(room) || 'rgba(220, 220, 220, 0.7)';
         } else {
-            // Other normal rooms
-            fillColor = 'rgba(200, 200, 200, 0.7)';
+            fillColor = roomColors.get(room) || 'rgba(200, 200, 200, 0.7)';
         }
         
         const x = toMinimapX(room.x);
@@ -127,12 +170,12 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.lineWidth = 1;
         ctx.strokeRect(x, z, width, height);
         
-        // Add a special marker for alcoves
+        // Add a small star marker for alcoves only
         if (room.roomType === 'alcove') {
             const centerX = x + width / 2;
             const centerZ = z + height / 2;
             
-            // Draw a small star or diamond in alcoves to highlight them
+            // Draw a small star to highlight alcoves
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
             
             // Draw a five-point star (simplified)
@@ -152,22 +195,6 @@ export function updateMinimap(ctx, dungeon, player) {
                 }
                 ctx.lineTo(x2, y2);
             }
-            ctx.closePath();
-            ctx.fill();
-        }
-        
-        // Add a special marker for cardinalPlus rooms to highlight them
-        if (room.roomType === 'cardinalPlus') {
-            const centerX = x + width / 2;
-            const centerZ = z + height / 2;
-            
-            // Draw a small diamond in the center of cardinalPlus rooms
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerZ - 3);
-            ctx.lineTo(centerX + 3, centerZ);
-            ctx.lineTo(centerX, centerZ + 3);
-            ctx.lineTo(centerX - 3, centerZ);
             ctx.closePath();
             ctx.fill();
         }
@@ -229,4 +256,36 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.closePath();
         ctx.fill();
     }
+}
+
+// Helper function to calculate distance between room centers
+function calculateDistance(room1, room2) {
+    const centerX1 = room1.x + room1.width / 2;
+    const centerZ1 = room1.z + room1.height / 2;
+    const centerX2 = room2.x + room2.width / 2;
+    const centerZ2 = room2.z + room2.height / 2;
+    
+    return Math.sqrt(
+        Math.pow(centerX2 - centerX1, 2) + 
+        Math.pow(centerZ2 - centerZ1, 2)
+    );
+}
+
+// Helper function to make a color slightly brighter
+function makeColorBrighter(rgbaColor) {
+    // Parse rgba values
+    const matches = rgbaColor.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (!matches) return rgbaColor;
+    
+    const r = parseInt(matches[1], 10);
+    const g = parseInt(matches[2], 10);
+    const b = parseInt(matches[3], 10);
+    const a = parseFloat(matches[4]);
+    
+    // Make the color slightly brighter (max 255)
+    const brighterR = Math.min(r + 20, 255);
+    const brighterG = Math.min(g + 20, 255);
+    const brighterB = Math.min(b + 20, 255);
+    
+    return `rgba(${brighterR}, ${brighterG}, ${brighterB}, ${a})`;
 }
