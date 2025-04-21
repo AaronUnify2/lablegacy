@@ -204,6 +204,13 @@ export function togglePauseMenu() {
 
 // Update inventory display
 function updateInventoryDisplay() {
+    // Get player inventory if available
+    const player = window.game?.player;
+    if (player) {
+        // Sync pause menu inventory with player inventory
+        pauseMenuState.inventoryItems = player.getInventory();
+    }
+    
     // Clear all slots first
     const slots = document.querySelectorAll('.inventory-slot');
     slots.forEach(slot => {
@@ -221,6 +228,7 @@ function updateInventoryDisplay() {
             `;
             slot.classList.add('filled');
             slot.dataset.itemId = item.id;
+            slot.dataset.index = index;
         }
     });
     
@@ -308,37 +316,21 @@ function useSelectedItem() {
     if (!selectedSlot) return;
     
     const index = parseInt(selectedSlot.dataset.index);
-    if (index >= pauseMenuState.inventoryItems.length) return;
+    if (isNaN(index)) return;
     
-    const item = pauseMenuState.inventoryItems[index];
-    
-    // Use the item based on its type
-    switch (item.type) {
-        case 'healthPotion':
-            // Apply health potion effect
-            const player = window.game?.player;
-            if (player) {
-                const healAmount = 30; // Health potions heal 30 HP
-                player.health = Math.min(player.maxHealth, player.health + healAmount);
-                
-                // Update UI
-                document.getElementById('health-fill').style.width = `${(player.health / player.maxHealth) * 100}%`;
-            }
-            break;
-        case 'staminaPotion':
-            // Stamina potions will be implemented later
-            break;
-        // Add other item types here
+    // Use the player's useItem method
+    const player = window.game?.player;
+    if (player && player.useItem) {
+        const success = player.useItem(index);
+        
+        if (success) {
+            // Update the inventory display
+            updateInventoryDisplay();
+            
+            // Update health UI if it was a health potion
+            document.getElementById('health-fill').style.width = `${(player.health / player.maxHealth) * 100}%`;
+        }
     }
-    
-    // Reduce item count or remove if last one
-    item.count--;
-    if (item.count <= 0) {
-        pauseMenuState.inventoryItems.splice(index, 1);
-    }
-    
-    // Update the inventory display
-    updateInventoryDisplay();
 }
 
 // Save game to localStorage
@@ -422,4 +414,29 @@ export function addItemToInventory(item) {
     
     // Return success
     return true;
-      }
+}
+
+// Export a function to create test items for development
+export function createTestItems() {
+    return [
+        { id: 'smallHealthPotion', count: 5 },
+        { id: 'mediumHealthPotion', count: 2 },
+        { id: 'smallStaminaPotion', count: 3 },
+        { id: 'sharpBlade', count: 1 }
+    ];
+}
+
+// Export a global function to update the pause menu inventory from anywhere
+export function updatePauseMenuInventory(items) {
+    if (!pauseMenuState) return;
+    
+    pauseMenuState.inventoryItems = items;
+    
+    // If the inventory menu is currently active, update it
+    if (pauseMenuState.isVisible && pauseMenuState.currentMenu === PauseMenuType.INVENTORY) {
+        updateInventoryDisplay();
+    }
+}
+
+// Expose this function globally so it can be called from the player class
+window.updatePauseMenuInventory = updatePauseMenuInventory;
