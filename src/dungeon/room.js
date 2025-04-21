@@ -13,9 +13,9 @@ export class Room {
         this.isSloped = false;
         this.isSpecial = false;
         
-        // New properties for radial dungeon layout
+        // Properties for radial dungeon layout
         this.isSpawnRoom = false;
-        this.roomType = null; // null for normal, 'radial', 'cardinal', or special types below
+        this.roomType = null; // null for normal, 'radial', 'cardinal', 'cardinalPlus', or special types below
         
         // Original room type property (now secondary)
         this.specialType = 'normal'; // normal, treasure, boss, challenge
@@ -87,7 +87,7 @@ export class Room {
             this.specialType = type;
             this.isSpecial = type !== 'normal';
         } else {
-            // For new room types (radial, cardinal), set the new roomType property
+            // For new room types (radial, cardinal, cardinalPlus), set the new roomType property
             this.roomType = type;
         }
     }
