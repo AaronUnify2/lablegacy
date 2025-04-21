@@ -180,7 +180,7 @@ function createActionButtons() {
     const buttons = [
         ['button-interact', 'L', 'rgba(100, 149, 237, 0.8)', 0, 0, 'interact'],
         ['button-up', '↑', 'rgba(220, 20, 60, 0.8)', 0, 1, 'moveForward'],
-        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'chargeAttack'],
+        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'chargeAttack'], // Changed from 'switchWeapon' to 'chargeAttack'
         ['button-left', '←', 'rgba(220, 20, 60, 0.8)', 1, 0, 'moveLeft'],
         ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'jump'],  // Changed to jump
         ['button-right', '→', 'rgba(220, 20, 60, 0.8)', 1, 2, 'moveRight'],
@@ -368,6 +368,9 @@ function handleButtonPress(action, isPressed) {
         case 'attack':
             inputState.attack = isPressed;
             break;
+        case 'chargeAttack': // This handles the staff attack
+            inputState.chargeAttack = isPressed;
+            break;
         case 'dash':
             inputState.dash = isPressed;
             break;
@@ -379,12 +382,6 @@ function handleButtonPress(action, isPressed) {
             break;
         case 'inventory':
             inputState.inventory = isPressed;
-            break;
-        case 'switchWeapon':
-            // This would need to be implemented in your game logic
-            if (isPressed) {
-                console.log("Switch weapon pressed");
-            }
             break;
     }
 }
