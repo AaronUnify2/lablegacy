@@ -87,7 +87,7 @@ export class Physics {
         const corridors = dungeon.corridors || [];
         
         // For flat dungeon, always use ground level 2.0 as minimum
-        let groundLevel = 2.0;
+        let groundLevel = 0.01;
         
         // Check all rooms and corridors to find which one contains the player
         for (const space of [...rooms, ...corridors]) {
