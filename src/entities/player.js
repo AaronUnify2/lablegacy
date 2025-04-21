@@ -12,7 +12,7 @@ export class Player {
         this.experienceToNextLevel = 100;
         
         // Movement and position
-        this.position = new THREE.Vector3(0, 2.0, 0); // Raised starting position
+        this.position = new THREE.Vector3(0, 1.0, 0); // Raised starting position
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.moveSpeed = 5;
         this.dashSpeed = 15;
