@@ -91,6 +91,14 @@ function generateRadialRooms(dungeon, size) {
         maxHeight: 10
     };
     
+    // New size for cardinalPlus rooms
+    const cardinalPlusRoomSize = {
+        minWidth: 7,
+        maxWidth: 11,
+        minHeight: 7,
+        maxHeight: 11
+    };
+    
     // Corridor sizes
     const corridorWidth = 3;
     
@@ -182,6 +190,48 @@ function generateRadialRooms(dungeon, size) {
             connectedTo: 'west', // This room connects to the west radial room
             connected: false,
             room: null
+        },
+        
+        // Cardinal Plus rooms - new room type
+        northPlus: {
+            dirX: 0,
+            dirZ: -2,
+            angle: 0,
+            isRadial: false,
+            isCardinalPlus: true,
+            connectedTo: 'north', // Connect to north radial room
+            connected: false,
+            room: null
+        },
+        eastPlus: {
+            dirX: 2,
+            dirZ: 0,
+            angle: Math.PI / 2,
+            isRadial: false,
+            isCardinalPlus: true,
+            connectedTo: 'east', // Connect to east radial room
+            connected: false,
+            room: null
+        },
+        southPlus: {
+            dirX: 0,
+            dirZ: 2,
+            angle: Math.PI,
+            isRadial: false,
+            isCardinalPlus: true,
+            connectedTo: 'south', // Connect to south radial room
+            connected: false,
+            room: null
+        },
+        westPlus: {
+            dirX: -2,
+            dirZ: 0,
+            angle: Math.PI * 3 / 2,
+            isRadial: false,
+            isCardinalPlus: true,
+            connectedTo: 'west', // Connect to west radial room
+            connected: false,
+            room: null
         }
     };
     
@@ -189,10 +239,15 @@ function generateRadialRooms(dungeon, size) {
     for (const [name, position] of Object.entries(roomPositions)) {
         // For radial rooms, 80% chance of spawning
         // For cardinal rooms, 50% chance of spawning if the connected radial room exists
+        // For cardinalPlus rooms, 40% chance of spawning if the connected radial room exists
         let shouldSpawn = false;
         
         if (position.isRadial) {
             shouldSpawn = Math.random() < 0.8; // 80% chance for radial rooms
+        } else if (position.isCardinalPlus) {
+            // Check if the connected radial room exists
+            const connectedRadialRoom = roomPositions[position.connectedTo].room;
+            shouldSpawn = connectedRadialRoom && Math.random() < 0.4; // 40% chance if connected radial exists
         } else {
             // Check if the connected radial room exists
             const connectedRadialRoom = roomPositions[position.connectedTo].room;
@@ -202,7 +257,15 @@ function generateRadialRooms(dungeon, size) {
         if (!shouldSpawn) continue;
         
         // Determine room size
-        const sizeTemplate = position.isRadial ? radialRoomSize : cardinalRoomSize;
+        let sizeTemplate;
+        if (position.isRadial) {
+            sizeTemplate = radialRoomSize;
+        } else if (position.isCardinalPlus) {
+            sizeTemplate = cardinalPlusRoomSize;
+        } else {
+            sizeTemplate = cardinalRoomSize;
+        }
+        
         const roomWidth = Math.floor(sizeTemplate.minWidth + Math.random() * (sizeTemplate.maxWidth - sizeTemplate.minWidth));
         const roomHeight = Math.floor(sizeTemplate.minHeight + Math.random() * (sizeTemplate.maxHeight - sizeTemplate.minHeight));
         
@@ -210,6 +273,8 @@ function generateRadialRooms(dungeon, size) {
         let roomDistance;
         if (position.isRadial) {
             roomDistance = centerRoomSize.width / 2 + roomSpacing + roomWidth / 2;
+        } else if (position.isCardinalPlus) {
+            roomDistance = centerRoomSize.width / 2 + roomSpacing * 3 + roomWidth / 2; // Even further out
         } else {
             roomDistance = centerRoomSize.width / 2 + roomSpacing * 2 + roomWidth / 2;
         }
@@ -219,7 +284,7 @@ function generateRadialRooms(dungeon, size) {
         
         // Create room
         const room = new Room(roomX, 0, roomZ, roomWidth, roomHeight);
-        room.roomType = position.isRadial ? 'radial' : 'cardinal';
+        room.roomType = position.isRadial ? 'radial' : (position.isCardinalPlus ? 'cardinalPlus' : 'cardinal');
         dungeon.addRoom(room);
         
         // Store room in position data
@@ -231,7 +296,7 @@ function generateRadialRooms(dungeon, size) {
             connectRoomsWithCorridor(dungeon, centerRoom, room);
             position.connected = true;
         } else {
-            // Connect cardinal room to its radial room
+            // Connect cardinal or cardinalPlus room to its radial room
             const connectedRadialRoom = roomPositions[position.connectedTo].room;
             if (connectedRadialRoom) {
                 connectRoomsWithCorridor(dungeon, connectedRadialRoom, room);
@@ -407,16 +472,36 @@ function placeKeyAndExit(dungeon) {
     // Find rooms by type
     const radialRooms = rooms.filter(room => room.roomType === 'radial');
     const cardinalRooms = rooms.filter(room => room.roomType === 'cardinal');
+    const cardinalPlusRooms = rooms.filter(room => room.roomType === 'cardinalPlus');
     const normalRooms = rooms.filter(room => !room.roomType && !room.isSpawnRoom);
     
     let keyRoom, exitRoom;
     
-    // Optimal placement strategy:
-    // 1. If we have cardinal rooms, put key in a cardinal room and exit in the opposite side
-    // 2. Otherwise, if we have radial rooms, put key in a radial room and exit in another
-    // 3. As a fallback, find two rooms that are far apart
+    // Updated optimal placement strategy:
+    // 1. If we have cardinalPlus rooms, prefer putting key in one of these (they're further out)
+    // 2. If we have cardinal rooms, put key in a cardinal room and exit in the opposite side
+    // 3. Otherwise, if we have radial rooms, put key in a radial room and exit in another
+    // 4. As a fallback, find two rooms that are far apart
     
-    if (cardinalRooms.length >= 1) {
+    if (cardinalPlusRooms.length >= 1) {
+        // Place key in a cardinalPlus room
+        keyRoom = cardinalPlusRooms[Math.floor(Math.random() * cardinalPlusRooms.length)];
+        
+        // Find another room as far as possible for exit
+        const potentialExitRooms = [...cardinalPlusRooms, ...cardinalRooms, ...radialRooms].filter(room => room !== keyRoom);
+        
+        if (potentialExitRooms.length > 0) {
+            // Find the room that's farthest from the key room
+            exitRoom = findFarthestRoom(keyRoom, potentialExitRooms);
+        } else if (normalRooms.length > 0) {
+            // Fall back to normal rooms if no cardinal/radial options
+            exitRoom = findFarthestRoom(keyRoom, normalRooms);
+        } else {
+            // If we have no other options, use another room or any other room
+            const otherRooms = rooms.filter(room => room !== keyRoom && room !== spawnRoom);
+            exitRoom = findFarthestRoom(keyRoom, otherRooms);
+        }
+    } else if (cardinalRooms.length >= 1) {
         // Place key in a cardinal room
         keyRoom = cardinalRooms[Math.floor(Math.random() * cardinalRooms.length)];
         
@@ -590,6 +675,8 @@ function addDecorations(dungeon, theme) {
 function getDecorationMultiplier(room) {
     if (room.isSpawnRoom) {
         return 1.5; // More decorations in spawn room
+    } else if (room.roomType === 'cardinalPlus') {
+        return 1.4; // Most decorations in cardinalPlus rooms (they're special!)
     } else if (room.roomType === 'radial') {
         return 1.2; // Slightly more in radial rooms
     } else if (room.roomType === 'cardinal') {
