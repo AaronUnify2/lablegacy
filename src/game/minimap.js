@@ -197,4 +197,3 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.closePath();
         ctx.fill();
     }
-}
