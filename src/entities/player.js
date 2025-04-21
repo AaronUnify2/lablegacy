@@ -194,10 +194,11 @@ export class Player {
         const staffWorldPosition = new THREE.Vector3();
         this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
         
-        // Set initial position slightly in front of the staff
+        // Set direction to match the player's facing direction (FIXED: reversed direction)
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotation);
         
+        // Set initial position slightly in front of the staff
         const startPosition = new THREE.Vector3(
             staffWorldPosition.x + direction.x * 0.7,
             staffWorldPosition.y + 0.65, // Position at the staff top
