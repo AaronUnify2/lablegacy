@@ -88,6 +88,11 @@ export class Game {
             removeFromScene(this.currentDungeon.getObject());
         }
         
+        // Clean up player projectiles
+        if (this.player) {
+            this.player.cleanupProjectiles(this.scene);
+        }
+        
         // Clear entities list
         this.entities = [];
         
@@ -142,8 +147,8 @@ export class Game {
             return;
         }
         
-        // Update player
-        this.player.update(deltaTime, inputState, this.currentDungeon);
+        // Update player - pass scene to handle projectiles
+        this.player.update(deltaTime, inputState, this.currentDungeon, this.scene);
         
         // Update camera to follow player
         this.updateCamera(deltaTime);
@@ -158,6 +163,9 @@ export class Game {
         
         // Check for collisions
         this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
+        
+        // Check for projectile collisions with enemies
+        this.player.checkProjectileCollisions(this.entities);
         
         // Update UI
         updateUI(this.player, this.currentFloor);
