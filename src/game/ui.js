@@ -1,43 +1,89 @@
-// src/game/ui.js - User interface management
+// src/game/ui.js - Enhanced user interface with three status bars
 
 // Update UI elements with current game state
 export function updateUI(player, floorNumber) {
     updateHealthBar(player);
+    updateManaBar(player);
+    updateStaminaBar(player);
     updateWeaponInfo(player);
     updateFloorInfo(floorNumber);
     updateMinimap();
-    
-    // Show jumping animation if player is in air
-    // if (player.isInAir()) {
-    //     showJumpingIndicator(true);
-    // } else {
-    //     showJumpingIndicator(false);
-    // }
 }
 
 // Update health bar UI
 function updateHealthBar(player) {
     const healthPercentage = (player.health / player.maxHealth) * 100;
-    document.getElementById('health-fill').style.width = `${healthPercentage}%`;
-    
-    // Change health bar color based on health percentage
     const healthFill = document.getElementById('health-fill');
     
-    if (healthPercentage > 60) {
-        healthFill.style.backgroundColor = '#f04040'; // Normal red
-    } else if (healthPercentage > 30) {
-        healthFill.style.backgroundColor = '#f0a000'; // Warning yellow
-    } else {
-        healthFill.style.backgroundColor = '#f04000'; // Critical red-orange
-        // Add pulsing effect for critical health
-        if (!healthFill.classList.contains('pulse')) {
-            healthFill.classList.add('pulse');
+    if (healthFill) {
+        healthFill.style.width = `${healthPercentage}%`;
+        
+        // Change health bar color based on health percentage
+        if (healthPercentage > 60) {
+            healthFill.style.backgroundColor = '#f04040'; // Normal red
+        } else if (healthPercentage > 30) {
+            healthFill.style.backgroundColor = '#f0a000'; // Warning yellow
+        } else {
+            healthFill.style.backgroundColor = '#f04000'; // Critical red-orange
+            // Add pulsing effect for critical health
+            if (!healthFill.classList.contains('pulse')) {
+                healthFill.classList.add('pulse');
+            }
+        }
+        
+        // Remove pulsing effect if health is above critical
+        if (healthPercentage > 30 && healthFill.classList.contains('pulse')) {
+            healthFill.classList.remove('pulse');
         }
     }
     
-    // Remove pulsing effect if health is above critical
-    if (healthPercentage > 30 && healthFill.classList.contains('pulse')) {
-        healthFill.classList.remove('pulse');
+    // Update numerical value
+    const healthValue = document.getElementById('health-value');
+    if (healthValue) {
+        healthValue.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
+    }
+}
+
+// Update mana bar UI (staff energy)
+function updateManaBar(player) {
+    // For now, mana is based on staff cooldown (inverse)
+    let manaPercentage = 100;
+    if (player.weapons && player.weapons.staff) {
+        const staff = player.weapons.staff;
+        if (staff.cooldownTimer > 0) {
+            manaPercentage = 100 - ((staff.cooldownTimer / staff.cooldown) * 100);
+        }
+    }
+    
+    const manaFill = document.getElementById('mana-fill');
+    if (manaFill) {
+        manaFill.style.width = `${manaPercentage}%`;
+    }
+    
+    // Update numerical value (for now showing 100/100 when full)
+    const manaValue = document.getElementById('mana-value');
+    if (manaValue) {
+        manaValue.textContent = `${Math.floor(manaPercentage)}/${100}`;
+    }
+}
+
+// Update stamina bar UI (dash energy)
+function updateStaminaBar(player) {
+    // For now, stamina is based on dash cooldown (inverse)
+    let staminaPercentage = 100;
+    if (player.dashCooldownTimer > 0) {
+        staminaPercentage = 100 - ((player.dashCooldownTimer / player.dashCooldown) * 100);
+    }
+    
+    const staminaFill = document.getElementById('stamina-fill');
+    if (staminaFill) {
+        staminaFill.style.width = `${staminaPercentage}%`;
+    }
+    
+    // Update numerical value
+    const staminaValue = document.getElementById('stamina-value');
+    if (staminaValue) {
+        staminaValue.textContent = `${Math.floor(staminaPercentage)}/${100}`;
     }
 }
 
@@ -74,80 +120,6 @@ function updateWeaponInfo(player) {
             durabilityElement.style.color = '#f04000'; // Critical red-orange
         }
     }
-    
-    // Update weapon cooldown indicators if they exist
-    updateWeaponCooldowns(player);
-}
-
-// Update weapon cooldown indicators
-function updateWeaponCooldowns(player) {
-    // Check for staff cooldown element, create if doesn't exist
-    let staffCooldownElement = document.getElementById('staff-cooldown');
-    
-    if (!staffCooldownElement) {
-        // Create container for cooldown indicators
-        let cooldownContainer = document.getElementById('cooldown-container');
-        
-        if (!cooldownContainer) {
-            cooldownContainer = document.createElement('div');
-            cooldownContainer.id = 'cooldown-container';
-            cooldownContainer.style.position = 'absolute';
-            cooldownContainer.style.bottom = '20px';
-            cooldownContainer.style.right = '20px';
-            cooldownContainer.style.display = 'flex';
-            cooldownContainer.style.gap = '10px';
-            document.body.appendChild(cooldownContainer);
-        }
-        
-        // Create staff cooldown indicator
-        staffCooldownElement = document.createElement('div');
-        staffCooldownElement.id = 'staff-cooldown';
-        staffCooldownElement.style.width = '40px';
-        staffCooldownElement.style.height = '40px';
-        staffCooldownElement.style.borderRadius = '50%';
-        staffCooldownElement.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
-        staffCooldownElement.style.border = '2px solid #4040ff';
-        staffCooldownElement.style.position = 'relative';
-        staffCooldownElement.style.overflow = 'hidden';
-        
-        const staffIcon = document.createElement('div');
-        staffIcon.style.position = 'absolute';
-        staffIcon.style.top = '50%';
-        staffIcon.style.left = '50%';
-        staffIcon.style.transform = 'translate(-50%, -50%)';
-        staffIcon.style.color = '#4040ff';
-        staffIcon.style.fontSize = '18px';
-        staffIcon.textContent = '✦'; // Magic star symbol
-        
-        staffCooldownElement.appendChild(staffIcon);
-        cooldownContainer.appendChild(staffCooldownElement);
-        
-        // Create cooldown overlay
-        const staffOverlay = document.createElement('div');
-        staffOverlay.id = 'staff-cooldown-overlay';
-        staffOverlay.style.position = 'absolute';
-        staffOverlay.style.bottom = '0';
-        staffOverlay.style.left = '0';
-        staffOverlay.style.width = '100%';
-        staffOverlay.style.backgroundColor = 'rgba(64, 64, 255, 0.5)';
-        staffOverlay.style.transition = 'height 0.1s linear';
-        
-        staffCooldownElement.appendChild(staffOverlay);
-    }
-    
-    // Update staff cooldown display
-    const staffCooldownOverlay = document.getElementById('staff-cooldown-overlay');
-    if (staffCooldownOverlay) {
-        const cooldownPercentage = (player.weapons.staff.cooldownTimer / player.weapons.staff.cooldown) * 100;
-        staffCooldownOverlay.style.height = `${cooldownPercentage}%`;
-        
-        // Make it glow when ready
-        if (cooldownPercentage <= 0) {
-            staffCooldownElement.style.boxShadow = '0 0 10px #4040ff';
-        } else {
-            staffCooldownElement.style.boxShadow = 'none';
-        }
-    }
 }
 
 // Update floor information UI
@@ -162,6 +134,80 @@ function updateFloorInfo(floorNumber) {
 function updateMinimap() {
     // This will be implemented after we have the dungeon generation system
     // For now, this is just a placeholder
+}
+
+// Initialize the UI
+export function initUI() {
+    // Create/update UI container if needed
+    let uiContainer = document.getElementById('ui-container');
+    
+    if (!uiContainer) {
+        uiContainer = document.createElement('div');
+        uiContainer.id = 'ui-container';
+        document.body.appendChild(uiContainer);
+    }
+    
+    // Clear existing content
+    uiContainer.innerHTML = '';
+    
+    // Create the three status bars
+    
+    // 1. Health Bar
+    const healthBarContainer = document.createElement('div');
+    healthBarContainer.className = 'stat-bar-container';
+    healthBarContainer.innerHTML = `
+        <div class="stat-label">
+            <span>HEALTH</span>
+            <span id="health-value" class="stat-value">100/100</span>
+        </div>
+        <div class="stat-bar">
+            <div id="health-fill" class="stat-fill" style="width: 100%;"></div>
+        </div>
+    `;
+    uiContainer.appendChild(healthBarContainer);
+    
+    // 2. Mana Bar
+    const manaBarContainer = document.createElement('div');
+    manaBarContainer.className = 'stat-bar-container';
+    manaBarContainer.innerHTML = `
+        <div class="stat-label">
+            <span>MANA</span>
+            <span id="mana-value" class="stat-value">100/100</span>
+        </div>
+        <div class="stat-bar">
+            <div id="mana-fill" class="stat-fill" style="width: 100%;"></div>
+        </div>
+    `;
+    uiContainer.appendChild(manaBarContainer);
+    
+    // 3. Stamina Bar
+    const staminaBarContainer = document.createElement('div');
+    staminaBarContainer.className = 'stat-bar-container';
+    staminaBarContainer.innerHTML = `
+        <div class="stat-label">
+            <span>STAMINA</span>
+            <span id="stamina-value" class="stat-value">100/100</span>
+        </div>
+        <div class="stat-bar">
+            <div id="stamina-fill" class="stat-fill" style="width: 100%;"></div>
+        </div>
+    `;
+    uiContainer.appendChild(staminaBarContainer);
+    
+    // Floor Info
+    const floorInfo = document.createElement('div');
+    floorInfo.id = 'floor-info';
+    floorInfo.innerHTML = 'Floor: <span id="floor-number">1</span>';
+    uiContainer.appendChild(floorInfo);
+    
+    // Weapon Info
+    const weaponInfo = document.createElement('div');
+    weaponInfo.id = 'weapon-info';
+    weaponInfo.innerHTML = `
+        <div class="weapon-name">Sword & Staff</div>
+        <div class="weapon-durability">Durability: <span id="durability-value">100/100</span>%</div>
+    `;
+    uiContainer.appendChild(weaponInfo);
 }
 
 // Helper function to capitalize first letter
@@ -289,11 +335,5 @@ export function showInventory(player) {
 // Add this function to create control hints
 export function createControlHints() {
     // Function disabled to prevent control hints from showing
-    return;
-}
-
-// Add a visual indicator when player is jumping
-function showJumpingIndicator(isJumping) {
-    // Function disabled to prevent jumping indicator from showing
     return;
 }
