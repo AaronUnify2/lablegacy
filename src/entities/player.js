@@ -29,7 +29,7 @@ export class Player {
         this.jumpHeight = 2;        // Maximum jump height
         this.jumpTimer = 0;
         this.jumpDuration = 0.5;    // Time to reach peak of jump
-        this.jumpCooldown = 0.2;    // Cooldown between jumps
+        this.jumpCooldown = 0.05;    // Cooldown between jumps
         this.jumpCooldownTimer = 0;
         this.gravity = 15;          // Gravity force pulling player down
         this.groundLevel = 2.0;     // Current ground level, raised to 1.0
