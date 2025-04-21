@@ -1,4 +1,4 @@
-// src/engine/input.js - Input handling system with mobile controller support (Continued)
+// src/engine/input.js - Input handling system with mobile controller support and added pause button
 
 // Input state object
 const inputState = {
@@ -68,6 +68,7 @@ let joystickElement;
 let joystickKnob;
 let actionButtons;
 let mobileControls;
+let pauseButton; // Added pause button element
 
 // Set up input event listeners
 export function setupInput() {
@@ -114,10 +115,17 @@ function setupMobileControls() {
     mobileControls.style.height = '40%';
     mobileControls.style.zIndex = '1000';
     mobileControls.style.pointerEvents = 'none'; // Allow clicks to pass through by default
+    mobileControls.style.display = 'flex';
+    mobileControls.style.alignItems = 'center';
+    mobileControls.style.justifyContent = 'space-between';
+    mobileControls.style.padding = '0 20px';
     document.body.appendChild(mobileControls);
     
     // Create joystick
     createJoystick();
+    
+    // Create pause button
+    createPauseButton();
     
     // Create action buttons
     createActionButtons();
@@ -133,10 +141,7 @@ function createJoystick() {
     // Joystick container
     joystickElement = document.createElement('div');
     joystickElement.id = 'joystick';
-    joystickElement.style.position = 'absolute';
-    joystickElement.style.left = '20%';
-    joystickElement.style.bottom = '30%';
-    joystickElement.style.transform = 'translate(-50%, 50%)';
+    joystickElement.style.position = 'relative'; // Changed from absolute to relative
     joystickElement.style.width = '120px';
     joystickElement.style.height = '120px';
     joystickElement.style.borderRadius = '50%';
@@ -161,32 +166,80 @@ function createJoystick() {
     joystickElement.appendChild(joystickKnob);
 }
 
+// Create pause button in the middle
+function createPauseButton() {
+    pauseButton = document.createElement('div');
+    pauseButton.id = 'pause-button';
+    pauseButton.className = 'control-button';
+    pauseButton.dataset.action = 'pause';
+    
+    pauseButton.style.width = '60px';
+    pauseButton.style.height = '60px';
+    pauseButton.style.borderRadius = '50%';
+    pauseButton.style.backgroundColor = 'rgba(240, 240, 240, 0.8)';
+    pauseButton.style.border = '2px solid rgba(255, 255, 255, 1)';
+    pauseButton.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.7)';
+    pauseButton.style.display = 'flex';
+    pauseButton.style.justifyContent = 'center';
+    pauseButton.style.alignItems = 'center';
+    pauseButton.style.color = '#333';
+    pauseButton.style.fontFamily = 'Arial, sans-serif';
+    pauseButton.style.fontWeight = 'bold';
+    pauseButton.style.fontSize = '14px';
+    pauseButton.style.userSelect = 'none';
+    pauseButton.style.pointerEvents = 'auto';
+    pauseButton.style.position = 'relative';
+    
+    // Create pause icon (two vertical bars)
+    const pauseIcon = document.createElement('div');
+    pauseIcon.style.display = 'flex';
+    pauseIcon.style.gap = '5px';
+    
+    const bar1 = document.createElement('div');
+    bar1.style.width = '8px';
+    bar1.style.height = '20px';
+    bar1.style.backgroundColor = '#333';
+    bar1.style.borderRadius = '2px';
+    
+    const bar2 = document.createElement('div');
+    bar2.style.width = '8px';
+    bar2.style.height = '20px';
+    bar2.style.backgroundColor = '#333';
+    bar2.style.borderRadius = '2px';
+    
+    pauseIcon.appendChild(bar1);
+    pauseIcon.appendChild(bar2);
+    pauseButton.appendChild(pauseIcon);
+    
+    mobileControls.appendChild(pauseButton);
+}
+
 // Create action buttons
 function createActionButtons() {
     // Button container for right side
     const buttonContainer = document.createElement('div');
     buttonContainer.id = 'action-buttons';
-    buttonContainer.style.position = 'absolute';
-    buttonContainer.style.right = '10%';
-    buttonContainer.style.bottom = '20%';
+    buttonContainer.style.position = 'relative'; // Changed from absolute to relative
     buttonContainer.style.display = 'grid';
     buttonContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
     buttonContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
-    buttonContainer.style.gap = '10px';
+    buttonContainer.style.gap = '7px'; // Reduced gap from 10px to 7px
     buttonContainer.style.pointerEvents = 'auto';
+    buttonContainer.style.transform = 'scale(0.6)'; // Shrink by 40%
+    buttonContainer.style.transformOrigin = 'right center'; // Scale from right side
     mobileControls.appendChild(buttonContainer);
     
     // Button definitions: [id, label, color, row, col, action]
     const buttons = [
         ['button-interact', 'L', 'rgba(100, 149, 237, 0.8)', 0, 0, 'interact'],
         ['button-up', '↑', 'rgba(220, 20, 60, 0.8)', 0, 1, 'moveForward'],
-        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'chargeAttack'], // Changed from 'switchWeapon' to 'chargeAttack'
+        ['button-staff', 'Staff', 'rgba(186, 85, 211, 0.8)', 0, 2, 'chargeAttack'], 
         ['button-left', '←', 'rgba(220, 20, 60, 0.8)', 1, 0, 'moveLeft'],
-        ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'jump'],  // Changed to jump
+        ['button-jump', 'JUMP', 'rgba(60, 179, 113, 0.8)', 1, 1, 'jump'],  
         ['button-right', '→', 'rgba(220, 20, 60, 0.8)', 1, 2, 'moveRight'],
         ['button-attack', 'Sword', 'rgba(205, 133, 63, 0.8)', 2, 0, 'attack'],
         ['button-down', '↓', 'rgba(220, 20, 60, 0.8)', 2, 1, 'moveBackward'],
-        ['button-dash', 'DASH', 'rgba(255, 150, 50, 0.8)', 2, 2, 'dash']  // Added dash button
+        ['button-dash', 'DASH', 'rgba(255, 150, 50, 0.8)', 2, 2, 'dash']
     ];
     
     // Create each button
@@ -235,8 +288,16 @@ function handleTouchStart(event) {
             updateJoystickPosition(touch);
         }
         
+        // Check if touch is on pause button
+        if (target.id === 'pause-button' || target.parentElement === pauseButton) {
+            // Handle pause button press
+            handleButtonPress('pause', true);
+            // Visual feedback
+            pauseButton.style.transform = 'scale(0.9)';
+        }
+        
         // Check if touch is on action button
-        if (target.classList && target.classList.contains('control-button')) {
+        if (target.classList && target.classList.contains('control-button') && target.id !== 'pause-button') {
             const action = target.dataset.action;
             
             // Highlight button
@@ -261,6 +322,7 @@ function handleTouchMove(event) {
         }
     }
 }
+
 // Handle touch end for mobile controls
 function handleTouchEnd(event) {
     event.preventDefault();
@@ -277,7 +339,17 @@ function handleTouchEnd(event) {
         
         // Find if touch was on an action button
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (target && target.classList && target.classList.contains('control-button')) {
+        
+        // Check for pause button
+        if (target && (target.id === 'pause-button' || target.parentElement === pauseButton)) {
+            // Reset button appearance
+            pauseButton.style.transform = 'scale(1)';
+            // Reset input state (but keep the "just pressed" state for one frame)
+            handleButtonPress('pause', false);
+        }
+        
+        // Check for other buttons
+        if (target && target.classList && target.classList.contains('control-button') && target.id !== 'pause-button') {
             const action = target.dataset.action;
             
             // Reset button appearance
@@ -382,6 +454,9 @@ function handleButtonPress(action, isPressed) {
             break;
         case 'inventory':
             inputState.inventory = isPressed;
+            break;
+        case 'pause':
+            inputState.pause = isPressed;
             break;
     }
 }
@@ -525,6 +600,6 @@ export function setCursorLock(locked) {
 // Show/hide mobile controls
 export function toggleMobileControls(show) {
     if (mobileControls) {
-        mobileControls.style.display = show ? 'block' : 'none';
+        mobileControls.style.display = show ? 'flex' : 'none';
     }
 }
