@@ -118,7 +118,7 @@ function setupMobileControls() {
     mobileControls.style.display = 'flex';
     mobileControls.style.alignItems = 'center';
     mobileControls.style.justifyContent = 'space-between';
-    mobileControls.style.padding = '0 20px';
+    mobileControls.style.padding = '0';
     document.body.appendChild(mobileControls);
     
     // Create joystick
@@ -173,8 +173,10 @@ function createPauseButton() {
     pauseButton.className = 'control-button';
     pauseButton.dataset.action = 'pause';
     
-    pauseButton.style.width = '60px';
-    pauseButton.style.height = '60px';
+    pauseButton.style.width = '45px'; // Smaller button
+    pauseButton.style.height = '45px'; // Smaller button
+    pauseButton.style.marginLeft = '30px'; // Add space on left side
+    pauseButton.style.marginRight = '-40px'; // Shift left by reducing right margin
     pauseButton.style.borderRadius = '50%';
     pauseButton.style.backgroundColor = 'rgba(240, 240, 240, 0.8)';
     pauseButton.style.border = '2px solid rgba(255, 255, 255, 1)';
@@ -193,17 +195,17 @@ function createPauseButton() {
     // Create pause icon (two vertical bars)
     const pauseIcon = document.createElement('div');
     pauseIcon.style.display = 'flex';
-    pauseIcon.style.gap = '5px';
+    pauseIcon.style.gap = '4px'; // Slightly narrower gap
     
     const bar1 = document.createElement('div');
-    bar1.style.width = '8px';
-    bar1.style.height = '20px';
+    bar1.style.width = '6px'; // Slightly narrower bars
+    bar1.style.height = '16px'; // Slightly shorter bars
     bar1.style.backgroundColor = '#333';
     bar1.style.borderRadius = '2px';
     
     const bar2 = document.createElement('div');
-    bar2.style.width = '8px';
-    bar2.style.height = '20px';
+    bar2.style.width = '6px'; // Slightly narrower bars
+    bar2.style.height = '16px'; // Slightly shorter bars
     bar2.style.backgroundColor = '#333';
     bar2.style.borderRadius = '2px';
     
@@ -227,6 +229,7 @@ function createActionButtons() {
     buttonContainer.style.pointerEvents = 'auto';
     buttonContainer.style.transform = 'scale(0.6)'; // Shrink by 40%
     buttonContainer.style.transformOrigin = 'right center'; // Scale from right side
+    buttonContainer.style.marginRight = '40px'; // Add right margin to shift left
     mobileControls.appendChild(buttonContainer);
     
     // Button definitions: [id, label, color, row, col, action]
