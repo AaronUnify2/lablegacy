@@ -43,29 +43,109 @@ function updateHealthBar(player) {
 
 // Update weapon information UI
 function updateWeaponInfo(player) {
-    const weapon = player.currentWeapon;
+    // Get both weapons from player
+    const sword = player.weapons.sword;
+    const staff = player.weapons.staff;
     
-    if (!weapon) return;
+    if (!sword || !staff) return;
     
-    // Update weapon name
+    // Update sword info (main weapon display)
     const weaponNameElement = document.querySelector('.weapon-name');
     if (weaponNameElement) {
-        weaponNameElement.textContent = capitalizeFirstLetter(weapon.type);
+        weaponNameElement.textContent = 'Sword & Staff';
     }
     
-    // Update weapon durability
+    // Update sword durability
     const durabilityElement = document.getElementById('durability-value');
     if (durabilityElement) {
-        const durabilityPercentage = Math.floor((weapon.durability / weapon.maxDurability) * 100);
-        durabilityElement.textContent = durabilityPercentage;
+        const swordDurabilityPercentage = Math.floor((sword.durability / sword.maxDurability) * 100);
+        const staffDurabilityPercentage = Math.floor((staff.durability / staff.maxDurability) * 100);
         
-        // Change color based on durability
-        if (durabilityPercentage > 60) {
+        // Show both weapons' durability
+        durabilityElement.textContent = `${swordDurabilityPercentage}% / ${staffDurabilityPercentage}%`;
+        
+        // Change color based on the lower durability
+        const lowerDurability = Math.min(swordDurabilityPercentage, staffDurabilityPercentage);
+        if (lowerDurability > 60) {
             durabilityElement.style.color = '#ffffff'; // Normal
-        } else if (durabilityPercentage > 30) {
+        } else if (lowerDurability > 30) {
             durabilityElement.style.color = '#f0a000'; // Warning yellow
         } else {
             durabilityElement.style.color = '#f04000'; // Critical red-orange
+        }
+    }
+    
+    // Update weapon cooldown indicators if they exist
+    updateWeaponCooldowns(player);
+}
+
+// Update weapon cooldown indicators
+function updateWeaponCooldowns(player) {
+    // Check for staff cooldown element, create if doesn't exist
+    let staffCooldownElement = document.getElementById('staff-cooldown');
+    
+    if (!staffCooldownElement) {
+        // Create container for cooldown indicators
+        let cooldownContainer = document.getElementById('cooldown-container');
+        
+        if (!cooldownContainer) {
+            cooldownContainer = document.createElement('div');
+            cooldownContainer.id = 'cooldown-container';
+            cooldownContainer.style.position = 'absolute';
+            cooldownContainer.style.bottom = '20px';
+            cooldownContainer.style.right = '20px';
+            cooldownContainer.style.display = 'flex';
+            cooldownContainer.style.gap = '10px';
+            document.body.appendChild(cooldownContainer);
+        }
+        
+        // Create staff cooldown indicator
+        staffCooldownElement = document.createElement('div');
+        staffCooldownElement.id = 'staff-cooldown';
+        staffCooldownElement.style.width = '40px';
+        staffCooldownElement.style.height = '40px';
+        staffCooldownElement.style.borderRadius = '50%';
+        staffCooldownElement.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+        staffCooldownElement.style.border = '2px solid #4040ff';
+        staffCooldownElement.style.position = 'relative';
+        staffCooldownElement.style.overflow = 'hidden';
+        
+        const staffIcon = document.createElement('div');
+        staffIcon.style.position = 'absolute';
+        staffIcon.style.top = '50%';
+        staffIcon.style.left = '50%';
+        staffIcon.style.transform = 'translate(-50%, -50%)';
+        staffIcon.style.color = '#4040ff';
+        staffIcon.style.fontSize = '18px';
+        staffIcon.textContent = '✦'; // Magic star symbol
+        
+        staffCooldownElement.appendChild(staffIcon);
+        cooldownContainer.appendChild(staffCooldownElement);
+        
+        // Create cooldown overlay
+        const staffOverlay = document.createElement('div');
+        staffOverlay.id = 'staff-cooldown-overlay';
+        staffOverlay.style.position = 'absolute';
+        staffOverlay.style.bottom = '0';
+        staffOverlay.style.left = '0';
+        staffOverlay.style.width = '100%';
+        staffOverlay.style.backgroundColor = 'rgba(64, 64, 255, 0.5)';
+        staffOverlay.style.transition = 'height 0.1s linear';
+        
+        staffCooldownElement.appendChild(staffOverlay);
+    }
+    
+    // Update staff cooldown display
+    const staffCooldownOverlay = document.getElementById('staff-cooldown-overlay');
+    if (staffCooldownOverlay) {
+        const cooldownPercentage = (player.weapons.staff.cooldownTimer / player.weapons.staff.cooldown) * 100;
+        staffCooldownOverlay.style.height = `${cooldownPercentage}%`;
+        
+        // Make it glow when ready
+        if (cooldownPercentage <= 0) {
+            staffCooldownElement.style.boxShadow = '0 0 10px #4040ff';
+        } else {
+            staffCooldownElement.style.boxShadow = 'none';
         }
     }
 }
@@ -222,7 +302,8 @@ export function createControlHints() {
             <div>Move:</div><div>WASD or Arrows</div>
             <div>Jump:</div><div>SPACE</div>
             <div>Dash:</div><div>SHIFT</div>
-            <div>Attack:</div><div>Left Mouse</div>
+            <div>Melee Attack:</div><div>Left Mouse</div>
+            <div>Magic Attack:</div><div>Right Mouse</div>
             <div>Interact:</div><div>E</div>
             <div>Inventory:</div><div>I</div>
             <div>Pause:</div><div>ESC</div>
@@ -230,6 +311,19 @@ export function createControlHints() {
     `;
     
     hintsContainer.innerHTML = hintContent;
+    
+    // Style the container
+    hintsContainer.style.position = 'absolute';
+    hintsContainer.style.top = '20px';
+    hintsContainer.style.left = '20px';
+    hintsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    hintsContainer.style.color = 'white';
+    hintsContainer.style.padding = '15px';
+    hintsContainer.style.borderRadius = '8px';
+    hintsContainer.style.fontFamily = 'Arial, sans-serif';
+    hintsContainer.style.fontSize = '14px';
+    hintsContainer.style.zIndex = '1000';
+    hintsContainer.style.userSelect = 'none';
     
     // Add to document
     document.body.appendChild(hintsContainer);
