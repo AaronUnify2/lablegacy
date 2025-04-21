@@ -8,11 +8,11 @@ export function updateUI(player, floorNumber) {
     updateMinimap();
     
     // Show jumping animation if player is in air
-    if (player.isInAir()) {
-        showJumpingIndicator(true);
-    } else {
-        showJumpingIndicator(false);
-    }
+    // if (player.isInAir()) {
+    //     showJumpingIndicator(true);
+    // } else {
+    //     showJumpingIndicator(false);
+    // }
 }
 
 // Update health bar UI
@@ -288,103 +288,12 @@ export function showInventory(player) {
 
 // Add this function to create control hints
 export function createControlHints() {
-    // Check if hints already exist
-    if (document.getElementById('control-hints')) return;
-    
-    // Create container for control hints
-    const hintsContainer = document.createElement('div');
-    hintsContainer.id = 'control-hints';
-    
-    // Set up the basic hint content
-    const hintContent = `
-        <div style="margin-bottom: 8px; font-weight: bold;">CONTROLS:</div>
-        <div style="display: grid; grid-template-columns: auto auto; gap: 5px;">
-            <div>Move:</div><div>WASD or Arrows</div>
-            <div>Jump:</div><div>SPACE</div>
-            <div>Dash:</div><div>SHIFT</div>
-            <div>Melee Attack:</div><div>Left Mouse</div>
-            <div>Magic Attack:</div><div>Right Mouse</div>
-            <div>Interact:</div><div>E</div>
-            <div>Inventory:</div><div>I</div>
-            <div>Pause:</div><div>ESC</div>
-        </div>
-    `;
-    
-    hintsContainer.innerHTML = hintContent;
-    
-    // Style the container
-    hintsContainer.style.position = 'absolute';
-    hintsContainer.style.top = '20px';
-    hintsContainer.style.left = '20px';
-    hintsContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    hintsContainer.style.color = 'white';
-    hintsContainer.style.padding = '15px';
-    hintsContainer.style.borderRadius = '8px';
-    hintsContainer.style.fontFamily = 'Arial, sans-serif';
-    hintsContainer.style.fontSize = '14px';
-    hintsContainer.style.zIndex = '1000';
-    hintsContainer.style.userSelect = 'none';
-    
-    // Add to document
-    document.body.appendChild(hintsContainer);
-    
-    // Auto-hide after 10 seconds
-    setTimeout(() => {
-        hintsContainer.style.opacity = '0';
-        hintsContainer.style.transition = 'opacity 1s';
-        
-        // Remove from DOM after fade out
-        setTimeout(() => {
-            if (hintsContainer.parentNode) {
-                hintsContainer.parentNode.removeChild(hintsContainer);
-            }
-        }, 1000);
-    }, 10000);
+    // Function disabled to prevent control hints from showing
+    return;
 }
 
 // Add a visual indicator when player is jumping
 function showJumpingIndicator(isJumping) {
-    // Get or create the indicator
-    let jumpIndicator = document.getElementById('jump-indicator');
-    
-    if (!jumpIndicator && isJumping) {
-        // Create the indicator if it doesn't exist
-        jumpIndicator = document.createElement('div');
-        jumpIndicator.id = 'jump-indicator';
-        jumpIndicator.style.position = 'absolute';
-        jumpIndicator.style.bottom = '100px';
-        jumpIndicator.style.left = '20px';
-        jumpIndicator.style.backgroundColor = 'rgba(60, 179, 113, 0.6)';
-        jumpIndicator.style.color = 'white';
-        jumpIndicator.style.padding = '5px 10px';
-        jumpIndicator.style.borderRadius = '4px';
-        jumpIndicator.style.fontFamily = 'Arial, sans-serif';
-        jumpIndicator.style.fontSize = '14px';
-        jumpIndicator.style.opacity = '0';
-        jumpIndicator.style.transition = 'opacity 0.3s';
-        jumpIndicator.textContent = 'JUMPING';
-        
-        document.body.appendChild(jumpIndicator);
-        
-        // Fade in
-        setTimeout(() => {
-            jumpIndicator.style.opacity = '1';
-        }, 10);
-    }
-    
-    // Show or hide the indicator
-    if (jumpIndicator) {
-        if (isJumping) {
-            jumpIndicator.style.opacity = '1';
-        } else {
-            jumpIndicator.style.opacity = '0';
-            
-            // Remove from DOM after fade out
-            setTimeout(() => {
-                if (jumpIndicator && jumpIndicator.parentNode) {
-                    jumpIndicator.parentNode.removeChild(jumpIndicator);
-                }
-            }, 300);
-        }
-    }
+    // Function disabled to prevent jumping indicator from showing
+    return;
 }
