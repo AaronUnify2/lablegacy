@@ -96,6 +96,9 @@ export function updateMinimap(ctx, dungeon, player) {
         if (room.isSpawnRoom) {
             // Center/spawn room
             fillColor = 'rgba(50, 180, 255, 0.8)';
+        } else if (room.roomType === 'cardinalPlus') {
+            // CardinalPlus rooms - use a purple color to make them stand out
+            fillColor = 'rgba(180, 100, 220, 0.8)';
         } else if (room.roomType === 'radial') {
             // Radial rooms
             fillColor = 'rgba(100, 200, 100, 0.8)';
@@ -120,6 +123,22 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x, z, width, height);
+        
+        // Add a special marker for cardinalPlus rooms to highlight them
+        if (room.roomType === 'cardinalPlus') {
+            const centerX = x + width / 2;
+            const centerZ = z + height / 2;
+            
+            // Draw a small diamond in the center of cardinalPlus rooms
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerZ - 3);
+            ctx.lineTo(centerX + 3, centerZ);
+            ctx.lineTo(centerX, centerZ + 3);
+            ctx.lineTo(centerX - 3, centerZ);
+            ctx.closePath();
+            ctx.fill();
+        }
     });
     
     // Draw key and exit if they exist
@@ -178,4 +197,3 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.closePath();
         ctx.fill();
     }
-}
