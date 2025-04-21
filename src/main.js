@@ -1,9 +1,10 @@
-// src/main.js - Updated to initialize jump functionality and pause menu
+// src/main.js - Updated to initialize the new UI system
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
-import { createControlHints } from './game/ui.js';
+import { initUI } from './game/ui.js';
 import { initPauseMenu } from './game/pauseMenu.js';
+
 // Main game instance
 let game;
 
@@ -15,12 +16,12 @@ function init() {
     setupRenderer();
     setupInput();
     
+    // Initialize UI with three status bars
+    initUI();
+    
     // Create and initialize the game
     game = new Game();
     game.init();
-    
-    // Removed control hints
-    // createControlHints();
     
     // Start the game loop
     requestAnimationFrame(gameLoop);
