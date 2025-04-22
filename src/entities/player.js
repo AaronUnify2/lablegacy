@@ -50,8 +50,6 @@ export class Player {
             sword: {
                 type: 'sword',
                 damage: 10,
-                durability: 100,
-                maxDurability: 100,
                 range: 2,
                 attackSpeed: 1.0,
                 mesh: null
@@ -59,8 +57,6 @@ export class Player {
             staff: {
                 type: 'staff',
                 damage: 8,
-                durability: 100,
-                maxDurability: 100,
                 range: 15,
                 attackSpeed: 0.8,
                 cooldown: 0.7,
@@ -494,14 +490,6 @@ export class Player {
         this.isAttacking = true;
         this.attackTimer = this.attackCooldown;
         
-        // Reduce weapon durability
-        this.weapons.sword.durability -= 1;
-        if (this.weapons.sword.durability <= 0) {
-            // Weapon broke!
-            console.log('Sword broke!');
-            // TODO: Handle weapon breaking
-        }
-        
         // Start attack animation
         this.attackAnimationTime = 0;
         this.attackAnimationDuration = 0.3;
@@ -520,9 +508,6 @@ export class Player {
         
         // Add projectile to scene
         scene.add(projectileMesh);
-        
-        // Reduce staff durability
-        this.weapons.staff.durability -= 0.5; // Less durability use than sword
         
         // Do staff animation
         this.animateStaffCast();
