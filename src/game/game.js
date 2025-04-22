@@ -204,11 +204,15 @@ export class Game {
             this.state = GameState.PLAYING;
             console.log("Game resumed");
             
-            // Reset input state when unpausing to prevent stuck keys
-            // This happens because key up events might be missed while paused
+            // Reset input state when unpausing to ensure no stuck controls
             if (window.resetInputState) {
                 window.resetInputState();
+            } else {
+                console.log("WARNING: resetInputState function is not available!");
             }
+            
+            // Reset timestamp to prevent huge delta on first frame after unpause
+            this.lastTimestamp = performance.now();
         }
     }
     
