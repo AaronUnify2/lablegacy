@@ -606,3 +606,49 @@ export function toggleMobileControls(show) {
         mobileControls.style.display = show ? 'flex' : 'none';
     }
 }
+
+// Reset all input states - used when unpausing to prevent stuck controls
+export function resetInputState() {
+    // Reset movement controls
+    inputState.moveForward = false;
+    inputState.moveBackward = false;
+    inputState.moveLeft = false;
+    inputState.moveRight = false;
+    
+    // Reset action controls
+    inputState.attack = false;
+    inputState.chargeAttack = false;
+    inputState.interact = false;
+    inputState.dash = false;
+    inputState.jump = false;
+    
+    // Reset UI controls
+    inputState.inventory = false;
+    inputState.map = false;
+    inputState.pause = false;
+    
+    // Reset mouse data
+    inputState.mouse.leftButton = false;
+    inputState.mouse.rightButton = false;
+    
+    // Reset "just pressed" states
+    for (const key in inputState.justPressed) {
+        inputState.justPressed[key] = false;
+    }
+    
+    // Reset "previously pressed" states
+    for (const key in inputState.previouslyPressed) {
+        inputState.previouslyPressed[key] = false;
+    }
+    
+    // Reset analog input values
+    inputState.axes.leftStickX = 0;
+    inputState.axes.leftStickY = 0;
+    inputState.axes.rightStickX = 0;
+    inputState.axes.rightStickY = 0;
+    
+    console.log("Input state has been reset");
+}
+
+// Make this function available globally so it can be called from the pause menu
+window.resetInputState = resetInputState;
