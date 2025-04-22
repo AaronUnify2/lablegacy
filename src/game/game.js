@@ -41,6 +41,9 @@ export class Game {
         
         // Minimap context
         this.minimapContext = null;
+        
+        // Flag to track previous pause state for fixing the unpausing issue
+        this.wasPaused = false;
     }
     
     // Initialize the game
@@ -141,6 +144,9 @@ export class Game {
                 this.updateGameOver(inputState);
                 break;
         }
+        
+        // Track the last pause state to detect transitions
+        this.wasPaused = (this.state === GameState.PAUSED);
     }
     
     // Update game while playing
@@ -189,7 +195,21 @@ export class Game {
     // Toggle between paused and playing states
     togglePause() {
         const isPaused = togglePauseMenu();
-        this.state = isPaused ? GameState.PAUSED : GameState.PLAYING;
+        
+        // Update game state based on pause menu state
+        if (isPaused) {
+            this.state = GameState.PAUSED;
+            console.log("Game paused");
+        } else {
+            this.state = GameState.PLAYING;
+            console.log("Game resumed");
+            
+            // Reset input state when unpausing to prevent stuck keys
+            // This happens because key up events might be missed while paused
+            if (window.resetInputState) {
+                window.resetInputState();
+            }
+        }
     }
     
     // Update camera position to follow player
