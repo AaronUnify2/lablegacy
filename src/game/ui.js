@@ -89,36 +89,16 @@ function updateStaminaBar(player) {
 
 // Update weapon information UI
 function updateWeaponInfo(player) {
-    // Get both weapons from player
-    const sword = player.weapons.sword;
-    const staff = player.weapons.staff;
-    
-    if (!sword || !staff) return;
-    
-    // Update sword info (main weapon display)
+    // Update weapon name
     const weaponNameElement = document.querySelector('.weapon-name');
     if (weaponNameElement) {
         weaponNameElement.textContent = 'Sword & Staff';
     }
     
-    // Update sword durability
-    const durabilityElement = document.getElementById('durability-value');
-    if (durabilityElement) {
-        const swordDurabilityPercentage = Math.floor((sword.durability / sword.maxDurability) * 100);
-        const staffDurabilityPercentage = Math.floor((staff.durability / staff.maxDurability) * 100);
-        
-        // Show both weapons' durability
-        durabilityElement.textContent = `${swordDurabilityPercentage}% / ${staffDurabilityPercentage}%`;
-        
-        // Change color based on the lower durability
-        const lowerDurability = Math.min(swordDurabilityPercentage, staffDurabilityPercentage);
-        if (lowerDurability > 60) {
-            durabilityElement.style.color = '#ffffff'; // Normal
-        } else if (lowerDurability > 30) {
-            durabilityElement.style.color = '#f0a000'; // Warning yellow
-        } else {
-            durabilityElement.style.color = '#f04000'; // Critical red-orange
-        }
+    // Remove durability display element if it exists
+    const durabilityContainer = document.querySelector('.weapon-durability');
+    if (durabilityContainer) {
+        durabilityContainer.style.display = 'none';
     }
 }
 
@@ -200,12 +180,11 @@ export function initUI() {
     floorInfo.innerHTML = 'Floor: <span id="floor-number">1</span>';
     uiContainer.appendChild(floorInfo);
     
-    // Weapon Info
+    // Weapon Info (without durability)
     const weaponInfo = document.createElement('div');
     weaponInfo.id = 'weapon-info';
     weaponInfo.innerHTML = `
         <div class="weapon-name">Sword & Staff</div>
-        <div class="weapon-durability">Durability: <span id="durability-value">100/100</span>%</div>
     `;
     uiContainer.appendChild(weaponInfo);
 }
