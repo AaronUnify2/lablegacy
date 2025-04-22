@@ -1,4 +1,4 @@
-/* styles/pause-menu.css - Pause menu styling */
+/* styles/pause-menu.css - Pause menu styling with touchscreen improvements */
 
 /* Pause Menu Container - covers the entire screen */
 .pause-menu-container {
@@ -57,21 +57,23 @@
     display: flex;
 }
 
-/* Menu Buttons */
+/* Menu Buttons - increased touch targets for mobile */
 .menu-button {
     background-color: rgba(60, 60, 60, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
-    padding: 14px;
+    padding: 16px; /* Increased from 14px for easier touch */
     color: white;
     font-size: 18px;
     font-weight: bold;
     cursor: pointer;
     transition: all 0.2s;
     text-align: center;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* Remove default mobile tap highlight */
 }
 
-.menu-button:hover {
+.menu-button:hover,
+.menu-button.touch-active { /* Added for touch feedback */
     background-color: rgba(80, 80, 80, 0.8);
     border-color: #f0a000;
     transform: translateY(-2px);
@@ -86,14 +88,17 @@
 .menu-button.back-button {
     margin-top: 20px;
     background-color: rgba(40, 40, 40, 0.8);
+    min-height: 54px; /* Minimum height for better touch target */
 }
 
 .menu-button.resume {
     margin-top: 30px;
     background-color: rgba(20, 100, 20, 0.8);
+    min-height: 54px; /* Minimum height for better touch target */
 }
 
-.menu-button.resume:hover {
+.menu-button.resume:hover,
+.menu-button.resume.touch-active { /* Added for touch feedback */
     background-color: rgba(30, 120, 30, 0.8);
 }
 
@@ -147,7 +152,7 @@
     margin-bottom: 20px;
 }
 
-/* Inventory Slots */
+/* Inventory Slots - improved for touch */
 .inventory-slot {
     background-color: rgba(30, 30, 30, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -159,9 +164,12 @@
     position: relative;
     cursor: pointer;
     transition: all 0.2s;
+    min-height: 60px; /* Minimum size for better touch target */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* Remove default mobile tap highlight */
 }
 
-.inventory-slot:hover {
+.inventory-slot:hover,
+.inventory-slot.touch-active { /* Added for touch feedback */
     background-color: rgba(40, 40, 40, 0.8);
     border-color: rgba(255, 255, 255, 0.4);
 }
@@ -265,7 +273,7 @@
     margin-top: 20px;
 }
 
-/* Save Game Section */
+/* Save Game Section - improved for touch */
 .save-slots {
     display: flex;
     flex-direction: column;
@@ -277,7 +285,7 @@
     background-color: rgba(30, 30, 30, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
-    padding: 15px;
+    padding: 18px; /* Increased from 15px for easier touch */
     color: white;
     font-size: 18px;
     cursor: pointer;
@@ -285,9 +293,12 @@
     text-align: left;
     display: flex;
     justify-content: space-between;
+    min-height: 60px; /* Minimum height for better touch target */
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* Remove default mobile tap highlight */
 }
 
-.save-slot:hover {
+.save-slot:hover,
+.save-slot.touch-active { /* Added for touch feedback */
     background-color: rgba(50, 50, 50, 0.8);
     border-color: #f0a000;
 }
@@ -312,24 +323,9 @@
     color: #f04040;
 }
 
-/* Mobile adjustments */
+/* Mobile adjustments - enhanced for better touch experience */
 @media (max-width: 767px) {
     .pause-menu {
         width: 95%;
         padding: 15px;
     }
-    
-    .pause-menu h1 {
-        font-size: 28px;
-        margin-bottom: 20px;
-    }
-    
-    .inventory-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .menu-button {
-        padding: 12px;
-        font-size: 16px;
-    }
-}
