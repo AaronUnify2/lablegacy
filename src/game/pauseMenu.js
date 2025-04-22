@@ -1,4 +1,4 @@
-// src/game/pauseMenu.js - Pause menu implementation
+// src/game/pauseMenu.js - Pause menu implementation with durability removed
 
 // Enum for tracking the current selected menu in the pause screen
 export const PauseMenuType = {
@@ -67,7 +67,6 @@ function createPauseMenuDOM() {
                 <h2>Sword</h2>
                 <div class="weapon-stats">
                     <p>Damage: <span id="sword-damage">10</span></p>
-                    <p>Durability: <span id="sword-durability">100</span>/100</p>
                 </div>
                 <div class="upgrade-list" id="sword-upgrades">
                     <!-- Sword upgrades will be listed here -->
@@ -81,7 +80,6 @@ function createPauseMenuDOM() {
                 <h2>Staff</h2>
                 <div class="weapon-stats">
                     <p>Damage: <span id="staff-damage">8</span></p>
-                    <p>Durability: <span id="staff-durability">100</span>/100</p>
                 </div>
                 <div class="upgrade-list" id="staff-abilities">
                     <!-- Staff abilities will be listed here -->
@@ -244,7 +242,6 @@ function updateSwordDisplay() {
     const player = window.game?.player;
     if (player) {
         document.getElementById('sword-damage').textContent = player.weapons.sword.damage;
-        document.getElementById('sword-durability').textContent = Math.floor(player.weapons.sword.durability);
     }
     
     // Update sword upgrades (will be implemented later)
@@ -256,7 +253,6 @@ function updateStaffDisplay() {
     const player = window.game?.player;
     if (player) {
         document.getElementById('staff-damage').textContent = player.weapons.staff.damage;
-        document.getElementById('staff-durability').textContent = Math.floor(player.weapons.staff.durability);
     }
     
     // Update staff abilities (will be implemented later)
@@ -344,8 +340,6 @@ function saveGame(slot) {
             playerMaxHealth: window.game?.player?.maxHealth || 100,
             currentFloor: window.game?.currentFloor || 1,
             inventory: pauseMenuState.inventoryItems,
-            swordDurability: window.game?.player?.weapons?.sword?.durability || 100,
-            staffDurability: window.game?.player?.weapons?.staff?.durability || 100,
             timestamp: Date.now()
         };
         
@@ -378,12 +372,6 @@ export function loadGame(slot) {
             window.game.player.health = gameState.playerHealth;
             window.game.player.maxHealth = gameState.playerMaxHealth;
             window.game.currentFloor = gameState.currentFloor;
-            
-            // Update weapons
-            if (gameState.swordDurability) 
-                window.game.player.weapons.sword.durability = gameState.swordDurability;
-            if (gameState.staffDurability)
-                window.game.player.weapons.staff.durability = gameState.staffDurability;
             
             // Load inventory
             pauseMenuState.inventoryItems = gameState.inventory || [];
@@ -421,8 +409,7 @@ export function createTestItems() {
     return [
         { id: 'smallHealthPotion', count: 5 },
         { id: 'mediumHealthPotion', count: 2 },
-        { id: 'smallStaminaPotion', count: 3 },
-        { id: 'sharpBlade', count: 1 }
+        { id: 'smallStaminaPotion', count: 3 }
     ];
 }
 
