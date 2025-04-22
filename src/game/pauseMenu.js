@@ -173,6 +173,43 @@ function setupEventListeners() {
             slot.classList.remove('touch-active');
         });
     });
+
+    // Add a direct event listener for resume button that ensures controls are reset
+    const resumeButton = document.getElementById('resume-btn');
+    if (resumeButton) {
+        // Add this extra event listener to ensure we clean up the input state
+        resumeButton.addEventListener('click', function() {
+            // Create a simple reset function in case the window.resetInputState isn't available
+            function emergencyResetInputs() {
+                const gameInput = window.game?.inputState;
+                if (gameInput) {
+                    // Reset basic movement inputs
+                    gameInput.moveForward = false;
+                    gameInput.moveBackward = false;
+                    gameInput.moveLeft = false;
+                    gameInput.moveRight = false;
+                    
+                    // Reset action inputs
+                    gameInput.attack = false;
+                    gameInput.chargeAttack = false;
+                    gameInput.interact = false;
+                    gameInput.dash = false;
+                    gameInput.jump = false;
+                    
+                    console.log("Emergency input reset performed");
+                }
+            }
+            
+            // Try both methods to reset input
+            if (window.resetInputState) {
+                window.resetInputState();
+            } else {
+                emergencyResetInputs();
+            }
+            
+            console.log("Resume button clicked - input state was forcibly reset");
+        });
+    }
 }
 
 // Helper function to add both mouse and touch event listeners to an element
@@ -258,6 +295,14 @@ export function togglePauseMenu() {
         showMenu(PauseMenuType.MAIN);
     } else {
         pauseMenuContainer.style.display = 'none';
+        
+        // Reset input state when unpausing to prevent stuck controls
+        if (window.resetInputState) {
+            window.resetInputState();
+            console.log("Input state was reset on unpause");
+        } else {
+            console.log("WARNING: resetInputState function not available!");
+        }
     }
     
     // Return the current state for the game to know if the menu is open
