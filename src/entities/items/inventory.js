@@ -1,10 +1,9 @@
-// src/entities/items/inventory.js - Inventory management system
+// src/entities/items/inventory.js - Inventory management system with durability features removed
 
 // Define item types
 export const ItemType = {
     HEALTH_POTION: 'healthPotion',
     STAMINA_POTION: 'staminaPotion',
-    WEAPON_UPGRADE: 'weaponUpgrade',
     STAFF_CRYSTAL: 'staffCrystal',
     KEY: 'key',
     SCROLL: 'scroll'
@@ -59,32 +58,6 @@ export const ItemDatabase = {
         duration: 15,
         stackable: true,
         iconClass: 'staminaPotion'
-    },
-    
-    // Weapon upgrades
-    'sharpBlade': {
-        id: 'sharpBlade',
-        name: 'Sharp Blade',
-        type: ItemType.WEAPON_UPGRADE,
-        description: 'Increases sword damage by 5 points.',
-        upgradeType: 'sword',
-        statBoost: {
-            damage: 5
-        },
-        stackable: false,
-        iconClass: 'swordUpgrade'
-    },
-    'reinforcedHilt': {
-        id: 'reinforcedHilt',
-        name: 'Reinforced Hilt',
-        type: ItemType.WEAPON_UPGRADE,
-        description: 'Increases sword durability by 50 points.',
-        upgradeType: 'sword',
-        statBoost: {
-            maxDurability: 50
-        },
-        stackable: false,
-        iconClass: 'swordUpgrade'
     },
     
     // Staff crystals
@@ -233,28 +206,6 @@ export class Inventory {
                 }
                 return false;
                 
-            case ItemType.WEAPON_UPGRADE:
-                // Apply weapon upgrade
-                if (item.upgradeType === 'sword' && player.weapons.sword) {
-                    // Apply stat boosts
-                    for (const [stat, value] of Object.entries(item.statBoost)) {
-                        if (stat === 'damage') {
-                            player.weapons.sword.damage += value;
-                        } else if (stat === 'maxDurability') {
-                            player.weapons.sword.maxDurability += value;
-                            player.weapons.sword.durability += value;
-                        }
-                    }
-                    
-                    // Remove the item (not stackable)
-                    this.items.splice(index, 1);
-                    
-                    // Trigger callback
-                    if (this.onInventoryChanged) this.onInventoryChanged();
-                    return true;
-                }
-                return false;
-                
             case ItemType.STAFF_CRYSTAL:
                 // Apply staff crystal for new abilities
                 if (player.unlockStaffAbility) {
@@ -296,7 +247,6 @@ export function createTestItems() {
     return [
         { id: 'smallHealthPotion', count: 5 },
         { id: 'mediumHealthPotion', count: 2 },
-        { id: 'smallStaminaPotion', count: 3 },
-        { id: 'sharpBlade', count: 1 }
+        { id: 'smallStaminaPotion', count: 3 }
     ];
 }
