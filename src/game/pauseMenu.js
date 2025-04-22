@@ -1,4 +1,4 @@
-// src/game/pauseMenu.js - Pause menu implementation with durability removed
+// src/game/pauseMenu.js - Pause menu implementation with touchscreen support added
 
 // Enum for tracking the current selected menu in the pause screen
 export const PauseMenuType = {
@@ -16,6 +16,7 @@ let pauseMenuState = {
     inventoryItems: [], // Will store player's inventory items
     swordUpgrades: [],  // Will store sword upgrades
     staffAbilities: [], // Will store staff abilities
+    selectedInventorySlot: -1 // Track selected inventory slot
 };
 
 // Initialize the pause menu
@@ -122,33 +123,96 @@ function generateInventorySlots(count) {
     }
 }
 
-// Setup event listeners for menu buttons
+// Setup event listeners for menu buttons - with improved touch support
 function setupEventListeners() {
-    // Main menu buttons
-    document.getElementById('inventory-btn').addEventListener('click', () => showMenu(PauseMenuType.INVENTORY));
-    document.getElementById('sword-btn').addEventListener('click', () => showMenu(PauseMenuType.SWORD));
-    document.getElementById('staff-btn').addEventListener('click', () => showMenu(PauseMenuType.STAFF));
-    document.getElementById('save-btn').addEventListener('click', () => showMenu(PauseMenuType.SAVE));
-    document.getElementById('resume-btn').addEventListener('click', togglePauseMenu);
+    // Main menu buttons - add touchstart and touchend events for mobile
+    addTouchableEventListeners('inventory-btn', () => showMenu(PauseMenuType.INVENTORY));
+    addTouchableEventListeners('sword-btn', () => showMenu(PauseMenuType.SWORD));
+    addTouchableEventListeners('staff-btn', () => showMenu(PauseMenuType.STAFF));
+    addTouchableEventListeners('save-btn', () => showMenu(PauseMenuType.SAVE));
+    addTouchableEventListeners('resume-btn', togglePauseMenu);
     
     // Back buttons
-    document.getElementById('inventory-back-btn').addEventListener('click', () => showMenu(PauseMenuType.MAIN));
-    document.getElementById('sword-back-btn').addEventListener('click', () => showMenu(PauseMenuType.MAIN));
-    document.getElementById('staff-back-btn').addEventListener('click', () => showMenu(PauseMenuType.MAIN));
-    document.getElementById('save-back-btn').addEventListener('click', () => showMenu(PauseMenuType.MAIN));
+    addTouchableEventListeners('inventory-back-btn', () => showMenu(PauseMenuType.MAIN));
+    addTouchableEventListeners('sword-back-btn', () => showMenu(PauseMenuType.MAIN));
+    addTouchableEventListeners('staff-back-btn', () => showMenu(PauseMenuType.MAIN));
+    addTouchableEventListeners('save-back-btn', () => showMenu(PauseMenuType.MAIN));
     
     // Save slot buttons
-    document.getElementById('save-slot-1').addEventListener('click', () => saveGame(1));
-    document.getElementById('save-slot-2').addEventListener('click', () => saveGame(2));
-    document.getElementById('save-slot-3').addEventListener('click', () => saveGame(3));
+    addTouchableEventListeners('save-slot-1', () => saveGame(1));
+    addTouchableEventListeners('save-slot-2', () => saveGame(2));
+    addTouchableEventListeners('save-slot-3', () => saveGame(3));
     
     // Use item button
-    document.getElementById('use-item-btn').addEventListener('click', useSelectedItem);
+    addTouchableEventListeners('use-item-btn', useSelectedItem);
     
-    // Inventory slot selection
+    // Inventory slot selection - add touch capability to all slots
     const inventorySlots = document.querySelectorAll('.inventory-slot');
     inventorySlots.forEach(slot => {
-        slot.addEventListener('click', (e) => selectInventorySlot(parseInt(e.currentTarget.dataset.index)));
+        const index = parseInt(slot.dataset.index, 10);
+        
+        // Add click for desktop and touchstart for mobile
+        slot.addEventListener('click', (e) => {
+            e.preventDefault();
+            selectInventorySlot(index);
+        });
+        
+        slot.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            slot.classList.add('touch-active');
+            selectInventorySlot(index);
+        });
+        
+        slot.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            slot.classList.remove('touch-active');
+        });
+        
+        slot.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            slot.classList.remove('touch-active');
+        });
+    });
+}
+
+// Helper function to add both mouse and touch event listeners to an element
+function addTouchableEventListeners(elementId, callback) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    // Add visual feedback for touch
+    const addActiveClass = () => element.classList.add('touch-active');
+    const removeActiveClass = () => element.classList.remove('touch-active');
+    
+    // Mouse events (for desktop)
+    element.addEventListener('click', (e) => {
+        e.preventDefault();
+        callback();
+    });
+    
+    // Touch events (for mobile)
+    element.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        addActiveClass();
+    });
+    
+    element.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        removeActiveClass();
+        
+        // Only trigger the callback if the touch ended on the element
+        const touch = e.changedTouches[0];
+        const elementRect = element.getBoundingClientRect();
+        
+        if (touch.clientX >= elementRect.left && touch.clientX <= elementRect.right &&
+            touch.clientY >= elementRect.top && touch.clientY <= elementRect.bottom) {
+            callback();
+        }
+    });
+    
+    element.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        removeActiveClass();
     });
 }
 
@@ -214,6 +278,7 @@ function updateInventoryDisplay() {
     slots.forEach(slot => {
         slot.innerHTML = '';
         slot.classList.remove('filled');
+        slot.classList.remove('selected');
     });
     
     // Display items in inventory
@@ -227,13 +292,37 @@ function updateInventoryDisplay() {
             slot.classList.add('filled');
             slot.dataset.itemId = item.id;
             slot.dataset.index = index;
+            
+            // If this was the previously selected slot, re-select it
+            if (index === pauseMenuState.selectedInventorySlot) {
+                slot.classList.add('selected');
+                updateItemDetails(item);
+            }
         }
     });
     
-    // Reset item details
-    document.getElementById('item-name').textContent = 'Select an item';
-    document.getElementById('item-description').textContent = 'Item description will appear here.';
-    document.getElementById('use-item-btn').disabled = true;
+    // If no slot is selected or the selected slot is now empty, reset item details
+    if (pauseMenuState.selectedInventorySlot === -1 || 
+        pauseMenuState.selectedInventorySlot >= pauseMenuState.inventoryItems.length) {
+        document.getElementById('item-name').textContent = 'Select an item';
+        document.getElementById('item-description').textContent = 'Item description will appear here.';
+        document.getElementById('use-item-btn').disabled = true;
+        pauseMenuState.selectedInventorySlot = -1;
+    }
+}
+
+// Update item details panel
+function updateItemDetails(item) {
+    if (!item) {
+        document.getElementById('item-name').textContent = 'Select an item';
+        document.getElementById('item-description').textContent = 'Item description will appear here.';
+        document.getElementById('use-item-btn').disabled = true;
+        return;
+    }
+    
+    document.getElementById('item-name').textContent = item.name;
+    document.getElementById('item-description').textContent = item.description;
+    document.getElementById('use-item-btn').disabled = false;
 }
 
 // Update sword display
@@ -295,29 +384,28 @@ function selectInventorySlot(index) {
         
         // Update item details
         const item = pauseMenuState.inventoryItems[index];
-        document.getElementById('item-name').textContent = item.name;
-        document.getElementById('item-description').textContent = item.description;
-        document.getElementById('use-item-btn').disabled = false;
+        updateItemDetails(item);
+        
+        // Remember selected slot
+        pauseMenuState.selectedInventorySlot = index;
     } else {
         // No item in this slot
         document.getElementById('item-name').textContent = 'Empty slot';
         document.getElementById('item-description').textContent = '';
         document.getElementById('use-item-btn').disabled = true;
+        pauseMenuState.selectedInventorySlot = -1;
     }
 }
 
 // Use the selected item
 function useSelectedItem() {
-    const selectedSlot = document.querySelector('.inventory-slot.selected');
-    if (!selectedSlot) return;
-    
-    const index = parseInt(selectedSlot.dataset.index);
-    if (isNaN(index)) return;
+    const selectedIndex = pauseMenuState.selectedInventorySlot;
+    if (selectedIndex === -1) return;
     
     // Use the player's useItem method
     const player = window.game?.player;
     if (player && player.useItem) {
-        const success = player.useItem(index);
+        const success = player.useItem(selectedIndex);
         
         if (success) {
             // Update the inventory display
