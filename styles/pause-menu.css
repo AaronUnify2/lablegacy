@@ -87,8 +87,21 @@
 
 .menu-button.back-button {
     margin-top: 20px;
-    background-color: rgba(40, 40, 40, 0.8);
+    background-color: rgba(80, 40, 40, 0.8); /* Darker red background for visibility */
     min-height: 54px; /* Minimum height for better touch target */
+    border: 2px solid #f04040; /* Red border for visibility */
+    color: #ffffff; /* White text for contrast */
+    font-size: 20px; /* Larger font size */
+    display: block !important; /* Force display */
+    visibility: visible !important; /* Force visibility */
+    position: relative; /* Ensure proper positioning */
+    z-index: 100; /* Higher z-index to prevent being hidden */
+}
+
+.menu-button.back-button:hover,
+.menu-button.back-button.touch-active {
+    background-color: rgba(120, 40, 40, 0.9); /* Brighter red on hover */
+    border-color: #ff6060; /* Brighter red border on hover */
 }
 
 .menu-button.resume {
@@ -323,9 +336,25 @@
     color: #f04040;
 }
 
-/* Mobile adjustments - enhanced for better touch experience */
+/* Fixed position back button for mobile */
 @media (max-width: 767px) {
     .pause-menu {
         width: 95%;
         padding: 15px;
     }
+    
+    /* Fix for back button on mobile */
+    .menu-button.back-button {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        background-color: rgba(80, 40, 40, 0.8);
+        padding: 15px;
+        border: 2px solid #f04040;
+        border-radius: 8px;
+        font-size: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+        position: sticky;
+        bottom: 0;
+        z-index: 100;
+    }
+}
