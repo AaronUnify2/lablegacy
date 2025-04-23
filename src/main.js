@@ -3,7 +3,7 @@ import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
 import { initUI } from './game/ui.js';
-import { initMenu } from './game/pauseMenu.js'; // Renamed function but same file for now
+import { initMenu } from './game/pauseMenu.js'; // Using initMenu from pauseMenu.js
 
 // Main game instance
 let game;
@@ -23,7 +23,7 @@ function init() {
     game = new Game();
     game.init();
     
-    // Initialize menu system (renamed from pause menu)
+    // Initialize menu system
     initMenu();
     
     // Start the game loop
