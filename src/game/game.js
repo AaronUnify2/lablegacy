@@ -193,34 +193,66 @@ export class Game {
     }
     
     // Toggle between paused and playing states
-    togglePause() {
-        const isPaused = togglePauseMenu();
-        
-        // Update game state based on pause menu state
-        if (isPaused) {
-            this.state = GameState.PAUSED;
-            console.log("Game paused");
-        } else {
-            this.state = GameState.PLAYING;
-            console.log("Game resumed");
-            
-            // Force all movement and action inputs to reset
-            if (window.resetInputState) {
-                window.resetInputState();
+    // Replace the togglePause method in your game.js file with this version
+
+// Toggle between paused and playing states
+togglePause() {
+    const isPaused = togglePauseMenu();
+    
+    // Update game state based on pause menu state
+    if (isPaused) {
+        if (this.player) {
+            // Mark the player as paused to store state
+            if (typeof this.player.markPaused === 'function') {
+                this.player.markPaused();
             }
-            
-            // Also reset player velocity directly to be sure
-            if (this.player) {
+        }
+        
+        this.state = GameState.PAUSED;
+        console.log("Game paused", this.state);
+    } else {
+        // We're unpausing - reset everything!
+        
+        // 1. Reset input through global function
+        if (typeof window.resetInputState === 'function') {
+            window.resetInputState();
+            console.log("Input state reset via global function");
+        } else {
+            console.warn("Global resetInputState function not found!");
+        }
+        
+        // 2. Notify player they're being unpaused
+        if (this.player) {
+            if (typeof this.player.markUnpaused === 'function') {
+                this.player.markUnpaused();
+                console.log("Player marked as unpaused");
+            } else {
+                // Fallback - reset critical player properties directly
+                console.log("Using fallback player reset");
                 this.player.velocity.x = 0;
                 this.player.velocity.z = 0;
                 this.player.isAttacking = false;
                 this.player.chargeAttack = false;
             }
-            
-            // Reset timestamp to prevent huge delta on first frame after unpause
-            this.lastTimestamp = performance.now();
         }
+        
+        // 3. Reset game state
+        this.state = GameState.PLAYING;
+        console.log("Game resumed", this.state);
+        
+        // 4. Reset timestamp to prevent huge delta on first frame after unpause
+        this.lastTimestamp = performance.now();
+        
+        // 5. Schedule another reset for next frame as extra insurance
+        setTimeout(() => {
+            if (this.player && this.state === GameState.PLAYING) {
+                this.player.velocity.x = 0;
+                this.player.velocity.z = 0;
+                console.log("Delayed velocity reset executed");
+            }
+        }, 50);
     }
+}
     
     // Update camera position to follow player
     updateCamera(deltaTime) {
