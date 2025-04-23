@@ -289,6 +289,11 @@ export function togglePauseMenu() {
     } else {
         pauseMenuContainer.style.display = 'none';
         
+        // Reset input state when unpausing using our global function
+        if (window.resetInputState) {
+            window.resetInputState();
+        }
+        
         // Emergency fix for input issues on unpause
         setTimeout(() => {
             if (window.game && window.game.player) {
