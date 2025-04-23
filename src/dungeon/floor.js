@@ -1,7 +1,6 @@
 // src/dungeon/floor.js - Dungeon floor class
 import * as THREE from 'three';
 
-
 export class Dungeon {
     constructor(floorNumber, size, theme) {
         this.floorNumber = floorNumber;
@@ -11,6 +10,7 @@ export class Dungeon {
         this.rooms = [];
         this.corridors = [];
         this.decorations = [];
+        this.chests = []; // Array to hold treasure chests
         
         this.keyPosition = null;
         this.exitPosition = null;
