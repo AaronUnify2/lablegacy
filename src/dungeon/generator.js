@@ -7,8 +7,6 @@ import { getDungeonTheme } from './themes.js';
 import { determineChestTier, generateLoot } from '../entities/items/loot.js';
 import { TreasureChest } from '../entities/items/item.js';
 
-
-
 // Generate a dungeon floor
 export function generateDungeon(floorNumber) {
     console.log(`Generating dungeon for floor ${floorNumber}...`);
@@ -839,10 +837,6 @@ function getChestSpawnWeight(room) {
 function addChestsToDungeon(dungeon, eligibleRooms) {
     if (eligibleRooms.length === 0) return;
     
-    // Import loot generation functions
-    const { determineChestTier, generateLoot } = require('../entities/items/loot.js');
-    const { TreasureChest } = require('../entities/items/item.js');
-    
     // Determine how many chests to spawn based on floor number
     const floorNumber = dungeon.floorNumber;
     let chestCount;
@@ -921,5 +915,22 @@ function addChestsToDungeon(dungeon, eligibleRooms) {
         
         // Add chest to dungeon entities
         dungeon.addChest(chest);
+    }
+}
+
+// Get decoration multiplier based on room type
+function getDecorationMultiplier(room) {
+    if (room.isSpawnRoom) {
+        return 1.5; // More decorations in spawn room
+    } else if (room.roomType === 'alcove') {
+        return 2.0; // Most decorations in alcoves (they're special places)
+    } else if (room.roomType === 'cardinalPlus') {
+        return 1.4; // Many decorations in cardinalPlus rooms
+    } else if (room.roomType === 'radial') {
+        return 1.2; // Slightly more in radial rooms
+    } else if (room.roomType === 'cardinal') {
+        return 1.0; // Normal amount in cardinal rooms
+    } else {
+        return 0.8; // Fewer in other rooms
     }
 }
