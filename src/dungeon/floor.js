@@ -55,6 +55,27 @@ export class Dungeon {
         return decorations[Math.floor(Math.random() * decorations.length)];
     }
     
+    // Add a chest to the dungeon
+    addChest(chest) {
+        this.chests.push(chest);
+        this.object.add(chest.getObject());
+    }
+    
+    // Get all chests in the dungeon
+    getChests() {
+        return this.chests;
+    }
+    
+    // Find an interactable chest near the player
+    findInteractableChest(playerPosition) {
+        for (const chest of this.chests) {
+            if (chest.canInteract(playerPosition)) {
+                return chest;
+            }
+        }
+        return null;
+    }
+    
     // Place the key in the dungeon
     placeKey(x, y, z) {
         this.keyPosition = { x, y, z };
@@ -623,6 +644,11 @@ export class Dungeon {
             if (this.exitMesh.children.length > 0 && this.exitMesh.children[0].isLight) {
                 this.exitMesh.children[0].color.setHex(0x00ff00);
             }
+        }
+        
+        // Update chests
+        for (const chest of this.chests) {
+            chest.update(deltaTime);
         }
     }
     
