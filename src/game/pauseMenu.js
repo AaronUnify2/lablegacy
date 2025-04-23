@@ -196,7 +196,7 @@ function setupEventListeners() {
                 player.isDashing = false;
                 
                 // Ensure the game state is PLAYING
-                window.game.state = 'PLAYING';
+                window.game.state = 'playing';
                 window.game.lastTimestamp = performance.now();
                 
                 console.log("Player controls reset by enhanced resume button handler");
