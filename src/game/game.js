@@ -7,7 +7,7 @@ import { Player } from '../entities/player.js';
 import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
-import { togglePauseMenu } from './pauseMenu.js'; // Keeping name for compatibility
+import { toggleMenu } from './pauseMenu.js'; // Use toggleMenu instead of togglePauseMenu
 
 // Game states - removed PAUSED state since we don't pause anymore
 const GameState = {
@@ -125,9 +125,9 @@ export class Game {
         // Cap delta time to prevent huge jumps after tab switch or similar
         const cappedDeltaTime = Math.min(deltaTime, 0.1);
         
-        // Handle menu toggling (previously pause)
-        if (inputState.justPressed.menu) { // Renamed from justPressed.pause
-            this.toggleMenu(); // Renamed from togglePause
+        // Handle menu toggling
+        if (inputState.justPressed.menu) {
+            this.toggleMenu();
         }
         
         // Update player - game always runs now
@@ -167,7 +167,7 @@ export class Game {
     
     // Toggle menu overlay without pausing the game
     toggleMenu() {
-        this.isMenuVisible = togglePauseMenu(); // Using existing function for compatibility
+        this.isMenuVisible = toggleMenu(); // Using toggleMenu instead of togglePauseMenu
         
         // The game continues to run - we just show/hide the menu
         console.log(this.isMenuVisible ? "Menu opened" : "Menu closed");
@@ -201,11 +201,6 @@ export class Game {
         // Look at player
         this.camera.lookAt(playerPosition);
     }
-    
-    // Update menu state - no longer needed, game always runs
-    // updateMenu(inputState) {
-    //     // Menu logic removed since menus don't pause the game
-    // }
     
     // Update game over state
     updateGameOver(inputState) {
