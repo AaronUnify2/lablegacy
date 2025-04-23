@@ -195,7 +195,7 @@ function setupEventListeners() {
             
             // Force the game state to PLAYING 
             if (window.game) {
-                window.game.state = GameState.PLAYING;
+                window.game.state = 'PLAYING';
                 window.game.lastTimestamp = performance.now();
             }
             
