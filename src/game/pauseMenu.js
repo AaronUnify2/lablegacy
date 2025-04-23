@@ -195,7 +195,7 @@ function setupEventListeners() {
                 player.isFalling = false;
                 player.isDashing = false;
                 
-                // Ensure the game state is PLAYING
+                // Ensure the game state is PLAYING - WITH CORRECT CASE!
                 window.game.state = 'playing';
                 window.game.lastTimestamp = performance.now();
                 
