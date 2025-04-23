@@ -2,8 +2,9 @@
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
-import { initUI } from './game/ui.js';
+import { initUI, showMessage } from './game/ui.js';
 import { initMenu } from './game/pauseMenu.js'; // Using initMenu from pauseMenu.js
+import { ItemDatabase } from './entities/items/inventory.js';
 
 // Main game instance
 let game;
@@ -31,6 +32,10 @@ function init() {
     
     // Handle window resize
     window.addEventListener('resize', onWindowResize);
+    
+    // Expose necessary functions globally
+    window.showMessage = showMessage;
+    window.ItemDatabase = ItemDatabase;
 }
 
 // Main game loop
