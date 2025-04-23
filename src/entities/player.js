@@ -98,6 +98,10 @@ export class Player {
         this.object = null;
         this.collider = null;
         this.mesh = null;
+        
+        // Pause state tracking
+        this._wasUnpaused = false;
+        this._prePauseState = null;
     }
     
     // Initialize player's 3D model and physics
@@ -314,6 +318,18 @@ export class Player {
     
     // Update player state based on input
     update(deltaTime, input, dungeon, scene) {
+        // Emergency reset check - if we're coming back from pause, make sure controls are clean
+        if (this._wasUnpaused) {
+            console.log("Applying post-unpause cleanup");
+            this.velocity.x = 0;
+            this.velocity.z = 0;
+            this.velocity.y = 0;
+            this.isAttacking = false;
+            this.isDashing = false;
+            this.isJumping = false;
+            this._wasUnpaused = false;
+        }
+        
         // Handle movement
         this.updateMovement(deltaTime, input);
         
@@ -349,6 +365,42 @@ export class Player {
         
         // Update collider
         this.updateCollider();
+        
+        // Debug logging of movement states (only when moving or paused/unpaused)
+        if (this.velocity.x !== 0 || this.velocity.z !== 0 || window.game?.state === 'paused') {
+            console.log(`Player state - vX: ${this.velocity.x.toFixed(2)}, vZ: ${this.velocity.z.toFixed(2)}, 
+                        jump: ${this.isJumping}, fall: ${this.isFalling}, dash: ${this.isDashing}`);
+        }
+    }
+    
+    // Mark player as paused to store current state
+    markPaused() {
+        // Store current movement state
+        this._prePauseState = {
+            velocity: { ...this.velocity },
+            isJumping: this.isJumping,
+            isFalling: this.isFalling,
+            isDashing: this.isDashing,
+            isAttacking: this.isAttacking
+        };
+        
+        // Freeze all movement
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+    }
+    
+    // Mark player as unpaused to clean up on next update
+    markUnpaused() {
+        // Set flag for next update to ensure clean state
+        this._wasUnpaused = true;
+        
+        // Force reset all movement state
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+        this.velocity.y = 0;
+        this.isAttacking = false;
+        this.isDashing = false;
+        // Note: we don't reset jumping state immediately to prevent falling through floors
     }
     
     // Handle player movement
