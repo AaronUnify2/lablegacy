@@ -206,13 +206,11 @@ export function showMessage(message, duration = 3000) {
         messageContainer.style.top = '20%';
         messageContainer.style.left = '50%';
         messageContainer.style.transform = 'translateX(-50%)';
-        messageContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        messageContainer.style.color = 'white';
-        messageContainer.style.padding = '10px 20px';
-        messageContainer.style.borderRadius = '5px';
-        messageContainer.style.fontFamily = 'Arial, sans-serif';
-        messageContainer.style.fontSize = '18px';
-        messageContainer.style.textAlign = 'center';
+        messageContainer.style.display = 'flex';
+        messageContainer.style.flexDirection = 'column';
+        messageContainer.style.alignItems = 'center';
+        messageContainer.style.gap = '10px';
+        messageContainer.style.maxWidth = '80%';
         messageContainer.style.zIndex = '1000';
         messageContainer.style.pointerEvents = 'none'; // Don't block mouse events
         document.body.appendChild(messageContainer);
@@ -221,16 +219,44 @@ export function showMessage(message, duration = 3000) {
     // Create message element
     const messageElement = document.createElement('div');
     messageElement.textContent = message;
-    messageElement.style.opacity = '1';
-    messageElement.style.transition = 'opacity 0.5s';
+    messageElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    messageElement.style.color = 'white';
+    messageElement.style.padding = '10px 20px';
+    messageElement.style.borderRadius = '5px';
+    messageElement.style.fontFamily = 'Arial, sans-serif';
+    messageElement.style.fontSize = '18px';
+    messageElement.style.textAlign = 'center';
+    messageElement.style.opacity = '0';
+    messageElement.style.transition = 'opacity 0.3s ease-in-out';
     messageContainer.appendChild(messageElement);
+    
+    // Detect if message mentions chest tier and style accordingly
+    if (message.includes('Epic Chest:')) {
+        messageElement.style.backgroundColor = 'rgba(153, 50, 204, 0.8)'; // Purple background
+        messageElement.style.border = '2px solid #d070ff';
+    } else if (message.includes('Gold Chest:')) {
+        messageElement.style.backgroundColor = 'rgba(212, 175, 55, 0.8)'; // Gold background
+        messageElement.style.border = '2px solid #ffd700';
+    } else if (message.includes('Silver Chest:')) {
+        messageElement.style.backgroundColor = 'rgba(192, 192, 192, 0.8)'; // Silver background
+        messageElement.style.border = '2px solid #e0e0e0';
+    }
+    
+    // Force reflow before adding opacity
+    void messageElement.offsetWidth;
+    
+    // Fade in
+    messageElement.style.opacity = '1';
     
     // Fade out and remove after duration
     setTimeout(() => {
         messageElement.style.opacity = '0';
         setTimeout(() => {
-            messageContainer.removeChild(messageElement);
-        }, 500);
+            // Check if the element is still in the container before removing
+            if (messageElement.parentNode === messageContainer) {
+                messageContainer.removeChild(messageElement);
+            }
+        }, 300);
     }, duration);
 }
 
