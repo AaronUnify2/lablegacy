@@ -1,6 +1,6 @@
-// src/game/pauseMenu.js - Pause menu implementation with touchscreen support added
+// src/game/pauseMenu.js - Menu implementation with touchscreen support added
 
-// Enum for tracking the current selected menu in the pause screen
+// Enum for tracking the current selected menu in the menu screen
 export const PauseMenuType = {
     MAIN: 'main',
     INVENTORY: 'inventory',
@@ -9,7 +9,7 @@ export const PauseMenuType = {
     SAVE: 'save'
 };
 
-// State for the pause menu
+// State for the menu
 let pauseMenuState = {
     isVisible: false,
     currentMenu: PauseMenuType.MAIN,
@@ -19,24 +19,24 @@ let pauseMenuState = {
     selectedInventorySlot: -1 // Track selected inventory slot
 };
 
-// Initialize the pause menu
-export function initPauseMenu() {
-    createPauseMenuDOM();
+// Initialize the menu
+export function initMenu() {
+    createMenuDOM();
     setupEventListeners();
 }
 
-// Create and inject the pause menu DOM elements
-function createPauseMenuDOM() {
-    // Create main pause menu container
-    const pauseMenuContainer = document.createElement('div');
-    pauseMenuContainer.id = 'pause-menu-container';
-    pauseMenuContainer.className = 'pause-menu-container';
-    pauseMenuContainer.style.display = 'none';
+// Create and inject the menu DOM elements
+function createMenuDOM() {
+    // Create main menu container
+    const menuContainer = document.createElement('div');
+    menuContainer.id = 'pause-menu-container';
+    menuContainer.className = 'menu-container';
+    menuContainer.style.display = 'none';
     
-    // Create pause menu content
-    pauseMenuContainer.innerHTML = `
+    // Create menu content
+    menuContainer.innerHTML = `
         <div class="pause-menu">
-            <h1>PAUSED</h1>
+            <h1>MENU</h1>
             
             <!-- Main Menu -->
             <div id="main-menu" class="menu-section active">
@@ -44,7 +44,7 @@ function createPauseMenuDOM() {
                 <button id="sword-btn" class="menu-button">Sword</button>
                 <button id="staff-btn" class="menu-button">Staff</button>
                 <button id="save-btn" class="menu-button">Save Game</button>
-                <button id="resume-btn" class="menu-button resume">Resume Game</button>
+                <button id="resume-btn" class="menu-button resume">Close Menu</button>
             </div>
             
             <!-- Inventory Menu -->
@@ -104,7 +104,7 @@ function createPauseMenuDOM() {
     `;
     
     // Add to DOM
-    document.body.appendChild(pauseMenuContainer);
+    document.body.appendChild(menuContainer);
     
     // Generate inventory slots
     generateInventorySlots(16); // 16 slots for the inventory
@@ -130,7 +130,7 @@ function setupEventListeners() {
     addTouchableEventListeners('sword-btn', () => showMenu(PauseMenuType.SWORD));
     addTouchableEventListeners('staff-btn', () => showMenu(PauseMenuType.STAFF));
     addTouchableEventListeners('save-btn', () => showMenu(PauseMenuType.SAVE));
-    addTouchableEventListeners('resume-btn', togglePauseMenu);
+    addTouchableEventListeners('resume-btn', toggleMenu);
     
     // Back buttons
     addTouchableEventListeners('inventory-back-btn', () => showMenu(PauseMenuType.MAIN));
@@ -174,7 +174,7 @@ function setupEventListeners() {
         });
     });
 
-    // Direct Resume button handler with enhanced reset functionality
+    // Direct Close button handler with enhanced reset functionality
     const resumeButton = document.getElementById('resume-btn');
     if (resumeButton) {
         // Instead of replacing the button, add another click handler that runs AFTER the original
@@ -199,7 +199,7 @@ function setupEventListeners() {
                 window.game.state = 'playing';
                 window.game.lastTimestamp = performance.now();
                 
-                console.log("Player controls reset by enhanced resume button handler");
+                console.log("Player controls reset by enhanced close button handler");
             }
         });
     }
@@ -278,23 +278,23 @@ function showMenu(menuType) {
     pauseMenuState.currentMenu = menuType;
 }
 
-// Toggle pause menu visibility
-export function togglePauseMenu() {
+// Toggle menu visibility
+export function toggleMenu() {
     pauseMenuState.isVisible = !pauseMenuState.isVisible;
     
-    const pauseMenuContainer = document.getElementById('pause-menu-container');
+    const menuContainer = document.getElementById('pause-menu-container');
     if (pauseMenuState.isVisible) {
-        pauseMenuContainer.style.display = 'flex';
+        menuContainer.style.display = 'flex';
         showMenu(PauseMenuType.MAIN);
     } else {
-        pauseMenuContainer.style.display = 'none';
+        menuContainer.style.display = 'none';
         
-        // Reset input state when unpausing using our global function
+        // Reset input state when closing menu using our global function
         if (window.resetInputState) {
             window.resetInputState();
         }
         
-        // Emergency fix for input issues on unpause
+        // Emergency fix for input issues on closing menu
         setTimeout(() => {
             if (window.game && window.game.player) {
                 // Force reset player velocity
@@ -310,12 +310,17 @@ export function togglePauseMenu() {
     return pauseMenuState.isVisible;
 }
 
+// For backwards compatibility with existing code
+export function togglePauseMenu() {
+    return toggleMenu();
+}
+
 // Update inventory display
 function updateInventoryDisplay() {
     // Get player inventory if available
     const player = window.game?.player;
     if (player) {
-        // Sync pause menu inventory with player inventory
+        // Sync menu inventory with player inventory
         pauseMenuState.inventoryItems = player.getInventory();
     }
     
@@ -547,8 +552,8 @@ export function createTestItems() {
     ];
 }
 
-// Export a global function to update the pause menu inventory from anywhere
-export function updatePauseMenuInventory(items) {
+// Export a global function to update the menu inventory from anywhere
+export function updateMenuInventory(items) {
     if (!pauseMenuState) return;
     
     pauseMenuState.inventoryItems = items;
@@ -560,4 +565,4 @@ export function updatePauseMenuInventory(items) {
 }
 
 // Expose this function globally so it can be called from the player class
-window.updatePauseMenuInventory = updatePauseMenuInventory;
+window.updatePauseMenuInventory = updateMenuInventory;
