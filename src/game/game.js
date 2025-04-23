@@ -205,6 +205,11 @@ export class Game {
             console.log("Game resumed");
             
             // Force all movement and action inputs to reset
+            if (window.resetInputState) {
+                window.resetInputState();
+            }
+            
+            // Also reset player velocity directly to be sure
             if (this.player) {
                 this.player.velocity.x = 0;
                 this.player.velocity.z = 0;
