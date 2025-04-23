@@ -1,22 +1,23 @@
-/* styles/pause-menu.css - Pause menu styling with touchscreen improvements */
+/* styles/menu.css - Renamed from pause-menu.css with updated styling for non-pausing menu */
 
-/* Pause Menu Container - covers the entire screen */
-.pause-menu-container {
+/* Menu Container - covers the entire screen */
+.menu-container {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(0, 0, 0, 0.7); /* Slightly more transparent for overlay */
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 2000;
     font-family: 'Arial', sans-serif;
+    pointer-events: auto; /* Ensure we can click on menu items */
 }
 
-/* Pause Menu Panel */
-.pause-menu {
+/* Menu Panel */
+.pause-menu { /* Keeping this class name for compatibility */
     width: 80%;
     max-width: 800px;
     max-height: 90vh;
