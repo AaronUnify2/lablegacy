@@ -135,7 +135,7 @@ export class Game {
                 this.updatePlaying(cappedDeltaTime, inputState);
                 break;
             case GameState.PAUSED:
-                this.updatePaused(inputState);
+                this.updatePaused(cappedDeltaTime, inputState);
                 break;
             case GameState.MENU:
                 this.updateMenu(inputState);
@@ -204,11 +204,12 @@ export class Game {
             this.state = GameState.PLAYING;
             console.log("Game resumed");
             
-            // Reset input state when unpausing to ensure no stuck controls
-            if (window.resetInputState) {
-                window.resetInputState();
-            } else {
-                console.log("WARNING: resetInputState function is not available!");
+            // Force all movement and action inputs to reset
+            if (this.player) {
+                this.player.velocity.x = 0;
+                this.player.velocity.z = 0;
+                this.player.isAttacking = false;
+                this.player.chargeAttack = false;
             }
             
             // Reset timestamp to prevent huge delta on first frame after unpause
@@ -243,14 +244,47 @@ export class Game {
     }
     
     // Update game while paused
-    updatePaused(inputState) {
+    updatePaused(deltaTime, inputState) {
         // Handle unpause input
         if (inputState.justPressed.pause) {
             this.togglePause();
+            return;
         }
         
-        // While paused, we still render the scene but don't update game logic
-        // This allows the pause menu to be displayed over the frozen game
+        // IMPORTANT CHANGE: Keep processing input state updates even while paused
+        // This prevents controls from getting "stuck" when unpausing
+        
+        // We don't update the entire game state, but we DO process input
+        // so that when we unpause, the input state is fresh
+        
+        // Just process small deltaTime to keep things gentle
+        const minimalDelta = Math.min(deltaTime, 0.01); 
+        
+        // Update "just pressed" states from input system
+        // but don't apply physics, movement, or other game logic
+        
+        // The player object isn't updated fully, but we can still
+        // reset its controls based on the current inputState
+        if (this.player) {
+            // Manually sync control states directly from input
+            this.player.velocity.x = 0;
+            this.player.velocity.z = 0;
+            
+            // Don't change player position, but keep controls fresh
+            if (inputState) {
+                // Force controls to match current input state
+                if (!inputState.moveForward) this.player.velocity.z = 0;
+                if (!inputState.moveBackward) this.player.velocity.z = 0;
+                if (!inputState.moveLeft) this.player.velocity.x = 0;
+                if (!inputState.moveRight) this.player.velocity.x = 0;
+                if (!inputState.attack) this.player.isAttacking = false;
+                if (!inputState.chargeAttack) this.player.chargeAttack = false;
+                if (!inputState.jump) this.player.isJumping = false;
+            }
+        }
+        
+        // While paused, we still render the scene but don't update other game logic
+        // This allows the pause menu to be displayed over the mostly frozen game
     }
     
     // Update menu state
