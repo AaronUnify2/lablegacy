@@ -177,29 +177,9 @@ function setupEventListeners() {
     // Direct Resume button handler with enhanced reset functionality
     const resumeButton = document.getElementById('resume-btn');
     if (resumeButton) {
-        // Remove any existing event listeners and add our enhanced version
-        resumeButton.replaceWith(resumeButton.cloneNode(true));
-        
-        // Get the new button reference after replacing
-        const newResumeButton = document.getElementById('resume-btn');
-        
-        // Add our enhanced handler
-        newResumeButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Hide the pause menu immediately
-            const pauseMenuContainer = document.getElementById('pause-menu-container');
-            if (pauseMenuContainer) {
-                pauseMenuContainer.style.display = 'none';
-            }
-            
-            // Force the game state to PLAYING 
-            if (window.game) {
-                window.game.state = 'PLAYING';
-                window.game.lastTimestamp = performance.now();
-            }
-            
-            // Direct reset of player controls
+        // Instead of replacing the button, add another click handler that runs AFTER the original
+        resumeButton.addEventListener('click', function(e) {
+            // Emergency reset of player controls
             if (window.game && window.game.player) {
                 const player = window.game.player;
                 
@@ -215,13 +195,12 @@ function setupEventListeners() {
                 player.isFalling = false;
                 player.isDashing = false;
                 
-                console.log("Player controls reset by resume button");
+                // Ensure the game state is PLAYING
+                window.game.state = 'PLAYING';
+                window.game.lastTimestamp = performance.now();
+                
+                console.log("Player controls reset by enhanced resume button handler");
             }
-            
-            // Update menu state
-            pauseMenuState.isVisible = false;
-            
-            console.log("Game resumed by resume button");
         });
     }
 }
