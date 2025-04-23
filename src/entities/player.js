@@ -514,16 +514,25 @@ export class Player {
         }
     }
     
-    // Handle player attack
+// Handle player attack
     updateAttack(deltaTime, input, scene) {
         // Update attack cooldown
         if (this.attackTimer > 0) {
             this.attackTimer -= deltaTime;
         }
         
-        // Handle melee attack (left mouse button)
+        // Handle melee attack (left mouse button) - now functions as action/attack button
         if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
-            this.startMeleeAttack();
+            // Check if player is near a chest first
+            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
+            
+            if (nearbyChest) {
+                // If near a chest, open it instead of attacking
+                this.interactWithChest(nearbyChest);
+            } else {
+                // Otherwise, perform normal attack
+                this.startMeleeAttack();
+            }
         }
         
         // Handle ranged attack (right mouse button)
@@ -534,6 +543,55 @@ export class Player {
         // Update attack animation if currently attacking
         if (this.isAttacking) {
             this.updateAttackAnimation(deltaTime);
+        }
+    }
+    
+    // Interact with a chest
+    interactWithChest(chest) {
+        // Open the chest
+        const items = chest.open();
+        
+        if (items && items.length > 0) {
+            // Show what was in the chest
+            let itemNames = [];
+            for (const item of items) {
+                // Add item to inventory
+                this.addToInventory(item);
+                
+                // Get item name for notification
+                const itemDef = window.ItemDatabase[item.id];
+                if (itemDef) {
+                    const count = item.count > 1 ? ` x${item.count}` : '';
+                    itemNames.push(`${itemDef.name}${count}`);
+                }
+            }
+            
+            // Show notification with all items found
+            let message = `Found: ${itemNames.join(', ')}`;
+            
+            // Format message based on chest tier
+            let chestType = '';
+            switch (chest.getTier()) {
+                case 'uncommon':
+                    chestType = 'Silver';
+                    break;
+                case 'rare':
+                    chestType = 'Gold';
+                    break;
+                case 'epic':
+                    chestType = 'Epic';
+                    break;
+                default:
+                    chestType = '';
+            }
+            
+            // Only show chest type if it's not a common chest
+            if (chestType) {
+                message = `${chestType} Chest: ${message}`;
+            }
+            
+            // Show the message
+            window.showMessage?.(message, 3000);
         }
     }
     
