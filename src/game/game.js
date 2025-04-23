@@ -80,7 +80,7 @@ export class Game {
         
         console.log('Game initialized!');
     }
-    
+
     // Generate a new dungeon floor
     generateNewFloor(floorNumber) {
         console.log(`Generating floor ${floorNumber}...`);
@@ -109,6 +109,9 @@ export class Game {
         
         // Update UI
         document.getElementById('floor-number').textContent = floorNumber;
+        
+        // Show floor transition message
+        window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
         
         // TODO: Spawn enemies
         // TODO: Place items and treasures
