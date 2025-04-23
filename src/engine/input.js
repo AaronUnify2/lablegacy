@@ -1,4 +1,4 @@
-// src/engine/input.js - Input handling system with mobile controller support and added pause button
+// src/engine/input.js - Input handling system with mobile controller support and menu button
 
 // Input state object
 const inputState = {
@@ -18,7 +18,7 @@ const inputState = {
     // UI controls
     inventory: false,
     map: false,
-    pause: false,
+    menu: false,  // Changed from pause to menu
     
     // Mouse data
     mouse: {
@@ -34,7 +34,7 @@ const inputState = {
         interact: false,
         inventory: false,
         map: false,
-        pause: false,
+        menu: false,  // Changed from pause to menu
         dash: false,
         jump: false  // Add jump to justPressed tracking
     },
@@ -45,7 +45,7 @@ const inputState = {
         interact: false,
         inventory: false,
         map: false,
-        pause: false,
+        menu: false,  // Changed from pause to menu
         dash: false,
         jump: false  // Add jump to previouslyPressed tracking
     },
@@ -68,7 +68,7 @@ let joystickElement;
 let joystickKnob;
 let actionButtons;
 let mobileControls;
-let pauseButton; // Added pause button element
+let menuButton; // Changed from pauseButton
 
 // Set up input event listeners
 export function setupInput() {
@@ -124,8 +124,8 @@ function setupMobileControls() {
     // Create joystick
     createJoystick();
     
-    // Create pause button
-    createPauseButton();
+    // Create menu button
+    createMenuButton();
     
     // Create action buttons
     createActionButtons();
@@ -166,54 +166,50 @@ function createJoystick() {
     joystickElement.appendChild(joystickKnob);
 }
 
-// Create pause button in the middle
-function createPauseButton() {
-    pauseButton = document.createElement('div');
-    pauseButton.id = 'pause-button';
-    pauseButton.className = 'control-button';
-    pauseButton.dataset.action = 'pause';
+// Create menu button in the middle
+function createMenuButton() {
+    menuButton = document.createElement('div');
+    menuButton.id = 'menu-button';     // Updated ID from 'pause-button'
+    menuButton.className = 'control-button';
+    menuButton.dataset.action = 'menu'; // Changed from 'pause' to 'menu'
     
-    pauseButton.style.width = '45px'; // Smaller button
-    pauseButton.style.height = '45px'; // Smaller button
-    pauseButton.style.marginLeft = '30px'; // Add space on left side
-    pauseButton.style.marginRight = '-40px'; // Shift left by reducing right margin
-    pauseButton.style.borderRadius = '50%';
-    pauseButton.style.backgroundColor = 'rgba(240, 240, 240, 0.8)';
-    pauseButton.style.border = '2px solid rgba(255, 255, 255, 1)';
-    pauseButton.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.7)';
-    pauseButton.style.display = 'flex';
-    pauseButton.style.justifyContent = 'center';
-    pauseButton.style.alignItems = 'center';
-    pauseButton.style.color = '#333';
-    pauseButton.style.fontFamily = 'Arial, sans-serif';
-    pauseButton.style.fontWeight = 'bold';
-    pauseButton.style.fontSize = '14px';
-    pauseButton.style.userSelect = 'none';
-    pauseButton.style.pointerEvents = 'auto';
-    pauseButton.style.position = 'relative';
+    menuButton.style.width = '45px';
+    menuButton.style.height = '45px';
+    menuButton.style.marginLeft = '30px';
+    menuButton.style.marginRight = '-40px';
+    menuButton.style.borderRadius = '50%';
+    menuButton.style.backgroundColor = 'rgba(240, 240, 240, 0.8)';
+    menuButton.style.border = '2px solid rgba(255, 255, 255, 1)';
+    menuButton.style.boxShadow = '0 0 10px rgba(255, 255, 255, 0.7)';
+    menuButton.style.display = 'flex';
+    menuButton.style.justifyContent = 'center';
+    menuButton.style.alignItems = 'center';
+    menuButton.style.color = '#333';
+    menuButton.style.fontFamily = 'Arial, sans-serif';
+    menuButton.style.fontWeight = 'bold';
+    menuButton.style.fontSize = '14px';
+    menuButton.style.userSelect = 'none';
+    menuButton.style.pointerEvents = 'auto';
+    menuButton.style.position = 'relative';
     
-    // Create pause icon (two vertical bars)
-    const pauseIcon = document.createElement('div');
-    pauseIcon.style.display = 'flex';
-    pauseIcon.style.gap = '4px'; // Slightly narrower gap
+    // Create menu icon (three horizontal lines/hamburger menu)
+    const menuIcon = document.createElement('div');
+    menuIcon.style.display = 'flex';
+    menuIcon.style.flexDirection = 'column';
+    menuIcon.style.gap = '4px';
     
-    const bar1 = document.createElement('div');
-    bar1.style.width = '6px'; // Slightly narrower bars
-    bar1.style.height = '16px'; // Slightly shorter bars
-    bar1.style.backgroundColor = '#333';
-    bar1.style.borderRadius = '2px';
+    // Create three bars for hamburger menu icon
+    for (let i = 0; i < 3; i++) {
+        const bar = document.createElement('div');
+        bar.style.width = '16px';
+        bar.style.height = '3px';
+        bar.style.backgroundColor = '#333';
+        bar.style.borderRadius = '2px';
+        menuIcon.appendChild(bar);
+    }
     
-    const bar2 = document.createElement('div');
-    bar2.style.width = '6px'; // Slightly narrower bars
-    bar2.style.height = '16px'; // Slightly shorter bars
-    bar2.style.backgroundColor = '#333';
-    bar2.style.borderRadius = '2px';
-    
-    pauseIcon.appendChild(bar1);
-    pauseIcon.appendChild(bar2);
-    pauseButton.appendChild(pauseIcon);
-    
-    mobileControls.appendChild(pauseButton);
+    menuButton.appendChild(menuIcon);
+    mobileControls.appendChild(menuButton);
 }
 
 // Create action buttons
@@ -291,16 +287,16 @@ function handleTouchStart(event) {
             updateJoystickPosition(touch);
         }
         
-        // Check if touch is on pause button
-        if (target.id === 'pause-button' || target.parentElement === pauseButton) {
-            // Handle pause button press
-            handleButtonPress('pause', true);
+        // Check if touch is on menu button
+        if (target.id === 'menu-button' || target.parentElement === menuButton) {
+            // Handle menu button press
+            handleButtonPress('menu', true);
             // Visual feedback
-            pauseButton.style.transform = 'scale(0.9)';
+            menuButton.style.transform = 'scale(0.9)';
         }
         
         // Check if touch is on action button
-        if (target.classList && target.classList.contains('control-button') && target.id !== 'pause-button') {
+        if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
             const action = target.dataset.action;
             
             // Highlight button
@@ -343,16 +339,16 @@ function handleTouchEnd(event) {
         // Find if touch was on an action button
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
         
-        // Check for pause button
-        if (target && (target.id === 'pause-button' || target.parentElement === pauseButton)) {
+        // Check for menu button
+        if (target && (target.id === 'menu-button' || target.parentElement === menuButton)) {
             // Reset button appearance
-            pauseButton.style.transform = 'scale(1)';
+            menuButton.style.transform = 'scale(1)';
             // Reset input state (but keep the "just pressed" state for one frame)
-            handleButtonPress('pause', false);
+            handleButtonPress('menu', false);
         }
         
         // Check for other buttons
-        if (target && target.classList && target.classList.contains('control-button') && target.id !== 'pause-button') {
+        if (target && target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
             const action = target.dataset.action;
             
             // Reset button appearance
@@ -458,8 +454,8 @@ function handleButtonPress(action, isPressed) {
         case 'inventory':
             inputState.inventory = isPressed;
             break;
-        case 'pause':
-            inputState.pause = isPressed;
+        case 'menu':  // Changed from 'pause' to 'menu'
+            inputState.menu = isPressed;
             break;
     }
 }
@@ -518,7 +514,7 @@ function updateInputState(code, isPressed) {
             inputState.map = isPressed;
             break;
         case 'Escape':
-            inputState.pause = isPressed;
+            inputState.menu = isPressed;  // Changed from pause to menu
             break;
     }
 }
@@ -560,7 +556,7 @@ function handleMouseUp(event) {
 // Update "just pressed" states for single-press actions
 function updateJustPressedStates() {
     // List of keys to check for "just pressed" state
-    const keysToCheck = ['attack', 'interact', 'inventory', 'map', 'pause', 'dash', 'jump'];
+    const keysToCheck = ['attack', 'interact', 'inventory', 'map', 'menu', 'dash', 'jump'];
     
     keysToCheck.forEach(key => {
         // A key is "just pressed" if it's currently down but wasn't in the previous frame
@@ -607,7 +603,7 @@ export function toggleMobileControls(show) {
     }
 }
 
-// Reset all input states - used when unpausing to prevent stuck controls
+// Reset all input states - used when needed to clear inputs
 export function resetInputState() {
     // Reset movement controls
     inputState.moveForward = false;
@@ -625,7 +621,7 @@ export function resetInputState() {
     // Reset UI controls
     inputState.inventory = false;
     inputState.map = false;
-    inputState.pause = false;
+    inputState.menu = false;  // Changed from pause to menu
     
     // Reset mouse data
     inputState.mouse.leftButton = false;
@@ -650,5 +646,5 @@ export function resetInputState() {
     console.log("Input state has been reset");
 }
 
-// Make this function available globally so it can be called from the pause menu
+// Make this function available globally for emergency resets
 window.resetInputState = resetInputState;
