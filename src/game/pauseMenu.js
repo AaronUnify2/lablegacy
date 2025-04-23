@@ -174,40 +174,54 @@ function setupEventListeners() {
         });
     });
 
-    // Add a direct event listener for resume button that ensures controls are reset
+    // Direct Resume button handler with enhanced reset functionality
     const resumeButton = document.getElementById('resume-btn');
     if (resumeButton) {
-        // Add this extra event listener to ensure we clean up the input state
-        resumeButton.addEventListener('click', function() {
-            // Create a simple reset function in case the window.resetInputState isn't available
-            function emergencyResetInputs() {
-                const gameInput = window.game?.inputState;
-                if (gameInput) {
-                    // Reset basic movement inputs
-                    gameInput.moveForward = false;
-                    gameInput.moveBackward = false;
-                    gameInput.moveLeft = false;
-                    gameInput.moveRight = false;
-                    
-                    // Reset action inputs
-                    gameInput.attack = false;
-                    gameInput.chargeAttack = false;
-                    gameInput.interact = false;
-                    gameInput.dash = false;
-                    gameInput.jump = false;
-                    
-                    console.log("Emergency input reset performed");
-                }
+        // Remove any existing event listeners and add our enhanced version
+        resumeButton.replaceWith(resumeButton.cloneNode(true));
+        
+        // Get the new button reference after replacing
+        const newResumeButton = document.getElementById('resume-btn');
+        
+        // Add our enhanced handler
+        newResumeButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Hide the pause menu immediately
+            const pauseMenuContainer = document.getElementById('pause-menu-container');
+            if (pauseMenuContainer) {
+                pauseMenuContainer.style.display = 'none';
             }
             
-            // Try both methods to reset input
-            if (window.resetInputState) {
-                window.resetInputState();
-            } else {
-                emergencyResetInputs();
+            // Force the game state to PLAYING 
+            if (window.game) {
+                window.game.state = GameState.PLAYING;
+                window.game.lastTimestamp = performance.now();
             }
             
-            console.log("Resume button clicked - input state was forcibly reset");
+            // Direct reset of player controls
+            if (window.game && window.game.player) {
+                const player = window.game.player;
+                
+                // Reset all movement controls
+                player.velocity.x = 0;
+                player.velocity.z = 0;
+                player.velocity.y = 0;
+                
+                // Reset action states
+                player.isAttacking = false;
+                player.chargeAttack = false;
+                player.isJumping = false;
+                player.isFalling = false;
+                player.isDashing = false;
+                
+                console.log("Player controls reset by resume button");
+            }
+            
+            // Update menu state
+            pauseMenuState.isVisible = false;
+            
+            console.log("Game resumed by resume button");
         });
     }
 }
@@ -296,13 +310,16 @@ export function togglePauseMenu() {
     } else {
         pauseMenuContainer.style.display = 'none';
         
-        // Reset input state when unpausing to prevent stuck controls
-        if (window.resetInputState) {
-            window.resetInputState();
-            console.log("Input state was reset on unpause");
-        } else {
-            console.log("WARNING: resetInputState function not available!");
-        }
+        // Emergency fix for input issues on unpause
+        setTimeout(() => {
+            if (window.game && window.game.player) {
+                // Force reset player velocity
+                window.game.player.velocity.x = 0;
+                window.game.player.velocity.z = 0;
+                window.game.player.isAttacking = false;
+                window.game.player.chargeAttack = false;
+            }
+        }, 50); // Small delay to ensure it happens after state transition
     }
     
     // Return the current state for the game to know if the menu is open
