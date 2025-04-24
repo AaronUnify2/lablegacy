@@ -580,7 +580,7 @@ function calculateDistance(room1, room2) {
 }
 
 
-            // Place the key and exit in the dungeon in a more strategic way
+// Place the key and exit in the dungeon in a more strategic way
 function placeKeyAndExit(dungeon) {
     const rooms = dungeon.getRooms();
     
@@ -841,9 +841,40 @@ function getDecorationMultiplier(room) {
 
 // Force spawn chests in rooms to ensure they appear
 function forceSpawnChests(dungeon) {
-    console.log("Force spawning chests");
+    console.log("Force spawning chests with enhanced center room placement");
     const rooms = dungeon.getRooms();
     
+    // ENHANCEMENT: FIRST FIND THE CENTER/SPAWN ROOM AND FORCE A CHEST THERE
+    const spawnRoom = rooms.find(room => room.isSpawnRoom);
+    
+    if (spawnRoom) {
+        console.log("Found spawn room at:", spawnRoom.x, spawnRoom.z, "with size", spawnRoom.width, spawnRoom.height);
+        
+        // Position chest right in the center of the spawn room
+        const centerX = spawnRoom.x + spawnRoom.width / 2;
+        const centerZ = spawnRoom.z + spawnRoom.height / 2;
+        
+        // Create a VERY obvious chest - use epic tier for visibility
+        const centerChest = new TreasureChest(
+            centerX, 
+            spawnRoom.floorHeight + 2, // Raise it well above floor
+            centerZ,
+            generateLoot('epic', 5), // Lots of epic loot
+            'epic' // Epic tier for purple glow
+        );
+        
+        // Add extra debugging to see if the chest is being created properly
+        console.log("Created center chest at position:", centerX, spawnRoom.floorHeight + 2, centerZ);
+        console.log("Chest object created:", centerChest);
+        
+        // Add chest to dungeon
+        dungeon.addChest(centerChest);
+        console.log("Added center chest to dungeon, total chests:", dungeon.chests.length);
+    } else {
+        console.log("WARNING: No spawn room found for center chest placement");
+    }
+    
+    // Original code - still try to add chests to other rooms
     // Skip the spawn room and small rooms
     const eligibleRooms = rooms.filter(room => 
         !room.isSpawnRoom && 
