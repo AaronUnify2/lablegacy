@@ -316,55 +316,61 @@ export class Player {
         };
     }
     
-    // Update player state based on input
-    update(deltaTime, input, dungeon, scene) {
-        // Emergency reset check - if we're coming back from pause, make sure controls are clean
-        if (this._wasUnpaused) {
-            console.log("Applying post-unpause cleanup");
-            this.velocity.x = 0;
-            this.velocity.z = 0;
-            this.velocity.y = 0;
-            this.isAttacking = false;
-            this.isDashing = false;
-            this.isJumping = false;
-            this._wasUnpaused = false;
-        }
+    // Update in Player update method to include updateInteraction call
+
+// Update player state based on input
+update(deltaTime, input, dungeon, scene) {
+    // Emergency reset check - if we're coming back from pause, make sure controls are clean
+    if (this._wasUnpaused) {
+        console.log("Applying post-unpause cleanup");
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+        this.velocity.y = 0;
+        this.isAttacking = false;
+        this.isDashing = false;
+        this.isJumping = false;
+        this._wasUnpaused = false;
+    }
+    
+    // Handle movement
+    this.updateMovement(deltaTime, input);
+    
+    // Handle jumping and gravity
+    this.updateJumping(deltaTime, input);
+    
+    // Handle attacking
+    this.updateAttack(deltaTime, input, scene);
+    
+    // Handle interactions (like chests)
+    this.updateInteraction(input);
+    
+    // Handle dash ability
+    this.updateDash(deltaTime, input);
+    
+    // Update projectiles
+    this.updateProjectiles(deltaTime, scene);
+    
+    // Update cooldown timers
+    if (this.weapons.staff.cooldownTimer > 0) {
+        this.weapons.staff.cooldownTimer -= deltaTime;
+    }
+    
+    // Update invulnerability timer
+    if (this.invulnerabilityTime > 0) {
+        this.invulnerabilityTime -= deltaTime;
         
-        // Handle movement
-        this.updateMovement(deltaTime, input);
-        
-        // Handle jumping and gravity
-        this.updateJumping(deltaTime, input);
-        
-        // Handle attacking
-        this.updateAttack(deltaTime, input, scene);
-        
-        // Handle dash ability
-        this.updateDash(deltaTime, input);
-        
-        // Update projectiles
-        this.updateProjectiles(deltaTime, scene);
-        
-        // Update cooldown timers
-        if (this.weapons.staff.cooldownTimer > 0) {
-            this.weapons.staff.cooldownTimer -= deltaTime;
-        }
-        
-        // Update invulnerability timer
-        if (this.invulnerabilityTime > 0) {
-            this.invulnerabilityTime -= deltaTime;
-            
-            // Flash effect for invulnerability
-            this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
-        } else {
-            this.mesh.visible = true;
-        }
-        
-        // Update 3D object position and rotation
-        this.object.position.copy(this.position);
-        
-        // Update collider
-        this.updateCollider();
+        // Flash effect for invulnerability
+        this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+    } else {
+        this.mesh.visible = true;
+    }
+    
+    // Update 3D object position and rotation
+    this.object.position.copy(this.position);
+    
+    // Update collider
+    this.updateCollider();
+}
         
         // Debug logging of movement states (only when moving or paused/unpaused)
         if (this.velocity.x !== 0 || this.velocity.z !== 0 || window.game?.state === 'paused') {
