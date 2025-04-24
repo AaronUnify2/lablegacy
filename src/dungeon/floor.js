@@ -55,46 +55,44 @@ export class Dungeon {
         return decorations[Math.floor(Math.random() * decorations.length)];
     }
     
-    // Updated addChest method for Dungeon class (src/dungeon/floor.js)
-
-// Add a chest to the dungeon - simplified version
-addChest(chest) {
-    // Add to the chest collection
-    this.chests.push(chest);
-    
-    // Debug log
-    console.log(`Adding chest to dungeon at position:`, chest.position);
-    
-    // Add chest object to dungeon's main object container
-    const chestObject = chest.getObject();
-    if (chestObject) {
-        this.object.add(chestObject);
-        console.log(`Successfully added chest object to dungeon`);
-    }
-}
-
-// Find an interactable chest near the player
-findInteractableChest(playerPosition) {
-    console.log(`Checking for interactable chests near player at (${playerPosition.x.toFixed(2)}, ${playerPosition.z.toFixed(2)})`);
-    
-    // Log chests for debugging
-    console.log(`Total chests in dungeon: ${this.chests.length}`);
-    
-    for (const chest of this.chests) {
-        // Skip already opened chests
-        if (chest.isOpen) {
-            continue;
-        }
+    // Add a chest to the dungeon - simplified version
+    addChest(chest) {
+        // Add to the chest collection
+        this.chests.push(chest);
         
-        // Check if the chest can be interacted with
-        if (chest.canInteract(playerPosition)) {
-            console.log("Found interactable chest!");
-            return chest;
+        // Debug log
+        console.log(`Adding chest to dungeon at position:`, chest.position);
+        
+        // Add chest object to dungeon's main object container
+        const chestObject = chest.getObject();
+        if (chestObject) {
+            this.object.add(chestObject);
+            console.log(`Successfully added chest object to dungeon`);
         }
     }
-    console.log("No interactable chests found");
-    return null;
-}
+    
+    // Find an interactable chest near the player
+    findInteractableChest(playerPosition) {
+        console.log(`Checking for interactable chests near player at (${playerPosition.x.toFixed(2)}, ${playerPosition.z.toFixed(2)})`);
+        
+        // Log chests for debugging
+        console.log(`Total chests in dungeon: ${this.chests.length}`);
+        
+        for (const chest of this.chests) {
+            // Skip already opened chests
+            if (chest.isOpen) {
+                continue;
+            }
+            
+            // Check if the chest can be interacted with
+            if (chest.canInteract(playerPosition)) {
+                console.log("Found interactable chest!");
+                return chest;
+            }
+        }
+        console.log("No interactable chests found");
+        return null;
+    }
     
     // Place the key in the dungeon
     placeKey(x, y, z) {
