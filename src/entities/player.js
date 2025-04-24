@@ -316,61 +316,58 @@ export class Player {
         };
     }
     
-    // Update in Player update method to include updateInteraction call
-
-// Update player state based on input
-update(deltaTime, input, dungeon, scene) {
-    // Emergency reset check - if we're coming back from pause, make sure controls are clean
-    if (this._wasUnpaused) {
-        console.log("Applying post-unpause cleanup");
-        this.velocity.x = 0;
-        this.velocity.z = 0;
-        this.velocity.y = 0;
-        this.isAttacking = false;
-        this.isDashing = false;
-        this.isJumping = false;
-        this._wasUnpaused = false;
-    }
-    
-    // Handle movement
-    this.updateMovement(deltaTime, input);
-    
-    // Handle jumping and gravity
-    this.updateJumping(deltaTime, input);
-    
-    // Handle attacking
-    this.updateAttack(deltaTime, input, scene);
-    
-    // Handle interactions (like chests)
-    this.updateInteraction(input);
-    
-    // Handle dash ability
-    this.updateDash(deltaTime, input);
-    
-    // Update projectiles
-    this.updateProjectiles(deltaTime, scene);
-    
-    // Update cooldown timers
-    if (this.weapons.staff.cooldownTimer > 0) {
-        this.weapons.staff.cooldownTimer -= deltaTime;
-    }
-    
-    // Update invulnerability timer
-    if (this.invulnerabilityTime > 0) {
-        this.invulnerabilityTime -= deltaTime;
+    // Update player state based on input
+    update(deltaTime, input, dungeon, scene) {
+        // Emergency reset check - if we're coming back from pause, make sure controls are clean
+        if (this._wasUnpaused) {
+            console.log("Applying post-unpause cleanup");
+            this.velocity.x = 0;
+            this.velocity.z = 0;
+            this.velocity.y = 0;
+            this.isAttacking = false;
+            this.isDashing = false;
+            this.isJumping = false;
+            this._wasUnpaused = false;
+        }
         
-        // Flash effect for invulnerability
-        this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
-    } else {
-        this.mesh.visible = true;
-    }
-    
-    // Update 3D object position and rotation
-    this.object.position.copy(this.position);
-    
-    // Update collider
-    this.updateCollider();
-}
+        // Handle movement
+        this.updateMovement(deltaTime, input);
+        
+        // Handle jumping and gravity
+        this.updateJumping(deltaTime, input);
+        
+        // Handle attacking
+        this.updateAttack(deltaTime, input, scene);
+        
+        // Handle interactions (like chests)
+        this.updateInteraction(input);
+        
+        // Handle dash ability
+        this.updateDash(deltaTime, input);
+        
+        // Update projectiles
+        this.updateProjectiles(deltaTime, scene);
+        
+        // Update cooldown timers
+        if (this.weapons.staff.cooldownTimer > 0) {
+            this.weapons.staff.cooldownTimer -= deltaTime;
+        }
+        
+        // Update invulnerability timer
+        if (this.invulnerabilityTime > 0) {
+            this.invulnerabilityTime -= deltaTime;
+            
+            // Flash effect for invulnerability
+            this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+        } else {
+            this.mesh.visible = true;
+        }
+        
+        // Update 3D object position and rotation
+        this.object.position.copy(this.position);
+        
+        // Update collider
+        this.updateCollider();
         
         // Debug logging of movement states (only when moving or paused/unpaused)
         if (this.velocity.x !== 0 || this.velocity.z !== 0 || window.game?.state === 'paused') {
@@ -519,118 +516,115 @@ update(deltaTime, input, dungeon, scene) {
             this.position.y = Math.max(this.groundLevel, 0);
         }
     }
-    // Updated updateAttack method in Player class (src/entities/player.js)
-
-// Handle player attack
-updateAttack(deltaTime, input, scene) {
-    // Update attack cooldown
-    if (this.attackTimer > 0) {
-        this.attackTimer -= deltaTime;
-    }
     
-    // Handle interaction (primary attack button)
-    if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
-        // Check if player is near a chest first
-        const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
-        
-        if (nearbyChest) {
-            // If near a chest, interact with it instead of attacking
-            console.log("Found nearby chest, attempting to interact");
-            this.interactWithChest(nearbyChest);
-            // Apply cooldown to prevent immediate re-interaction
-            this.attackTimer = this.attackCooldown;
-        } else {
-            // Otherwise, perform normal attack
-            this.startMeleeAttack();
+    // Handle player attack
+    updateAttack(deltaTime, input, scene) {
+        // Update attack cooldown
+        if (this.attackTimer > 0) {
+            this.attackTimer -= deltaTime;
         }
-    }
-    
-    // Handle ranged attack (right mouse button/staff attack)
-    if (input.chargeAttack && this.weapons.staff.cooldownTimer <= 0) {
-        this.fireStaffProjectile(scene);
-    }
-    
-    // Update attack animation if currently attacking
-    if (this.isAttacking) {
-        this.updateAttackAnimation(deltaTime);
-    }
-}
-
-// Handle interaction specifically (for cases where we need dedicated interact button)
-updateInteraction(input) {
-    if (input.justPressed.interact) {
-        // Check if player is near a chest
-        const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
         
-        if (nearbyChest) {
-            console.log("Player trying to interact with chest via dedicated interact button");
-            this.interactWithChest(nearbyChest);
-        } else {
-            // Could handle other interactions here
-            console.log("No interactable objects nearby");
-        }
-    }
-}
-    
-// Improved interactWithChest method for Player class (src/entities/player.js)
-
-// Interact with a chest
-interactWithChest(chest) {
-    console.log("Player attempting to interact with chest");
-    
-    // Open the chest
-    const items = chest.open();
-    
-    if (items && items.length > 0) {
-        // Show what was in the chest
-        let itemNames = [];
-        for (const item of items) {
-            // Add item to inventory
-            this.addToInventory(item);
+        // Handle interaction (primary attack button)
+        if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
+            // Check if player is near a chest first
+            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
             
-            // Get item name for notification
-            const itemDef = window.ItemDatabase[item.id];
-            if (itemDef) {
-                const count = item.count > 1 ? ` x${item.count}` : '';
-                itemNames.push(`${itemDef.name}${count}`);
+            if (nearbyChest) {
+                // If near a chest, interact with it instead of attacking
+                console.log("Found nearby chest, attempting to interact");
+                this.interactWithChest(nearbyChest);
+                // Apply cooldown to prevent immediate re-interaction
+                this.attackTimer = this.attackCooldown;
+            } else {
+                // Otherwise, perform normal attack
+                this.startMeleeAttack();
             }
         }
         
-        // Show notification with all items found
-        let message = `Found: ${itemNames.join(', ')}`;
-        
-        // Format message based on chest tier
-        let chestType = '';
-        switch (chest.getTier()) {
-            case 'uncommon':
-                chestType = 'Silver';
-                break;
-            case 'rare':
-                chestType = 'Gold';
-                break;
-            case 'epic':
-                chestType = 'Epic';
-                break;
-            default:
-                chestType = '';
+        // Handle ranged attack (right mouse button)
+        if (input.chargeAttack && this.weapons.staff.cooldownTimer <= 0) {
+            this.fireStaffProjectile(scene);
         }
         
-        // Only show chest type if it's not a common chest
-        if (chestType) {
-            message = `${chestType} Chest: ${message}`;
+        // Update attack animation if currently attacking
+        if (this.isAttacking) {
+            this.updateAttackAnimation(deltaTime);
         }
-        
-        // Show the message (include longer display time for more items)
-        const duration = 3000 + (items.length * 1000);
-        window.showMessage?.(message, duration);
-        
-        console.log(`Opened chest and found: ${itemNames.join(', ')}`);
-        return true;
-    } else {
-        console.log("Chest was empty or already opened");
-        return false;
     }
-}
+    
+    // Handle interaction specifically (for cases where we need dedicated interact button)
+    updateInteraction(input) {
+        if (input.justPressed.interact) {
+            // Check if player is near a chest
+            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
+            
+            if (nearbyChest) {
+                console.log("Player trying to interact with chest via dedicated interact button");
+                this.interactWithChest(nearbyChest);
+            } else {
+                // Could handle other interactions here
+                console.log("No interactable objects nearby");
+            }
+        }
+    }
+    
+    // Interact with a chest
+    interactWithChest(chest) {
+        console.log("Player attempting to interact with chest");
+        
+        // Open the chest
+        const items = chest.open();
+        
+        if (items && items.length > 0) {
+            // Show what was in the chest
+            let itemNames = [];
+            for (const item of items) {
+                // Add item to inventory
+                this.addToInventory(item);
+                
+                // Get item name for notification
+                const itemDef = window.ItemDatabase[item.id];
+                if (itemDef) {
+                    const count = item.count > 1 ? ` x${item.count}` : '';
+                    itemNames.push(`${itemDef.name}${count}`);
+                }
+            }
+            
+            // Show notification with all items found
+            let message = `Found: ${itemNames.join(', ')}`;
+            
+            // Format message based on chest tier
+            let chestType = '';
+            switch (chest.getTier()) {
+                case 'uncommon':
+                    chestType = 'Silver';
+                    break;
+                case 'rare':
+                    chestType = 'Gold';
+                    break;
+                case 'epic':
+                    chestType = 'Epic';
+                    break;
+                default:
+                    chestType = '';
+            }
+            
+            // Only show chest type if it's not a common chest
+            if (chestType) {
+                message = `${chestType} Chest: ${message}`;
+            }
+            
+            // Show the message (include longer display time for more items)
+            const duration = 3000 + (items.length * 1000);
+            window.showMessage?.(message, duration);
+            
+            console.log(`Opened chest and found: ${itemNames.join(', ')}`);
+            return true;
+        } else {
+            console.log("Chest was empty or already opened");
+            return false;
+        }
+    }
     
     // Start a melee attack with the sword
     startMeleeAttack() {
@@ -837,119 +831,3 @@ interactWithChest(chest) {
     getInventory() {
         return [...this.inventory];
     }
-    
-    // Use an item from inventory
-    useItem(itemIndex) {
-        if (itemIndex < 0 || itemIndex >= this.inventory.length) return false;
-        
-        const item = this.inventory[itemIndex];
-        
-        // Apply item effects based on type
-        switch (item.type) {
-            case 'healthPotion':
-                // Only use if not at full health
-                if (this.health < this.maxHealth) {
-                    this.health = Math.min(this.maxHealth, this.health + (item.healAmount || 30));
-                    
-                    // Remove item or reduce count
-                    this.removeFromInventory(itemIndex);
-                    return true;
-                }
-                return false;
-                
-            case 'staminaPotion':
-                // Reset dash cooldown
-                this.dashCooldownTimer = 0;
-                
-                // Remove item or reduce count
-                this.removeFromInventory(itemIndex);
-                return true;
-                
-            // Handle other item types here
-            default:
-                return false;
-        }
-    }
-    
-    // Remove item from inventory
-    removeFromInventory(index) {
-        if (index < 0 || index >= this.inventory.length) return false;
-        
-        const item = this.inventory[index];
-        
-        if (item.count > 1) {
-            // Reduce count
-            item.count--;
-        } else {
-            // Remove entirely
-            this.inventory.splice(index, 1);
-        }
-        
-        // Update pause menu inventory if it exists
-        if (window.updatePauseMenuInventory) {
-            window.updatePauseMenuInventory(this.inventory);
-        }
-        
-        return true;
-    }
-    
-    // Get player object (for Three.js)
-    getObject() {
-        return this.object;
-    }
-    
-    // Get player position
-    getPosition() {
-        return this.position;
-    }
-    
-    // Set player position
-    setPosition(x, y, z) {
-        this.position.set(x, Math.max(y, 0), z); // Ensure y is never below 0
-        this.object.position.set(x, Math.max(y, 0), z);
-    }
-    
-    // Get player velocity
-    getVelocity() {
-        return this.velocity;
-    }
-    
-    // Get player collider
-    getCollider() {
-        return this.collider;
-    }
-    
-    // Get player attack state
-    isAttacking() {
-        return this.isAttacking;
-    }
-    
-    // Get player attack damage
-    getAttackDamage() {
-        return this.attackDamage;
-    }
-    
-    // Check if player is in air (jumping or falling)
-    isInAir() {
-        return this.isJumping || this.isFalling;
-    }
-    
-    // Apply stamina boost effect (for stamina potions)
-    applyStaminaBoost(duration) {
-        // Reset dash cooldown
-        this.dashCooldownTimer = 0;
-        
-        // TODO: Implement continuous jumping effect for duration
-        console.log(`Applied stamina boost for ${duration} seconds`);
-        
-        return true;
-    }
-    
-    // Unlock new staff ability
-    unlockStaffAbility(abilityType) {
-        // TODO: Implement staff abilities
-        console.log(`Unlocked staff ability: ${abilityType}`);
-        
-        return true;
-    }
-}
