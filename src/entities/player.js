@@ -546,8 +546,12 @@ export class Player {
         }
     }
     
+// Improved interactWithChest method for Player class (src/entities/player.js)
+
 // Interact with a chest
 interactWithChest(chest) {
+    console.log("Player attempting to interact with chest");
+    
     // Open the chest
     const items = chest.open();
     
@@ -595,8 +599,10 @@ interactWithChest(chest) {
         window.showMessage?.(message, duration);
         
         console.log(`Opened chest and found: ${itemNames.join(', ')}`);
+        return true;
     } else {
         console.log("Chest was empty or already opened");
+        return false;
     }
 }
     
