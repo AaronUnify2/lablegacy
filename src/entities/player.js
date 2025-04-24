@@ -513,38 +513,58 @@ export class Player {
             this.position.y = Math.max(this.groundLevel, 0);
         }
     }
-    
+    // Updated updateAttack method in Player class (src/entities/player.js)
+
 // Handle player attack
-    updateAttack(deltaTime, input, scene) {
-        // Update attack cooldown
-        if (this.attackTimer > 0) {
-            this.attackTimer -= deltaTime;
-        }
+updateAttack(deltaTime, input, scene) {
+    // Update attack cooldown
+    if (this.attackTimer > 0) {
+        this.attackTimer -= deltaTime;
+    }
+    
+    // Handle interaction (primary attack button)
+    if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
+        // Check if player is near a chest first
+        const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
         
-        // Handle melee attack (left mouse button) - now functions as action/attack button
-        if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
-            // Check if player is near a chest first
-            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
-            
-            if (nearbyChest) {
-                // If near a chest, open it instead of attacking
-                this.interactWithChest(nearbyChest);
-            } else {
-                // Otherwise, perform normal attack
-                this.startMeleeAttack();
-            }
-        }
-        
-        // Handle ranged attack (right mouse button)
-        if (input.chargeAttack && this.weapons.staff.cooldownTimer <= 0) {
-            this.fireStaffProjectile(scene);
-        }
-        
-        // Update attack animation if currently attacking
-        if (this.isAttacking) {
-            this.updateAttackAnimation(deltaTime);
+        if (nearbyChest) {
+            // If near a chest, interact with it instead of attacking
+            console.log("Found nearby chest, attempting to interact");
+            this.interactWithChest(nearbyChest);
+            // Apply cooldown to prevent immediate re-interaction
+            this.attackTimer = this.attackCooldown;
+        } else {
+            // Otherwise, perform normal attack
+            this.startMeleeAttack();
         }
     }
+    
+    // Handle ranged attack (right mouse button/staff attack)
+    if (input.chargeAttack && this.weapons.staff.cooldownTimer <= 0) {
+        this.fireStaffProjectile(scene);
+    }
+    
+    // Update attack animation if currently attacking
+    if (this.isAttacking) {
+        this.updateAttackAnimation(deltaTime);
+    }
+}
+
+// Handle interaction specifically (for cases where we need dedicated interact button)
+updateInteraction(input) {
+    if (input.justPressed.interact) {
+        // Check if player is near a chest
+        const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
+        
+        if (nearbyChest) {
+            console.log("Player trying to interact with chest via dedicated interact button");
+            this.interactWithChest(nearbyChest);
+        } else {
+            // Could handle other interactions here
+            console.log("No interactable objects nearby");
+        }
+    }
+}
     
 // Improved interactWithChest method for Player class (src/entities/player.js)
 
