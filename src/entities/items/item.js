@@ -367,7 +367,7 @@ export class TreasureChest {
         }
         
         // ENHANCEMENT: Make chests much larger - increasing scale by 5x
-        const scaleFactor = 0.5;
+        const scaleFactor = 0.1;
         
         // Create chest base
         const baseGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.5 * scaleFactor, 0.5 * scaleFactor);
