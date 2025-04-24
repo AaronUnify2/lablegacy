@@ -113,8 +113,8 @@ export class Game {
         // Show floor transition message
         window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
         
-        // TODO: Spawn enemies
-        // TODO: Place items and treasures
+        // Debug: Log the number of chests created
+        console.log(`Floor ${floorNumber} generated with ${this.currentDungeon.chests.length} chests`);
         
         console.log(`Floor ${floorNumber} generated`);
     }
@@ -135,6 +135,11 @@ export class Game {
         
         // Update player - game always runs now
         this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
+        
+        // Update dungeon (includes chest animations)
+        if (this.currentDungeon) {
+            this.currentDungeon.update(cappedDeltaTime);
+        }
         
         // Update camera to follow player
         this.updateCamera(cappedDeltaTime);
