@@ -339,9 +339,6 @@ export class Player {
         // Handle attacking
         this.updateAttack(deltaTime, input, scene);
         
-        // Handle interactions (like chests)
-        this.updateInteraction(input);
-        
         // Handle dash ability
         this.updateDash(deltaTime, input);
         
@@ -524,20 +521,25 @@ export class Player {
             this.attackTimer -= deltaTime;
         }
         
-        // Handle interaction (primary attack button)
+        // Handle melee attack (left mouse button) - now functions as action/attack button
         if (input.attack && this.attackTimer <= 0 && !this.isAttacking) {
             // Check if player is near a chest first
             const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
             
             if (nearbyChest) {
-                // If near a chest, interact with it instead of attacking
-                console.log("Found nearby chest, attempting to interact");
+                // If near a chest, open it instead of attacking
                 this.interactWithChest(nearbyChest);
-                // Apply cooldown to prevent immediate re-interaction
-                this.attackTimer = this.attackCooldown;
             } else {
                 // Otherwise, perform normal attack
                 this.startMeleeAttack();
+            }
+        }
+        
+        // Check for dedicated interact button press
+        if (input.justPressed.interact) {
+            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
+            if (nearbyChest) {
+                this.interactWithChest(nearbyChest);
             }
         }
         
@@ -552,26 +554,8 @@ export class Player {
         }
     }
     
-    // Handle interaction specifically (for cases where we need dedicated interact button)
-    updateInteraction(input) {
-        if (input.justPressed.interact) {
-            // Check if player is near a chest
-            const nearbyChest = window.game?.currentDungeon?.findInteractableChest(this.position);
-            
-            if (nearbyChest) {
-                console.log("Player trying to interact with chest via dedicated interact button");
-                this.interactWithChest(nearbyChest);
-            } else {
-                // Could handle other interactions here
-                console.log("No interactable objects nearby");
-            }
-        }
-    }
-    
     // Interact with a chest
     interactWithChest(chest) {
-        console.log("Player attempting to interact with chest");
-        
         // Open the chest
         const items = chest.open();
         
@@ -619,10 +603,8 @@ export class Player {
             window.showMessage?.(message, duration);
             
             console.log(`Opened chest and found: ${itemNames.join(', ')}`);
-            return true;
         } else {
             console.log("Chest was empty or already opened");
-            return false;
         }
     }
     
@@ -831,3 +813,119 @@ export class Player {
     getInventory() {
         return [...this.inventory];
     }
+    
+    // Use an item from inventory
+    useItem(itemIndex) {
+        if (itemIndex < 0 || itemIndex >= this.inventory.length) return false;
+        
+        const item = this.inventory[itemIndex];
+        
+        // Apply item effects based on type
+        switch (item.type) {
+            case 'healthPotion':
+                // Only use if not at full health
+                if (this.health < this.maxHealth) {
+                    this.health = Math.min(this.maxHealth, this.health + (item.healAmount || 30));
+                    
+                    // Remove item or reduce count
+                    this.removeFromInventory(itemIndex);
+                    return true;
+                }
+                return false;
+                
+            case 'staminaPotion':
+                // Reset dash cooldown
+                this.dashCooldownTimer = 0;
+                
+                // Remove item or reduce count
+                this.removeFromInventory(itemIndex);
+                return true;
+                
+            // Handle other item types here
+            default:
+                return false;
+        }
+    }
+    
+    // Remove item from inventory
+    removeFromInventory(index) {
+        if (index < 0 || index >= this.inventory.length) return false;
+        
+        const item = this.inventory[index];
+        
+        if (item.count > 1) {
+            // Reduce count
+            item.count--;
+        } else {
+            // Remove entirely
+            this.inventory.splice(index, 1);
+        }
+        
+        // Update pause menu inventory if it exists
+        if (window.updatePauseMenuInventory) {
+            window.updatePauseMenuInventory(this.inventory);
+        }
+        
+        return true;
+    }
+    
+    // Get player object (for Three.js)
+    getObject() {
+        return this.object;
+    }
+    
+    // Get player position
+    getPosition() {
+        return this.position;
+    }
+    
+    // Set player position
+    setPosition(x, y, z) {
+        this.position.set(x, Math.max(y, 0), z); // Ensure y is never below 0
+        this.object.position.set(x, Math.max(y, 0), z);
+    }
+    
+    // Get player velocity
+    getVelocity() {
+        return this.velocity;
+    }
+    
+    // Get player collider
+    getCollider() {
+        return this.collider;
+    }
+    
+    // Get player attack state
+    isAttacking() {
+        return this.isAttacking;
+    }
+    
+    // Get player attack damage
+    getAttackDamage() {
+        return this.attackDamage;
+    }
+    
+    // Check if player is in air (jumping or falling)
+    isInAir() {
+        return this.isJumping || this.isFalling;
+    }
+    
+    // Apply stamina boost effect (for stamina potions)
+    applyStaminaBoost(duration) {
+        // Reset dash cooldown
+        this.dashCooldownTimer = 0;
+        
+        // TODO: Implement continuous jumping effect for duration
+        console.log(`Applied stamina boost for ${duration} seconds`);
+        
+        return true;
+    }
+    
+    // Unlock new staff ability
+    unlockStaffAbility(abilityType) {
+        // TODO: Implement staff abilities
+        console.log(`Unlocked staff ability: ${abilityType}`);
+        
+        return true;
+    }
+}
