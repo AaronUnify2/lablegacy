@@ -310,9 +310,9 @@ export class Item {
     }
 }
 
-// Create a treasure chest that contains items
+// Ensure this class is properly exported
 export class TreasureChest {
-    constructor(x, y, z, items = []) {
+    constructor(x, y, z, items = [], tier = 'common') {
         // Position in world
         this.position = new THREE.Vector3(x, y, z);
         
@@ -321,6 +321,11 @@ export class TreasureChest {
         
         // Chest state
         this.isOpen = false;
+        this.isInteractable = true;
+        this.interactionDistance = 3.0; // How close player needs to be to interact
+        
+        // Chest appearance
+        this.tier = tier;
         
         // Three.js objects
         this.object = null;
@@ -333,48 +338,98 @@ export class TreasureChest {
         this.createMesh();
     }
     
-    // Create chest mesh
+    // Create chest mesh - ENHANCED VERSION with larger size and bright materials
     createMesh() {
         this.object = new THREE.Object3D();
         this.object.position.copy(this.position);
         
+        // Determine color based on tier
+        let baseColor, metalColor;
+        
+        switch(this.tier) {
+            case 'uncommon':
+                baseColor = 0x665544; // Darker wood
+                metalColor = 0xc0c0c0; // Silver
+                break;
+            case 'rare':
+                baseColor = 0x704214; // Rich wood
+                metalColor = 0xFFD700; // Gold
+                break;
+            case 'epic':
+                baseColor = 0x4a2a0a; // Dark ornate wood
+                metalColor = 0x9932CC; // Purple
+                break;
+            case 'common':
+            default:
+                baseColor = 0x8B4513; // Brown
+                metalColor = 0xddaa44; // Bronze
+                break;
+        }
+        
+        // ENHANCEMENT: Make chests much larger - increasing scale by 5x
+        const scaleFactor = 0.5;
+        
         // Create chest base
-        const baseGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.5);
-        const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const baseGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.5 * scaleFactor, 0.5 * scaleFactor);
+        const baseMaterial = new THREE.MeshLambertMaterial({ 
+            color: baseColor,
+            emissive: baseColor,
+            emissiveIntensity: 0.3 // Add glow
+        });
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         
         // Create chest lid (will be animated when opened)
-        const lidGeometry = new THREE.BoxGeometry(0.8, 0.3, 0.5);
-        const lidMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const lidGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.3 * scaleFactor, 0.5 * scaleFactor);
+        const lidMaterial = new THREE.MeshLambertMaterial({ 
+            color: baseColor,
+            emissive: baseColor,
+            emissiveIntensity: 0.3 // Add glow
+        });
         this.lid = new THREE.Mesh(lidGeometry, lidMaterial);
-        this.lid.position.y = 0.4;
+        this.lid.position.y = 0.4 * scaleFactor;
         this.lid.rotation.x = 0; // Closed
         
         // Create decorative elements
         const metalMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xddaa44,
+            color: metalColor,
+            emissive: metalColor,
+            emissiveIntensity: 0.5, // Increased glow
             metalness: 0.8,
             roughness: 0.3
         });
         
         // Metal bands
-        const bandGeometry1 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+        const bandGeometry1 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
         const band1 = new THREE.Mesh(bandGeometry1, metalMaterial);
-        band1.position.y = 0.15;
+        band1.position.y = 0.15 * scaleFactor;
         
-        const bandGeometry2 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+        const bandGeometry2 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
         const band2 = new THREE.Mesh(bandGeometry2, metalMaterial);
-        band2.position.y = 0.45;
+        band2.position.y = 0.45 * scaleFactor;
         
         // Lock
-        const lockGeometry = new THREE.BoxGeometry(0.1, 0.15, 0.1);
+        const lockGeometry = new THREE.BoxGeometry(0.1 * scaleFactor, 0.15 * scaleFactor, 0.1 * scaleFactor);
         const lock = new THREE.Mesh(lockGeometry, metalMaterial);
-        lock.position.set(0, 0.4, 0.25 + 0.05);
+        lock.position.set(0, 0.4 * scaleFactor, (0.25 + 0.05) * scaleFactor);
         
         // Add all parts to chest
         this.mesh = new THREE.Group();
         this.mesh.add(base, this.lid, band1, band2, lock);
         this.object.add(this.mesh);
+        
+        // ENHANCEMENT: Raise position to ensure chest is visible
+        // Adjust the Y position to lift the chest above the floor
+        this.object.position.y += 1.0; // Raise chest 1 unit above the floor
+        
+        // ENHANCEMENT: Add bright light to make chest extremely visible
+        const chestLight = new THREE.PointLight(metalColor, 1.5, 10);
+        chestLight.position.set(0, 0.5 * scaleFactor, 0);
+        this.object.add(chestLight);
+        
+        // Add brighter glow for all chest types
+        const secondaryLight = new THREE.PointLight(0xffffff, 0.8, 5);
+        secondaryLight.position.set(0, 0, 0);
+        this.object.add(secondaryLight);
     }
     
     // Update chest state
@@ -398,6 +453,12 @@ export class TreasureChest {
         return this.position;
     }
     
+    // Set chest position
+    setPosition(x, y, z) {
+        this.position.set(x, y, z);
+        this.object.position.set(x, y, z);
+    }
+    
     // Get collision box
     getCollider() {
         return {
@@ -412,6 +473,34 @@ export class TreasureChest {
                 this.position.z + 0.25
             )
         };
+    }
+    
+    // Get interaction collider (slightly larger than physical collider)
+    getInteractionCollider() {
+        return {
+            min: new THREE.Vector3(
+                this.position.x - this.interactionDistance,
+                this.position.y - this.interactionDistance,
+                this.position.z - this.interactionDistance
+            ),
+            max: new THREE.Vector3(
+                this.position.x + this.interactionDistance,
+                this.position.y + this.interactionDistance,
+                this.position.z + this.interactionDistance
+            )
+        };
+    }
+    
+    // Check if player is close enough to interact
+    canInteract(playerPosition) {
+        if (!this.isInteractable || this.isOpen) return false;
+        
+        const distance = Math.sqrt(
+            Math.pow(playerPosition.x - this.position.x, 2) +
+            Math.pow(playerPosition.z - this.position.z, 2)
+        );
+        
+        return distance <= this.interactionDistance;
     }
     
     // Open the chest and return items
@@ -437,5 +526,10 @@ export class TreasureChest {
     // Get items from the chest
     getItems() {
         return [...this.items];
+    }
+    
+    // Get chest tier
+    getTier() {
+        return this.tier;
     }
 }
