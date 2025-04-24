@@ -322,7 +322,7 @@ export class TreasureChest {
         // Chest state
         this.isOpen = false;
         this.isInteractable = true;
-        this.interactionDistance = 3.0; // How close player needs to be to interact
+        this.interactionDistance = 10.0; // How close player needs to be to interact
         
         // Chest appearance
         this.tier = tier;
@@ -419,7 +419,7 @@ export class TreasureChest {
         
         // ENHANCEMENT: Raise position to ensure chest is visible
         // Adjust the Y position to lift the chest above the floor
-        this.object.position.y += 0.0; // Raise chest 0 unit above the floor
+        this.object.position.y += -0.5; // Raise chest -0.5 unit above the floor
         
         // ENHANCEMENT: Add bright light to make chest extremely visible
         const chestLight = new THREE.PointLight(metalColor, 1.5, 10);
