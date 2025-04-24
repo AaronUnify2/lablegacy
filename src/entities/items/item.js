@@ -310,7 +310,7 @@ export class Item {
     }
 }
 
-// Create a treasure chest that contains items
+// Ensure this class is properly exported
 export class TreasureChest {
     constructor(x, y, z, items = [], tier = 'common') {
         // Position in world
