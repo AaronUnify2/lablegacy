@@ -310,7 +310,7 @@ export class Item {
     }
 }
 
-// Updated TreasureChest class with proper sizing and improved interaction
+// TreasureChest class with proper sizing and interaction
 export class TreasureChest {
     constructor(x, y, z, items = [], tier = 'common') {
         // Position in world
@@ -365,9 +365,6 @@ export class TreasureChest {
                 metalColor = 0xddaa44; // Bronze
                 break;
         }
-        
-        // Standard chest size that's reasonable for the game world
-        const scaleFactor = 1.0; // Normal scale
         
         // Create chest base
         const baseGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.5);
@@ -491,21 +488,12 @@ export class TreasureChest {
             Math.pow(playerPosition.z - this.position.z, 2)
         );
         
-        // Log distance for debugging
-        if (distance < 5) {
-            console.log(`Distance to chest: ${distance.toFixed(2)} vs. required ${this.interactionDistance}`);
-        }
-        
         return distance <= this.interactionDistance;
     }
     
     // Open the chest and return items
     open() {
         if (this.isOpen) return null;
-        
-        // Log the chest being opened
-        console.log(`Opening chest with ${this.items.length} items`);
-        console.log("Chest contents:", this.items);
         
         this.isOpen = true;
         
@@ -533,4 +521,3 @@ export class TreasureChest {
         return this.tier;
     }
 }
-
