@@ -576,6 +576,22 @@ function calculateDistance(room1, room2) {
     );
 }
 
+// Helper function to find the farthest room from a source room
+function findFarthestRoom(sourceRoom, roomOptions) {
+    let maxDistance = 0;
+    let farthestRoom = roomOptions[0];
+    
+    for (const room of roomOptions) {
+        const distance = calculateDistance(sourceRoom, room);
+        
+        if (distance > maxDistance) {
+            maxDistance = distance;
+            farthestRoom = room;
+        }
+    }
+    
+    return farthestRoom;
+}
 
 // Place the key and exit in the dungeon in a more strategic way
 function placeKeyAndExit(dungeon) {
