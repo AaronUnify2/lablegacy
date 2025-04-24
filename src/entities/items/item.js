@@ -310,9 +310,9 @@ export class Item {
     }
 }
 
-// Ensure this class is properly exported
+// Create a treasure chest that contains items
 export class TreasureChest {
-    constructor(x, y, z, items = [], tier = 'common') {
+    constructor(x, y, z, items = []) {
         // Position in world
         this.position = new THREE.Vector3(x, y, z);
         
@@ -321,11 +321,6 @@ export class TreasureChest {
         
         // Chest state
         this.isOpen = false;
-        this.isInteractable = true;
-        this.interactionDistance = 10.0; // How close player needs to be to interact
-        
-        // Chest appearance
-        this.tier = tier;
         
         // Three.js objects
         this.object = null;
@@ -343,44 +338,21 @@ export class TreasureChest {
         this.object = new THREE.Object3D();
         this.object.position.copy(this.position);
         
-        // Determine color based on tier
-        let baseColor, metalColor;
-        
-        switch(this.tier) {
-            case 'uncommon':
-                baseColor = 0x665544; // Darker wood
-                metalColor = 0xc0c0c0; // Silver
-                break;
-            case 'rare':
-                baseColor = 0x704214; // Rich wood
-                metalColor = 0xFFD700; // Gold
-                break;
-            case 'epic':
-                baseColor = 0x4a2a0a; // Dark ornate wood
-                metalColor = 0x9932CC; // Purple
-                break;
-            case 'common':
-            default:
-                baseColor = 0x8B4513; // Brown
-                metalColor = 0xddaa44; // Bronze
-                break;
-        }
-        
         // Create chest base
         const baseGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.5);
-        const baseMaterial = new THREE.MeshLambertMaterial({ color: baseColor });
+        const baseMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         
         // Create chest lid (will be animated when opened)
         const lidGeometry = new THREE.BoxGeometry(0.8, 0.3, 0.5);
-        const lidMaterial = new THREE.MeshLambertMaterial({ color: baseColor });
+        const lidMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
         this.lid = new THREE.Mesh(lidGeometry, lidMaterial);
         this.lid.position.y = 0.4;
         this.lid.rotation.x = 0; // Closed
         
         // Create decorative elements
         const metalMaterial = new THREE.MeshStandardMaterial({ 
-            color: metalColor,
+            color: 0xddaa44,
             metalness: 0.8,
             roughness: 0.3
         });
@@ -403,13 +375,6 @@ export class TreasureChest {
         this.mesh = new THREE.Group();
         this.mesh.add(base, this.lid, band1, band2, lock);
         this.object.add(this.mesh);
-        
-        // For epic and rare chests, add a subtle glow effect
-        if (this.tier === 'epic' || this.tier === 'rare') {
-            const light = new THREE.PointLight(metalColor, 0.5, 2);
-            light.position.set(0, 0.3, 0);
-            this.object.add(light);
-        }
     }
     
     // Update chest state
@@ -433,12 +398,6 @@ export class TreasureChest {
         return this.position;
     }
     
-    // Set chest position
-    setPosition(x, y, z) {
-        this.position.set(x, y, z);
-        this.object.position.set(x, y, z);
-    }
-    
     // Get collision box
     getCollider() {
         return {
@@ -453,34 +412,6 @@ export class TreasureChest {
                 this.position.z + 0.25
             )
         };
-    }
-    
-    // Get interaction collider (slightly larger than physical collider)
-    getInteractionCollider() {
-        return {
-            min: new THREE.Vector3(
-                this.position.x - this.interactionDistance,
-                this.position.y - this.interactionDistance,
-                this.position.z - this.interactionDistance
-            ),
-            max: new THREE.Vector3(
-                this.position.x + this.interactionDistance,
-                this.position.y + this.interactionDistance,
-                this.position.z + this.interactionDistance
-            )
-        };
-    }
-    
-    // Check if player is close enough to interact
-    canInteract(playerPosition) {
-        if (!this.isInteractable || this.isOpen) return false;
-        
-        const distance = Math.sqrt(
-            Math.pow(playerPosition.x - this.position.x, 2) +
-            Math.pow(playerPosition.z - this.position.z, 2)
-        );
-        
-        return distance <= this.interactionDistance;
     }
     
     // Open the chest and return items
@@ -506,10 +437,5 @@ export class TreasureChest {
     // Get items from the chest
     getItems() {
         return [...this.items];
-    }
-    
-    // Get chest tier
-    getTier() {
-        return this.tier;
     }
 }
