@@ -310,139 +310,92 @@ export class Item {
     }
 }
 
-// Ensure this class is properly exported
-export class TreasureChest {
-    constructor(x, y, z, items = [], tier = 'common') {
-        // Position in world
-        this.position = new THREE.Vector3(x, y, z);
-        
-        // Items contained in the chest
-        this.items = items;
-        
-        // Chest state
-        this.isOpen = false;
-        this.isInteractable = true;
-        this.interactionDistance = 3.0; // How close player needs to be to interact
-        
-        // Chest appearance
-        this.tier = tier;
-        
-        // Three.js objects
-        this.object = null;
-        this.mesh = null;
-        
-        // Entity type for physics/collision detection
-        this.type = 'chest';
-        
-        // Create visual representation
-        this.createMesh();
+
+
+// Create chest mesh - NORMAL SIZE version
+createMesh() {
+    this.object = new THREE.Object3D();
+    this.object.position.copy(this.position);
+    
+    // Determine color based on tier
+    let baseColor, metalColor;
+    
+    switch(this.tier) {
+        case 'uncommon':
+            baseColor = 0x665544; // Darker wood
+            metalColor = 0xc0c0c0; // Silver
+            break;
+        case 'rare':
+            baseColor = 0x704214; // Rich wood
+            metalColor = 0xFFD700; // Gold
+            break;
+        case 'epic':
+            baseColor = 0x4a2a0a; // Dark ornate wood
+            metalColor = 0x9932CC; // Purple
+            break;
+        case 'common':
+        default:
+            baseColor = 0x8B4513; // Brown
+            metalColor = 0xddaa44; // Bronze
+            break;
     }
     
-    // Create chest mesh - ENHANCED VERSION with larger size and bright materials
-    createMesh() {
-        this.object = new THREE.Object3D();
-        this.object.position.copy(this.position);
-        
-        // Determine color based on tier
-        let baseColor, metalColor;
-        
-        switch(this.tier) {
-            case 'uncommon':
-                baseColor = 0x665544; // Darker wood
-                metalColor = 0xc0c0c0; // Silver
-                break;
-            case 'rare':
-                baseColor = 0x704214; // Rich wood
-                metalColor = 0xFFD700; // Gold
-                break;
-            case 'epic':
-                baseColor = 0x4a2a0a; // Dark ornate wood
-                metalColor = 0x9932CC; // Purple
-                break;
-            case 'common':
-            default:
-                baseColor = 0x8B4513; // Brown
-                metalColor = 0xddaa44; // Bronze
-                break;
-        }
-        
-        // ENHANCEMENT: Make chests much larger - increasing scale by 5x
-        const scaleFactor = 5;
-        
-        // Create chest base
-        const baseGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.5 * scaleFactor, 0.5 * scaleFactor);
-        const baseMaterial = new THREE.MeshLambertMaterial({ 
-            color: baseColor,
-            emissive: baseColor,
-            emissiveIntensity: 0.3 // Add glow
-        });
-        const base = new THREE.Mesh(baseGeometry, baseMaterial);
-        
-        // Create chest lid (will be animated when opened)
-        const lidGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.3 * scaleFactor, 0.5 * scaleFactor);
-        const lidMaterial = new THREE.MeshLambertMaterial({ 
-            color: baseColor,
-            emissive: baseColor,
-            emissiveIntensity: 0.3 // Add glow
-        });
-        this.lid = new THREE.Mesh(lidGeometry, lidMaterial);
-        this.lid.position.y = 0.4 * scaleFactor;
-        this.lid.rotation.x = 0; // Closed
-        
-        // Create decorative elements
-        const metalMaterial = new THREE.MeshStandardMaterial({ 
-            color: metalColor,
-            emissive: metalColor,
-            emissiveIntensity: 0.5, // Increased glow
-            metalness: 0.8,
-            roughness: 0.3
-        });
-        
-        // Metal bands
-        const bandGeometry1 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
-        const band1 = new THREE.Mesh(bandGeometry1, metalMaterial);
-        band1.position.y = 0.15 * scaleFactor;
-        
-        const bandGeometry2 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
-        const band2 = new THREE.Mesh(bandGeometry2, metalMaterial);
-        band2.position.y = 0.45 * scaleFactor;
-        
-        // Lock
-        const lockGeometry = new THREE.BoxGeometry(0.1 * scaleFactor, 0.15 * scaleFactor, 0.1 * scaleFactor);
-        const lock = new THREE.Mesh(lockGeometry, metalMaterial);
-        lock.position.set(0, 0.4 * scaleFactor, (0.25 + 0.05) * scaleFactor);
-        
-        // Add all parts to chest
-        this.mesh = new THREE.Group();
-        this.mesh.add(base, this.lid, band1, band2, lock);
-        this.object.add(this.mesh);
-        
-        // ENHANCEMENT: Raise position to ensure chest is visible
-        // Adjust the Y position to lift the chest above the floor
-        this.object.position.y += 1.0; // Raise chest 1 unit above the floor
-        
-        // ENHANCEMENT: Add bright light to make chest extremely visible
-        const chestLight = new THREE.PointLight(metalColor, 1.5, 10);
-        chestLight.position.set(0, 0.5 * scaleFactor, 0);
-        this.object.add(chestLight);
-        
-        // Add brighter glow for all chest types
-        const secondaryLight = new THREE.PointLight(0xffffff, 0.8, 5);
-        secondaryLight.position.set(0, 0, 0);
-        this.object.add(secondaryLight);
-    }
+    // Create chest base
+    const baseGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.5);
+    const baseMaterial = new THREE.MeshLambertMaterial({ 
+        color: baseColor,
+        emissive: baseColor,
+        emissiveIntensity: 0.2 // Reduced from 0.3
+    });
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
     
-    // Update chest state
-    update(deltaTime) {
-        // If chest is open, animate the lid
-        if (this.isOpen && this.lid.rotation.x < Math.PI / 2) {
-            this.lid.rotation.x += 3 * deltaTime;
-            if (this.lid.rotation.x > Math.PI / 2) {
-                this.lid.rotation.x = Math.PI / 2; // Cap at 90 degrees
-            }
-        }
-    }
+    // Create chest lid (will be animated when opened)
+    const lidGeometry = new THREE.BoxGeometry(0.8, 0.3, 0.5);
+    const lidMaterial = new THREE.MeshLambertMaterial({ 
+        color: baseColor,
+        emissive: baseColor,
+        emissiveIntensity: 0.2 // Reduced from 0.3
+    });
+    this.lid = new THREE.Mesh(lidGeometry, lidMaterial);
+    this.lid.position.y = 0.4;
+    this.lid.rotation.x = 0; // Closed
     
+    // Create decorative elements
+    const metalMaterial = new THREE.MeshStandardMaterial({ 
+        color: metalColor,
+        emissive: metalColor,
+        emissiveIntensity: 0.3, // Reduced from 0.5
+        metalness: 0.8,
+        roughness: 0.3
+    });
+    
+    // Metal bands
+    const bandGeometry1 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+    const band1 = new THREE.Mesh(bandGeometry1, metalMaterial);
+    band1.position.y = 0.15;
+    
+    const bandGeometry2 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+    const band2 = new THREE.Mesh(bandGeometry2, metalMaterial);
+    band2.position.y = 0.45;
+    
+    // Lock
+    const lockGeometry = new THREE.BoxGeometry(0.1, 0.15, 0.1);
+    const lock = new THREE.Mesh(lockGeometry, metalMaterial);
+    lock.position.set(0, 0.4, 0.3);
+    
+    // Add all parts to chest
+    this.mesh = new THREE.Group();
+    this.mesh.add(base, this.lid, band1, band2, lock);
+    this.object.add(this.mesh);
+    
+    // Add modest light to make chest visible, but not too bright
+    const chestLight = new THREE.PointLight(metalColor, 0.5, 3);
+    chestLight.position.set(0, 0.5, 0);
+    this.object.add(chestLight);
+}
+
+
+/
     // Get the Three.js object for rendering
     getObject() {
         return this.object;
