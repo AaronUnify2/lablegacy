@@ -29,8 +29,11 @@ export function generateDungeon(floorNumber) {
     // Place key and exit
     placeKeyAndExit(dungeon);
     
-    // Add decorative elements
+    // Add decorative elements and chests
     addDecorations(dungeon, theme);
+    
+    // Force spawn chests to ensure they appear
+    forceSpawnChests(dungeon);
     
     // Set player spawn in the center room
     const spawnPosition = centerRoom.getCenter();
@@ -576,7 +579,8 @@ function calculateDistance(room1, room2) {
     );
 }
 
-// Place the key and exit in the dungeon in a more strategic way
+
+            // Place the key and exit in the dungeon in a more strategic way
 function placeKeyAndExit(dungeon) {
     const rooms = dungeon.getRooms();
     
@@ -818,6 +822,105 @@ function addDecorations(dungeon, theme) {
     addChestsToDungeon(dungeon, chestsEligibleRooms);
 }
 
+// Get decoration multiplier based on room type
+function getDecorationMultiplier(room) {
+    if (room.isSpawnRoom) {
+        return 1.5; // More decorations in spawn room
+    } else if (room.roomType === 'alcove') {
+        return 2.0; // Most decorations in alcoves (they're special places)
+    } else if (room.roomType === 'cardinalPlus') {
+        return 1.4; // Many decorations in cardinalPlus rooms
+    } else if (room.roomType === 'radial') {
+        return 1.2; // Slightly more in radial rooms
+    } else if (room.roomType === 'cardinal') {
+        return 1.0; // Normal amount in cardinal rooms
+    } else {
+        return 0.8; // Fewer in other rooms
+    }
+}
+
+// Force spawn chests in rooms to ensure they appear
+function forceSpawnChests(dungeon) {
+    console.log("Force spawning chests");
+    const rooms = dungeon.getRooms();
+    
+    // Skip the spawn room and small rooms
+    const eligibleRooms = rooms.filter(room => 
+        !room.isSpawnRoom && 
+        !room.isCorridor && 
+        room.width >= 10 && 
+        room.height >= 10
+    );
+    
+    if (eligibleRooms.length === 0) {
+        // If no suitable rooms, put chests in any room
+        for (const room of rooms.slice(0, 2)) {
+            // Put chest in center of room
+            const chestX = room.x + room.width / 2;
+            const chestZ = room.z + room.height / 2;
+            const chestY = room.floorHeight;
+            
+            // Create two chests - one common and one rare
+            const commonChest = new TreasureChest(
+                chestX - 1.5, 
+                chestY, 
+                chestZ,
+                generateLoot('common', 2),
+                'common'
+            );
+            
+            const rareChest = new TreasureChest(
+                chestX + 1.5, 
+                chestY, 
+                chestZ,
+                generateLoot('rare', 3),
+                'rare'
+            );
+            
+            // Add chests to dungeon
+            dungeon.addChest(commonChest);
+            dungeon.addChest(rareChest);
+        }
+    } else {
+        // Place 2 chests in each eligible room, up to 4 rooms
+        const roomsToUse = eligibleRooms.slice(0, 4);
+        
+        for (const room of roomsToUse) {
+            // Position chests with some spacing
+            const centerX = room.x + room.width / 2;
+            const centerZ = room.z + room.height / 2;
+            
+            // Different tier chests
+            const tiers = ['common', 'uncommon', 'rare', 'epic'];
+            const tier1 = tiers[Math.floor(Math.random() * 2)]; // Common or uncommon
+            const tier2 = tiers[Math.floor(Math.random() * 2) + 2]; // Rare or epic
+            
+            // Create two chests
+            const chest1 = new TreasureChest(
+                centerX - 2, 
+                room.floorHeight, 
+                centerZ,
+                generateLoot(tier1, 2),
+                tier1
+            );
+            
+            const chest2 = new TreasureChest(
+                centerX + 2, 
+                room.floorHeight, 
+                centerZ,
+                generateLoot(tier2, 3),
+                tier2
+            );
+            
+            // Add chests to dungeon
+            dungeon.addChest(chest1);
+            dungeon.addChest(chest2);
+        }
+    }
+    
+    console.log(`Forced ${dungeon.chests.length} chests to spawn`);
+}
+
 // Determine chest spawn weight based on room type
 function getChestSpawnWeight(room) {
     if (room.roomType === 'cardinalPlus') {
@@ -915,22 +1018,5 @@ function addChestsToDungeon(dungeon, eligibleRooms) {
         
         // Add chest to dungeon entities
         dungeon.addChest(chest);
-    }
-}
-
-// Get decoration multiplier based on room type
-function getDecorationMultiplier(room) {
-    if (room.isSpawnRoom) {
-        return 1.5; // More decorations in spawn room
-    } else if (room.roomType === 'alcove') {
-        return 2.0; // Most decorations in alcoves (they're special places)
-    } else if (room.roomType === 'cardinalPlus') {
-        return 1.4; // Many decorations in cardinalPlus rooms
-    } else if (room.roomType === 'radial') {
-        return 1.2; // Slightly more in radial rooms
-    } else if (room.roomType === 'cardinal') {
-        return 1.0; // Normal amount in cardinal rooms
-    } else {
-        return 0.8; // Fewer in other rooms
     }
 }
