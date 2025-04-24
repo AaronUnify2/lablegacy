@@ -322,7 +322,7 @@ export class TreasureChest {
         // Chest state
         this.isOpen = false;
         this.isInteractable = true;
-        this.interactionDistance = 3.0; // How close player needs to be to interact
+        this.interactionDistance = 10.0; // How close player needs to be to interact
         
         // Chest appearance
         this.tier = tier;
