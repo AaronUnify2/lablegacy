@@ -1,4 +1,4 @@
-// src/dungeon/floor.js - Dungeon floor class
+// src/dungeon/floor.js - Dungeon floor class with fixed chest interaction
 import * as THREE from 'three';
 
 export class Dungeon {
@@ -71,12 +71,19 @@ export class Dungeon {
         }
     }
     
-    // Find an interactable chest near the player
+    // Find an interactable chest near the player - FIXED function
     findInteractableChest(playerPosition) {
-        console.log(`Checking for interactable chests near player at (${playerPosition.x.toFixed(2)}, ${playerPosition.z.toFixed(2)})`);
+        // Check if chests array exists and has items
+        if (!this.chests || this.chests.length === 0) {
+            console.log("No chests in dungeon to interact with");
+            return null;
+        }
         
-        // Log chests for debugging
+        console.log(`Checking for interactable chests near player at (${playerPosition.x.toFixed(2)}, ${playerPosition.z.toFixed(2)})`);
         console.log(`Total chests in dungeon: ${this.chests.length}`);
+        
+        let closestChest = null;
+        let minDistance = Infinity;
         
         for (const chest of this.chests) {
             // Skip already opened chests
@@ -84,12 +91,28 @@ export class Dungeon {
                 continue;
             }
             
-            // Check if the chest can be interacted with
-            if (chest.canInteract(playerPosition)) {
-                console.log("Found interactable chest!");
-                return chest;
+            const chestPos = chest.getPosition();
+            // Calculate distance to chest
+            const distance = Math.sqrt(
+                Math.pow(playerPosition.x - chestPos.x, 2) +
+                Math.pow(playerPosition.z - chestPos.z, 2)
+            );
+            
+            // Check if the chest is within interaction distance
+            if (distance <= chest.interactionDistance) {
+                // If we found multiple chests in range, pick the closest one
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestChest = chest;
+                }
             }
         }
+        
+        if (closestChest) {
+            console.log(`Found interactable chest at distance ${minDistance.toFixed(2)}`);
+            return closestChest;
+        }
+        
         console.log("No interactable chests found");
         return null;
     }
@@ -665,8 +688,10 @@ export class Dungeon {
         }
         
         // Update chests
-        for (const chest of this.chests) {
-            chest.update(deltaTime);
+        if (this.chests && this.chests.length > 0) {
+            for (const chest of this.chests) {
+                chest.update(deltaTime);
+            }
         }
     }
     
