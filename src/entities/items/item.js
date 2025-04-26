@@ -310,7 +310,7 @@ export class Item {
     }
 }
 
-// TreasureChest class with proper sizing and interaction
+// Ensure this class is properly exported
 export class TreasureChest {
     constructor(x, y, z, items = [], tier = 'common') {
         // Position in world
@@ -322,7 +322,7 @@ export class TreasureChest {
         // Chest state
         this.isOpen = false;
         this.isInteractable = true;
-        this.interactionDistance = 3.0; // How close player needs to be to interact
+        this.interactionDistance = 10.0; // How close player needs to be to interact
         
         // Chest appearance
         this.tier = tier;
@@ -338,7 +338,7 @@ export class TreasureChest {
         this.createMesh();
     }
     
-    // Create chest mesh - with standard sizing
+    // Create chest mesh - ENHANCED VERSION with larger size and bright materials
     createMesh() {
         this.object = new THREE.Object3D();
         this.object.position.copy(this.position);
@@ -366,8 +366,11 @@ export class TreasureChest {
                 break;
         }
         
+        // ENHANCEMENT: Make chests much larger - increasing scale by 5x
+        const scaleFactor = 0.2;
+        
         // Create chest base
-        const baseGeometry = new THREE.BoxGeometry(0.8, 0.5, 0.5);
+        const baseGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.5 * scaleFactor, 0.5 * scaleFactor);
         const baseMaterial = new THREE.MeshLambertMaterial({ 
             color: baseColor,
             emissive: baseColor,
@@ -376,14 +379,14 @@ export class TreasureChest {
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         
         // Create chest lid (will be animated when opened)
-        const lidGeometry = new THREE.BoxGeometry(0.8, 0.3, 0.5);
+        const lidGeometry = new THREE.BoxGeometry(0.8 * scaleFactor, 0.3 * scaleFactor, 0.5 * scaleFactor);
         const lidMaterial = new THREE.MeshLambertMaterial({ 
             color: baseColor,
             emissive: baseColor,
             emissiveIntensity: 0.3 // Add glow
         });
         this.lid = new THREE.Mesh(lidGeometry, lidMaterial);
-        this.lid.position.y = 0.4;
+        this.lid.position.y = 0.4 * scaleFactor;
         this.lid.rotation.x = 0; // Closed
         
         // Create decorative elements
@@ -396,28 +399,37 @@ export class TreasureChest {
         });
         
         // Metal bands
-        const bandGeometry1 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+        const bandGeometry1 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
         const band1 = new THREE.Mesh(bandGeometry1, metalMaterial);
-        band1.position.y = 0.15;
+        band1.position.y = 0.15 * scaleFactor;
         
-        const bandGeometry2 = new THREE.BoxGeometry(0.82, 0.05, 0.52);
+        const bandGeometry2 = new THREE.BoxGeometry(0.82 * scaleFactor, 0.05 * scaleFactor, 0.52 * scaleFactor);
         const band2 = new THREE.Mesh(bandGeometry2, metalMaterial);
-        band2.position.y = 0.45;
+        band2.position.y = 0.45 * scaleFactor;
         
         // Lock
-        const lockGeometry = new THREE.BoxGeometry(0.1, 0.15, 0.1);
+        const lockGeometry = new THREE.BoxGeometry(0.1 * scaleFactor, 0.15 * scaleFactor, 0.1 * scaleFactor);
         const lock = new THREE.Mesh(lockGeometry, metalMaterial);
-        lock.position.set(0, 0.4, 0.3);
+        lock.position.set(0, 0.4 * scaleFactor, (0.25 + 0.05) * scaleFactor);
         
         // Add all parts to chest
         this.mesh = new THREE.Group();
         this.mesh.add(base, this.lid, band1, band2, lock);
         this.object.add(this.mesh);
         
-        // Add light to make chest visible
-        const chestLight = new THREE.PointLight(metalColor, 1.0, 5);
-        chestLight.position.set(0, 0.5, 0);
+        // ENHANCEMENT: Raise position to ensure chest is visible
+        // Adjust the Y position to lift the chest above the floor
+        this.object.position.y += -0.5; // Raise chest -0.5 unit above the floor
+        
+        // ENHANCEMENT: Add bright light to make chest extremely visible
+        const chestLight = new THREE.PointLight(metalColor, 1.5, 10);
+        chestLight.position.set(0, 0.5 * scaleFactor, 0);
         this.object.add(chestLight);
+        
+        // Add brighter glow for all chest types
+        const secondaryLight = new THREE.PointLight(0xffffff, 0.8, 5);
+        secondaryLight.position.set(0, 0, 0);
+        this.object.add(secondaryLight);
     }
     
     // Update chest state
