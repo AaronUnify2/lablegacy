@@ -1,4 +1,4 @@
-// src/dungeon/floor.js - Dungeon floor class with fixed chest interaction
+// src/dungeon/floor.js - Dungeon floor class
 import * as THREE from 'three';
 
 export class Dungeon {
@@ -55,7 +55,7 @@ export class Dungeon {
         return decorations[Math.floor(Math.random() * decorations.length)];
     }
     
-    // Add a chest to the dungeon - simplified version
+    // Add a chest to the dungeon - ENHANCED version with direct scene addition
     addChest(chest) {
         // Add to the chest collection
         this.chests.push(chest);
@@ -68,52 +68,48 @@ export class Dungeon {
         if (chestObject) {
             this.object.add(chestObject);
             console.log(`Successfully added chest object to dungeon`);
+            
+            // DIRECT SCENE ADDITION - ensure the chest is visible regardless of parent
+            // This will add the chest directly to the scene as a fallback
+            if (window.game && window.game.scene) {
+                window.game.scene.add(chestObject.clone());
+                console.log(`Added chest backup directly to main scene`);
+            }
+        } else {
+            console.error(`Failed to get chest object`);
         }
+        
+        // Scale up chest massively as a last resort 
+        if (chest.mesh) {
+            if (chest.mesh.scale) {
+                // Make it HUGE to ensure visibility
+                chest.mesh.scale.set(10, 10, 10);
+                console.log(`Scaled up chest mesh to ensure visibility`);
+            }
+        }
+        
+        // Also try to re-add after a delay (in case of race condition)
+        setTimeout(() => {
+            if (chest.getObject() && this.object) {
+                // Try re-adding to make sure it's in the scene
+                this.object.add(chest.getObject());
+                console.log(`Re-added chest after delay`);
+            }
+        }, 1000);
     }
     
-    // Find an interactable chest near the player - FIXED function
+    // Get all chests in the dungeon
+    getChests() {
+        return this.chests;
+    }
+    
+    // Find an interactable chest near the player
     findInteractableChest(playerPosition) {
-        // Check if chests array exists and has items
-        if (!this.chests || this.chests.length === 0) {
-            console.log("No chests in dungeon to interact with");
-            return null;
-        }
-        
-        console.log(`Checking for interactable chests near player at (${playerPosition.x.toFixed(2)}, ${playerPosition.z.toFixed(2)})`);
-        console.log(`Total chests in dungeon: ${this.chests.length}`);
-        
-        let closestChest = null;
-        let minDistance = Infinity;
-        
         for (const chest of this.chests) {
-            // Skip already opened chests
-            if (chest.isOpen) {
-                continue;
-            }
-            
-            const chestPos = chest.getPosition();
-            // Calculate distance to chest
-            const distance = Math.sqrt(
-                Math.pow(playerPosition.x - chestPos.x, 2) +
-                Math.pow(playerPosition.z - chestPos.z, 2)
-            );
-            
-            // Check if the chest is within interaction distance
-            if (distance <= chest.interactionDistance) {
-                // If we found multiple chests in range, pick the closest one
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    closestChest = chest;
-                }
+            if (chest.canInteract(playerPosition)) {
+                return chest;
             }
         }
-        
-        if (closestChest) {
-            console.log(`Found interactable chest at distance ${minDistance.toFixed(2)}`);
-            return closestChest;
-        }
-        
-        console.log("No interactable chests found");
         return null;
     }
     
@@ -688,10 +684,8 @@ export class Dungeon {
         }
         
         // Update chests
-        if (this.chests && this.chests.length > 0) {
-            for (const chest of this.chests) {
-                chest.update(deltaTime);
-            }
+        for (const chest of this.chests) {
+            chest.update(deltaTime);
         }
     }
     
