@@ -358,4 +358,173 @@
         bottom: 0;
         z-index: 100;
     }
+
+    /* Add these styles to styles/menu.css */
+
+/* Player stats display in inventory menu */
+.player-stats {
+    background-color: rgba(30, 30, 30, 0.8);
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.stat {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+#inventory-health {
+    color: #f04040; /* Red for health */
+}
+
+#inventory-mana {
+    color: #4080f0; /* Blue for mana */
+}
+
+#inventory-stamina {
+    color: #40f080; /* Green for stamina */
+}
+
+/* Updated Item Icons - Add missing types and fix class names */
+
+/* Generic item icon styling */
+.item-icon {
+    width: 60%;
+    height: 60%;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+/* Health Potion - Fix to match both type and iconClass */
+.item-icon.healthPotion,
+.item-icon.HEALTH_POTION {
+    background-color: #f04040;
+    border-radius: 50%;
+    position: relative;
+}
+
+.item-icon.healthPotion::after,
+.item-icon.HEALTH_POTION::after {
+    content: "+";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Stamina Potion - Fix to match both type and iconClass */
+.item-icon.staminaPotion,
+.item-icon.STAMINA_POTION {
+    background-color: #40f040;
+    border-radius: 50%;
+    position: relative;
+}
+
+.item-icon.staminaPotion::after,
+.item-icon.STAMINA_POTION::after {
+    content: "↑";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Staff Crystal - Add new styles */
+.item-icon.staffCrystal,
+.item-icon.STAFF_CRYSTAL {
+    background-color: #6040f0; /* Purple for staff crystals */
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); /* Diamond shape */
+    position: relative;
+}
+
+.item-icon.staffCrystal::after,
+.item-icon.STAFF_CRYSTAL::after {
+    content: "✦"; /* Star symbol */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Add blue crystal specific style */
+.item-icon.staffCrystal[data-ability="frost"],
+.item-icon.STAFF_CRYSTAL[data-ability="frost"] {
+    background-color: #4080ff; /* Blue for frost */
+}
+
+/* Add red crystal specific style */
+.item-icon.staffCrystal[data-ability="fire"],
+.item-icon.STAFF_CRYSTAL[data-ability="fire"] {
+    background-color: #ff4040; /* Red for fire */
+}
+
+/* Key item style */
+.item-icon.key,
+.item-icon.KEY {
+    background-color: #ffd700; /* Gold for keys */
+    clip-path: polygon(50% 0%, 70% 0%, 70% 50%, 100% 50%, 100% 70%, 70% 70%, 70% 100%, 50% 100%, 50% 70%, 0% 70%, 0% 50%, 50% 50%); /* Key shape */
+}
+
+/* Scroll item style */
+.item-icon.scroll,
+.item-icon.SCROLL {
+    background-color: #d0c090; /* Parchment color */
+    border-radius: 5px;
+    position: relative;
+}
+
+.item-icon.scroll::after,
+.item-icon.SCROLL::after {
+    content: "≡"; /* Lines symbol */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #333;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* Make use item button more visible */
+#use-item-btn {
+    background-color: rgba(60, 120, 60, 0.8);
+    border: 2px solid rgba(100, 200, 100, 0.6);
+    font-size: 18px;
+    padding: 12px;
+    font-weight: bold;
+}
+
+#use-item-btn:hover,
+#use-item-btn.touch-active {
+    background-color: rgba(80, 160, 80, 0.8);
+    border-color: rgba(120, 220, 120, 0.8);
+}
+
+#use-item-btn:disabled {
+    background-color: rgba(60, 60, 60, 0.5);
+    border-color: rgba(100, 100, 100, 0.3);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+    
 }
