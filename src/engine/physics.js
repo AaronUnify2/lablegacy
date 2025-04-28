@@ -41,9 +41,6 @@ export class Physics {
                 }
             }
         }
-        
-        // Check for nearby chests (even if not colliding)
-        this.checkNearbyChests(player, dungeon);
     }
     
     // Check if player is colliding with dungeon walls
@@ -226,30 +223,6 @@ export class Physics {
         
         // Remove item from the game
         item.collect();
-    }
-    
-    // Check for nearby chests (even if not colliding)
-    checkNearbyChests(player, dungeon) {
-        if (!dungeon || !dungeon.chests) return;
-        
-        const playerPos = player.getPosition();
-        
-        // Add visual indicator when near a chest
-        for (const chest of dungeon.chests) {
-            if (chest.isOpen) continue;
-            
-            const chestPos = chest.getPosition();
-            const distance = Math.sqrt(
-                Math.pow(playerPos.x - chestPos.x, 2) +
-                Math.pow(playerPos.z - chestPos.z, 2)
-            );
-            
-            // If player is within interaction distance, highlight the chest somehow
-            if (distance <= chest.interactionDistance) {
-                // We'll leave this to the dungeon's findInteractableChest method
-                // This just makes sure we're checking for nearby chests in the physics loop
-            }
-        }
     }
     
     // Cast a ray and check for intersection
