@@ -1,4 +1,5 @@
-// src/entities/items/treasureChest.js - Dedicated file for treasure chest functionality
+// src/entities/items/treasureChest.js - Fixed treasure chest implementation
+
 import * as THREE from 'three';
 import { generateLoot } from './loot.js';
 
@@ -255,27 +256,8 @@ export function placeChestsInDungeon(dungeon, chestCount = 3) {
     const chests = [];
     const usedRooms = new Set();
     
-    // Always place a chest in center/spawn room if possible
-    const spawnRoom = dungeon.getRooms().find(room => room.isSpawnRoom);
-    if (spawnRoom) {
-        const centerX = spawnRoom.x + spawnRoom.width / 2;
-        const centerZ = spawnRoom.z + spawnRoom.height / 2;
-        
-        const epicChest = createChestWithLoot(
-            centerX, 
-            spawnRoom.floorHeight, 
-            centerZ,
-            'epic',
-            4
-        );
-        
-        chests.push(epicChest);
-        usedRooms.add(spawnRoom);
-        console.log(`Placed epic chest in spawn room at (${centerX}, ${centerZ})`);
-    }
-    
     // Place remaining chests in other rooms
-    const remainingCount = Math.min(chestCount - chests.length, rooms.length - usedRooms.size);
+    const remainingCount = Math.min(chestCount, rooms.length);
     
     for (let i = 0; i < remainingCount; i++) {
         // Select an unused room
@@ -305,6 +287,9 @@ export function placeChestsInDungeon(dungeon, chestCount = 3) {
         
         const chest = createChestWithLoot(x, room.floorHeight, z, tier, 2 + Math.floor(Math.random() * 2));
         chests.push(chest);
+        
+        // Important: Add the chest to the scene
+        dungeon.addChest(chest);
         
         console.log(`Placed ${tier} chest in ${room.roomType || 'normal'} room at (${x.toFixed(2)}, ${z.toFixed(2)})`);
     }
