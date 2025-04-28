@@ -12,9 +12,6 @@ const ChestTier = {
 };
 
 // Define simple loot tables for each chest tier
-// Update this section in src/entities/items/chestSpawner.js
-
-// Define simple loot tables for each chest tier
 const lootTables = {
     common: [
         { itemId: 'smallHealthPotion', weight: 60, countRange: [1, 2] },
@@ -43,7 +40,7 @@ const lootTables = {
     ]
 };
 
-// Simple loot generation function
+// Simple loot generation function with fixed database lookup
 function generateLoot(tier = 'common', itemCount = 1) {
     const tierTable = lootTables[tier.toLowerCase()] || lootTables.common;
     const loot = [];
@@ -51,26 +48,56 @@ function generateLoot(tier = 'common', itemCount = 1) {
     
     // Generate items based on weighted random selection
     for (let i = 0; i < itemsToGenerate; i++) {
+        // Calculate total weight for this tier
+        const totalWeight = tierTable.reduce((sum, item) => sum + item.weight, 0);
+        
         // Simple random item selection
-        const randomIndex = Math.floor(Math.random() * tierTable.length);
-        const lootItem = tierTable[randomIndex];
+        const roll = Math.random() * totalWeight;
+        let weightSum = 0;
         
-        // Determine count based on range
-        const countRange = lootItem.countRange || [1, 1];
-        const count = Math.floor(Math.random() * (countRange[1] - countRange[0] + 1)) + countRange[0];
-        
-        // Create item entry
-        const item = {
-            id: lootItem.itemId,
-            count: count
-        };
-        
-        // Check if item already exists in loot and increase count if stackable
-        const existingItem = loot.find(i => i.id === item.id);
-        if (existingItem && ItemDatabase[item.id]?.stackable) {
-            existingItem.count += item.count;
-        } else {
-            loot.push(item);
+        // Find which item was rolled
+        for (const lootItem of tierTable) {
+            weightSum += lootItem.weight;
+            
+            if (roll <= weightSum) {
+                // Determine count based on range
+                const countRange = lootItem.countRange || [1, 1];
+                const count = Math.floor(Math.random() * (countRange[1] - countRange[0] + 1)) + countRange[0];
+                
+                // Get item data from database
+                const itemData = ItemDatabase[lootItem.itemId];
+                
+                if (!itemData) {
+                    console.error(`Item ${lootItem.itemId} not found in database`);
+                    continue;
+                }
+                
+                // Create item entry
+                const item = {
+                    id: lootItem.itemId,
+                    name: itemData.name,
+                    type: itemData.type,
+                    description: itemData.description,
+                    count: count,
+                    stackable: itemData.stackable,
+                    iconClass: itemData.iconClass
+                };
+                
+                // Add special properties based on item type
+                if (itemData.healAmount) item.healAmount = itemData.healAmount;
+                if (itemData.duration) item.duration = itemData.duration;
+                if (itemData.abilityType) item.abilityType = itemData.abilityType;
+                
+                // Check if item already exists in loot and increase count if stackable
+                const existingItem = loot.find(i => i.id === item.id);
+                if (existingItem && item.stackable) {
+                    existingItem.count += item.count;
+                } else {
+                    loot.push(item);
+                }
+                
+                break;
+            }
         }
     }
     
@@ -314,6 +341,9 @@ export function createSimpleChest(x, y, z, tier, itemCount = 2) {
     
     // Generate loot based on tier and item count
     const loot = generateLoot(tierString, itemCount);
+    
+    // Log the generated loot for debugging
+    console.log(`Created ${tierString} chest with items:`, loot);
     
     // Create and return the chest
     return new SimpleChest(x, y, z, loot, tierString);
