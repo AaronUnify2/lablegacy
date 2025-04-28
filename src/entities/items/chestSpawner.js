@@ -12,6 +12,9 @@ const ChestTier = {
 };
 
 // Define simple loot tables for each chest tier
+// Update this section in src/entities/items/chestSpawner.js
+
+// Define simple loot tables for each chest tier
 const lootTables = {
     common: [
         { itemId: 'smallHealthPotion', weight: 60, countRange: [1, 2] },
@@ -20,16 +23,23 @@ const lootTables = {
     uncommon: [
         { itemId: 'smallHealthPotion', weight: 40, countRange: [1, 3] },
         { itemId: 'mediumHealthPotion', weight: 20, countRange: [1, 1] },
-        { itemId: 'smallStaminaPotion', weight: 30, countRange: [1, 2] }
+        { itemId: 'smallStaminaPotion', weight: 30, countRange: [1, 2] },
+        { itemId: 'largeStaminaPotion', weight: 10, countRange: [1, 1] }
     ],
     rare: [
-        { itemId: 'mediumHealthPotion', weight: 35, countRange: [1, 2] },
+        { itemId: 'mediumHealthPotion', weight: 30, countRange: [1, 2] },
         { itemId: 'largeHealthPotion', weight: 15, countRange: [1, 1] },
-        { itemId: 'largeStaminaPotion', weight: 30, countRange: [1, 1] }
+        { itemId: 'largeStaminaPotion', weight: 25, countRange: [1, 1] },
+        // Added staff crystals to rare chests with lower weights
+        { itemId: 'blueCrystal', weight: 15, countRange: [1, 1] },
+        { itemId: 'redCrystal', weight: 15, countRange: [1, 1] }
     ],
     epic: [
-        { itemId: 'largeHealthPotion', weight: 40, countRange: [1, 2] },
-        { itemId: 'largeStaminaPotion', weight: 40, countRange: [1, 2] }
+        { itemId: 'largeHealthPotion', weight: 25, countRange: [1, 2] },
+        { itemId: 'largeStaminaPotion', weight: 25, countRange: [1, 2] },
+        // Higher chance to get staff crystals from epic chests
+        { itemId: 'blueCrystal', weight: 25, countRange: [1, 1] },
+        { itemId: 'redCrystal', weight: 25, countRange: [1, 1] }
     ]
 };
 
