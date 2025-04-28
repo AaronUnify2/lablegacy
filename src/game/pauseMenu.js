@@ -1,4 +1,4 @@
-// src/game/pauseMenu.js - Menu implementation with touchscreen support added
+// src/game/pauseMenu.js - Menu implementation with improved inventory layout
 
 // Enum for tracking the current selected menu in the menu screen
 export const PauseMenuType = {
@@ -36,10 +36,9 @@ function createMenuDOM() {
     // Create menu content
     menuContainer.innerHTML = `
         <div class="pause-menu">
-            <h1>MENU</h1>
-            
             <!-- Main Menu -->
             <div id="main-menu" class="menu-section active">
+                <h1>MENU</h1>
                 <button id="inventory-btn" class="menu-button">Inventory</button>
                 <button id="sword-btn" class="menu-button">Sword</button>
                 <button id="staff-btn" class="menu-button">Staff</button>
@@ -47,10 +46,10 @@ function createMenuDOM() {
                 <button id="resume-btn" class="menu-button resume">Close Menu</button>
             </div>
             
-            <!-- Inventory Menu -->
+            <!-- Inventory Menu - Simplified header and improved layout -->
             <div id="inventory-menu" class="menu-section">
-                <h2>Inventory</h2>
-                <!-- Player stats display -->
+                <h1>INVENTORY</h1>
+                <!-- Player stats display - moved up -->
                 <div class="player-stats">
                     <div class="stat-row">
                         <div class="stat">Health: <span id="inventory-health">100/100</span></div>
@@ -58,9 +57,12 @@ function createMenuDOM() {
                         <div class="stat">Stamina: <span id="inventory-stamina">100/100</span></div>
                     </div>
                 </div>
+                <!-- Simplified inventory layout -->
                 <div class="inventory-container">
-                    <div id="inventory-grid" class="inventory-grid">
-                        <!-- Inventory slots will be generated here -->
+                    <div id="inventory-scrollable" class="inventory-scrollable">
+                        <div id="inventory-grid" class="inventory-grid">
+                            <!-- Inventory slots will be generated here -->
+                        </div>
                     </div>
                     <div class="inventory-details">
                         <h3 id="item-name">Select an item</h3>
@@ -73,7 +75,7 @@ function createMenuDOM() {
             
             <!-- Sword Menu -->
             <div id="sword-menu" class="menu-section">
-                <h2>Sword</h2>
+                <h1>SWORD</h1>
                 <div class="weapon-stats">
                     <p>Damage: <span id="sword-damage">10</span></p>
                 </div>
@@ -86,7 +88,7 @@ function createMenuDOM() {
             
             <!-- Staff Menu -->
             <div id="staff-menu" class="menu-section">
-                <h2>Staff</h2>
+                <h1>STAFF</h1>
                 <div class="weapon-stats">
                     <p>Damage: <span id="staff-damage">8</span></p>
                 </div>
@@ -99,7 +101,7 @@ function createMenuDOM() {
             
             <!-- Save Game Menu -->
             <div id="save-menu" class="menu-section">
-                <h2>Save Game</h2>
+                <h1>SAVE GAME</h1>
                 <div class="save-slots">
                     <button id="save-slot-1" class="save-slot">Save Slot 1<span class="save-date"></span></button>
                     <button id="save-slot-2" class="save-slot">Save Slot 2<span class="save-date"></span></button>
@@ -114,8 +116,8 @@ function createMenuDOM() {
     // Add to DOM
     document.body.appendChild(menuContainer);
     
-    // Generate inventory slots
-    generateInventorySlots(16); // 16 slots for the inventory
+    // Generate inventory slots (5x10 grid)
+    generateInventorySlots(50); // 50 slots for a 5x10 grid
 }
 
 // Generate inventory slots
