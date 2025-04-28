@@ -201,69 +201,6 @@ export function updateMinimap(ctx, dungeon, player) {
         ctx.stroke();
     }
     
-    // NEW CODE: Draw chests on the minimap
-    if (dungeon.chests && dungeon.chests.length > 0) {
-        console.log(`Drawing ${dungeon.chests.length} chests on minimap`);
-        
-        dungeon.chests.forEach((chest, index) => {
-            const chestPos = chest.getPosition();
-            const x = toMinimapX(chestPos.x);
-            const z = toMinimapZ(chestPos.z);
-            
-            // Choose color based on chest tier
-            let chestColor;
-            switch(chest.tier) {
-                case 'uncommon':
-                    chestColor = 'rgba(192, 192, 192, 1)'; // Silver
-                    break;
-                case 'rare':
-                    chestColor = 'rgba(255, 215, 0, 1)'; // Gold
-                    break;
-                case 'epic':
-                    chestColor = 'rgba(153, 50, 204, 1)'; // Purple
-                    break;
-                case 'common':
-                default:
-                    chestColor = 'rgba(139, 69, 19, 1)'; // Brown
-            }
-            
-            // Draw chest as a square with outer glow
-            const chestSize = 5;
-            
-            // Draw glow
-            ctx.fillStyle = chestColor.replace('1)', '0.5)'); // Transparent version
-            ctx.beginPath();
-            ctx.arc(x, z, chestSize + 2, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw chest
-            ctx.fillStyle = chestColor;
-            ctx.fillRect(x - chestSize/2, z - chestSize/2, chestSize, chestSize);
-            
-            // Add a border
-            ctx.strokeStyle = 'white';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(x - chestSize/2, z - chestSize/2, chestSize, chestSize);
-            
-            // Add an X if chest is open
-            if (chest.isOpen) {
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(x - chestSize/2 + 1, z - chestSize/2 + 1);
-                ctx.lineTo(x + chestSize/2 - 1, z + chestSize/2 - 1);
-                ctx.moveTo(x + chestSize/2 - 1, z - chestSize/2 + 1);
-                ctx.lineTo(x - chestSize/2 + 1, z + chestSize/2 - 1);
-                ctx.stroke();
-            }
-            
-            // Log chest position for debugging
-            console.log(`Chest ${index}: world pos (${chestPos.x.toFixed(2)}, ${chestPos.z.toFixed(2)}), minimap pos (${x.toFixed(2)}, ${z.toFixed(2)})`);
-        });
-    } else {
-        console.log("No chests found in dungeon data");
-    }
-    
     // Draw player position
     if (player) {
         const playerPos = player.getPosition();
