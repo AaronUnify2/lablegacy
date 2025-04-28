@@ -50,6 +50,14 @@ function createMenuDOM() {
             <!-- Inventory Menu -->
             <div id="inventory-menu" class="menu-section">
                 <h2>Inventory</h2>
+                <!-- Player stats display -->
+                <div class="player-stats">
+                    <div class="stat-row">
+                        <div class="stat">Health: <span id="inventory-health">100/100</span></div>
+                        <div class="stat">Mana: <span id="inventory-mana">100/100</span></div>
+                        <div class="stat">Stamina: <span id="inventory-stamina">100/100</span></div>
+                    </div>
+                </div>
                 <div class="inventory-container">
                     <div id="inventory-grid" class="inventory-grid">
                         <!-- Inventory slots will be generated here -->
@@ -317,11 +325,49 @@ export function togglePauseMenu() {
 
 // Update inventory display
 function updateInventoryDisplay() {
-    // Get player inventory if available
+    // Get player stats if available
     const player = window.game?.player;
     if (player) {
         // Sync menu inventory with player inventory
         pauseMenuState.inventoryItems = player.getInventory();
+        
+        // Update player stats display
+        const healthEl = document.getElementById('inventory-health');
+        const manaEl = document.getElementById('inventory-mana');
+        const staminaEl = document.getElementById('inventory-stamina');
+        
+        if (healthEl) {
+            healthEl.textContent = `${Math.floor(player.health)}/${player.maxHealth}`;
+            // Color based on health amount
+            if (player.health < player.maxHealth * 0.3) {
+                healthEl.style.color = '#ff4040'; // Red for low health
+            } else if (player.health < player.maxHealth * 0.6) {
+                healthEl.style.color = '#ffaa40'; // Orange for medium health
+            } else {
+                healthEl.style.color = '#ffffff'; // White for high health
+            }
+        }
+        
+        if (manaEl) {
+            // For mana, use staff cooldown (inverse)
+            let manaPercentage = 100;
+            if (player.weapons && player.weapons.staff) {
+                const staff = player.weapons.staff;
+                if (staff.cooldownTimer > 0) {
+                    manaPercentage = 100 - ((staff.cooldownTimer / staff.cooldown) * 100);
+                }
+            }
+            manaEl.textContent = `${Math.floor(manaPercentage)}/100`;
+        }
+        
+        if (staminaEl) {
+            // For stamina, use dash cooldown (inverse)
+            let staminaPercentage = 100;
+            if (player.dashCooldownTimer > 0) {
+                staminaPercentage = 100 - ((player.dashCooldownTimer / player.dashCooldown) * 100);
+            }
+            staminaEl.textContent = `${Math.floor(staminaPercentage)}/100`;
+        }
     }
     
     // Clear all slots first
@@ -330,14 +376,59 @@ function updateInventoryDisplay() {
         slot.innerHTML = '';
         slot.classList.remove('filled');
         slot.classList.remove('selected');
+        // Remove any custom data attributes
+        slot.removeAttribute('data-ability');
     });
     
-    // Display items in inventory
+    // Display items in inventory with improved type handling
     pauseMenuState.inventoryItems.forEach((item, index) => {
         if (index < slots.length) {
             const slot = slots[index];
+            
+            // Determine the CSS class to use - fix mismatches between item.type and CSS classes
+            let iconClass = '';
+            
+            // Match item type to the appropriate CSS class
+            if (typeof ItemType !== 'undefined') {
+                // Use ItemType constants if available
+                switch(item.type) {
+                    case 'healthPotion':
+                    case ItemType.HEALTH_POTION:
+                        iconClass = 'healthPotion';
+                        break;
+                    case 'staminaPotion':
+                    case ItemType.STAMINA_POTION:
+                        iconClass = 'staminaPotion';
+                        break;
+                    case 'staffCrystal':
+                    case ItemType.STAFF_CRYSTAL:
+                        iconClass = 'staffCrystal';
+                        // Add data attribute for crystal type if available
+                        if (item.abilityType) {
+                            slot.dataset.ability = item.abilityType;
+                        }
+                        break;
+                    case 'key':
+                    case ItemType.KEY:
+                        iconClass = 'key';
+                        break;
+                    case 'scroll':
+                    case ItemType.SCROLL:
+                        iconClass = 'scroll';
+                        break;
+                    default:
+                        // Use the provided iconClass if available, otherwise fallback to type
+                        iconClass = item.iconClass || item.type;
+                        break;
+                }
+            } else {
+                // Fallback if ItemType is not defined
+                iconClass = item.iconClass || item.type;
+            }
+            
+            // Create the item display
             slot.innerHTML = `
-                <div class="item-icon ${item.type}"></div>
+                <div class="item-icon ${iconClass}"></div>
                 <div class="item-count">${item.count}</div>
             `;
             slot.classList.add('filled');
@@ -456,13 +547,28 @@ function useSelectedItem() {
     // Use the player's useItem method
     const player = window.game?.player;
     if (player && player.useItem) {
+        const selectedItem = pauseMenuState.inventoryItems[selectedIndex];
         const success = player.useItem(selectedIndex);
         
         if (success) {
+            // Show message based on item type
+            if (typeof ItemType !== 'undefined') {
+                if (selectedItem.type === 'healthPotion' || selectedItem.type === ItemType.HEALTH_POTION) {
+                    window.showMessage?.(`Used ${selectedItem.name}: +${selectedItem.healAmount} Health`);
+                } else if (selectedItem.type === 'staminaPotion' || selectedItem.type === ItemType.STAMINA_POTION) {
+                    window.showMessage?.(`Used ${selectedItem.name}: Dash Recharged`);
+                } else if (selectedItem.type === 'staffCrystal' || selectedItem.type === ItemType.STAFF_CRYSTAL) {
+                    window.showMessage?.(`Used ${selectedItem.name}: Unlocked ${selectedItem.abilityType} ability`);
+                }
+            } else {
+                // Generic success message if ItemType is not defined
+                window.showMessage?.(`Used ${selectedItem.name}`);
+            }
+            
             // Update the inventory display
             updateInventoryDisplay();
             
-            // Update health UI if it was a health potion
+            // Update main UI health bar if it was a health potion
             document.getElementById('health-fill').style.width = `${(player.health / player.maxHealth) * 100}%`;
         }
     }
