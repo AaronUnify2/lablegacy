@@ -29,11 +29,8 @@ export function generateDungeon(floorNumber) {
     // Place key and exit
     placeKeyAndExit(dungeon);
     
-    // Add decorative elements and chests
+    // Add decorative elements
     addDecorations(dungeon, theme);
-    
-    // Force spawn chests to ensure they appear
-    forceSpawnChests(dungeon);
     
     // Set player spawn in the center room
     const spawnPosition = centerRoom.getCenter();
@@ -41,6 +38,9 @@ export function generateDungeon(floorNumber) {
     
     // Build the dungeon mesh
     dungeon.buildMesh();
+    
+    // Force spawn chests AFTER the dungeon is built, with a delay
+    forceSpawnChests(dungeon);
     
     return dungeon;
 }
