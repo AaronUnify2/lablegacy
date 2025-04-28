@@ -74,30 +74,28 @@ export class Player {
         this.inventory = [];
         this.maxInventorySize = 20;
         
-        // Add some starting items for testing
+        // Add some starting items for testing - using the proper item structure
         this.inventory.push({
             id: 'smallHealthPotion',
             name: 'Small Health Potion',
-            type: 'healthPotion',
+            type: 'healthPotion', // Using string type to match CSS classes
             description: 'Restores 20 health points.',
             healAmount: 20,
             stackable: true,
-            count: 3
+            count: 3,
+            iconClass: 'healthPotion'
         });
-        
+
         this.inventory.push({
             id: 'smallStaminaPotion',
             name: 'Small Stamina Potion',
-            type: 'staminaPotion',
+            type: 'staminaPotion', // Using string type to match CSS classes
             description: 'Instantly recharges dash ability.',
+            duration: 5,
             stackable: true,
-            count: 2
+            count: 2,
+            iconClass: 'staminaPotion'
         });
-        
-        // Three.js objects
-        this.object = null;
-        this.collider = null;
-        this.mesh = null;
         
         // Pause state tracking
         this._wasUnpaused = false;
@@ -123,6 +121,12 @@ export class Player {
         
         // Create collider
         this.updateCollider();
+        
+        // Initialize inventory in UI if the global function exists
+        if (window.updatePauseMenuInventory) {
+            window.updatePauseMenuInventory(this.inventory);
+            console.log("Player inventory synchronized with menu system");
+        }
     }
     
     // Create visual representations of the player's weapons
@@ -752,26 +756,53 @@ export class Player {
         // Apply item effects based on type
         switch (item.type) {
             case 'healthPotion':
+            case ItemType.HEALTH_POTION:
                 // Only use if not at full health
                 if (this.health < this.maxHealth) {
-                    this.health = Math.min(this.maxHealth, this.health + (item.healAmount || 30));
+                    const healAmount = item.healAmount || 20; // Default to 20 if missing
+                    this.health = Math.min(this.maxHealth, this.health + healAmount);
                     
                     // Remove item or reduce count
                     this.removeFromInventory(itemIndex);
+                    
+                    // Update UI
+                    document.getElementById('health-fill').style.width = `${(this.health / this.maxHealth) * 100}%`;
+                    
                     return true;
                 }
                 return false;
                 
             case 'staminaPotion':
+            case ItemType.STAMINA_POTION:
                 // Reset dash cooldown
                 this.dashCooldownTimer = 0;
+                
+                // If duration is specified, apply special effects
+                if (item.duration) {
+                    // Could implement continuous jumping here
+                    console.log(`Applied stamina boost for ${item.duration} seconds`);
+                }
                 
                 // Remove item or reduce count
                 this.removeFromInventory(itemIndex);
                 return true;
                 
-            // Handle other item types here
+            case 'staffCrystal':
+            case ItemType.STAFF_CRYSTAL:
+                // Apply staff crystal for new abilities
+                const abilityType = item.abilityType || 'generic';
+                console.log(`Unlocked staff ability: ${abilityType}`);
+                
+                // Here we would implement the actual ability unlock
+                // For now just show a message
+                window.showMessage?.(`Unlocked ${abilityType} staff ability!`, 5000);
+                
+                // Remove the item (not stackable)
+                this.removeFromInventory(itemIndex);
+                return true;
+                
             default:
+                console.log(`No handler for item type: ${item.type}`);
                 return false;
         }
     }
@@ -850,7 +881,7 @@ export class Player {
         return true;
     }
     
-// Unlock new staff ability
+    // Unlock new staff ability
     unlockStaffAbility(abilityType) {
         // TODO: Implement staff abilities
         console.log(`Unlocked staff ability: ${abilityType}`);
