@@ -850,10 +850,40 @@ export class Player {
         return true;
     }
     
-    // Unlock new staff ability
+// Unlock new staff ability
     unlockStaffAbility(abilityType) {
         // TODO: Implement staff abilities
         console.log(`Unlocked staff ability: ${abilityType}`);
+        
+        return true;
+    }
+    
+    // Interaction with chests
+    interactWithChest(chest) {
+        if (!chest || !chest.canInteract(this.position)) return false;
+        
+        // Open the chest
+        const items = chest.open();
+        if (!items) return false;
+        
+        console.log(`Player opened a ${chest.getTier()} chest and found:`, items);
+        
+        // Show message to the player
+        const tierName = chest.getTier().charAt(0).toUpperCase() + chest.getTier().slice(1);
+        window.showMessage?.(`${tierName} Chest: Found ${items.length} items!`);
+        
+        // Add items to player's inventory
+        let itemsAdded = 0;
+        for (const item of items) {
+            if (this.addToInventory(item)) {
+                itemsAdded++;
+            }
+        }
+        
+        // Show another message with items added
+        if (itemsAdded > 0) {
+            window.showMessage?.(`Added ${itemsAdded} items to your inventory`);
+        }
         
         return true;
     }
