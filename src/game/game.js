@@ -119,27 +119,39 @@ export class Game {
         console.log(`Floor ${floorNumber} generated`);
     }
     
-    // Main update loop - game always runs now regardless of menu state
-    update(timestamp, inputState) {
-        // Calculate delta time
-        const deltaTime = (timestamp - this.lastTimestamp) / 1000;
-        this.lastTimestamp = timestamp;
-        
-        // Cap delta time to prevent huge jumps after tab switch or similar
-        const cappedDeltaTime = Math.min(deltaTime, 0.1);
-        
-        // Handle menu toggling
-        if (inputState.justPressed.menu) {
-            this.toggleMenu();
+    // Look for this section in the update method of the Game class in src/game/game.js
+
+update(timestamp, inputState) {
+    // Calculate delta time
+    const deltaTime = (timestamp - this.lastTimestamp) / 1000;
+    this.lastTimestamp = timestamp;
+    
+    // Cap delta time to prevent huge jumps after tab switch or similar
+    const cappedDeltaTime = Math.min(deltaTime, 0.1);
+    
+    // Handle menu toggling
+    if (inputState.justPressed.menu) {
+        this.toggleMenu();
+    }
+    
+    // Update player - game always runs now
+    this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
+    
+    // Check for interactions with chests
+    if (inputState.justPressed.interact) {
+        // Find a chest to interact with
+        const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
+        if (interactableChest) {
+            this.player.interactWithChest(interactableChest);
         }
-        
-        // Update player - game always runs now
-        this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
-        
-        // Update dungeon (includes chest animations)
-        if (this.currentDungeon) {
-            this.currentDungeon.update(cappedDeltaTime);
-        }
+    }
+    
+    // Update dungeon (includes chest animations)
+    if (this.currentDungeon) {
+        this.currentDungeon.update(cappedDeltaTime);
+    }
+    
+
         
         // Update camera to follow player
         this.updateCamera(cappedDeltaTime);
