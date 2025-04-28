@@ -5,7 +5,7 @@ import { Room } from './room.js';
 import { Dungeon } from './floor.js';
 import { getDungeonTheme } from './themes.js';
 import { determineChestTier, generateLoot } from '../entities/items/loot.js';
-import { TreasureChest } from '../entities/items/item.js';
+import { TreasureChest, placeChestsInDungeon } from '../entities/items/treasureChest.js';
 
 // Generate a dungeon floor
 export function generateDungeon(floorNumber) {
