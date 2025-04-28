@@ -55,25 +55,57 @@ export class Dungeon {
         return decorations[Math.floor(Math.random() * decorations.length)];
     }
     
-    // Add a chest to the dungeon
-    addChest(chest) {
-        // Add to the chest collection
-        this.chests.push(chest);
-        
-        // Debug log
-        console.log(`Adding chest to dungeon at position:`, chest.position);
-        
-        // Add chest object to dungeon's main object container
-        const chestObject = chest.getObject();
-        if (chestObject) {
+    // Add a chest to the dungeon with improved error handling
+addChest(chest) {
+    // Add to the chest collection
+    this.chests.push(chest);
+    
+    // Debug log
+    console.log(`Adding chest to dungeon at position:`, chest.position);
+    
+    // Ensure the dungeon's main object exists
+    if (!this.object) {
+        console.error("Dungeon object is not initialized! Creating a new one.");
+        this.object = new THREE.Object3D();
+    }
+    
+    // Add chest object to dungeon's main object container
+    const chestObject = chest.getObject();
+    if (chestObject) {
+        try {
             this.object.add(chestObject);
             console.log(`Successfully added chest object to dungeon`);
-        } else {
-            console.error(`Failed to get chest object`);
+            
+            // Add additional logging for debugging
+            console.log(`Chest position relative to dungeon:`, 
+                        chestObject.position.x, 
+                        chestObject.position.y, 
+                        chestObject.position.z);
+            
+            // Check if the chest is visible and properly positioned
+            if (chestObject.visible === false) {
+                console.warn("Chest is set to invisible! Setting to visible.");
+                chestObject.visible = true;
+            }
+            
+            // Add chest to global scene as a fallback (if window.game.scene exists)
+            if (window.game && window.game.scene) {
+                try {
+                    window.game.scene.add(chestObject.clone());
+                    console.log("Also added chest directly to main scene as a fallback");
+                } catch (e) {
+                    console.error("Failed to add chest to main scene:", e);
+                }
+            }
+        } catch (e) {
+            console.error(`Error adding chest to dungeon:`, e);
         }
-        
-        return chest; // Return chest for chaining
+    } else {
+        console.error(`Failed to get chest object`);
     }
+    
+    return chest; // Return chest for chaining
+}
     
     // Get all chests in the dungeon
     getChests() {
