@@ -23,17 +23,19 @@ const lootTables = {
         { itemId: 'largeStaminaPotion', weight: 10, countRange: [1, 1] }
     ],
     rare: [
-        { itemId: 'mediumHealthPotion', weight: 35, countRange: [1, 2] },
+        { itemId: 'mediumHealthPotion', weight: 30, countRange: [1, 2] },
         { itemId: 'largeHealthPotion', weight: 15, countRange: [1, 1] },
-        { itemId: 'largeStaminaPotion', weight: 30, countRange: [1, 1] },
-        { itemId: 'blueCrystal', weight: 10, countRange: [1, 1] },
-        { itemId: 'redCrystal', weight: 10, countRange: [1, 1] }
+        { itemId: 'largeStaminaPotion', weight: 25, countRange: [1, 1] },
+        // Added staff crystals to rare chests with lower weights
+        { itemId: 'blueCrystal', weight: 15, countRange: [1, 1] },
+        { itemId: 'redCrystal', weight: 15, countRange: [1, 1] }
     ],
     epic: [
-        { itemId: 'largeHealthPotion', weight: 30, countRange: [1, 2] },
+        { itemId: 'largeHealthPotion', weight: 25, countRange: [1, 2] },
         { itemId: 'largeStaminaPotion', weight: 25, countRange: [1, 2] },
-        { itemId: 'blueCrystal', weight: 20, countRange: [1, 1] },
-        { itemId: 'redCrystal', weight: 20, countRange: [1, 1] }
+        // Higher chance to get staff crystals from epic chests
+        { itemId: 'blueCrystal', weight: 25, countRange: [1, 1] },
+        { itemId: 'redCrystal', weight: 25, countRange: [1, 1] }
     ]
 };
 
@@ -61,15 +63,25 @@ export function generateLoot(tier = ChestTier.COMMON, itemCount = 1) {
                 const countRange = lootItem.countRange || [1, 1];
                 const count = Math.floor(Math.random() * (countRange[1] - countRange[0] + 1)) + countRange[0];
                 
-                // Create item entry
+                // Create item entry - add important props from ItemDatabase
+                const itemData = ItemDatabase[lootItem.itemId] || {};
                 const item = {
                     id: lootItem.itemId,
-                    count: count
+                    count: count,
+                    // Include these properties from the database to ensure proper display
+                    type: itemData.type || 'unknown',
+                    name: itemData.name || lootItem.itemId,
+                    description: itemData.description || '',
+                    iconClass: itemData.iconClass || '',
+                    healAmount: itemData.healAmount,
+                    duration: itemData.duration,
+                    stackable: itemData.stackable !== undefined ? itemData.stackable : true,
+                    abilityType: itemData.abilityType
                 };
                 
                 // Check if item already exists in loot and increase count instead if stackable
                 const existingItem = loot.find(i => i.id === item.id);
-                if (existingItem && ItemDatabase[item.id].stackable) {
+                if (existingItem && item.stackable) {
                     existingItem.count += item.count;
                 } else {
                     loot.push(item);
