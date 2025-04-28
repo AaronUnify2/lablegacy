@@ -5,7 +5,7 @@ import { Room } from './room.js';
 import { Dungeon } from './floor.js';
 import { getDungeonTheme } from './themes.js';
 import { determineChestTier, generateLoot } from '../entities/items/loot.js';
-import { TreasureChest, placeChestsInDungeon } from '../entities/items/treasureChest.js';
+import { TreasureChest } from '../entities/items/item.js';
 
 // Generate a dungeon floor
 export function generateDungeon(floorNumber) {
@@ -839,18 +839,215 @@ function getDecorationMultiplier(room) {
     }
 }
 
+// Force spawn chests in rooms to ensure they appear
 function forceSpawnChests(dungeon) {
-    console.log("Placing chests using new chest system");
+    console.log("Force spawning chests with enhanced center room placement");
+    const rooms = dungeon.getRooms();
     
-    // Use our new function from treasureChest.js to place chests
-    const chests = placeChestsInDungeon(dungeon, 5); // Place up to 5 chests
+    // ENHANCEMENT: FIRST FIND THE CENTER/SPAWN ROOM AND FORCE A CHEST THERE
+    const spawnRoom = rooms.find(room => room.isSpawnRoom);
     
-    // Add all generated chests to the dungeon
-    for (const chest of chests) {
-        dungeon.addChest(chest);
+    if (spawnRoom) {
+        console.log("Found spawn room at:", spawnRoom.x, spawnRoom.z, "with size", spawnRoom.width, spawnRoom.height);
+        
+        // Position chest right in the center of the spawn room
+        const centerX = spawnRoom.x + spawnRoom.width / 2;
+        const centerZ = spawnRoom.z + spawnRoom.height / 2;
+        
+        // Create a VERY obvious chest - use epic tier for visibility
+        const centerChest = new TreasureChest(
+            centerX, 
+            spawnRoom.floorHeight + 2, // Raise it well above floor
+            centerZ,
+            generateLoot('epic', 5), // Lots of epic loot
+            'epic' // Epic tier for purple glow
+        );
+        
+        // Add extra debugging to see if the chest is being created properly
+        console.log("Created center chest at position:", centerX, spawnRoom.floorHeight + 2, centerZ);
+        console.log("Chest object created:", centerChest);
+        
+        // Add chest to dungeon
+        dungeon.addChest(centerChest);
+        console.log("Added center chest to dungeon, total chests:", dungeon.chests.length);
+    } else {
+        console.log("WARNING: No spawn room found for center chest placement");
     }
     
-    console.log(`Added ${chests.length} chests to dungeon`);
+    // Original code - still try to add chests to other rooms
+    // Skip the spawn room and small rooms
+    const eligibleRooms = rooms.filter(room => 
+        !room.isSpawnRoom && 
+        !room.isCorridor && 
+        room.width >= 10 && 
+        room.height >= 10
+    );
+    
+    if (eligibleRooms.length === 0) {
+        // If no suitable rooms, put chests in any room
+        for (const room of rooms.slice(0, 2)) {
+            // Put chest in center of room
+            const chestX = room.x + room.width / 2;
+            const chestZ = room.z + room.height / 2;
+            const chestY = room.floorHeight;
+            
+            // Create two chests - one common and one rare
+            const commonChest = new TreasureChest(
+                chestX - 1.5, 
+                chestY, 
+                chestZ,
+                generateLoot('common', 2),
+                'common'
+            );
+            
+            const rareChest = new TreasureChest(
+                chestX + 1.5, 
+                chestY, 
+                chestZ,
+                generateLoot('rare', 3),
+                'rare'
+            );
+            
+            // Add chests to dungeon
+            dungeon.addChest(commonChest);
+            dungeon.addChest(rareChest);
+        }
+    } else {
+        // Place 2 chests in each eligible room, up to 4 rooms
+        const roomsToUse = eligibleRooms.slice(0, 4);
+        
+        for (const room of roomsToUse) {
+            // Position chests with some spacing
+            const centerX = room.x + room.width / 2;
+            const centerZ = room.z + room.height / 2;
+            
+            // Different tier chests
+            const tiers = ['common', 'uncommon', 'rare', 'epic'];
+            const tier1 = tiers[Math.floor(Math.random() * 2)]; // Common or uncommon
+            const tier2 = tiers[Math.floor(Math.random() * 2) + 2]; // Rare or epic
+            
+            // Create two chests
+            const chest1 = new TreasureChest(
+                centerX - 2, 
+                room.floorHeight, 
+                centerZ,
+                generateLoot(tier1, 2),
+                tier1
+            );
+            
+            const chest2 = new TreasureChest(
+                centerX + 2, 
+                room.floorHeight, 
+                centerZ,
+                generateLoot(tier2, 3),
+                tier2
+            );
+            
+            // Add chests to dungeon
+            dungeon.addChest(chest1);
+            dungeon.addChest(chest2);
+        }
+    }
+    
+    console.log(`Forced ${dungeon.chests.length} chests to spawn`);
 }
 
+// Determine chest spawn weight based on room type
+function getChestSpawnWeight(room) {
+    if (room.roomType === 'cardinalPlus') {
+        return 2.0; // Higher chance in far rooms
+    } else if (room.roomType === 'cardinal') {
+        return 1.5; // Good chance in cardinal rooms
+    } else if (room.roomType === 'radial') {
+        return 1.2; // Slightly higher in radial rooms
+    } else if (room.roomType === 'alcove') {
+        return 1.8; // Good chance in alcoves (hidden treasures)
+    } else {
+        return 1.0; // Normal chance in other rooms
+    }
+}
+
+// Add chests to appropriate rooms in the dungeon
+function addChestsToDungeon(dungeon, eligibleRooms) {
+    if (eligibleRooms.length === 0) return;
+    
+    // Determine how many chests to spawn based on floor number
+    const floorNumber = dungeon.floorNumber;
+    let chestCount;
+    
+    if (floorNumber <= 3) {
+        chestCount = 1 + Math.floor(Math.random() * 2); // 1-2 chests
+    } else if (floorNumber <= 7) {
+        chestCount = 2 + Math.floor(Math.random() * 2); // 2-3 chests
+    } else {
+        chestCount = 3 + Math.floor(Math.random() * 3); // 3-5 chests
+    }
+    
+    // Cap chest count based on available rooms
+    chestCount = Math.min(chestCount, Math.ceil(eligibleRooms.length * 0.6));
+    
+    // Calculate total weight
+    const totalWeight = eligibleRooms.reduce((sum, room) => sum + room.weight, 0);
+    
+    // Store rooms that already have chests to avoid duplicates
+    const roomsWithChests = new Set();
+    
+    // Add chests
+    for (let i = 0; i < chestCount; i++) {
+        // Select room based on weighted probability
+        let selectedRoom = null;
+        const roll = Math.random() * totalWeight;
+        let accumulatedWeight = 0;
+        
+        for (const roomEntry of eligibleRooms) {
+            accumulatedWeight += roomEntry.weight;
+            
+            // Skip rooms that already have chests
+            if (roomsWithChests.has(roomEntry.room)) continue;
+            
+            if (roll <= accumulatedWeight) {
+                selectedRoom = roomEntry.room;
+                break;
+            }
+        }
+        
+        // If no room was selected (all had chests already), try again with any room
+        if (!selectedRoom) {
+            const availableRooms = eligibleRooms.filter(entry => !roomsWithChests.has(entry.room));
+            if (availableRooms.length > 0) {
+                selectedRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)].room;
+            } else {
+                // No more rooms available
+                break;
+            }
+        }
+        
+        // Mark room as having a chest
+        roomsWithChests.add(selectedRoom);
+        
+        // Position chest in room
+        const margin = 2.0;
+        const chestX = selectedRoom.x + margin + Math.random() * (selectedRoom.width - margin * 2);
+        const chestZ = selectedRoom.z + margin + Math.random() * (selectedRoom.height - margin * 2);
+        const chestY = selectedRoom.floorHeight;
+        
+        // Determine chest tier based on floor number
+        const chestTier = determineChestTier(floorNumber);
+        
+        // Generate loot for chest - more items in higher tier chests
+        const itemCount = {
+            'common': 1 + Math.floor(Math.random() * 1), // 1-1 items
+            'uncommon': 1 + Math.floor(Math.random() * 2), // 1-2 items
+            'rare': 2 + Math.floor(Math.random() * 2), // 2-3 items
+            'epic': 3 + Math.floor(Math.random() * 2) // 3-4 items
+        }[chestTier];
+        
+        const loot = generateLoot(chestTier, itemCount);
+        
+        // Create chest
+        const chest = new TreasureChest(chestX, chestY, chestZ, loot, chestTier);
+        
+        // Add chest to dungeon entities
+        dungeon.addChest(chest);
+    }
 }
