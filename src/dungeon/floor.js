@@ -55,63 +55,33 @@ export class Dungeon {
         return decorations[Math.floor(Math.random() * decorations.length)];
     }
     
-    // Add a chest to the dungeon - ENHANCED version with direct scene addition
-    addChest(chest) {
-        // Add to the chest collection
-        this.chests.push(chest);
-        
-        // Debug log
-        console.log(`Adding chest to dungeon at position:`, chest.position);
-        
-        // Add chest object to dungeon's main object container
-        const chestObject = chest.getObject();
-        if (chestObject) {
-            this.object.add(chestObject);
-            console.log(`Successfully added chest object to dungeon`);
-            
-            // DIRECT SCENE ADDITION - ensure the chest is visible regardless of parent
-            // This will add the chest directly to the scene as a fallback
-            if (window.game && window.game.scene) {
-                window.game.scene.add(chestObject.clone());
-                console.log(`Added chest backup directly to main scene`);
-            }
-        } else {
-            console.error(`Failed to get chest object`);
-        }
-        
-        // Scale up chest massively as a last resort 
-        if (chest.mesh) {
-            if (chest.mesh.scale) {
-                // Make it HUGE to ensure visibility
-                chest.mesh.scale.set(10, 10, 10);
-                console.log(`Scaled up chest mesh to ensure visibility`);
-            }
-        }
-        
-        // Also try to re-add after a delay (in case of race condition)
-        setTimeout(() => {
-            if (chest.getObject() && this.object) {
-                // Try re-adding to make sure it's in the scene
-                this.object.add(chest.getObject());
-                console.log(`Re-added chest after delay`);
-            }
-        }, 1000);
-    }
+// Update the addChest method in the Dungeon class
+// Replace the current addChest method with this simplified version
+
+// Add a chest to the dungeon
+addChest(chest) {
+    // Add to the chest collection
+    this.chests.push(chest);
     
-    // Get all chests in the dungeon
-    getChests() {
-        return this.chests;
+    // Add chest object to dungeon's main object container
+    const chestObject = chest.getObject();
+    if (chestObject) {
+        this.object.add(chestObject);
+        console.log(`Added ${chest.getTier()} chest at position:`, chest.getPosition());
+    } else {
+        console.error(`Failed to get chest object`);
     }
-    
-    // Find an interactable chest near the player
-    findInteractableChest(playerPosition) {
-        for (const chest of this.chests) {
-            if (chest.canInteract(playerPosition)) {
-                return chest;
-            }
+}
+
+// Find an interactable chest near the player
+findInteractableChest(playerPosition) {
+    for (const chest of this.chests) {
+        if (chest.canInteract(playerPosition)) {
+            return chest;
         }
-        return null;
     }
+    return null;
+}
     
     // Place the key in the dungeon
     placeKey(x, y, z) {
