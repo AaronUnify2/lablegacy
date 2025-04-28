@@ -890,61 +890,70 @@ function addChestsToDungeon(dungeon, eligibleRooms) {
     }
 }
 
-// Force spawn chests in the dungeon
+// Force spawn chests in the dungeon with a delay
 function forceSpawnChests(dungeon) {
-    console.log("Forcing chest spawns in dungeon...");
+    console.log("Setting up delayed chest spawns in dungeon...");
     
-    // Get all rooms that could have chests
-    const rooms = dungeon.getRooms().filter(room => 
-        !room.isCorridor && room.width >= 10 && room.height >= 10
-    );
-    
-    // Determine number of chests based on floor
-    const floorNumber = dungeon.floorNumber;
-    const chestCount = 3 + Math.min(Math.floor(floorNumber / 3), 2); // 3-5 chests
-    
-    // Keep track of rooms where we've placed chests
-    const usedRooms = new Set();
-    const chests = [];
-    
-    // Place chests in appropriate rooms
-    for (let i = 0; i < chestCount && i < rooms.length; i++) {
-        // Select an unused room randomly
-        const availableRooms = rooms.filter(room => !usedRooms.has(room));
-        if (availableRooms.length === 0) break;
+    // Add a delay to ensure the dungeon is fully rendered first
+    setTimeout(() => {
+        console.log("Now spawning chests after delay...");
         
-        const roomIndex = Math.floor(Math.random() * availableRooms.length);
-        const room = availableRooms[roomIndex];
-        usedRooms.add(room);
+        // Get all rooms that could have chests
+        const rooms = dungeon.getRooms().filter(room => 
+            !room.isCorridor && room.width >= 10 && room.height >= 10
+        );
         
-        // Determine chest tier based on room type and floor
-        let tier;
-        if (room.roomType === 'cardinalPlus' || room.roomType === 'alcove') {
-            // Higher tier for special rooms
-            tier = Math.random() < 0.6 ? 'rare' : 'epic';
-        } else if (room.roomType === 'radial') {
-            tier = Math.random() < 0.7 ? 'uncommon' : 'rare';
-        } else if (room.roomType === 'cardinal') {
-            tier = Math.random() < 0.6 ? 'common' : 'uncommon';
-        } else {
-            tier = 'common';
+        // Determine number of chests based on floor
+        const floorNumber = dungeon.floorNumber;
+        const chestCount = 3 + Math.min(Math.floor(floorNumber / 3), 2); // 3-5 chests
+        
+        // Keep track of rooms where we've placed chests
+        const usedRooms = new Set();
+        const chests = [];
+        
+        // Place chests in appropriate rooms
+        for (let i = 0; i < chestCount && i < rooms.length; i++) {
+            // Select an unused room randomly
+            const availableRooms = rooms.filter(room => !usedRooms.has(room));
+            if (availableRooms.length === 0) break;
+            
+            const roomIndex = Math.floor(Math.random() * availableRooms.length);
+            const room = availableRooms[roomIndex];
+            usedRooms.add(room);
+            
+            // Determine chest tier based on room type and floor
+            let tier;
+            if (room.roomType === 'cardinalPlus' || room.roomType === 'alcove') {
+                // Higher tier for special rooms
+                tier = Math.random() < 0.6 ? 'rare' : 'epic';
+            } else if (room.roomType === 'radial') {
+                tier = Math.random() < 0.7 ? 'uncommon' : 'rare';
+            } else if (room.roomType === 'cardinal') {
+                tier = Math.random() < 0.6 ? 'common' : 'uncommon';
+            } else {
+                tier = 'common';
+            }
+            
+            // Place chest in room
+            const margin = 2;
+            const x = room.x + margin + Math.random() * (room.width - margin * 2);
+            const z = room.z + margin + Math.random() * (room.height - margin * 2);
+            
+            // Create chest with loot
+            const itemCount = 2 + Math.floor(Math.random() * 3); // 2-4 items
+            const chest = createChestWithLoot(x, room.floorHeight, z, tier, itemCount);
+            
+            // Add chest to dungeon and track it
+            dungeon.addChest(chest);
+            chests.push(chest);
+            
+            console.log(`Placed ${tier} chest in ${room.roomType || 'normal'} room at (${x.toFixed(2)}, ${z.toFixed(2)})`);
         }
         
-        // Place chest in room
-        const margin = 2;
-        const x = room.x + margin + Math.random() * (room.width - margin * 2);
-        const z = room.z + margin + Math.random() * (room.height - margin * 2);
+        console.log(`Successfully spawned ${chests.length} chests after delay`);
         
-        // Create chest with loot
-        const itemCount = 2 + Math.floor(Math.random() * 3); // 2-4 items
-        const chest = createChestWithLoot(x, room.floorHeight, z, tier, itemCount);
-        
-        // Add chest to dungeon and track it
-        dungeon.addChest(chest);
-        chests.push(chest);
-        
-        console.log(`Placed ${tier} chest in ${room.roomType || 'normal'} room at (${x.toFixed(2)}, ${z.toFixed(2)})`);
-    }
+        return chests;
+    }, 1000); // 1000ms (1 second) delay should be enough
     
-    return chests;
+    return []; // Return empty array immediately, real chests will spawn after delay
 }
