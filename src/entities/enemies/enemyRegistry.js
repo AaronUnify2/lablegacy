@@ -1,6 +1,8 @@
 // src/entities/enemies/enemyRegistry.js - Central registry for all enemy types
-import { EnemyType } from './enemyBase.js';
-
+// Register standard enemy types
+// These will be imported from their respective files in the variants directory
+import { createSlimeEnemy } from './variants/slime.js';
+import { createGolemEnemy } from './variants/golem.js'; // Add this line
 // Enemy registry to manage all enemy types
 export class EnemyRegistryClass {
     constructor() {
