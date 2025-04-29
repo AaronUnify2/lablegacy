@@ -139,6 +139,16 @@ export function registerInitialEnemies() {
     });
     
     // Future enemies would be registered here by importing from their files
+
+// Register golem enemy
+EnemyRegistry.registerEnemy('golem', createGolemEnemy, {
+    name: 'Stone Golem',
+    type: EnemyType.MINI_BOSS,
+    minFloor: 3,
+    maxFloor: 10,
+    rarity: 0.6,
+    description: 'A powerful stone construct that can cause earthquakes.'
+});
     
     console.log(`Registered ${EnemyRegistry.getEnemyIds().length} enemy types`);
 }
