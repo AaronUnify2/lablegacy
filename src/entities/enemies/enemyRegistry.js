@@ -2,7 +2,7 @@
 // Register standard enemy types
 // These will be imported from their respective files in the variants directory
 import { createSlimeEnemy } from './variants/slime.js';
-import { createGolemEnemy } from './variants/golem.js'; // Add this line
+import { createGolemEnemy } from './variants/golem.js';
 // Enemy registry to manage all enemy types
 export class EnemyRegistryClass {
     constructor() {
@@ -124,10 +124,6 @@ export class EnemyRegistryClass {
 // Create singleton instance
 export const EnemyRegistry = new EnemyRegistryClass();
 
-// Register standard enemy types
-// These will be imported from their respective files in the variants directory
-import { createSlimeEnemy } from './variants/slime.js';
-
 // Register initial enemies
 export function registerInitialEnemies() {
     // Register slime enemy (we'll implement it)
@@ -140,17 +136,15 @@ export function registerInitialEnemies() {
         description: 'A basic slime monster that hops toward its prey.'
     });
     
-    // Future enemies would be registered here by importing from their files
-
-// Register golem enemy
-EnemyRegistry.registerEnemy('golem', createGolemEnemy, {
-    name: 'Stone Golem',
-    type: EnemyType.MINI_BOSS,
-    minFloor: 3,
-    maxFloor: 10,
-    rarity: 0.6,
-    description: 'A powerful stone construct that can cause earthquakes.'
-});
+    // Register golem enemy
+    EnemyRegistry.registerEnemy('golem', createGolemEnemy, {
+        name: 'Stone Golem',
+        type: EnemyType.MINI_BOSS,
+        minFloor: 3,
+        maxFloor: 10,
+        rarity: 0.6,
+        description: 'A powerful stone construct that can cause earthquakes.'
+    });
     
     console.log(`Registered ${EnemyRegistry.getEnemyIds().length} enemy types`);
 }
