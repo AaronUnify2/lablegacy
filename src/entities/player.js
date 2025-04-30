@@ -197,6 +197,8 @@ export class Player {
     }
     
     
+// This is a more comprehensive fix for the createProjectile method in src/entities/player.js
+
 // Create a magic projectile from the staff
 createProjectile() {
     // Create projectile geometry and material
@@ -215,20 +217,29 @@ createProjectile() {
     projectileLight.position.set(0, 0, 0);
     projectileMesh.add(projectileLight);
     
-    // Get staff position and player facing direction
+    // Get staff position in world coordinates
     const staffWorldPosition = new THREE.Vector3();
     this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
     
-    // FIXED: Set direction to match the player's facing direction
-    // Use forward direction (0, 0, -1) and apply player's rotation
-    const direction = new THREE.Vector3(0, 0, -1);
-    direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotation);
+    // COMPLETELY REVISED DIRECTION CALCULATION:
+    // Instead of using the player's rotation property directly,
+    // calculate direction based on where the player is actually facing
+    
+    // Option 1: Use the player's forward direction based on object rotation
+    // This uses the negative Z-axis transformed by the player's rotation matrix
+    const forward = new THREE.Vector3();
+    forward.setFromMatrixColumn(this.object.matrix, 2); // Extract forward (Z) direction
+    forward.negate(); // Negate because forward is -Z in Three.js
+    
+    // Debug log to help diagnose the issue
+    console.log('Player rotation:', this.rotation);
+    console.log('Calculated forward vector:', forward);
     
     // Set initial position slightly in front of the staff
     const startPosition = new THREE.Vector3(
-        staffWorldPosition.x + direction.x * 0.7,
+        staffWorldPosition.x + forward.x * 0.7,
         staffWorldPosition.y + 0.65, // Position at the staff top
-        staffWorldPosition.z + direction.z * 0.7
+        staffWorldPosition.z + forward.z * 0.7
     );
     
     projectileMesh.position.copy(startPosition);
@@ -236,7 +247,7 @@ createProjectile() {
     // Create projectile object with necessary properties
     const projectile = {
         mesh: projectileMesh,
-        direction: direction,
+        direction: forward.clone(), // Use the forward vector as direction
         speed: this.weapons.staff.projectileSpeed,
         damage: this.weapons.staff.damage,
         lifeTime: 3.0, // Seconds before projectile disappears
