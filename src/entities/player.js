@@ -199,6 +199,8 @@ export class Player {
     
 // This is a more comprehensive fix for the createProjectile method in src/entities/player.js
 
+// Replace the createProjectile method in src/entities/player.js with this version
+
 // Create a magic projectile from the staff
 createProjectile() {
     // Create projectile geometry and material
@@ -221,25 +223,28 @@ createProjectile() {
     const staffWorldPosition = new THREE.Vector3();
     this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
     
-    // COMPLETELY REVISED DIRECTION CALCULATION:
-    // Instead of using the player's rotation property directly,
-    // calculate direction based on where the player is actually facing
+    // Create direction vector - use player's movement direction
+    let direction = new THREE.Vector3();
     
-    // Option 1: Use the player's forward direction based on object rotation
-    // This uses the negative Z-axis transformed by the player's rotation matrix
-    const forward = new THREE.Vector3();
-    forward.setFromMatrixColumn(this.object.matrix, 2); // Extract forward (Z) direction
-    forward.negate(); // Negate because forward is -Z in Three.js
-    
-    // Debug log to help diagnose the issue
-    console.log('Player rotation:', this.rotation);
-    console.log('Calculated forward vector:', forward);
+    // SOLUTION: Use the same logic that moves the player
+    // If the player is moving, use that direction
+    if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
+        // The player's velocity already points in the correct direction
+        direction.copy(this.velocity).normalize();
+    } else {
+        // Player is standing still, use rotation
+        // The key insight: Player's rotation is based on atan2(velocity.x, velocity.z)
+        // This means rotation 0 corresponds to -Z, so:
+        const angleRadians = this.rotation;
+        direction.x = Math.sin(angleRadians);
+        direction.z = Math.cos(angleRadians);
+    }
     
     // Set initial position slightly in front of the staff
     const startPosition = new THREE.Vector3(
-        staffWorldPosition.x + forward.x * 0.7,
+        staffWorldPosition.x + direction.x * 0.7,
         staffWorldPosition.y + 0.65, // Position at the staff top
-        staffWorldPosition.z + forward.z * 0.7
+        staffWorldPosition.z + direction.z * 0.7
     );
     
     projectileMesh.position.copy(startPosition);
@@ -247,7 +252,7 @@ createProjectile() {
     // Create projectile object with necessary properties
     const projectile = {
         mesh: projectileMesh,
-        direction: forward.clone(), // Use the forward vector as direction
+        direction: direction,
         speed: this.weapons.staff.projectileSpeed,
         damage: this.weapons.staff.damage,
         lifeTime: 3.0, // Seconds before projectile disappears
@@ -259,7 +264,9 @@ createProjectile() {
     // Add projectile to scene
     return projectileMesh;
 }
-    
+
+
+
     // Update projectiles
     updateProjectiles(deltaTime, scene) {
         // Process each projectile
@@ -267,7 +274,7 @@ createProjectile() {
             const projectile = this.projectiles[i];
             
             // Move projectile in its direction
-            projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+             projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
             projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
             
             // Update lifetime
