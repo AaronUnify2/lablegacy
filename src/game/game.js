@@ -287,7 +287,7 @@ export class Game {
                 }
                 
                 // Determine number of enemies based on floor
-                const baseEnemyCount = 3 + Math.floor(this.currentFloor / 2);
+                const baseEnemyCount = 10 + Math.floor(this.currentFloor / 2);
                 let remainingEnemies = baseEnemyCount;
                 
                 // Track which rooms already have enemies
