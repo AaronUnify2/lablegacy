@@ -1,374 +1,774 @@
-// src/entities/enemies/enemyBase.js - Base enemy class
+// src/entities/enemies/enemyBase.js - Base class for all enemies
 import * as THREE from 'three';
-import { EnemyAI, AIState } from './enemyAI.js';
 
-// Enemy types
-export const EnemyType = {
-    MOB: 'mob',
-    MINI_BOSS: 'miniBoss',
-    BOSS: 'boss'
-};
-
-// Base Enemy class
-export class Enemy {
-    constructor(options = {}) {
-        // Basic properties
-        this.id = Math.random().toString(36).substring(2, 9); // Unique ID
-        this.name = options.name || 'Unknown Enemy';
-        this.type = options.type || EnemyType.MOB;
-        this.level = options.level || 1;
+export class EnemyBase {
+    constructor(params = {}) {
+        // 1. Base identity properties
+        this.id = params.id || 'enemy';
+        this.name = params.name || 'Unknown Enemy';
+        this.level = params.level || 1;
+        this.type = 'enemy'; // Entity type for collision system
         
-        // Stats
-        this.maxHealth = options.maxHealth || 30;
+        // 2. Stats
+        this.maxHealth = params.maxHealth || 50;
         this.health = this.maxHealth;
-        this.baseDamage = options.damage || 10;
-        this.damageVariance = options.damageVariance || 0.2; // ±20% damage variance
-        this.experienceValue = options.experienceValue || 10;
+        this.baseDamage = params.baseDamage || 10;
+        this.damageVariance = params.damageVariance || 0.2; // ±20% damage variance
+        this.experienceValue = params.experienceValue || 20;
+        this.healthOrbChance = params.healthOrbChance || 0.3; // 30% chance to drop health orb
+        this.manaOrbChance = params.manaOrbChance || 0.2;     // 20% chance to drop mana orb
         
-        // Movement
-        this.position = new THREE.Vector3(0, 0, 0);
-        this.rotation = 0;
+        // 3. Movement
+        this.position = new THREE.Vector3(
+            params.x || 0,
+            params.y || 0,
+            params.z || 0
+        );
         this.velocity = new THREE.Vector3(0, 0, 0);
-        this.moveSpeed = options.moveSpeed || 3;
+        this.moveSpeed = params.moveSpeed || 3;
+        this.rotationSpeed = params.rotationSpeed || 4;
+        this.rotation = 0;
+        this.isMoving = false;
         
-        // Combat ranges
-        this.detectionRange = options.detectionRange || 15;  // When enemy becomes aware of player
-        this.aggroRange = options.aggroRange || 10;          // When enemy actively chases player
-        this.attackRange = options.attackRange || 2;         // When enemy can attack player
-        this.retreatRange = options.retreatRange || 0;       // When enemy should retreat (0 = never)
+        // 4. Detection ranges
+        this.detectionRange = params.detectionRange || 15;
+        this.attackRange = params.attackRange || 2;
+        this.retreatRange = params.retreatRange || 1;
         
-        // Attack properties
-        this.attackType = options.attackType || 'melee';     // 'melee' or 'ranged'
-        this.attackCooldown = options.attackCooldown || 1.5; // Seconds between attacks
+        // 5. Attack properties
+        this.attackType = params.attackType || 'melee'; // melee, ranged, slam
+        this.attackCooldown = params.attackCooldown || 2;
         this.attackTimer = 0;
         this.isAttacking = false;
-        this.attackDuration = options.attackDuration || 0.5; // How long an attack animation lasts
-        this.attackSpeed = options.attackSpeed || 1.0;       // Speed multiplier for attacks
-        this.attackHitbox = null;                            // Active attack hitbox
+        this.projectileSpeed = params.projectileSpeed || 8;
+        this.projectileLifetime = params.projectileLifetime || 3;
         
-        // Defense & status
-        this.defense = options.defense || 0;
-        this.isDead = false;
-        this.isStunned = false;
-        this.stunDuration = 0;
+        // 6. Defense stats
+        this.defense = params.defense || 0;
+        this.isStaggered = false;
+        this.staggerDuration = 0;
+        this.isInvulnerable = false;
         this.invulnerabilityTime = 0;
         
-        // Visual properties
-        this.primaryColor = options.primaryColor || 0x777777;
-        this.secondaryColor = options.secondaryColor || 0x444444;
-        this.scale = options.scale || 1.0;
-        this.glowIntensity = options.glowIntensity || 0;
-        this.glowColor = options.glowColor || 0xffffff;
+        // 7. Visuals
+        this.color = params.color || 0xff0000;
+        this.size = params.size || 1;
+        this.object = null;
+        this.mesh = null;
         
-        // 3D objects
-        this.object = new THREE.Object3D(); // Container for all meshes
-        this.mesh = null;                   // Main mesh
-        this.hitboxMesh = null;             // Visual hitbox for debugging
-        
-        // AI System
-        this.ai = new EnemyAI(this);
-        this.currentState = AIState.IDLE;
-        this.patrolPoints = options.patrolPoints || null;
+        // 8. AI state
+        this.state = 'idle'; // idle, patrol, chase, attack, retreat, staggered, dead
+        this.targetPosition = null;
+        this.lastPlayerPosition = null;
+        this.aggroTime = 0;
+        this.maxAggroTime = params.maxAggroTime || 5;
+        this.patrolPoints = params.patrolPoints || [];
         this.currentPatrolIndex = 0;
-        this.targetPosition = null;         // Current movement target
-        this.stateTimer = 0;                // Timer for state transitions
+        this.waitTimer = 0;
         
-        // Path finding
-        this.path = [];                     // Current path to target
-        this.nextPathIndex = 0;             // Next point in path
-        this.pathFindingCooldown = 0;       // Cooldown for path recalculation
+        // 9. Pathfinding properties
+        this.path = [];
+        this.pathIndex = 0;
+        this.recalculatePathTimer = 0;
+        this.recalculatePathInterval = 1;
         
-        // Entity type for physics/collision
-        this.type = 'enemy';
-        this.collisionRadius = options.collisionRadius || 1.0;
+        // 10. Collision
+        this.collider = null;
+        this.collisionRadius = params.collisionRadius || this.size;
         
-        // Effect timers
-        this.flashTimer = 0;                // For hit flash effect
-        this.floatOffset = 0;               // For floating animation
+        // 11. Custom behavior override
+        this.customBehavior = params.customBehavior || null;
         
-        // Custom behavior overrides - allows for specialized behavior 
-        this.customBehavior = options.customBehavior || null;
-        
-        // Special ability
-        this.specialAbility = options.specialAbility || null;
-        this.specialAbilityCooldown = options.specialAbilityCooldown || 10;
-        this.specialAbilityTimer = this.specialAbilityCooldown;
+        // Initialize the enemy
+        this.init(params);
     }
     
-    // Initialize meshes and appearance
-    init() {
-        // Create default mesh if not overridden
-        if (!this.mesh) {
-            this.createDefaultMesh();
-        }
+    // Initialize the enemy
+    init(params) {
+        this.createMesh(params);
+        this.updateCollider();
+    }
+    
+    // Create mesh based on enemy type
+    createMesh(params) {
+        // Create a simple geometry for the base enemy
+        const geometry = new THREE.BoxGeometry(this.size, this.size, this.size);
+        const material = new THREE.MeshLambertMaterial({ color: this.color });
+        this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
         
-        // Create hitbox visual (only visible in debug mode)
-        this.createHitboxMesh();
-        
-        // Add meshes to object container
+        // Create container object for positioning
+        this.object = new THREE.Object3D();
+        this.object.position.copy(this.position);
         this.object.add(this.mesh);
         
-        // Set initial position
-        this.object.position.copy(this.position);
-        
-        console.log(`${this.name} initialized at position: `, this.position);
-        
-        return this;
-    }
-    
-    // Create default mesh - should be overridden by specific enemy types
-    createDefaultMesh() {
-        // Create a simple shape as fallback
-        const geometry = new THREE.BoxGeometry(1, 2, 1);
-        const material = new THREE.MeshLambertMaterial({ color: this.primaryColor });
-        this.mesh = new THREE.Mesh(geometry, material);
-        
-        // Position mesh so bottom is at y=0
-        this.mesh.position.y = 1;
-        
-        // Add a small glow light if specified
-        if (this.glowIntensity > 0) {
-            const light = new THREE.PointLight(this.glowColor, this.glowIntensity, 5);
-            light.position.set(0, 1, 0); // Position light at center of mesh
-            this.mesh.add(light);
-        }
-    }
-    
-    // Create hitbox visualization for debugging
-    createHitboxMesh() {
-        const hitboxGeometry = new THREE.SphereGeometry(this.collisionRadius, 8, 8);
-        const hitboxMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.3,
-            wireframe: true
-        });
-        
-        this.hitboxMesh = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
-        this.hitboxMesh.position.y = this.collisionRadius;
-        this.hitboxMesh.visible = false; // Hidden by default
-        
-        this.object.add(this.hitboxMesh);
+        // Add a point light to make the enemy glow slightly
+        const light = new THREE.PointLight(this.color, 0.5, 3);
+        light.position.set(0, 0, 0);
+        this.mesh.add(light);
     }
     
     // Update enemy state
     update(deltaTime, player, dungeon) {
-        // Skip update if dead
-        if (this.isDead) return;
+        // Skip updates if dead
+        if (this.state === 'dead') return;
         
         // Update timers
         this.updateTimers(deltaTime);
         
-        // Process AI state and behavior
-        this.updateAI(deltaTime, player, dungeon);
+        // Run custom behavior if defined
+        if (this.customBehavior && typeof this.customBehavior === 'function') {
+            const shouldContinue = this.customBehavior(this, deltaTime, player, dungeon);
+            if (!shouldContinue) return;
+        }
         
-        // Update movement based on AI decisions
-        this.updateMovement(deltaTime, dungeon);
+        // Update state based on player position
+        this.updateState(player);
         
-        // Update attack state
-        this.updateAttack(deltaTime, player);
+        // Handle state-specific behavior
+        this.handleCurrentState(deltaTime, player, dungeon);
         
-        // Update animation effects
-        this.updateAnimations(deltaTime);
+        // Apply movement
+        this.applyMovement(deltaTime, dungeon);
         
-        // Update 3D object position and rotation
+        // Update object position and rotation
         this.object.position.copy(this.position);
         this.object.rotation.y = this.rotation;
+        
+        // Update collider
+        this.updateCollider();
+        
+        // Animate the enemy
+        this.animate(deltaTime);
     }
     
     // Update all timers
     updateTimers(deltaTime) {
-        // Cooldown timers
         if (this.attackTimer > 0) {
             this.attackTimer -= deltaTime;
         }
         
-        if (this.specialAbilityTimer > 0) {
-            this.specialAbilityTimer -= deltaTime;
-        }
-        
-        if (this.pathFindingCooldown > 0) {
-            this.pathFindingCooldown -= deltaTime;
-        }
-        
-        // Status effect timers
-        if (this.invulnerabilityTime > 0) {
-            this.invulnerabilityTime -= deltaTime;
-        }
-        
-        if (this.flashTimer > 0) {
-            this.flashTimer -= deltaTime;
-        }
-        
-        if (this.isStunned) {
-            this.stunDuration -= deltaTime;
-            if (this.stunDuration <= 0) {
-                this.isStunned = false;
+        if (this.staggerDuration > 0) {
+            this.staggerDuration -= deltaTime;
+            if (this.staggerDuration <= 0) {
+                this.isStaggered = false;
             }
         }
         
-        // State timers
-        this.stateTimer -= deltaTime;
-    }
-    
-    // Update AI state and behavior
-    updateAI(deltaTime, player, dungeon) {
-        // Skip if stunned
-        if (this.isStunned) return;
+        if (this.invulnerabilityTime > 0) {
+            this.invulnerabilityTime -= deltaTime;
+            if (this.invulnerabilityTime <= 0) {
+                this.isInvulnerable = false;
+                if (this.mesh) this.mesh.visible = true;
+            } else {
+                // Flash effect for invulnerability
+                if (this.mesh) {
+                    this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+                }
+            }
+        }
         
-        // Let the AI system update the state
-        this.ai.update(deltaTime, player, dungeon);
+        if (this.aggroTime > 0) {
+            this.aggroTime -= deltaTime;
+        }
+        
+        if (this.waitTimer > 0) {
+            this.waitTimer -= deltaTime;
+        }
+        
+        if (this.recalculatePathTimer > 0) {
+            this.recalculatePathTimer -= deltaTime;
+        }
     }
     
-    // Update enemy movement
-    updateMovement(deltaTime, dungeon) {
-        // Skip if stunned or attacking
-        if (this.isStunned || this.isAttacking) {
-            this.velocity.set(0, 0, 0);
+    // Update enemy state based on player position
+    updateState(player) {
+        if (this.isStaggered) {
+            this.state = 'staggered';
             return;
         }
         
-        // Apply movement from AI
-        if (this.velocity.length() > 0) {
-            // Move position
-            const moveX = this.velocity.x * deltaTime;
-            const moveZ = this.velocity.z * deltaTime;
-            
-            // Simple collision detection with dungeon walls
-            const newX = this.position.x + moveX;
-            const newZ = this.position.z + moveZ;
-            
-            // Check collisions using a simplified approach
-            // In a real implementation, we would use the physics system
-            let canMoveX = true;
-            let canMoveZ = true;
-            
-            // For now, just apply the movement
-            if (canMoveX) {
-                this.position.x = newX;
-            }
-            
-            if (canMoveZ) {
-                this.position.z = newZ;
-            }
-            
-            // Update rotation to face movement direction
-            if (Math.abs(moveX) > 0.001 || Math.abs(moveZ) > 0.001) {
-                const targetRotation = Math.atan2(moveX, moveZ);
-                this.rotation = targetRotation;
-            }
+        if (this.health <= 0) {
+            this.state = 'dead';
+            return;
         }
-    }
-    
-    // Update attack state and logic
-    updateAttack(deltaTime, player) {
-        // Skip if stunned
-        if (this.isStunned) return;
         
-        // If attacking, update attack animation
-        if (this.isAttacking) {
-            // For now, just count down the attack duration
-            this.attackTimer -= deltaTime;
+        // Skip state update if we're in the middle of an attack
+        if (this.isAttacking) return;
+        
+        // Get distance to player
+        const distanceToPlayer = this.getDistanceToPlayer(player);
+        
+        // If player is within detection range, chase or attack
+        if (distanceToPlayer <= this.detectionRange) {
+            // Store last known player position and refresh aggro time
+            this.lastPlayerPosition = player.getPosition().clone();
+            this.aggroTime = this.maxAggroTime;
             
-            if (this.attackTimer <= 0) {
-                this.isAttacking = false;
-                this.attackHitbox = null;
+            // If in attack range, attack
+            if (distanceToPlayer <= this.attackRange) {
+                if (distanceToPlayer <= this.retreatRange) {
+                    this.state = 'retreat';
+                } else {
+                    this.state = 'attack';
+                }
+            } else {
+                this.state = 'chase';
+            }
+        } 
+        // If we've lost sight of player but still have aggro, move to last known position
+        else if (this.lastPlayerPosition && this.aggroTime > 0) {
+            this.state = 'chase';
+        } 
+        // Otherwise go back to patrolling or idle
+        else {
+            if (this.patrolPoints && this.patrolPoints.length > 0) {
+                this.state = 'patrol';
+            } else {
+                this.state = 'idle';
             }
         }
     }
     
-    // Perform attack based on attack type
+    // Handle behavior based on current state
+    handleCurrentState(deltaTime, player, dungeon) {
+        switch(this.state) {
+            case 'idle':
+                this.handleIdleState(deltaTime);
+                break;
+            case 'patrol':
+                this.handlePatrolState(deltaTime);
+                break;
+            case 'chase':
+                this.handleChaseState(deltaTime, player);
+                break;
+            case 'attack':
+                this.handleAttackState(deltaTime, player);
+                break;
+            case 'retreat':
+                this.handleRetreatState(deltaTime, player);
+                break;
+            case 'staggered':
+                this.handleStaggeredState(deltaTime);
+                break;
+            case 'dead':
+                this.handleDeadState(deltaTime);
+                break;
+        }
+    }
+    
+    // Idle state behavior
+    handleIdleState(deltaTime) {
+        // In idle state, the enemy doesn't move
+        this.velocity.set(0, 0, 0);
+        this.isMoving = false;
+        
+        // Occasionally look around
+        if (Math.random() < 0.01) {
+            this.rotation = Math.random() * Math.PI * 2;
+        }
+    }
+    
+    // Patrol state behavior
+    handlePatrolState(deltaTime) {
+        // If no patrol points, go back to idle
+        if (!this.patrolPoints || this.patrolPoints.length === 0) {
+            this.state = 'idle';
+            return;
+        }
+        
+        // If waiting at a patrol point, decrement timer
+        if (this.waitTimer > 0) {
+            this.velocity.set(0, 0, 0);
+            this.isMoving = false;
+            return;
+        }
+        
+        // Get current patrol point
+        const targetPoint = this.patrolPoints[this.currentPatrolIndex];
+        const targetPosition = new THREE.Vector3(targetPoint.x, 0, targetPoint.z);
+        
+        // Calculate distance to target
+        const distance = this.position.distanceTo(targetPosition);
+        
+        // If we've reached the target, move to next patrol point
+        if (distance < 1) {
+            this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+            this.waitTimer = 1 + Math.random() * 2; // Wait 1-3 seconds at each point
+            return;
+        }
+        
+        // Move towards patrol point
+        this.moveTowardsPosition(targetPosition, this.moveSpeed * 0.5); // Move at half speed while patrolling
+    }
+    
+    // Chase state behavior
+    handleChaseState(deltaTime, player) {
+        // If we have a last known player position, move towards it
+        if (this.lastPlayerPosition) {
+            const distance = this.position.distanceTo(this.lastPlayerPosition);
+            
+            // If we've reached the last known position and lost the player
+            if (distance < 1 && this.getDistanceToPlayer(player) > this.detectionRange) {
+                this.lastPlayerPosition = null;
+                this.aggroTime = 0;
+                return;
+            }
+            
+            // Move towards player position
+            this.moveTowardsPosition(player.getPosition(), this.moveSpeed);
+        } else {
+            // If no last known position, go back to idle/patrol
+            if (this.patrolPoints && this.patrolPoints.length > 0) {
+                this.state = 'patrol';
+            } else {
+                this.state = 'idle';
+            }
+        }
+    }
+    
+    // Attack state behavior
+    handleAttackState(deltaTime, player) {
+        // Face the player
+        this.lookAtPosition(player.getPosition());
+        
+        // Stop moving while attacking
+        this.velocity.set(0, 0, 0);
+        this.isMoving = false;
+        
+        // Perform attack if cooldown is ready
+        if (this.attackTimer <= 0 && !this.isAttacking) {
+            this.performAttack(player);
+        }
+    }
+    
+    // Retreat state behavior
+    handleRetreatState(deltaTime, player) {
+        // Get direction away from player
+        const playerPos = player.getPosition();
+        const direction = new THREE.Vector3(
+            this.position.x - playerPos.x,
+            0,
+            this.position.z - playerPos.z
+        ).normalize();
+        
+        // Set velocity to move away
+        this.velocity.x = direction.x * this.moveSpeed;
+        this.velocity.z = direction.z * this.moveSpeed;
+        this.isMoving = true;
+        
+        // Face the player while retreating
+        this.lookAtPosition(playerPos);
+        
+        // Attack if we can
+        if (this.attackTimer <= 0 && !this.isAttacking) {
+            this.performAttack(player);
+        }
+    }
+    
+    // Staggered state behavior
+    handleStaggeredState(deltaTime) {
+        // Stop moving while staggered
+        this.velocity.set(0, 0, 0);
+        this.isMoving = false;
+    }
+    
+    // Dead state behavior
+    handleDeadState(deltaTime) {
+        // Stop moving
+        this.velocity.set(0, 0, 0);
+        this.isMoving = false;
+        
+        // Scale down mesh to show death
+        if (this.mesh) {
+            this.mesh.scale.y = Math.max(0.1, this.mesh.scale.y - deltaTime * 2);
+            
+            // If fully scaled down, remove from scene
+            if (this.mesh.scale.y <= 0.1) {
+                this.remove();
+            }
+        }
+    }
+    
+    // Apply movement and handle collisions with dungeon
+    applyMovement(deltaTime, dungeon) {
+        // Don't move if staggered, attacking or dead
+        if (this.isStaggered || this.isAttacking || this.state === 'dead') {
+            return;
+        }
+        
+        // Apply movement
+        const newPosition = new THREE.Vector3(
+            this.position.x + this.velocity.x * deltaTime,
+            this.position.y,
+            this.position.z + this.velocity.z * deltaTime
+        );
+        
+        // Simple collision detection with dungeon walls
+        if (dungeon) {
+            const colliders = dungeon.getColliders();
+            let collision = false;
+            
+            // Create a test collider
+            const testCollider = {
+                min: new THREE.Vector3(
+                    newPosition.x - this.collisionRadius,
+                    newPosition.y,
+                    newPosition.z - this.collisionRadius
+                ),
+                max: new THREE.Vector3(
+                    newPosition.x + this.collisionRadius,
+                    newPosition.y + this.size,
+                    newPosition.z + this.collisionRadius
+                )
+            };
+            
+            // Check for collisions with dungeon walls
+            for (const collider of colliders) {
+                if (this.checkCollision(testCollider, collider)) {
+                    collision = true;
+                    break;
+                }
+            }
+            
+            // Only update position if no collision
+            if (!collision) {
+                this.position.copy(newPosition);
+            } else {
+                // On collision, stop movement and slightly adjust position
+                this.velocity.set(0, 0, 0);
+                
+                // Try moving just X
+                const xOnlyPosition = new THREE.Vector3(
+                    this.position.x + this.velocity.x * deltaTime,
+                    this.position.y,
+                    this.position.z
+                );
+                
+                const xOnlyCollider = {
+                    min: new THREE.Vector3(
+                        xOnlyPosition.x - this.collisionRadius,
+                        xOnlyPosition.y,
+                        xOnlyPosition.z - this.collisionRadius
+                    ),
+                    max: new THREE.Vector3(
+                        xOnlyPosition.x + this.collisionRadius,
+                        xOnlyPosition.y + this.size,
+                        xOnlyPosition.z + this.collisionRadius
+                    )
+                };
+                
+                let xCollision = false;
+                for (const collider of colliders) {
+                    if (this.checkCollision(xOnlyCollider, collider)) {
+                        xCollision = true;
+                        break;
+                    }
+                }
+                
+                if (!xCollision) {
+                    this.position.x = xOnlyPosition.x;
+                }
+                
+                // Try moving just Z
+                const zOnlyPosition = new THREE.Vector3(
+                    this.position.x,
+                    this.position.y,
+                    this.position.z + this.velocity.z * deltaTime
+                );
+                
+                const zOnlyCollider = {
+                    min: new THREE.Vector3(
+                        zOnlyPosition.x - this.collisionRadius,
+                        zOnlyPosition.y,
+                        zOnlyPosition.z - this.collisionRadius
+                    ),
+                    max: new THREE.Vector3(
+                        zOnlyPosition.x + this.collisionRadius,
+                        zOnlyPosition.y + this.size,
+                        zOnlyPosition.z + this.collisionRadius
+                    )
+                };
+                
+                let zCollision = false;
+                for (const collider of colliders) {
+                    if (this.checkCollision(zOnlyCollider, collider)) {
+                        zCollision = true;
+                        break;
+                    }
+                }
+                
+                if (!zCollision) {
+                    this.position.z = zOnlyPosition.z;
+                }
+            }
+        } else {
+            // No dungeon, just move
+            this.position.copy(newPosition);
+        }
+    }
+    
+    // Simple collision check
+    checkCollision(colliderA, colliderB) {
+        return (
+            colliderA.min.x <= colliderB.max.x &&
+            colliderA.max.x >= colliderB.min.x &&
+            colliderA.min.y <= colliderB.max.y &&
+            colliderA.max.y >= colliderB.min.y &&
+            colliderA.min.z <= colliderB.max.z &&
+            colliderA.max.z >= colliderB.min.z
+        );
+    }
+    
+    // Move towards a position
+    moveTowardsPosition(targetPosition, speed) {
+        // Calculate direction to target
+        const direction = new THREE.Vector3(
+            targetPosition.x - this.position.x,
+            0,
+            targetPosition.z - this.position.z
+        ).normalize();
+        
+        // Set velocity
+        this.velocity.x = direction.x * speed;
+        this.velocity.z = direction.z * speed;
+        this.isMoving = true;
+        
+        // Update rotation to face movement direction
+        this.lookAtPosition(targetPosition);
+    }
+    
+    // Face towards a position
+    lookAtPosition(targetPosition) {
+        // Calculate angle to target
+        const dx = targetPosition.x - this.position.x;
+        const dz = targetPosition.z - this.position.z;
+        const targetRotation = Math.atan2(dx, dz);
+        
+        // Smoothly rotate towards target
+        const rotationDiff = targetRotation - this.rotation;
+        
+        // Handle rotation wrapping
+        if (rotationDiff > Math.PI) {
+            this.rotation += 2 * Math.PI;
+        } else if (rotationDiff < -Math.PI) {
+            this.rotation -= 2 * Math.PI;
+        }
+        
+        // Linear interpolation for smooth rotation
+        this.rotation = this.rotation + Math.sign(targetRotation - this.rotation) * 
+                       Math.min(Math.abs(targetRotation - this.rotation), this.rotationSpeed * 0.1);
+    }
+    
+    // Get distance to player
+    getDistanceToPlayer(player) {
+        const playerPos = player.getPosition();
+        return this.position.distanceTo(playerPos);
+    }
+    
+    // Perform attack
     performAttack(player) {
-        if (this.attackTimer > 0 || this.isStunned) return false;
+        if (this.attackTimer > 0 || this.isAttacking) return;
         
-        // Start attack sequence
         this.isAttacking = true;
+        
+        // Set attack timer
         this.attackTimer = this.attackCooldown;
         
-        console.log(`${this.name} attacks!`);
-        
-        // Different attack handling based on type
-        if (this.attackType === 'melee') {
-            return this.performMeleeAttack(player);
-        } else if (this.attackType === 'ranged') {
-            return this.performRangedAttack(player);
+        // Different attack behavior based on attack type
+        switch(this.attackType) {
+            case 'melee':
+                this.performMeleeAttack(player);
+                break;
+            case 'ranged':
+                this.performRangedAttack(player);
+                break;
+            case 'slam':
+                this.performSlamAttack(player);
+                break;
         }
         
-        return false;
+        // Attack animation will end the isAttacking state
+        setTimeout(() => {
+            this.isAttacking = false;
+        }, 500); // Attack animation lasts 0.5 seconds
     }
     
-    // Perform a melee attack
+    // Melee attack
     performMeleeAttack(player) {
-        // Create attack hitbox
-        this.attackHitbox = {
-            position: this.position.clone(),
-            radius: this.attackRange
-        };
-        
-        // Check if player is in range
-        const distanceToPlayer = this.distanceToEntity(player);
-        
-        if (distanceToPlayer <= this.attackRange) {
-            // Calculate damage with variance
-            const damageVariance = this.baseDamage * this.damageVariance;
-            const actualDamage = this.baseDamage + 
-                (Math.random() * damageVariance * 2 - damageVariance);
+        // Check if player is in attack range
+        const distance = this.getDistanceToPlayer(player);
+        if (distance <= this.attackRange) {
+            // Calculate actual damage with variance
+            const variance = 1 + (Math.random() * this.damageVariance * 2 - this.damageVariance);
+            const damage = Math.round(this.baseDamage * variance);
             
             // Apply damage to player
-            player.takeDamage(Math.round(actualDamage));
+            player.takeDamage(damage);
             
-            console.log(`${this.name} hit player for ${Math.round(actualDamage)} damage`);
-            return true;
+            // Apply knockback to player
+            const knockbackDirection = new THREE.Vector3(
+                player.position.x - this.position.x,
+                0,
+                player.position.z - this.position.z
+            ).normalize();
+            
+            player.applyKnockback(knockbackDirection, 2);
         }
-        
-        return false;
     }
     
-    // Perform a ranged attack
+    // Ranged attack
     performRangedAttack(player) {
-        // Create projectile (to be implemented)
-        console.log(`${this.name} fires a projectile at player`);
+        // Create a projectile in the direction of the player
+        const playerPos = player.getPosition();
+        const direction = new THREE.Vector3(
+            playerPos.x - this.position.x,
+            0,
+            playerPos.z - this.position.z
+        ).normalize();
         
-        // Will be implemented in the full version
-        return true;
-    }
-    
-    // Use special ability if available
-    useSpecialAbility(player, dungeon) {
-        if (!this.specialAbility || this.specialAbilityTimer > 0) return false;
-        
-        // Reset cooldown
-        this.specialAbilityTimer = this.specialAbilityCooldown;
-        
-        // Execute special ability (to be implemented by specific enemy types)
-        console.log(`${this.name} uses special ability`);
-        
-        return true;
-    }
-    
-    // Update animation effects
-    updateAnimations(deltaTime) {
-        // Flash effect when hit
-        if (this.flashTimer > 0) {
-            // Toggle visibility based on flash timer
-            this.mesh.visible = Math.floor(this.flashTimer * 10) % 2 === 0;
-        } else {
-            this.mesh.visible = true;
-        }
-        
-        // Float animation for certain enemies
-        this.floatOffset = Math.sin(Date.now() * 0.002) * 0.2;
-        
-        // Update mesh position for floating effect if this enemy floats
-        if (this.canFloat) {
-            this.mesh.position.y = 1 + this.floatOffset;
+        // Signal to the game that we're firing a projectile
+        // This will be implemented in projectileSystem.js
+        if (window.game && window.game.projectileSystem) {
+            window.game.projectileSystem.createEnemyProjectile(
+                this.position.clone(),
+                direction,
+                this.projectileSpeed,
+                this.baseDamage,
+                this.projectileLifetime,
+                this.color
+            );
         }
     }
     
-    // Take damage from player or other sources
+    // Slam attack
+    performSlamAttack(player) {
+        // First jump up
+        const jumpUp = () => {
+            // Save original y position
+            const originalY = this.position.y;
+            
+            // Animation to jump up
+            const jumpHeight = 3;
+            const jumpDuration = 500; // ms
+            
+            // Tween the position up
+            const startTime = Date.now();
+            
+            const jumpInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / jumpDuration, 1);
+                
+                // Parabolic jump - up then down
+                const jumpOffset = Math.sin(progress * Math.PI) * jumpHeight;
+                this.position.y = originalY + jumpOffset;
+                
+                if (progress >= 1) {
+                    clearInterval(jumpInterval);
+                    slamDown(originalY);
+                }
+            }, 16); // ~60fps
+        };
+        
+        // Then slam down
+        const slamDown = (originalY) => {
+            // Reset Y position
+            this.position.y = originalY;
+            
+            // Create a shockwave effect
+            const shockwaveRadius = this.attackRange * 1.5;
+            
+            // Check if player is in shockwave range
+            const distance = this.getDistanceToPlayer(player);
+            if (distance <= shockwaveRadius) {
+                // Calculate damage based on distance (more damage closer to center)
+                const damageMultiplier = 1 - (distance / shockwaveRadius);
+                const damage = Math.round(this.baseDamage * damageMultiplier * 1.5); // 50% more damage for slam
+                
+                // Apply damage to player
+                player.takeDamage(damage);
+                
+                // Apply knockback away from slam center
+                const knockbackDirection = new THREE.Vector3(
+                    player.position.x - this.position.x,
+                    0,
+                    player.position.z - this.position.z
+                ).normalize();
+                
+                player.applyKnockback(knockbackDirection, 4); // Stronger knockback for slam
+            }
+        };
+        
+        // Start the slam attack sequence
+        jumpUp();
+    }
+    
+    // Animate the enemy
+    animate(deltaTime) {
+        // Simple bobbing animation when moving
+        if (this.isMoving && this.mesh) {
+            this.mesh.position.y = Math.sin(Date.now() * 0.01) * 0.1;
+        }
+        
+        // Attack animation
+        if (this.isAttacking && this.mesh) {
+            // Different animation based on attack type
+            switch(this.attackType) {
+                case 'melee':
+                    // Lunge forward animation
+                    const attackProgress = 1 - (this.attackTimer / this.attackCooldown);
+                    if (attackProgress < 0.5) {
+                        // First half - lunge forward
+                        this.mesh.position.z = attackProgress * 2 * 0.5;
+                    } else {
+                        // Second half - move back
+                        this.mesh.position.z = (1 - (attackProgress - 0.5) * 2) * 0.5;
+                    }
+                    break;
+                    
+                case 'ranged':
+                    // Pulse animation for ranged attack
+                    const pulseProgress = 1 - (this.attackTimer / this.attackCooldown);
+                    if (pulseProgress < 0.2) {
+                        // Scale up quickly
+                        this.mesh.scale.set(
+                            1 + pulseProgress * 2,
+                            1 + pulseProgress * 2,
+                            1 + pulseProgress * 2
+                        );
+                    } else if (pulseProgress < 0.3) {
+                        // Scale back down quickly
+                        const scaleDown = 1 + (0.4 - (pulseProgress - 0.2) * 5) * 0.2;
+                        this.mesh.scale.set(scaleDown, scaleDown, scaleDown);
+                    } else {
+                        // Reset scale
+                        this.mesh.scale.set(1, 1, 1);
+                    }
+                    break;
+                    
+                case 'slam':
+                    // Handled in performSlamAttack
+                    break;
+            }
+        } else if (!this.isAttacking && this.mesh) {
+            // Reset position when not attacking
+            this.mesh.position.z = 0;
+            this.mesh.scale.set(1, 1, 1);
+        }
+        
+        // Stagger animation
+        if (this.isStaggered && this.mesh) {
+            this.mesh.rotation.z = Math.sin(Date.now() * 0.01 * 20) * 0.3;
+        } else if (this.mesh) {
+            this.mesh.rotation.z = 0;
+        }
+    }
+    
+    // Take damage
     takeDamage(amount) {
-        // Check invulnerability
-        if (this.invulnerabilityTime > 0) return 0;
+        // Don't take damage if invulnerable or already dead
+        if (this.isInvulnerable || this.state === 'dead') return 0;
         
         // Apply defense reduction
         const actualDamage = Math.max(1, amount - this.defense);
@@ -376,92 +776,68 @@ export class Enemy {
         // Reduce health
         this.health -= actualDamage;
         
-        // Apply hit effects
-        this.flashTimer = 0.2; // Flash for 0.2 seconds
-        this.invulnerabilityTime = 0.1; // Short invulnerability after hit
+        // Apply invulnerability
+        this.isInvulnerable = true;
+        this.invulnerabilityTime = 0.2; // Short invulnerability after taking damage
         
-        console.log(`${this.name} took ${actualDamage} damage, health: ${this.health}/${this.maxHealth}`);
+        // Stagger if damage is high enough
+        if (actualDamage > this.maxHealth * 0.2) { // Stagger if damage > 20% of max health
+            this.isStaggered = true;
+            this.staggerDuration = 0.5; // Staggered for 0.5 seconds
+        }
         
         // Check for death
         if (this.health <= 0) {
             this.die();
         }
         
+        // Return actual damage dealt
         return actualDamage;
     }
     
-    // Handle enemy death
+    // Die and drop loot
     die() {
-        if (this.isDead) return;
+        if (this.state === 'dead') return;
         
-        this.isDead = true;
-        console.log(`${this.name} has been defeated!`);
+        this.state = 'dead';
         
-        // Implement death effects, loot drops, etc.
+        // Drop loot based on chance
+        this.dropLoot();
         
-        // Mark for removal from the game
-        setTimeout(() => {
-            if (this.object.parent) {
-                this.object.parent.remove(this.object);
-            }
-        }, 1000); // Delay removal to allow for death animation
+        // Give experience to player
+        if (window.game && window.game.player) {
+            window.game.player.addExperience?.(this.experienceValue);
+        }
     }
     
-    // Stun the enemy temporarily
-    applyStun(duration) {
-        this.isStunned = true;
-        this.stunDuration = duration;
-        this.velocity.set(0, 0, 0);
+    // Drop loot on death
+    dropLoot() {
+        // Check for health orb drop
+        if (Math.random() < this.healthOrbChance) {
+            this.createHealthOrb();
+        }
+        
+        // Check for mana orb drop
+        if (Math.random() < this.manaOrbChance) {
+            this.createManaOrb();
+        }
     }
     
-    // Calculate distance to another entity
-    distanceToEntity(entity) {
-        return Math.sqrt(
-            Math.pow(this.position.x - entity.position.x, 2) +
-            Math.pow(this.position.z - entity.position.z, 2)
-        );
+    // Create a health orb
+    createHealthOrb() {
+        // Implementation would be in a loot system
+        console.log("Health orb dropped at", this.position);
     }
     
-    // Calculate angle to another entity
-    angleToEntity(entity) {
-        return Math.atan2(
-            entity.position.x - this.position.x,
-            entity.position.z - this.position.z
-        );
+    // Create a mana orb
+    createManaOrb() {
+        // Implementation would be in a loot system
+        console.log("Mana orb dropped at", this.position);
     }
     
-    // Get enemy position
-    getPosition() {
-        return this.position.clone();
-    }
-    
-    // Set enemy position
-    setPosition(x, y, z) {
-        this.position.set(x, y, z);
-        this.object.position.copy(this.position);
-        return this;
-    }
-    
-    // Get enemy rotation
-    getRotation() {
-        return this.rotation;
-    }
-    
-    // Set enemy rotation
-    setRotation(rotation) {
-        this.rotation = rotation;
-        this.object.rotation.y = rotation;
-        return this;
-    }
-    
-    // Get the main Three.js object
-    getObject() {
-        return this.object;
-    }
-    
-    // Get collision data for physics
-    getCollider() {
-        return {
+    // Update the enemy's bounding box (collider)
+    updateCollider() {
+        this.collider = {
             min: new THREE.Vector3(
                 this.position.x - this.collisionRadius,
                 this.position.y,
@@ -469,27 +845,56 @@ export class Enemy {
             ),
             max: new THREE.Vector3(
                 this.position.x + this.collisionRadius,
-                this.position.y + this.collisionRadius * 2,
+                this.position.y + this.size,
                 this.position.z + this.collisionRadius
             )
         };
     }
     
-    // Get the damage this enemy deals
-    getDamage() {
-        const variance = this.baseDamage * this.damageVariance;
-        return this.baseDamage + (Math.random() * variance * 2 - variance);
-    }
-    
-    // Check if enemy is dead
-    isDead() {
-        return this.isDead;
-    }
-    
-    // Toggle debug visualization
-    toggleDebug(enabled) {
-        if (this.hitboxMesh) {
-            this.hitboxMesh.visible = enabled;
+    // Clean up and remove from scene
+    remove() {
+        if (this.object && this.object.parent) {
+            this.object.parent.remove(this.object);
         }
+    }
+    
+    // Get position
+    getPosition() {
+        return this.position.clone();
+    }
+    
+    // Set position
+    setPosition(x, y, z) {
+        this.position.set(x, y, z);
+        if (this.object) {
+            this.object.position.copy(this.position);
+        }
+        this.updateCollider();
+    }
+    
+    // Get collider
+    getCollider() {
+        return this.collider;
+    }
+    
+    // Get object for rendering
+    getObject() {
+        return this.object;
+    }
+    
+    // Get damage
+    getDamage() {
+        const variance = 1 + (Math.random() * this.damageVariance * 2 - this.damageVariance);
+        return Math.round(this.baseDamage * variance);
+    }
+    
+    // Get the type of enemy (used for type checking)
+    getType() {
+        return 'enemy';
+    }
+    
+    // Set a custom behavior function
+    setCustomBehavior(behaviorFunction) {
+        this.customBehavior = behaviorFunction;
     }
 }
