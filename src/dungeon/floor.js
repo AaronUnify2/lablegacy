@@ -1,4 +1,4 @@
-// src/dungeon/floor.js - Dungeon floor class
+// src/dungeon/floor.js - Dungeon floor class with improved chest handling
 import * as THREE from 'three';
 
 export class Dungeon {
@@ -56,56 +56,75 @@ export class Dungeon {
     }
     
     // Add a chest to the dungeon with improved error handling
-addChest(chest) {
-    // Add to the chest collection
-    this.chests.push(chest);
-    
-    // Debug log
-    console.log(`Adding chest to dungeon at position:`, chest.position);
-    
-    // Ensure the dungeon's main object exists
-    if (!this.object) {
-        console.error("Dungeon object is not initialized! Creating a new one.");
-        this.object = new THREE.Object3D();
-    }
-    
-    // Add chest object to dungeon's main object container
-    const chestObject = chest.getObject();
-    if (chestObject) {
-        try {
-            this.object.add(chestObject);
-            console.log(`Successfully added chest object to dungeon`);
-            
-            // Add additional logging for debugging
-            console.log(`Chest position relative to dungeon:`, 
-                        chestObject.position.x, 
-                        chestObject.position.y, 
-                        chestObject.position.z);
-            
-            // Check if the chest is visible and properly positioned
-            if (chestObject.visible === false) {
-                console.warn("Chest is set to invisible! Setting to visible.");
-                chestObject.visible = true;
-            }
-            
-            // Add chest to global scene as a fallback (if window.game.scene exists)
-            if (window.game && window.game.scene) {
-                try {
-                    window.game.scene.add(chestObject.clone());
-                    console.log("Also added chest directly to main scene as a fallback");
-                } catch (e) {
-                    console.error("Failed to add chest to main scene:", e);
+    addChest(chest) {
+        if (!chest) {
+            console.error("Cannot add null or undefined chest to dungeon");
+            return null;
+        }
+        
+        // Add to the chest collection
+        this.chests.push(chest);
+        
+        // Debug log
+        console.log(`Adding chest to dungeon at position:`, chest.position);
+        
+        // Ensure the dungeon's main object exists
+        if (!this.object) {
+            console.error("Dungeon object is not initialized! Creating a new one.");
+            this.object = new THREE.Object3D();
+        }
+        
+        // Add chest object to dungeon's main object container
+        const chestObject = chest.getObject();
+        if (chestObject) {
+            try {
+                this.object.add(chestObject);
+                console.log(`Successfully added chest object to dungeon`);
+                
+                // Add additional logging for debugging
+                console.log(`Chest position relative to dungeon:`, 
+                            chestObject.position.x, 
+                            chestObject.position.y, 
+                            chestObject.position.z);
+                
+                // Check if the chest is visible and properly positioned
+                if (chestObject.visible === false) {
+                    console.warn("Chest is set to invisible! Setting to visible.");
+                    chestObject.visible = true;
+                }
+                
+                // Add chest to global scene as a redundant safety measure
+                if (window.game && window.game.scene) {
+                    try {
+                        const globalChest = chest.getObject().clone();
+                        // Store reference to the original chest on the clone
+                        globalChest.userData.originalChest = chest;
+                        window.game.scene.add(globalChest);
+                        console.log("Also added chest directly to main scene as a fallback");
+                    } catch (e) {
+                        console.error("Failed to add chest to main scene:", e);
+                    }
+                }
+            } catch (e) {
+                console.error(`Error adding chest to dungeon:`, e);
+                
+                // Attempt recovery by adding directly to scene
+                if (window.game && window.game.scene) {
+                    try {
+                        window.game.scene.add(chestObject);
+                        console.log("Recovery: Added chest directly to main scene instead");
+                    } catch (recoveryError) {
+                        console.error("Fatal: Could not recover chest addition:", recoveryError);
+                    }
                 }
             }
-        } catch (e) {
-            console.error(`Error adding chest to dungeon:`, e);
+        } else {
+            console.error(`Failed to get chest object - chest may be invalid`);
+            return null;
         }
-    } else {
-        console.error(`Failed to get chest object`);
+        
+        return chest; // Return chest for chaining
     }
-    
-    return chest; // Return chest for chaining
-}
     
     // Get all chests in the dungeon
     getChests() {
