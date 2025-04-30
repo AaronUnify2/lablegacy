@@ -1,6 +1,6 @@
-// src/dungeon/floor.js - Updated with fully enclosed walls
-
+// src/dungeon/floor.js - Dungeon floor class with improved chest handling
 import * as THREE from 'three';
+import { WallBuilder } from './walls.js';
 
 export class Dungeon {
     constructor(floorNumber, size, theme) {
@@ -26,8 +26,8 @@ export class Dungeon {
         // Colliders for physics
         this.colliders = [];
         
-        // Map to track doorways
-        this.doorways = [];
+        // Wall builder instance
+        this.wallBuilder = null;
     }
     
     // Add a room to the dungeon
@@ -250,62 +250,14 @@ export class Dungeon {
         // Create floor
         this.buildFloors();
         
-        // First find and register all doorways
-        this.findDoorways();
-        
-        // Create walls
+        // Create walls using the WallBuilder
         this.buildWalls();
-        
-        // Create doorways
-        this.buildDoorways();
-        
-        // Create ceilings
-        this.buildCeilings();
         
         // Create decorations
         this.buildDecorations();
         
         // Create key and exit
         this.buildKeyAndExit();
-    }
-    
-    // Build ceiling meshes
-    buildCeilings() {
-        // For each room and corridor, create a ceiling
-        [...this.rooms, ...this.corridors].forEach(room => {
-            // Create ceiling geometry
-            const ceilingGeometry = new THREE.BoxGeometry(room.width, 0.2, room.height);
-            const ceilingMaterial = new THREE.MeshLambertMaterial({ 
-                color: this.theme.ceilingColor || 0x222222,
-                map: this.theme.ceilingTexture
-            });
-            
-            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-            ceiling.position.set(
-                room.x + room.width / 2,
-                3.0, // Position ceiling 3 units above floor (matches wall height)
-                room.z + room.height / 2
-            );
-            
-            ceiling.receiveShadow = true;
-            ceiling.castShadow = true;
-            this.object.add(ceiling);
-            this.meshes.push(ceiling);
-            
-            // Add ceiling collider
-            this.colliders.push({
-                min: new THREE.Vector3(
-                    room.x,
-                    2.9, // Just below ceiling surface
-                    room.z
-                ),
-                max: new THREE.Vector3(
-                    room.x + room.width,
-                    3.1, // Slightly above ceiling surface
-                    room.z + room.height
-                )
-            });
-        });
     }
     
     // Build floor meshes
@@ -346,717 +298,359 @@ export class Dungeon {
         });
     }
     
-    // Find all doorways where corridors connect to rooms
-    findDoorways() {
-        this.doorways = [];
+    // Build walls using the WallBuilder
+    buildWalls() {
+        // Create wall builder
+        this.wallBuilder = new WallBuilder(this);
         
-        // Check each corridor against all rooms to find connections
-        for (const corridor of this.corridors) {
-            // Get corridor bounds
-            const corridorLeft = corridor.x;
-            const corridorRight = corridor.x + corridor.width;
-            const corridorTop = corridor.z;
-            const corridorBottom = corridor.z + corridor.height;
-            
-            // Check against each room
-            for (const room of this.rooms) {
-                // Skip if the room is marked as a corridor
-                if (room.isCorridor) continue;
-                
-                // Get room bounds
-                const roomLeft = room.x;
-                const roomRight = room.x + room.width;
-                const roomTop = room.z;
-                const roomBottom = room.z + room.height;
-                
-                // Check for overlap
-                // Doorway on North wall of room
-                if (corridorBottom >= roomTop && corridorBottom <= roomTop + 1 &&
-                    corridorRight > roomLeft && corridorLeft < roomRight) {
-                    // Corridor connects to North wall of room
-                    const doorwayLeft = Math.max(corridorLeft, roomLeft);
-                    const doorwayRight = Math.min(corridorRight, roomRight);
-                    
-                    this.doorways.push({
-                        x1: doorwayLeft,
-                        z1: roomTop,
-                        x2: doorwayRight,
-                        z2: roomTop,
-                        direction: 'north',
-                        room: room,
-                        corridor: corridor
-                    });
-                }
-                
-                // Doorway on South wall of room
-                if (corridorTop <= roomBottom && corridorTop >= roomBottom - 1 &&
-                    corridorRight > roomLeft && corridorLeft < roomRight) {
-                    // Corridor connects to South wall of room
-                    const doorwayLeft = Math.max(corridorLeft, roomLeft);
-                    const doorwayRight = Math.min(corridorRight, roomRight);
-                    
-                    this.doorways.push({
-                        x1: doorwayLeft,
-                        z1: roomBottom,
-                        x2: doorwayRight,
-                        z2: roomBottom,
-                        direction: 'south',
-                        room: room,
-                        corridor: corridor
-                    });
-                }
-                
-                // Doorway on East wall of room
-                if (corridorLeft <= roomRight && corridorLeft >= roomRight - 1 &&
-                    corridorBottom > roomTop && corridorTop < roomBottom) {
-                    // Corridor connects to East wall of room
-                    const doorwayTop = Math.max(corridorTop, roomTop);
-                    const doorwayBottom = Math.min(corridorBottom, roomBottom);
-                    
-                    this.doorways.push({
-                        x1: roomRight,
-                        z1: doorwayTop,
-                        x2: roomRight,
-                        z2: doorwayBottom,
-                        direction: 'east',
-                        room: room,
-                        corridor: corridor
-                    });
-                }
-                
-                // Doorway on West wall of room
-                if (corridorRight >= roomLeft && corridorRight <= roomLeft + 1 &&
-                    corridorBottom > roomTop && corridorTop < roomBottom) {
-                    // Corridor connects to West wall of room
-                    const doorwayTop = Math.max(corridorTop, roomTop);
-                    const doorwayBottom = Math.min(corridorBottom, roomBottom);
-                    
-                    this.doorways.push({
-                        x1: roomLeft,
-                        z1: doorwayTop,
-                        x2: roomLeft,
-                        z2: doorwayBottom,
-                        direction: 'west',
-                        room: room,
-                        corridor: corridor
-                    });
-                }
-            }
-            
-            // Also check corridor-to-corridor connections
-            for (const otherCorridor of this.corridors) {
-                // Skip self comparison
-                if (corridor === otherCorridor) continue;
-                
-                // Get other corridor bounds
-                const otherLeft = otherCorridor.x;
-                const otherRight = otherCorridor.x + otherCorridor.width;
-                const otherTop = otherCorridor.z;
-                const otherBottom = otherCorridor.z + otherCorridor.height;
-                
-                // Check for corridor-to-corridor connections
-                // These are treated as doorways too to prevent wall overlaps
-                
-                // Corridor connects to North of other corridor
-                if (corridorBottom >= otherTop && corridorBottom <= otherTop + 1 &&
-                    corridorRight > otherLeft && corridorLeft < otherRight) {
-                    // Corridor connects to North side of other corridor
-                    const doorwayLeft = Math.max(corridorLeft, otherLeft);
-                    const doorwayRight = Math.min(corridorRight, otherRight);
-                    
-                    this.doorways.push({
-                        x1: doorwayLeft,
-                        z1: otherTop,
-                        x2: doorwayRight,
-                        z2: otherTop,
-                        direction: 'north',
-                        room: otherCorridor,
-                        corridor: corridor
-                    });
-                }
-                
-                // Similar checks for south, east, west connections...
-                // South
-                if (corridorTop <= otherBottom && corridorTop >= otherBottom - 1 &&
-                    corridorRight > otherLeft && corridorLeft < otherRight) {
-                    const doorwayLeft = Math.max(corridorLeft, otherLeft);
-                    const doorwayRight = Math.min(corridorRight, otherRight);
-                    
-                    this.doorways.push({
-                        x1: doorwayLeft,
-                        z1: otherBottom,
-                        x2: doorwayRight,
-                        z2: otherBottom,
-                        direction: 'south',
-                        room: otherCorridor,
-                        corridor: corridor
-                    });
-                }
-                
-                // East
-                if (corridorLeft <= otherRight && corridorLeft >= otherRight - 1 &&
-                    corridorBottom > otherTop && corridorTop < otherBottom) {
-                    const doorwayTop = Math.max(corridorTop, otherTop);
-                    const doorwayBottom = Math.min(corridorBottom, otherBottom);
-                    
-                    this.doorways.push({
-                        x1: otherRight,
-                        z1: doorwayTop,
-                        x2: otherRight,
-                        z2: doorwayBottom,
-                        direction: 'east',
-                        room: otherCorridor,
-                        corridor: corridor
-                    });
-                }
-                
-                // West
-                if (corridorRight >= otherLeft && corridorRight <= otherLeft + 1 &&
-                    corridorBottom > otherTop && corridorTop < otherBottom) {
-                    const doorwayTop = Math.max(corridorTop, otherTop);
-                    const doorwayBottom = Math.min(corridorBottom, otherBottom);
-                    
-                    this.doorways.push({
-                        x1: otherLeft,
-                        z1: doorwayTop,
-                        x2: otherLeft,
-                        z2: doorwayBottom,
-                        direction: 'west',
-                        room: otherCorridor,
-                        corridor: corridor
-                    });
-                }
-            }
-        }
-    }
-    
-    // Build doorways
-    buildDoorways() {
-        // Create visual doorframe arches for each doorway
-        const doorwayMaterial = new THREE.MeshLambertMaterial({
-            color: this.theme.wallColor || 0x333333,
-            map: this.theme.wallTexture
+        // Build all walls
+        const { meshes, colliders } = this.wallBuilder.buildWalls();
+        
+        // Add wall meshes to the dungeon object
+        meshes.forEach(mesh => {
+            this.object.add(mesh);
+            this.meshes.push(mesh);
         });
         
-        for (const doorway of this.doorways) {
-            const wallHeight = 3;
-            const doorwayHeight = 2.5; // Slightly lower than wall height
-            const thickness = 0.3; // Thickness of doorway arch
-            
-            // Position and dimensions depend on doorway direction
-            if (doorway.direction === 'north' || doorway.direction === 'south') {
-                // Horizontal doorway (north-south)
-                const doorwayWidth = doorway.x2 - doorway.x1;
-                const doorwayCenter = (doorway.x1 + doorway.x2) / 2;
-                const zPos = doorway.z1;
-                
-                // Create top arch of doorway
-                const archGeometry = new THREE.BoxGeometry(doorwayWidth, wallHeight - doorwayHeight, thickness);
-                const arch = new THREE.Mesh(archGeometry, doorwayMaterial);
-                
-                arch.position.set(
-                    doorwayCenter,
-                    doorwayHeight + (wallHeight - doorwayHeight) / 2, // Top of doorway
-                    zPos
-                );
-                
-                arch.castShadow = true;
-                arch.receiveShadow = true;
-                
-                this.object.add(arch);
-                this.meshes.push(arch);
-                
-                // Add collider for the arch
-                this.colliders.push({
-                    min: new THREE.Vector3(
-                        doorwayCenter - doorwayWidth / 2,
-                        doorwayHeight,
-                        zPos - thickness / 2
-                    ),
-                    max: new THREE.Vector3(
-                        doorwayCenter + doorwayWidth / 2,
-                        wallHeight,
-                        zPos + thickness / 2
-                    )
-                });
-                
-                // Create side posts (optional - only for wider doorways)
-                if (doorwayWidth > 3) {
-                    // Left post
-                    const leftPostGeometry = new THREE.BoxGeometry(thickness, doorwayHeight, thickness);
-                    const leftPost = new THREE.Mesh(leftPostGeometry, doorwayMaterial);
-                    leftPost.position.set(
-                        doorway.x1 + thickness / 2,
-                        doorwayHeight / 2,
-                        zPos
-                    );
-                    leftPost.castShadow = true;
-                    leftPost.receiveShadow = true;
-                    this.object.add(leftPost);
-                    this.meshes.push(leftPost);
-                    
-                    // Right post
-                    const rightPostGeometry = new THREE.BoxGeometry(thickness, doorwayHeight, thickness);
-                    const rightPost = new THREE.Mesh(rightPostGeometry, doorwayMaterial);
-                    rightPost.position.set(
-                        doorway.x2 - thickness / 2,
-                        doorwayHeight / 2,
-                        zPos
-                    );
-                    rightPost.castShadow = true;
-                    rightPost.receiveShadow = true;
-                    this.object.add(rightPost);
-                    this.meshes.push(rightPost);
-                    
-                    // Add colliders for posts
-                    this.colliders.push({
-                        min: new THREE.Vector3(
-                            doorway.x1,
-                            0,
-                            zPos - thickness / 2
-                        ),
-                        max: new THREE.Vector3(
-                            doorway.x1 + thickness,
-                            doorwayHeight,
-                            zPos + thickness / 2
-                        )
-                    });
-                    
-                    this.colliders.push({
-                        min: new THREE.Vector3(
-                            doorway.x2 - thickness,
-                            0,
-                            zPos - thickness / 2
-                        ),
-                        max: new THREE.Vector3(
-                            doorway.x2,
-                            doorwayHeight,
-                            zPos + thickness / 2
-                        )
-                    });
-                }
-            } else {
-                // Vertical doorway (east-west)
-                const doorwayHeight = doorway.z2 - doorway.z1;
-                const doorwayCenter = (doorway.z1 + doorway.z2) / 2;
-                const xPos = doorway.x1;
-                
-                // Create top arch of doorway
-                const archGeometry = new THREE.BoxGeometry(thickness, wallHeight - doorwayHeight, doorwayHeight);
-                const arch = new THREE.Mesh(archGeometry, doorwayMaterial);
-                
-                arch.position.set(
-                    xPos,
-                    doorwayHeight + (wallHeight - doorwayHeight) / 2, // Top of doorway
-                    doorwayCenter
-                );
-                
-                arch.castShadow = true;
-                arch.receiveShadow = true;
-                
-                this.object.add(arch);
-                this.meshes.push(arch);
-                
-                // Add collider for the arch
-                this.colliders.push({
-                    min: new THREE.Vector3(
-                        xPos - thickness / 2,
-                        doorwayHeight,
-                        doorwayCenter - doorwayHeight / 2
-                    ),
-                    max: new THREE.Vector3(
-                        xPos + thickness / 2,
-                        wallHeight,
-                        doorwayCenter + doorwayHeight / 2
-                    )
-                });
-                
-                // Create side posts (optional - only for taller doorways)
-                if (doorwayHeight > 3) {
-                    // Top post
-                    const topPostGeometry = new THREE.BoxGeometry(thickness, doorwayHeight, thickness);
-                    const topPost = new THREE.Mesh(topPostGeometry, doorwayMaterial);
-                    topPost.position.set(
-                        xPos,
-                        doorwayHeight / 2,
-                        doorway.z1 + thickness / 2
-                    );
-                    topPost.castShadow = true;
-                    topPost.receiveShadow = true;
-                    this.object.add(topPost);
-                    this.meshes.push(topPost);
-                    
-                    // Bottom post
-                    const bottomPostGeometry = new THREE.BoxGeometry(thickness, doorwayHeight, thickness);
-                    const bottomPost = new THREE.Mesh(bottomPostGeometry, doorwayMaterial);
-                    bottomPost.position.set(
-                        xPos,
-                        doorwayHeight / 2,
-                        doorway.z2 - thickness / 2
-                    );
-                    bottomPost.castShadow = true;
-                    bottomPost.receiveShadow = true;
-                    this.object.add(bottomPost);
-                    this.meshes.push(bottomPost);
-                    
-                    // Add colliders for posts
-                    this.colliders.push({
-                        min: new THREE.Vector3(
-                            xPos - thickness / 2,
-                            0,
-                            doorway.z1
-                        ),
-                        max: new THREE.Vector3(
-                            xPos + thickness / 2,
-                            doorwayHeight,
-                            doorway.z1 + thickness
-                        )
-                    });
-                    
-                    this.colliders.push({
-                        min: new THREE.Vector3(
-                            xPos - thickness / 2,
-                            0,
-                            doorway.z2 - thickness
-                        ),
-                        max: new THREE.Vector3(
-                            xPos + thickness / 2,
-                            doorwayHeight,
-                            doorway.z2
-                        )
-                    });
-                }
-            }
-        }
+        // Add wall colliders to dungeon colliders
+        this.colliders.push(...colliders);
     }
     
-    // Check if a point is part of a doorway
-    isPartOfDoorway(x, z, direction, roomType) {
-        // Margin for doorway detection
-        const margin = 0.5;
+    // Check if there's a passage in a given direction from a room
+    hasPassageAt(room, direction) {
+        // Expand room slightly to ensure we find connecting corridors
+        const buffer = 1;
         
-        // Check each doorway
-        for (const doorway of this.doorways) {
-            // Only check doorways in the correct direction and with matching room type
-            if (doorway.direction !== direction) continue;
+        // Check if any corridor or room overlaps with the edge
+        for (const corridor of this.corridors) {
+            // Skip the room itself
+            if (corridor === room) continue;
             
-            // For horizontal doorways (north/south)
-            if (direction === 'north' || direction === 'south') {
-                // Check if point is within the doorway's horizontal span (with small margin)
-                if (x >= doorway.x1 - margin && x <= doorway.x2 + margin && 
-                    Math.abs(z - doorway.z1) < margin) {
-                    return true;
-                }
+            // Check if corridor connects to the room's edge
+            switch (direction) {
+                case 'north':
+                    if (corridor.z <= room.z && 
+                        corridor.z + corridor.height >= room.z &&
+                        corridor.x < room.x + room.width + buffer &&
+                        corridor.x + corridor.width > room.x - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'south':
+                    if (corridor.z <= room.z + room.height && 
+                        corridor.z + corridor.height >= room.z + room.height &&
+                        corridor.x < room.x + room.width + buffer &&
+                        corridor.x + corridor.width > room.x - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'east':
+                    if (corridor.x <= room.x + room.width && 
+                        corridor.x + corridor.width >= room.x + room.width &&
+                        corridor.z < room.z + room.height + buffer &&
+                        corridor.z + corridor.height > room.z - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'west':
+                    if (corridor.x <= room.x && 
+                        corridor.x + corridor.width >= room.x &&
+                        corridor.z < room.z + room.height + buffer &&
+                        corridor.z + corridor.height > room.z - buffer) {
+                        return true;
+                    }
+                    break;
             }
-            // For vertical doorways (east/west)
-            else if (direction === 'east' || direction === 'west') {
-                // Check if point is within the doorway's vertical span (with small margin)
-                if (Math.abs(x - doorway.x1) < margin && 
-                    z >= doorway.z1 - margin && z <= doorway.z2 + margin) {
-                    return true;
-                }
+        }
+        
+        // Check for adjacent rooms too
+        for (const otherRoom of this.rooms) {
+            // Skip the room itself
+            if (otherRoom === room) continue;
+            
+            // Check if room connects to the room's edge
+            switch (direction) {
+                case 'north':
+                    if (otherRoom.z + otherRoom.height >= room.z - buffer && 
+                        otherRoom.z <= room.z &&
+                        otherRoom.x < room.x + room.width + buffer &&
+                        otherRoom.x + otherRoom.width > room.x - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'south':
+                    if (otherRoom.z <= room.z + room.height + buffer && 
+                        otherRoom.z + otherRoom.height >= room.z + room.height &&
+                        otherRoom.x < room.x + room.width + buffer &&
+                        otherRoom.x + otherRoom.width > room.x - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'east':
+                    if (otherRoom.x <= room.x + room.width + buffer && 
+                        otherRoom.x + otherRoom.width >= room.x + room.width &&
+                        otherRoom.z < room.z + room.height + buffer &&
+                        otherRoom.z + otherRoom.height > room.z - buffer) {
+                        return true;
+                    }
+                    break;
+                case 'west':
+                    if (otherRoom.x + otherRoom.width >= room.x - buffer && 
+                        otherRoom.x <= room.x &&
+                        otherRoom.z < room.z + room.height + buffer &&
+                        otherRoom.z + otherRoom.height > room.z - buffer) {
+                        return true;
+                    }
+                    break;
             }
         }
         
         return false;
     }
     
-    // Build wall meshes with continuous walls and doorways
-    buildWalls() {
-        // Wall standard properties
-        const wallHeight = 3; // Standard wall height
-        const wallColor = this.theme.wallColor || 0x333333;
-        const wallMaterial = new THREE.MeshLambertMaterial({ 
-            color: wallColor,
-            map: this.theme.wallTexture 
+    // Find rooms connected to a corridor
+    findConnectedRooms(corridor) {
+        const connectedRooms = [];
+        
+        for (const room of this.rooms) {
+            // Check if room overlaps with corridor
+            const overlapX = Math.max(0, Math.min(room.x + room.width, corridor.x + corridor.width) - Math.max(room.x, corridor.x));
+            const overlapZ = Math.max(0, Math.min(room.z + room.height, corridor.z + corridor.height) - Math.max(room.z, corridor.z));
+            
+            if (overlapX > 0 && overlapZ > 0) {
+                connectedRooms.push(room);
+            }
+        }
+        
+        return connectedRooms;
+    }
+    
+    // Build decorations
+    buildDecorations() {
+        // Create decoration meshes based on type
+        this.decorations.forEach(decoration => {
+            let mesh;
+            
+            switch (decoration.type) {
+                case 'torch':
+                    mesh = this.createTorchMesh();
+                    break;
+                case 'barrel':
+                    mesh = this.createBarrelMesh();
+                    break;
+                case 'crate':
+                    mesh = this.createCrateMesh();
+                    break;
+                case 'rock':
+                default:
+                    mesh = this.createRockMesh();
+                    break;
+            }
+            
+            if (mesh) {
+                mesh.position.set(decoration.x, decoration.y, decoration.z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // Add some random rotation for variety
+                mesh.rotation.y = Math.random() * Math.PI * 2;
+                
+                this.object.add(mesh);
+                this.meshes.push(mesh);
+            }
         });
-        const wallThickness = 0.5;
+    }
+    
+    // Create a torch mesh
+    createTorchMesh() {
+        const torchGroup = new THREE.Group();
         
-        // Function to build a wall segment
-        const buildWallSegment = (x, y, z, width, height, depth) => {
-            const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-            
-            wall.position.set(x, y, z);
-            wall.castShadow = true;
-            wall.receiveShadow = true;
-            
-            this.object.add(wall);
-            this.meshes.push(wall);
-            
-            // Add collider for the wall
-            this.colliders.push({
-                min: new THREE.Vector3(
-                    x - width / 2,
-                    y - height / 2,
-                    z - depth / 2
-                ),
-                max: new THREE.Vector3(
-                    x + width / 2,
-                    y + height / 2,
-                    z + depth / 2
-                )
+        // Torch handle
+        const handleGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+        const handleMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.y = 0.5;
+        
+        // Torch head
+        const headGeometry = new THREE.CylinderGeometry(0.15, 0.2, 0.3, 8);
+        const headMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 1.15;
+        
+        // Flame (just a simple cone for now)
+        const flameGeometry = new THREE.ConeGeometry(0.15, 0.4, 8);
+        const flameMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+        const flame = new THREE.Mesh(flameGeometry, flameMaterial);
+        flame.position.y = 1.5;
+        
+        // Add light source
+        const light = new THREE.PointLight(0xff6600, 1, 10);
+        light.position.y = 1.5;
+        
+        torchGroup.add(handle, head, flame, light);
+        return torchGroup;
+    }
+    
+    // Create a barrel mesh
+    createBarrelMesh() {
+        const barrelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.8, 12);
+        const barrelMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+        barrel.position.y = 0.4;
+        
+        return barrel;
+    }
+    
+    // Create a crate mesh
+    createCrateMesh() {
+        const crateGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        const crateMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+        const crate = new THREE.Mesh(crateGeometry, crateMaterial);
+        crate.position.y = 0.4;
+        
+        return crate;
+    }
+    
+    // Create a rock mesh
+    createRockMesh() {
+        // Use an octahedron as a simple rock shape
+        const rockGeometry = new THREE.OctahedronGeometry(0.5, 1);
+        const rockMaterial = new THREE.MeshLambertMaterial({ color: 0x777777 });
+        const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+        
+        // Scale randomly for variety
+        const scale = 0.5 + Math.random() * 0.5;
+        rock.scale.set(scale, scale * 0.7, scale);
+        
+        // Position rock so it sits on floor
+        rock.position.y = scale * 0.35;
+        
+        return rock;
+    }
+    
+    // Build key and exit meshes
+    buildKeyAndExit() {
+        // Create key mesh
+        if (this.keyPosition) {
+            const keyGeometry = new THREE.TorusGeometry(0.3, 0.1, 8, 16);
+            const keyMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0xffcc00,
+                emissive: 0xff8800,
+                emissiveIntensity: 0.5
             });
-        };
+            
+            this.keyMesh = new THREE.Mesh(keyGeometry, keyMaterial);
+            this.keyMesh.position.set(
+                this.keyPosition.x,
+                this.keyPosition.y,
+                this.keyPosition.z
+            );
+            
+            // Add a light to the key to make it stand out
+            const keyLight = new THREE.PointLight(0xffcc00, 0.7, 5);
+            keyLight.position.set(0, 0, 0);
+            this.keyMesh.add(keyLight);
+            
+            // Add animation for the key
+            this.keyMesh.userData.animation = {
+                rotationSpeed: 0.01,
+                floatSpeed: 0.5,
+                floatHeight: 0.5,
+                originalY: this.keyPosition.y
+            };
+            
+            this.object.add(this.keyMesh);
+            this.meshes.push(this.keyMesh);
+        }
         
-        // Create walls for each room and corridor
-        for (const space of [...this.rooms, ...this.corridors]) {
-            // Calculate wall positions - y is always half of wall height
-            const floorHeight = space.floorHeight || 0;
-            const wallY = floorHeight + wallHeight / 2;
+        // Create exit mesh
+        if (this.exitPosition) {
+            // Create exit portal
+            const portalGeometry = new THREE.CircleGeometry(1.5, 32);
+            const portalMaterial = new THREE.MeshBasicMaterial({ 
+                color: this.keyCollected ? 0x00ff00 : 0xff0000,
+                side: THREE.DoubleSide
+            });
             
-            // Define wall segments based on doorways
-            // For each edge of the room, check if we need doorways
+            this.exitMesh = new THREE.Mesh(portalGeometry, portalMaterial);
+            this.exitMesh.position.set(
+                this.exitPosition.x,
+                this.exitPosition.y + 1.5,
+                this.exitPosition.z
+            );
             
-            // North Wall (top edge)
-            const northDoorways = this.doorways.filter(d => 
-                d.direction === 'north' && d.room === space);
+            // Rotate portal to be vertical
+            this.exitMesh.rotation.y = Math.PI / 2;
             
-            if (northDoorways.length === 0) {
-                // No doorways, build continuous wall
-                buildWallSegment(
-                    space.x + space.width / 2, // Center of wall
-                    wallY, 
-                    space.z - wallThickness / 2, // Align with north edge of room
-                    space.width + wallThickness, // Extend slightly beyond room
-                    wallHeight,
-                    wallThickness
-                );
-            } else {
-                // Build wall segments between doorways
-                let segments = this.getWallSegmentsBetweenDoorways(
-                    space.x, space.x + space.width, northDoorways, 'horizontal');
-                
-                for (const segment of segments) {
-                    const segmentWidth = segment[1] - segment[0];
-                    if (segmentWidth > 0.1) { // Minimum wall width
-                        buildWallSegment(
-                            segment[0] + segmentWidth / 2,
-                            wallY,
-                            space.z - wallThickness / 2,
-                            segmentWidth + wallThickness,
-                            wallHeight,
-                            wallThickness
-                        );
-                    }
-                }
-            }
+            // Add a light to the exit to make it stand out
+            const exitLight = new THREE.PointLight(
+                this.keyCollected ? 0x00ff00 : 0xff0000,
+                1,
+                8
+            );
+            exitLight.position.set(0, 0, 0);
+            this.exitMesh.add(exitLight);
             
-            // South Wall (bottom edge)
-            const southDoorways = this.doorways.filter(d => 
-                d.direction === 'south' && d.room === space);
-            
-            if (southDoorways.length === 0) {
-                // No doorways, build continuous wall
-                buildWallSegment(
-                    space.x + space.width / 2,
-                    wallY,
-                    space.z + space.height + wallThickness / 2,
-                    space.width + wallThickness,
-                    wallHeight,
-                    wallThickness
-                );
-            } else {
-                // Build wall segments between doorways
-                let segments = this.getWallSegmentsBetweenDoorways(
-                    space.x, space.x + space.width, southDoorways, 'horizontal');
-                
-                for (const segment of segments) {
-                    const segmentWidth = segment[1] - segment[0];
-                    if (segmentWidth > 0.1) {
-                        buildWallSegment(
-                            segment[0] + segmentWidth / 2,
-                            wallY,
-                            space.z + space.height + wallThickness / 2,
-                            segmentWidth + wallThickness,
-                            wallHeight,
-                            wallThickness
-                        );
-                    }
-                }
-            }
-            
-            // East Wall (right edge)
-            const eastDoorways = this.doorways.filter(d => 
-                d.direction === 'east' && d.room === space);
-            
-            if (eastDoorways.length === 0) {
-                // No doorways, build continuous wall
-                buildWallSegment(
-                    space.x + space.width + wallThickness / 2,
-                    wallY,
-                    space.z + space.height / 2,
-                    wallThickness,
-                    wallHeight,
-                    space.height + wallThickness
-                );
-            } else {
-                // Build wall segments between doorways
-                let segments = this.getWallSegmentsBetweenDoorways(
-                    space.z, space.z + space.height, eastDoorways, 'vertical');
-                
-                for (const segment of segments) {
-                    const segmentHeight = segment[1] - segment[0];
-                    if (segmentHeight > 0.1) {
-                        buildWallSegment(
-                            space.x + space.width + wallThickness / 2,
-                            wallY,
-                            segment[0] + segmentHeight / 2,
-                            wallThickness,
-                            wallHeight,
-                            segmentHeight + wallThickness
-                        );
-                    }
-                }
-            }
-            
-            // West Wall (left edge)
-            const westDoorways = this.doorways.filter(d => 
-                d.direction === 'west' && d.room === space);
-            
-            if (westDoorways.length === 0) {
-                // No doorways, build continuous wall
-                buildWallSegment(
-                    space.x - wallThickness / 2,
-                    wallY,
-                    space.z + space.height / 2,
-                    wallThickness,
-                    wallHeight,
-                    space.height + wallThickness
-                );
-            } else {
-                // Build wall segments between doorways
-                let segments = this.getWallSegmentsBetweenDoorways(
-                    space.z, space.z + space.height, westDoorways, 'vertical');
-                
-                for (const segment of segments) {
-                    const segmentHeight = segment[1] - segment[0];
-                    if (segmentHeight > 0.1) {
-                        buildWallSegment(
-                            space.x - wallThickness / 2,
-                            wallY,
-                            segment[0] + segmentHeight / 2,
-                            wallThickness,
-                            wallHeight,
-                            segmentHeight + wallThickness
-                        );
-                    }
-                }
-            }
-            
-            // Build wall corners to fully enclose the space
-            this.buildCornerPillars(space, wallY, wallHeight, wallThickness, wallMaterial);
+            this.object.add(this.exitMesh);
+            this.meshes.push(this.exitMesh);
         }
     }
     
-    // Build corner pillars to ensure full enclosure
-    buildCornerPillars(space, wallY, wallHeight, thickness, material) {
-        // Create pillars at each corner to ensure walls connect properly
-        // This creates a more polished look and fills in any gaps
-        
-        const cornerPositions = [
-            // NW corner
-            { x: space.x - thickness/2, z: space.z - thickness/2 },
-            // NE corner
-            { x: space.x + space.width + thickness/2, z: space.z - thickness/2 },
-            // SW corner
-            { x: space.x - thickness/2, z: space.z + space.height + thickness/2 },
-            // SE corner
-            { x: space.x + space.width + thickness/2, z: space.z + space.height + thickness/2 }
-        ];
-        
-        // Check each corner to see if it needs a pillar
-        for (const corner of cornerPositions) {
-            // Only add corner pillars if this corner isn't part of a doorway
-            const isNearDoorway = this.doorways.some(d => {
-                const margin = thickness * 1.5;
-                
-                // For horizontal doorways (north/south)
-                if (d.direction === 'north' || d.direction === 'south') {
-                    return (corner.x >= d.x1 - margin && corner.x <= d.x2 + margin &&
-                            Math.abs(corner.z - d.z1) < margin);
-                } 
-                // For vertical doorways (east/west)
-                else if (d.direction === 'east' || d.direction === 'west') {
-                    return (Math.abs(corner.x - d.x1) < margin &&
-                            corner.z >= d.z1 - margin && corner.z <= d.z2 + margin);
-                }
-                return false;
-            });
+    // Update dungeon state
+    update(deltaTime) {
+        // Animate key if it exists and hasn't been collected
+        if (this.keyMesh && !this.keyCollected) {
+            const anim = this.keyMesh.userData.animation;
             
-            if (!isNearDoorway) {
-                // Add a corner pillar
-                const pillarGeometry = new THREE.BoxGeometry(thickness, wallHeight, thickness);
-                const pillar = new THREE.Mesh(pillarGeometry, material);
-                pillar.position.set(corner.x, wallY, corner.z);
-                pillar.castShadow = true;
-                pillar.receiveShadow = true;
-                
-                this.object.add(pillar);
-                this.meshes.push(pillar);
-                
-                // Add collider for the pillar
-                this.colliders.push({
-                    min: new THREE.Vector3(
-                        corner.x - thickness/2,
-                        wallY - wallHeight/2,
-                        corner.z - thickness/2
-                    ),
-                    max: new THREE.Vector3(
-                        corner.x + thickness/2,
-                        wallY + wallHeight/2,
-                        corner.z + thickness/2
-                    )
-                });
+            // Rotate the key
+            this.keyMesh.rotation.y += anim.rotationSpeed;
+            
+            // Make the key float up and down
+            const floatOffset = Math.sin(Date.now() * 0.001 * anim.floatSpeed) * 0.2;
+            this.keyMesh.position.y = anim.originalY + floatOffset;
+        }
+        
+        // Update exit portal if key is collected
+        if (this.exitMesh && this.keyCollected && this.exitMesh.material.color.getHex() !== 0x00ff00) {
+            // Change portal color to green when key is collected
+            this.exitMesh.material.color.setHex(0x00ff00);
+            
+            // Update exit light color
+            if (this.exitMesh.children.length > 0 && this.exitMesh.children[0].isLight) {
+                this.exitMesh.children[0].color.setHex(0x00ff00);
             }
+        }
+        
+        // Update chests
+        for (const chest of this.chests) {
+            chest.update(deltaTime);
         }
     }
     
-    // Helper to calculate wall segments between doorways
-    getWallSegmentsBetweenDoorways(start, end, doorways, orientation) {
-        // Sort doorways by position
-        let sortedDoorways;
-        if (orientation === 'horizontal') {
-            sortedDoorways = doorways.sort((a, b) => a.x1 - b.x1);
-        } else {
-            sortedDoorways = doorways.sort((a, b) => a.z1 - b.z1);
-        }
-        
-        // Create segments
-        let segments = [];
-        let currentPos = start;
-        
-        // Add segment before first doorway
-        if (sortedDoorways.length > 0) {
-            const firstDoorway = sortedDoorways[0];
-            const firstDoorStart = orientation === 'horizontal' ? firstDoorway.x1 : firstDoorway.z1;
-            
-            if (firstDoorStart > start + 0.1) {
-                segments.push([start, firstDoorStart]);
+    // Get the main Three.js object for the dungeon
+    getObject() {
+        return this.object;
+    }
+    
+    // Clean up resources when dungeon is no longer needed
+    dispose() {
+        // Dispose of geometries and materials
+        this.meshes.forEach(mesh => {
+            if (mesh.geometry) {
+                mesh.geometry.dispose();
             }
             
-            // Add segments between doorways
-            for (let i = 0; i < sortedDoorways.length; i++) {
-                const currentDoorway = sortedDoorways[i];
-                const currentDoorEnd = orientation === 'horizontal' ? currentDoorway.x2 : currentDoorway.z2;
-                
-                // Update current position
-                currentPos = currentDoorEnd;
-                
-                // Add segment to next doorway or end
-                if (i < sortedDoorways.length - 1) {
-                    const nextDoorway = sortedDoorways[i + 1];
-                    const nextDoorStart = orientation === 'horizontal' ? nextDoorway.x1 : nextDoorway.z1;
-                    
-                    if (nextDoorStart > currentPos + 0.1) {
-                        segments.push([currentPos, nextDoorStart]);
-                    }
-                }
-                
-                // Add segment after last doorway
-                if (i === sortedDoorways.length - 1) {
-                    if (end > currentPos + 0.1) {
-                        segments.push([currentPos, end]);
-                    }
+            if (mesh.material) {
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach(material => material.dispose());
+                } else {
+                    mesh.material.dispose();
                 }
             }
+        });
+        
+        // Clear arrays
+        this.meshes = [];
+        this.colliders = [];
+    }
+}
