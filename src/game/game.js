@@ -1,4 +1,4 @@
-// src/game/game.js - Visual debugging version
+// src/game/game.js - Main game class with fixed enemy-player interaction
 import * as THREE from 'three';
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
@@ -9,7 +9,7 @@ import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
 import { toggleMenu } from './pauseMenu.js';
 
-// Minimal enemy imports
+// Enemy-related imports
 import { enemyRegistry } from '../entities/enemies/enemyRegistry.js';
 import { enemySpawner } from '../entities/enemies/enemySpawner.js';
 import { projectileSystem } from '../entities/enemies/projectileSystem.js';
@@ -34,7 +34,6 @@ export class Game {
         this.player = null;
         this.currentDungeon = null;
         this.entities = [];
-        this.debugObjects = []; // Store debug objects
         
         // Physics system
         this.physics = null;
@@ -50,14 +49,14 @@ export class Game {
         // Menu visibility tracking
         this.isMenuVisible = false;
         
-        // Enemy systems
+        // Added reference to enemy systems
         this.enemySpawner = enemySpawner;
         this.projectileSystem = projectileSystem;
     }
     
     // Initialize the game
     init() {
-        window.alert("Game initializing. We'll test enemy spawning with simple colored boxes");
+        console.log('Initializing game...');
         
         // Get references to Three.js objects
         const { scene, camera, renderer } = getRenderer();
@@ -74,6 +73,16 @@ export class Game {
         // Create player
         this.player = new Player();
         this.player.init();
+        
+        // Add missing player function that enemies are trying to use
+        // This is our fix for the "PlayerIsAttacking" error
+        if (!this.player.isAttacking) {
+            this.player.isAttacking = function() {
+                // Return false by default or check actual attack state if available
+                return this.attackTimer > 0 || false;
+            };
+        }
+        
         addToScene(this.player.getObject());
         
         // Initialize projectile system for enemies
@@ -93,20 +102,19 @@ export class Game {
         
         // Set game state to playing
         this.state = GameState.PLAYING;
+        
+        console.log('Game initialized!');
     }
 
     // Generate a new dungeon floor
     generateNewFloor(floorNumber) {
-        window.alert(`Generating floor ${floorNumber}. Will attempt to spawn test objects.`);
+        console.log(`Generating floor ${floorNumber}...`);
         
         // Remove old dungeon if it exists
         if (this.currentDungeon) {
             this.currentDungeon.dispose();
             removeFromScene(this.currentDungeon.getObject());
         }
-        
-        // Clear previous debug objects
-        this.clearDebugObjects();
         
         // Clean up projectiles
         this.projectileSystem.clear();
@@ -130,133 +138,66 @@ export class Game {
         const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
         this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
         
-        // Add visual debug objects instead of enemies
-        this.spawnDebugObjects();
+        // Initialize enemy spawner with current floor
+        this.enemySpawner.init(floorNumber);
         
-        // Try spawning a sphere enemy too
-        this.attemptToSpawnSphere();
+        // Add a wrapper with error handling for the enemy spawning
+        try {
+            // First just try to spawn sphere enemies initially
+            this.spawnOnlySpheres();
+            
+            /* Once spheres work, we can try the full spawner:
+            this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
+            */
+        } catch (error) {
+            console.error('Error during enemy spawning:', error);
+        }
         
         // Update UI
         document.getElementById('floor-number').textContent = floorNumber;
         
         // Show floor transition message
         window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
+        
+        console.log(`Floor ${floorNumber} generated`);
     }
     
-    // Clear all debug objects
-    clearDebugObjects() {
-        for (const obj of this.debugObjects) {
-            if (obj && obj.parent) {
-                obj.parent.remove(obj);
-            }
-        }
-        this.debugObjects = [];
-    }
-    
-    // Spawn simple colored boxes for debugging
-    spawnDebugObjects() {
-        try {
-            // Get rooms
-            const rooms = this.currentDungeon.getRooms();
+    // Custom function to spawn only sphere enemies for safety
+    spawnOnlySpheres() {
+        // Get all rooms except the spawn room
+        const rooms = this.currentDungeon.getRooms();
+        if (!rooms || rooms.length === 0) return;
+        
+        // Find non-spawn rooms
+        const nonSpawnRooms = rooms.filter(room => !room.isSpawnRoom);
+        if (nonSpawnRooms.length === 0) return;
+        
+        // Spawn 2 spheres in random rooms
+        for (let i = 0; i < Math.min(2, nonSpawnRooms.length); i++) {
+            const room = nonSpawnRooms[i];
             
-            // Check if rooms exist
-            if (!rooms || rooms.length === 0) {
-                window.alert("ERROR: No rooms found in dungeon!");
-                return;
-            }
+            // Calculate spawn position in room
+            const x = room.x + room.width / 2;
+            const y = room.floorHeight + 1;
+            const z = room.z + room.height / 2;
             
-            // Go through each room and place a debug box
-            for (let i = 0; i < Math.min(3, rooms.length); i++) {
-                const room = rooms[i];
-                
-                // Create a colored box
-                const colors = [0xff0000, 0x00ff00, 0x0000ff];
-                this.createDebugBox(
-                    room.x + room.width / 2,  // Center X
-                    room.floorHeight + 1.5,    // Y above floor
-                    room.z + room.height / 2,  // Center Z
-                    colors[i % colors.length]
-                );
-            }
-            
-            window.alert(`Created ${Math.min(3, rooms.length)} debug boxes in rooms`);
-        } catch (error) {
-            window.alert(`Error creating debug boxes: ${error.message}`);
-        }
-    }
-    
-    // Create a simple colored box at the given position
-    createDebugBox(x, y, z, color) {
-        try {
-            // Create a box geometry
-            const geometry = new THREE.BoxGeometry(1, 1, 1);
-            const material = new THREE.MeshBasicMaterial({ color: color });
-            const box = new THREE.Mesh(geometry, material);
-            
-            // Position it
-            box.position.set(x, y, z);
-            
-            // Add it to the scene
-            this.scene.add(box);
-            
-            // Store it for cleanup later
-            this.debugObjects.push(box);
-            
-            return box;
-        } catch (error) {
-            window.alert(`Error creating debug box: ${error.message}`);
-            return null;
-        }
-    }
-    
-    // Attempt to spawn a sphere enemy directly
-    attemptToSpawnSphere() {
-        try {
-            window.alert("Attempting to spawn a sphere enemy...");
-            
-            // Get a room
-            const rooms = this.currentDungeon.getRooms();
-            if (!rooms || rooms.length === 0) return;
-            
-            // Get a non-spawn room
-            const targetRoom = rooms.find(room => !room.isSpawnRoom) || rooms[0];
-            
-            // Calculate spawn position
-            const x = targetRoom.x + targetRoom.width / 2;
-            const y = targetRoom.floorHeight + 1;
-            const z = targetRoom.z + targetRoom.height / 2;
-            
-            // Create a direct reference to the Sphere class to bypass registry
+            // Create and spawn a sphere enemy
             try {
-                // Try to directly import Sphere
-                import('../entities/enemies/variants/Sphere.js')
-                    .then(module => {
-                        const Sphere = module.Sphere;
-                        if (Sphere) {
-                            // Create sphere directly
-                            const sphereEnemy = Sphere.create(x, y, z);
-                            if (sphereEnemy) {
-                                // Add to scene
-                                this.scene.add(sphereEnemy.getObject());
-                                // Add to enemies list
-                                this.enemySpawner.enemies.push(sphereEnemy);
-                                window.alert("Sphere enemy created successfully!");
-                            } else {
-                                window.alert("Failed to create sphere enemy");
-                            }
-                        } else {
-                            window.alert("Sphere class not found in module");
-                        }
-                    })
-                    .catch(error => {
-                        window.alert(`Error importing Sphere: ${error.message}`);
-                    });
+                const sphereEnemy = enemyRegistry.createEnemy('sphere', x, y, z);
+                if (sphereEnemy) {
+                    // Apply AI to enemy
+                    const { applyAIController } = require('../entities/enemies/enemyAI.js');
+                    applyAIController(sphereEnemy);
+                    
+                    // Add to scene
+                    this.scene.add(sphereEnemy.getObject());
+                    
+                    // Add to enemies list
+                    this.enemySpawner.enemies.push(sphereEnemy);
+                }
             } catch (error) {
-                window.alert(`Error with dynamic import: ${error.message}`);
+                console.error('Error spawning sphere:', error);
             }
-            
-        } catch (error) {
-            window.alert(`Error attempting to spawn sphere: ${error.message}`);
         }
     }
     
@@ -290,15 +231,18 @@ export class Game {
             this.currentDungeon.update(cappedDeltaTime);
         }
         
-        // Update enemies
-        this.enemySpawner.update(cappedDeltaTime, this.player, this.currentDungeon);
+        // Update enemies with error handling
+        try {
+            this.enemySpawner.update(cappedDeltaTime, this.player, this.currentDungeon);
+        } catch (error) {
+            console.error('Error updating enemies:', error);
+        }
         
-        // Animate debug objects (rotate them to make them visible)
-        for (const box of this.debugObjects) {
-            if (box) {
-                box.rotation.x += cappedDeltaTime;
-                box.rotation.y += cappedDeltaTime * 0.5;
-            }
+        // Update enemy projectiles with error handling
+        try {
+            this.projectileSystem.update(cappedDeltaTime, this.player);
+        } catch (error) {
+            console.error('Error updating projectiles:', error);
         }
         
         // Update camera to follow player
@@ -307,23 +251,35 @@ export class Game {
         // Update physics
         this.physics.update(cappedDeltaTime);
         
-        // Update all entities
-        this.entities = [...this.enemySpawner.getEnemies()];
-        for (const entity of this.entities) {
-            if (entity && typeof entity.update === 'function') {
-                try {
-                    entity.update(cappedDeltaTime, this.player, this.currentDungeon);
-                } catch (error) {
-                    // Silently handle errors during updates
+        // Update all entities with error handling
+        try {
+            this.entities = [...this.enemySpawner.getEnemies()];
+            for (const entity of this.entities) {
+                if (entity && typeof entity.update === 'function') {
+                    try {
+                        entity.update(cappedDeltaTime, this.player, this.currentDungeon);
+                    } catch (error) {
+                        console.error('Error updating entity:', error);
+                    }
                 }
             }
+        } catch (error) {
+            console.error('Error handling entities:', error);
         }
         
-        // Check for collisions
-        this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
+        // Check for collisions with error handling
+        try {
+            this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
+        } catch (error) {
+            console.error('Error checking collisions:', error);
+        }
         
         // Check for projectile collisions with enemies
-        this.player.checkProjectileCollisions(this.entities);
+        try {
+            this.player.checkProjectileCollisions(this.entities);
+        } catch (error) {
+            console.error('Error checking projectile collisions:', error);
+        }
         
         // Update UI
         updateUI(this.player, this.currentFloor);
@@ -345,6 +301,9 @@ export class Game {
         this.isMenuVisible = toggleMenu();
         
         // The game continues to run - we just show/hide the menu
+        console.log(this.isMenuVisible ? "Menu opened" : "Menu closed");
+        
+        // Return visibility state in case other code needs to know
         return this.isMenuVisible;
     }
     
@@ -372,6 +331,11 @@ export class Game {
         
         // Look at player
         this.camera.lookAt(playerPosition);
+    }
+    
+    // Update game over state
+    updateGameOver(inputState) {
+        // Game over logic will go here
     }
     
     // Render the current frame
