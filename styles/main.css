@@ -266,3 +266,69 @@ canvas {
     width: 2px;
     height: 20px;
 }
+
+
+/* Loading screen - Add to styles/main.css */
+#loading-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    transition: opacity 0.5s ease-in-out;
+}
+
+#loading-screen h1 {
+    font-size: 3em;
+    margin-bottom: 10px;
+    color: #f0a000;
+    text-shadow: 0 0 15px rgba(240, 160, 0, 0.7);
+    letter-spacing: 3px;
+}
+
+#loading-screen h2 {
+    font-size: 1.5em;
+    margin-bottom: 30px;
+    color: #ffffff;
+}
+
+#loading-bar-container {
+    width: 300px;
+    height: 20px;
+    background-color: rgba(50, 50, 50, 0.8);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+#loading-bar {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(to right, #f04040, #f0a000);
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 8px rgba(240, 64, 64, 0.7);
+}
+
+/* Mobile adjustments for loading screen */
+@media (max-width: 600px) {
+    #loading-screen h1 {
+        font-size: 2em;
+    }
+    
+    #loading-screen h2 {
+        font-size: 1.2em;
+    }
+    
+    #loading-bar-container {
+        width: 80%;
+        max-width: 280px;
+    }
+}
