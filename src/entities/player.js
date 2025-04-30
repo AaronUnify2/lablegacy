@@ -196,56 +196,58 @@ export class Player {
         this.object.add(this.weapons.staff.mesh);
     }
     
-    // Create a magic projectile from the staff
-    createProjectile() {
-        // Create projectile geometry and material
-        const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-        const projectileMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x4040ff,
-            emissive: 0x0000ff,
-            emissiveIntensity: 1.0
-        });
-        
-        // Create projectile mesh
-        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
-        
-        // Create a light for the projectile
-        const projectileLight = new THREE.PointLight(0x4040ff, 1, 5);
-        projectileLight.position.set(0, 0, 0);
-        projectileMesh.add(projectileLight);
-        
-        // Get staff position and player facing direction
-        const staffWorldPosition = new THREE.Vector3();
-        this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
-        
-        // Set direction to match the player's facing direction (FIXED: reversed direction)
-        const direction = new THREE.Vector3(0, 0, -1);
-        direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotation);
-        
-        // Set initial position slightly in front of the staff
-        const startPosition = new THREE.Vector3(
-            staffWorldPosition.x + direction.x * 0.7,
-            staffWorldPosition.y + 0.65, // Position at the staff top
-            staffWorldPosition.z + direction.z * 0.7
-        );
-        
-        projectileMesh.position.copy(startPosition);
-        
-        // Create projectile object with necessary properties
-        const projectile = {
-            mesh: projectileMesh,
-            direction: direction,
-            speed: this.weapons.staff.projectileSpeed,
-            damage: this.weapons.staff.damage,
-            lifeTime: 3.0, // Seconds before projectile disappears
-            timeAlive: 0
-        };
-        
-        this.projectiles.push(projectile);
-        
-        // Add projectile to scene
-        return projectileMesh;
-    }
+    
+// Create a magic projectile from the staff
+createProjectile() {
+    // Create projectile geometry and material
+    const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+    const projectileMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x4040ff,
+        emissive: 0x0000ff,
+        emissiveIntensity: 1.0
+    });
+    
+    // Create projectile mesh
+    const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+    
+    // Create a light for the projectile
+    const projectileLight = new THREE.PointLight(0x4040ff, 1, 5);
+    projectileLight.position.set(0, 0, 0);
+    projectileMesh.add(projectileLight);
+    
+    // Get staff position and player facing direction
+    const staffWorldPosition = new THREE.Vector3();
+    this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
+    
+    // FIXED: Set direction to match the player's facing direction
+    // Use forward direction (0, 0, -1) and apply player's rotation
+    const direction = new THREE.Vector3(0, 0, -1);
+    direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotation);
+    
+    // Set initial position slightly in front of the staff
+    const startPosition = new THREE.Vector3(
+        staffWorldPosition.x + direction.x * 0.7,
+        staffWorldPosition.y + 0.65, // Position at the staff top
+        staffWorldPosition.z + direction.z * 0.7
+    );
+    
+    projectileMesh.position.copy(startPosition);
+    
+    // Create projectile object with necessary properties
+    const projectile = {
+        mesh: projectileMesh,
+        direction: direction,
+        speed: this.weapons.staff.projectileSpeed,
+        damage: this.weapons.staff.damage,
+        lifeTime: 3.0, // Seconds before projectile disappears
+        timeAlive: 0
+    };
+    
+    this.projectiles.push(projectile);
+    
+    // Add projectile to scene
+    return projectileMesh;
+}
     
     // Update projectiles
     updateProjectiles(deltaTime, scene) {
