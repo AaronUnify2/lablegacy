@@ -1,453 +1,530 @@
-// src/entities/enemies/enemyAI.js - Enemy AI state machine
+// src/entities/enemies/enemyAI.js - Enhanced AI behaviors for enemies
+
 import * as THREE from 'three';
 
 // AI States
 export const AIState = {
     IDLE: 'idle',
-    PATROL: 'patrol',
+    PATROL: 'patrol', 
     CHASE: 'chase',
     ATTACK: 'attack',
     RETREAT: 'retreat',
-    STUNNED: 'stunned',
-    SPECIAL: 'special'
 };
 
-// Enemy AI system using a state machine
+// Main AI controller class
 export class EnemyAI {
     constructor(enemy) {
+        // Reference to the enemy this AI controls
         this.enemy = enemy;
+        
+        // Internal AI state tracking
         this.currentState = AIState.IDLE;
-        this.previousState = null;
+        this.previousState = AIState.IDLE;
         this.stateTimer = 0;
-        this.targetPosition = null;
-        this.playerLastSeen = null;
-        this.searchTimer = 0;
         
-        // Configuration
-        this.idleDuration = 2 + Math.random() * 3; // 2-5 seconds of idling
-        this.searchDuration = 3 + Math.random() * 2; // 3-5 seconds of searching
-        this.maxPatrolDistance = 20; // Maximum distance to patrol
-        this.pathUpdateInterval = 0.5; // How often to recalculate path (seconds)
-        this.pathfindingTimer = 0;
+        // Patrol behavior settings
+        this.patrolDirection = new THREE.Vector3(
+            Math.random() * 2 - 1, 
+            0, 
+            Math.random() * 2 - 1
+        ).normalize();
+        this.patrolTimer = 0;
+        this.patrolDuration = 2 + Math.random() * 3; // 2-5 seconds in one direction
         
-        // State transition probabilities
-        this.chanceToIdle = 0.2; // 20% chance to idle after finishing patrol
+        // Chase behavior settings
+        this.chaseTimer = 0;
+        this.maxChaseTime = 5; // Give up chase after 5 seconds
+        this.lastKnownPlayerPosition = null;
         
-        // Debugging
-        this.debug = false;
+        // Retreat behavior settings
+        this.retreatTimer = 0;
+        this.retreatDuration = 5; // Retreat for 5 seconds
+        this.healthRetreatThreshold = 0.1; // Retreat when below 10% health
+        
+        // Thinking settings
+        this.decisionCooldown = 0;
+        this.decisionInterval = 0.5; // Make decisions every 0.5 seconds
     }
     
-    // Update AI based on current state
+    // Main update function called every frame
     update(deltaTime, player, dungeon) {
-        // Skip if the enemy is stunned
-        if (this.enemy.isStunned) {
-            this.currentState = AIState.STUNNED;
+        // Skip AI if enemy is dead or staggered
+        if (this.enemy.state === 'dead' || this.enemy.isStaggered) {
             return;
         }
         
-        // Update state timer
-        this.stateTimer -= deltaTime;
+        // Update timers
+        this.updateTimers(deltaTime);
         
-        // Update pathfinding timer
-        this.pathfindingTimer -= deltaTime;
-        
-        // Calculate distance to player
-        const distanceToPlayer = this.enemy.distanceToEntity(player);
-        
-        // Check for state transitions first
-        this.checkStateTransitions(distanceToPlayer, player);
-        
-        // Execute current state behavior
-        switch (this.currentState) {
-            case AIState.IDLE:
-                this.executeIdleState(deltaTime);
-                break;
-            case AIState.PATROL:
-                this.executePatrolState(deltaTime, dungeon);
-                break;
-            case AIState.CHASE:
-                this.executeChaseState(deltaTime, player, dungeon);
-                break;
-            case AIState.ATTACK:
-                this.executeAttackState(deltaTime, player);
-                break;
-            case AIState.RETREAT:
-                this.executeRetreatState(deltaTime, player, dungeon);
-                break;
-            case AIState.SPECIAL:
-                this.executeSpecialState(deltaTime, player, dungeon);
-                break;
-            case AIState.STUNNED:
-                // No action needed, handled by the enemy class
-                break;
+        // Only make decisions when decision cooldown is ready
+        if (this.decisionCooldown <= 0) {
+            this.makeDecisions(player, dungeon);
+            this.decisionCooldown = this.decisionInterval;
         }
         
-        if (this.debug) {
-            console.log(`[${this.enemy.name}] State: ${this.currentState}, Distance to player: ${distanceToPlayer.toFixed(2)}`);
+        // Execute behavior for current state
+        this.executeBehavior(deltaTime, player, dungeon);
+    }
+    
+    // Update all timers
+    updateTimers(deltaTime) {
+        this.decisionCooldown -= deltaTime;
+        this.stateTimer += deltaTime;
+        
+        if (this.currentState === AIState.PATROL) {
+            this.patrolTimer += deltaTime;
+        } else if (this.currentState === AIState.CHASE) {
+            this.chaseTimer += deltaTime;
+        } else if (this.currentState === AIState.RETREAT) {
+            this.retreatTimer += deltaTime;
         }
     }
     
-    // Check for state transitions
-    checkStateTransitions(distanceToPlayer, player) {
-        // Store previous state before changing it
-        this.previousState = this.currentState;
+    // Make decisions about state transitions
+    makeDecisions(player, dungeon) {
+        // Get current enemy stats
+        const distanceToPlayer = this.enemy.getDistanceToPlayer(player);
+        const healthPercentage = this.enemy.health / this.enemy.maxHealth;
         
+        // Get important thresholds
+        const detectionRange = this.enemy.detectionRange;
+        const attackRange = this.enemy.attackRange;
+        
+        // Check for retreat condition first (priority behavior)
+        if (healthPercentage < this.healthRetreatThreshold && 
+            distanceToPlayer < detectionRange && 
+            this.currentState !== AIState.RETREAT) {
+            this.changeState(AIState.RETREAT);
+            this.retreatTimer = 0;
+            return;
+        }
+        
+        // Handle state-specific transitions
         switch (this.currentState) {
             case AIState.IDLE:
-                // Transition to patrol when idle timer expires
-                if (this.stateTimer <= 0) {
-                    this.changeState(AIState.PATROL);
-                }
-                
-                // Detect player
-                if (distanceToPlayer <= this.enemy.detectionRange) {
+                // From idle, either detect player or start patrolling
+                if (distanceToPlayer <= detectionRange) {
+                    this.lastKnownPlayerPosition = player.getPosition().clone();
                     this.changeState(AIState.CHASE);
+                } else if (this.stateTimer >= 2 + Math.random() * 3) {
+                    // After 2-5 seconds of idle, start patrolling
+                    this.changeState(AIState.PATROL);
                 }
                 break;
                 
             case AIState.PATROL:
-                // Detect player
-                if (distanceToPlayer <= this.enemy.detectionRange) {
+                // From patrol, either detect player or change direction
+                if (distanceToPlayer <= detectionRange) {
+                    this.lastKnownPlayerPosition = player.getPosition().clone();
                     this.changeState(AIState.CHASE);
+                } else if (this.patrolTimer >= this.patrolDuration) {
+                    // Change patrol direction
+                    this.patrolDirection = new THREE.Vector3(
+                        Math.random() * 2 - 1, 
+                        0, 
+                        Math.random() * 2 - 1
+                    ).normalize();
+                    this.patrolTimer = 0;
+                    this.patrolDuration = 2 + Math.random() * 3;
                 }
                 break;
                 
             case AIState.CHASE:
-                // Transition to attack if close enough
-                if (distanceToPlayer <= this.enemy.attackRange) {
+                // From chase, either attack, lose track, or update position
+                if (distanceToPlayer <= attackRange) {
                     this.changeState(AIState.ATTACK);
-                }
-                
-                // Lose track of player if too far
-                if (distanceToPlayer > this.enemy.detectionRange * 1.5) {
-                    // Start searching where player was last seen
-                    this.playerLastSeen = player.getPosition().clone();
-                    this.searchTimer = this.searchDuration;
+                } else if (this.chaseTimer >= this.maxChaseTime && distanceToPlayer > detectionRange) {
+                    // Give up chase after max time and return to patrol
                     this.changeState(AIState.PATROL);
-                }
-                
-                // If retreat behavior is enabled, check retreat conditions
-                if (this.enemy.retreatRange > 0 && this.enemy.health < this.enemy.maxHealth * 0.3) {
-                    this.changeState(AIState.RETREAT);
+                } else if (distanceToPlayer <= detectionRange) {
+                    // Update last known position if we still see the player
+                    this.lastKnownPlayerPosition = player.getPosition().clone();
+                    this.chaseTimer = 0; // Reset the give-up timer
                 }
                 break;
                 
             case AIState.ATTACK:
-                // Move back to chase if player moves out of attack range
-                if (distanceToPlayer > this.enemy.attackRange) {
-                    this.changeState(AIState.CHASE);
-                }
-                
-                // If retreat behavior is enabled, check retreat conditions
-                if (this.enemy.retreatRange > 0 && this.enemy.health < this.enemy.maxHealth * 0.3) {
-                    this.changeState(AIState.RETREAT);
+                // From attack, either go back to chase if player moves away
+                if (distanceToPlayer > attackRange) {
+                    if (distanceToPlayer <= detectionRange) {
+                        this.lastKnownPlayerPosition = player.getPosition().clone();
+                        this.changeState(AIState.CHASE);
+                    } else {
+                        this.changeState(AIState.PATROL);
+                    }
                 }
                 break;
                 
             case AIState.RETREAT:
-                // Return to chase if health is restored or player is far enough
-                if (this.enemy.health > this.enemy.maxHealth * 0.5 || 
-                    distanceToPlayer > this.enemy.detectionRange) {
-                    this.changeState(AIState.IDLE);
-                }
-                break;
-                
-            case AIState.SPECIAL:
-                // Return to previous state when special ability is complete
-                if (this.stateTimer <= 0) {
-                    // Default back to chase if player is in range
-                    if (distanceToPlayer <= this.enemy.detectionRange) {
-                        this.changeState(AIState.CHASE);
-                    } else {
-                        this.changeState(AIState.IDLE);
-                    }
-                }
-                break;
-                
-            case AIState.STUNNED:
-                // Check if stun has worn off
-                if (!this.enemy.isStunned) {
-                    if (distanceToPlayer <= this.enemy.attackRange) {
+                // From retreat, go back to attack/chase if timer is up
+                if (this.retreatTimer >= this.retreatDuration) {
+                    if (distanceToPlayer <= attackRange) {
                         this.changeState(AIState.ATTACK);
-                    } else if (distanceToPlayer <= this.enemy.detectionRange) {
+                    } else if (distanceToPlayer <= detectionRange) {
+                        this.lastKnownPlayerPosition = player.getPosition().clone();
                         this.changeState(AIState.CHASE);
                     } else {
-                        this.changeState(AIState.IDLE);
+                        this.changeState(AIState.PATROL);
                     }
                 }
                 break;
-        }
-        
-        // Special ability check for any state except special or stunned
-        if (this.currentState !== AIState.SPECIAL && 
-            this.currentState !== AIState.STUNNED && 
-            this.enemy.specialAbility && 
-            this.enemy.specialAbilityTimer <= 0 &&
-            distanceToPlayer <= this.enemy.detectionRange) {
-            
-            // Random chance to use special ability if not already using it
-            if (Math.random() < 0.1) { // 10% chance per update
-                this.changeState(AIState.SPECIAL);
-                this.stateTimer = 2.0; // 2 seconds in special state
-            }
         }
     }
     
-    // Change state with proper initialization
-    changeState(newState) {
-        // Skip if state is the same
-        if (newState === this.currentState) return;
-        
-        // Set new state
-        this.previousState = this.currentState;
-        this.currentState = newState;
-        
-        // Initialize new state
-        switch (newState) {
+    // Execute the behavior for the current state
+    executeBehavior(deltaTime, player, dungeon) {
+        switch (this.currentState) {
             case AIState.IDLE:
-                this.stateTimer = this.idleDuration;
-                this.enemy.velocity.set(0, 0, 0);
+                this.executeIdleBehavior(deltaTime);
                 break;
                 
             case AIState.PATROL:
-                this.setupPatrolPoint();
+                this.executePatrolBehavior(deltaTime, dungeon);
                 break;
                 
             case AIState.CHASE:
-                // Start with a short pathfinding delay
-                this.pathfindingTimer = 0.1;
+                this.executeChaseBehavior(deltaTime, player, dungeon);
                 break;
                 
             case AIState.ATTACK:
-                // Set timer based on attack cooldown
-                this.stateTimer = this.enemy.attackCooldown;
-                // Stop movement
-                this.enemy.velocity.set(0, 0, 0);
+                this.executeAttackBehavior(deltaTime, player);
                 break;
                 
             case AIState.RETREAT:
-                // Find a retreat position
-                this.findRetreatPosition();
+                this.executeRetreatBehavior(deltaTime, player, dungeon);
                 break;
-                
-            case AIState.SPECIAL:
-                // Stop movement and prepare for special ability
-                this.enemy.velocity.set(0, 0, 0);
-                // Timer for special ability duration
-                this.stateTimer = 2.0;
-                break;
-        }
-        
-        if (this.debug) {
-            console.log(`[${this.enemy.name}] State changed: ${this.previousState} -> ${this.currentState}`);
         }
     }
     
-    // Execute idle state logic
-    executeIdleState(deltaTime) {
-        // In idle state, the enemy just stands still
+    // Idle behavior - stay still but look around occasionally
+    executeIdleBehavior(deltaTime) {
+        // Stop movement
         this.enemy.velocity.set(0, 0, 0);
+        this.enemy.isMoving = false;
         
-        // Occasionally look around
-        if (Math.random() < 0.05) {
+        // Occasionally turn to a random direction
+        if (Math.random() < 0.02) {
             this.enemy.rotation = Math.random() * Math.PI * 2;
         }
     }
     
-    // Execute patrol state logic
-    executePatrolState(deltaTime, dungeon) {
-        // If no target position, set up a new patrol point
-        if (!this.targetPosition) {
-            this.setupPatrolPoint();
+    // Patrol behavior - walk in random directions
+    executePatrolBehavior(deltaTime, dungeon) {
+        // Set velocity based on patrol direction
+        this.enemy.velocity.x = this.patrolDirection.x * (this.enemy.moveSpeed * 0.6); // Slower patrol
+        this.enemy.velocity.z = this.patrolDirection.z * (this.enemy.moveSpeed * 0.6);
+        this.enemy.isMoving = true;
+        
+        // Make the enemy face the direction it's moving
+        if (this.enemy.velocity.x !== 0 || this.enemy.velocity.z !== 0) {
+            const targetRotation = Math.atan2(this.enemy.velocity.x, this.enemy.velocity.z);
+            this.enemy.rotation = this.lerpAngle(this.enemy.rotation, targetRotation, deltaTime * 5);
         }
         
-        // Move toward target position
-        if (this.targetPosition) {
-            this.moveTowardTarget(this.targetPosition, this.enemy.moveSpeed * 0.7);
+        // Check for obstacles and update direction if needed
+        if (dungeon && Math.random() < 0.1) { // Occasionally check for obstacles
+            const newPosition = new THREE.Vector3(
+                this.enemy.position.x + this.enemy.velocity.x * deltaTime * 2, // Look a bit ahead
+                this.enemy.position.y,
+                this.enemy.position.z + this.enemy.velocity.z * deltaTime * 2
+            );
             
-            // Check if reached target
-            const distanceToTarget = this.distanceToPoint(this.targetPosition);
-            if (distanceToTarget < 1.0) {
-                // Target reached
-                if (this.searchTimer > 0) {
-                    // If searching, continue for the search duration
-                    this.searchTimer -= deltaTime;
-                    
-                    // Look around more frequently while searching
-                    if (Math.random() < 0.2) {
-                        this.enemy.rotation = Math.random() * Math.PI * 2;
-                    }
-                    
-                    if (this.searchTimer <= 0) {
-                        // Reset search and go back to normal patrol
-                        this.playerLastSeen = null;
-                    }
+            // Create a test collider
+            const testCollider = {
+                min: new THREE.Vector3(
+                    newPosition.x - this.enemy.collisionRadius,
+                    newPosition.y,
+                    newPosition.z - this.enemy.collisionRadius
+                ),
+                max: new THREE.Vector3(
+                    newPosition.x + this.enemy.collisionRadius,
+                    newPosition.y + this.enemy.size,
+                    newPosition.z + this.enemy.collisionRadius
+                )
+            };
+            
+            // Check for collisions with dungeon walls
+            let collision = false;
+            const colliders = dungeon.getColliders();
+            for (const collider of colliders) {
+                if (this.enemy.checkCollision(testCollider, collider)) {
+                    collision = true;
+                    break;
                 }
-                
-                // Set up a new patrol point
-                this.setupPatrolPoint();
+            }
+            
+            // If collision detected, change direction
+            if (collision) {
+                this.patrolDirection = new THREE.Vector3(
+                    Math.random() * 2 - 1, 
+                    0, 
+                    Math.random() * 2 - 1
+                ).normalize();
+                this.patrolTimer = 0;
+                this.patrolDuration = 1 + Math.random() * 2; // Shorter duration after collision
             }
         }
     }
     
-    // Execute chase state logic
-    executeChaseState(deltaTime, player, dungeon) {
-        // Update pathfinding periodically
-        if (this.pathfindingTimer <= 0) {
-            this.updatePathToPlayer(player, dungeon);
-            this.pathfindingTimer = this.pathUpdateInterval;
+    // Chase behavior - move toward player's last known position
+    executeChaseBehavior(deltaTime, player, dungeon) {
+        if (!this.lastKnownPlayerPosition) {
+            // If we somehow don't have a position, go back to patrol
+            this.changeState(AIState.PATROL);
+            return;
         }
         
-        // Get player position
-        const playerPos = player.getPosition();
+        // Get direction to last known player position
+        const direction = new THREE.Vector3(
+            this.lastKnownPlayerPosition.x - this.enemy.position.x,
+            0,
+            this.lastKnownPlayerPosition.z - this.enemy.position.z
+        );
         
-        // Move toward player
-        this.moveTowardTarget(playerPos, this.enemy.moveSpeed);
+        // If we're close to the last known position, update our goal
+        const distanceToTarget = direction.length();
+        if (distanceToTarget < 1) {
+            // If we can see the player, update position
+            const distanceToPlayer = this.enemy.getDistanceToPlayer(player);
+            if (distanceToPlayer <= this.enemy.detectionRange) {
+                this.lastKnownPlayerPosition = player.getPosition().clone();
+            } else {
+                // Look around briefly before giving up
+                // Stop moving and just look around
+                this.enemy.velocity.set(0, 0, 0);
+                this.enemy.isMoving = false;
+                
+                // Rotate to look around
+                this.enemy.rotation += deltaTime * 2;
+                return;
+            }
+        }
+        
+        // Normalize direction and apply movement
+        direction.normalize();
+        this.enemy.velocity.x = direction.x * this.enemy.moveSpeed;
+        this.enemy.velocity.z = direction.z * this.enemy.moveSpeed;
+        this.enemy.isMoving = true;
+        
+        // Make the enemy face the direction it's moving
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        this.enemy.rotation = this.lerpAngle(this.enemy.rotation, targetRotation, deltaTime * 6);
     }
     
-    // Execute attack state logic
-    executeAttackState(deltaTime, player) {
+    // Attack behavior - stop and attack the player
+    executeAttackBehavior(deltaTime, player) {
+        // Stop moving during attack
+        this.enemy.velocity.set(0, 0, 0);
+        this.enemy.isMoving = false;
+        
         // Face the player
         const playerPos = player.getPosition();
-        this.enemy.rotation = Math.atan2(
+        const direction = new THREE.Vector3(
             playerPos.x - this.enemy.position.x,
+            0,
             playerPos.z - this.enemy.position.z
         );
         
-        // Perform attack if cooldown is ready
+        // Calculate desired rotation
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        this.enemy.rotation = this.lerpAngle(this.enemy.rotation, targetRotation, deltaTime * 8);
+        
+        // Attack when ready
         if (!this.enemy.isAttacking && this.enemy.attackTimer <= 0) {
             this.enemy.performAttack(player);
         }
     }
     
-    // Execute retreat state logic
-    executeRetreatState(deltaTime, player, dungeon) {
-        // If no retreat position set, find one
-        if (!this.targetPosition) {
-            this.findRetreatPosition(player);
+    // Retreat behavior - move away from player
+    executeRetreatBehavior(deltaTime, player, dungeon) {
+        // Get direction away from player
+        const playerPos = player.getPosition();
+        const direction = new THREE.Vector3(
+            this.enemy.position.x - playerPos.x,
+            0,
+            this.enemy.position.z - playerPos.z
+        );
+        
+        // Normalize and apply movement
+        direction.normalize();
+        this.enemy.velocity.x = direction.x * (this.enemy.moveSpeed * 1.2); // Faster retreat
+        this.enemy.velocity.z = direction.z * (this.enemy.moveSpeed * 1.2);
+        this.enemy.isMoving = true;
+        
+        // Look back at the player while retreating
+        const retreatLookDirection = new THREE.Vector3(
+            playerPos.x - this.enemy.position.x,
+            0,
+            playerPos.z - this.enemy.position.z
+        );
+        
+        const targetRotation = Math.atan2(retreatLookDirection.x, retreatLookDirection.z);
+        this.enemy.rotation = this.lerpAngle(this.enemy.rotation, targetRotation, deltaTime * 7);
+        
+        // Still attack if possible while retreating
+        if (!this.enemy.isAttacking && this.enemy.attackTimer <= 0 && 
+            this.enemy.getDistanceToPlayer(player) <= this.enemy.attackRange) {
+            this.enemy.performAttack(player);
         }
         
-        // Move toward retreat position
-        if (this.targetPosition) {
-            this.moveTowardTarget(this.targetPosition, this.enemy.moveSpeed * 1.2);
+        // Check for obstacles and update direction if needed
+        if (dungeon && Math.random() < 0.1) { // Occasionally check for obstacles
+            const newPosition = new THREE.Vector3(
+                this.enemy.position.x + this.enemy.velocity.x * deltaTime * 2, // Look ahead
+                this.enemy.position.y,
+                this.enemy.position.z + this.enemy.velocity.z * deltaTime * 2
+            );
             
-            // Check if reached target
-            const distanceToTarget = this.distanceToPoint(this.targetPosition);
-            if (distanceToTarget < 1.0) {
-                // Find a new retreat position
-                this.findRetreatPosition(player);
+            // Create a test collider
+            const testCollider = {
+                min: new THREE.Vector3(
+                    newPosition.x - this.enemy.collisionRadius,
+                    newPosition.y,
+                    newPosition.z - this.enemy.collisionRadius
+                ),
+                max: new THREE.Vector3(
+                    newPosition.x + this.enemy.collisionRadius,
+                    newPosition.y + this.enemy.size,
+                    newPosition.z + this.enemy.collisionRadius
+                )
+            };
+            
+            // Check for collisions with dungeon walls
+            let collision = false;
+            const colliders = dungeon.getColliders();
+            for (const collider of colliders) {
+                if (this.enemy.checkCollision(testCollider, collider)) {
+                    collision = true;
+                    break;
+                }
+            }
+            
+            // If collision detected, adjust direction
+            if (collision) {
+                // Add some perpendicular component to avoid getting stuck
+                const perpendicularDirection = new THREE.Vector3(-direction.z, 0, direction.x);
+                direction.add(perpendicularDirection.multiplyScalar(0.5));
+                direction.normalize();
+                
+                this.enemy.velocity.x = direction.x * (this.enemy.moveSpeed * 1.2);
+                this.enemy.velocity.z = direction.z * (this.enemy.moveSpeed * 1.2);
             }
         }
     }
     
-    // Execute special ability state logic
-    executeSpecialState(deltaTime, player, dungeon) {
-        // Face the player
-        const playerPos = player.getPosition();
-        this.enemy.rotation = Math.atan2(
-            playerPos.x - this.enemy.position.x,
-            playerPos.z - this.enemy.position.z
-        );
+    // Change AI state with proper transitions
+    changeState(newState) {
+        // Store previous state
+        this.previousState = this.currentState;
         
-        // Use special ability if not already used
-        if (this.enemy.specialAbilityTimer <= 0) {
-            this.enemy.useSpecialAbility(player, dungeon);
+        // Set new state
+        this.currentState = newState;
+        
+        // Reset state timer
+        this.stateTimer = 0;
+        
+        // Handle specific state entry actions
+        switch (newState) {
+            case AIState.IDLE:
+                this.enemy.velocity.set(0, 0, 0);
+                this.enemy.isMoving = false;
+                break;
+                
+            case AIState.PATROL:
+                this.patrolTimer = 0;
+                this.patrolDuration = 2 + Math.random() * 3;
+                this.patrolDirection = new THREE.Vector3(
+                    Math.random() * 2 - 1, 
+                    0, 
+                    Math.random() * 2 - 1
+                ).normalize();
+                break;
+                
+            case AIState.CHASE:
+                this.chaseTimer = 0;
+                break;
+                
+            case AIState.RETREAT:
+                this.retreatTimer = 0;
+                break;
         }
+        
+        // Debug logging
+        // console.log(`Enemy ${this.enemy.id} changed state: ${this.previousState} -> ${this.currentState}`);
     }
     
-    // Set up a patrol point for the enemy
-    setupPatrolPoint() {
-        // If searching for player, move toward last seen position
-        if (this.playerLastSeen) {
-            this.targetPosition = this.playerLastSeen.clone();
-            return;
-        }
+    // Helper for angle interpolation
+    lerpAngle(a, b, t) {
+        // Ensure the angles are within the same range to avoid spinning the wrong way
+        let delta = b - a;
         
-        // If patrol points are specified, use those
-        if (this.enemy.patrolPoints && this.enemy.patrolPoints.length > 0) {
-            // Move to next patrol point
-            this.enemy.currentPatrolIndex = (this.enemy.currentPatrolIndex + 1) % this.enemy.patrolPoints.length;
-            this.targetPosition = this.enemy.patrolPoints[this.enemy.currentPatrolIndex].clone();
-            return;
-        }
+        // Normalize delta to [-PI, PI]
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
         
-        // Otherwise, generate a random point around current position
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * this.maxPatrolDistance;
+        // Apply interpolation
+        let result = a + delta * t;
         
-        this.targetPosition = new THREE.Vector3(
-            this.enemy.position.x + Math.sin(angle) * distance,
-            this.enemy.position.y,
-            this.enemy.position.z + Math.cos(angle) * distance
-        );
+        // Normalize result to [0, 2*PI]
+        while (result > Math.PI * 2) result -= Math.PI * 2;
+        while (result < 0) result += Math.PI * 2;
         
-        // Check if there's a chance to idle
-        if (Math.random() < this.chanceToIdle) {
-            this.changeState(AIState.IDLE);
-        }
+        return result;
     }
     
-    // Update path to player (for now just direct line, would use proper pathfinding in full implementation)
-    updatePathToPlayer(player, dungeon) {
-        // Get player position
-        const playerPos = player.getPosition();
-        
-        // For now, we'll just set the target directly to the player's position
-        // In a full implementation, this would use A* pathfinding
-        this.targetPosition = playerPos.clone();
+    // Get current AI state
+    getState() {
+        return this.currentState;
     }
     
-    // Find a position to retreat to
-    findRetreatPosition(player) {
-        // Get direction away from player
-        const playerPos = player.getPosition();
-        const directionAwayFromPlayer = new THREE.Vector3(
-            this.enemy.position.x - playerPos.x,
-            0,
-            this.enemy.position.z - playerPos.z
-        ).normalize();
+    // Force a specific state
+    forceState(state) {
+        this.changeState(state);
+    }
+}
+
+// Export helper functions for common AI behaviors
+
+// Create a random patrol path around a center point
+export function createRandomPatrolPath(centerX, centerZ, radius, pointCount = 4) {
+    const points = [];
+    
+    for (let i = 0; i < pointCount; i++) {
+        const angle = (i / pointCount) * Math.PI * 2;
+        const x = centerX + Math.cos(angle) * radius;
+        const z = centerZ + Math.sin(angle) * radius;
         
-        // Set target position in that direction
-        const retreatDistance = this.enemy.retreatRange + Math.random() * 5; // Add some randomness
-        this.targetPosition = new THREE.Vector3(
-            this.enemy.position.x + directionAwayFromPlayer.x * retreatDistance,
-            this.enemy.position.y,
-            this.enemy.position.z + directionAwayFromPlayer.z * retreatDistance
-        );
+        points.push({ x, y: 0, z });
     }
     
-    // Move toward a target position
-    moveTowardTarget(target, speed) {
-        // Calculate direction to target
-        const direction = new THREE.Vector3(
-            target.x - this.enemy.position.x,
-            0,
-            target.z - this.enemy.position.z
-        ).normalize();
-        
-        // Set velocity
-        this.enemy.velocity.set(
-            direction.x * speed,
-            0,
-            direction.z * speed
-        );
-        
-        // Update rotation
-        if (direction.length() > 0.001) {
-            this.enemy.rotation = Math.atan2(direction.x, direction.z);
-        }
-    }
+    return points;
+}
+
+// Create a patrol path between fixed points
+export function createFixedPatrolPath(...points) {
+    return points.map(point => ({
+        x: point.x || 0,
+        y: point.y || 0,
+        z: point.z || 0
+    }));
+}
+
+// Apply an AI controller to an enemy
+export function applyAIController(enemy) {
+    const ai = new EnemyAI(enemy);
     
-    // Calculate distance to a point
-    distanceToPoint(point) {
-        return Math.sqrt(
-            Math.pow(this.enemy.position.x - point.x, 2) +
-            Math.pow(this.enemy.position.z - point.z, 2)
-        );
-    }
+    // Add the AI controller to the enemy
+    enemy.ai = ai;
     
-    // Enable/disable debug output
-    setDebug(enabled) {
-        this.debug = enabled;
-    }
+    // Override the enemy's update method to also update the AI
+    const originalUpdate = enemy.update;
+    enemy.update = function(deltaTime, player, dungeon) {
+        // Call the original update method
+        originalUpdate.call(this, deltaTime, player, dungeon);
+        
+        // Update the AI
+        ai.update(deltaTime, player, dungeon);
+    };
+    
+    return ai;
 }
