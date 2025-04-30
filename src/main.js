@@ -1,9 +1,10 @@
-// src/main.js - Updated for always-running game with menu overlay and inventory fixes
+// src/main.js - Updated with loading screen integration
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
 import { initUI, showMessage } from './game/ui.js';
-import { initMenu } from './game/pauseMenu.js'; // Using initMenu from pauseMenu.js
+import { initMenu } from './game/pauseMenu.js';
+import { loadingScreen } from './game/loadingScreen.js'; // Import loading screen
 import { ItemDatabase, ItemType } from './entities/items/inventory.js';
 
 // Main game instance
@@ -13,9 +14,16 @@ let game;
 function init() {
     console.log('Initializing Labyrinth Legacy...');
     
+    // Initialize loading screen first
+    loadingScreen.init();
+    loadingScreen.show('Initializing Game...');
+    loadingScreen.updateProgress(10);
+    
     // Setup essential engine components
     setupRenderer();
     setupInput();
+    
+    loadingScreen.updateProgress(30);
     
     // Initialize UI with three status bars
     initUI();
@@ -23,24 +31,29 @@ function init() {
     // Initialize menu system
     initMenu();
     
+    loadingScreen.updateProgress(50);
+    
     // Create and initialize the game
     game = new Game();
+    
+    // Start initialization - the game will handle its own loading screen updates
     game.init();
     
-    // Start the game loop
-    requestAnimationFrame(gameLoop);
-    
-    // Handle window resize
-    window.addEventListener('resize', onWindowResize);
+    // Setup global references
+    window.game = game;
     
     // Expose necessary functions globally
     window.showMessage = showMessage;
     window.ItemDatabase = ItemDatabase;
     window.ItemType = ItemType;
     
-    // Display welcome message
-    showMessage('Welcome to Labyrinth Legacy!', 5000);
-    showMessage('Press ESC for menu, WASD to move', 5000);
+    // Start the game loop - this will run even while the loading screen is showing
+    requestAnimationFrame(gameLoop);
+    
+    // Handle window resize
+    window.addEventListener('resize', onWindowResize);
+    
+    // Loading screen will finish in game.init()
 }
 
 // Main game loop
@@ -48,11 +61,15 @@ function gameLoop(timestamp) {
     // Get current input state
     const inputState = getInput();
     
-    // Update game state - game always runs now, no pausing
-    game.update(timestamp, inputState);
-    
-    // Render the current frame
-    game.render();
+    // Skip game updates if in loading screen but still render
+    if (game && loadingScreen.isShowing()) {
+        // Just render the scene
+        game.render();
+    } else if (game) {
+        // Normal update when not loading
+        game.update(timestamp, inputState);
+        game.render();
+    }
     
     // Continue the loop
     requestAnimationFrame(gameLoop);
@@ -61,14 +78,11 @@ function gameLoop(timestamp) {
 // Handle window resize
 function onWindowResize() {
     resizeRenderer();
-    game.onResize();
+    if (game) game.onResize();
 }
 
 // Start the game when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', init);
-
-// Expose game to window for debugging purposes
-window.game = game;
 
 // Handle errors by displaying a message
 window.addEventListener('error', function(event) {
@@ -107,3 +121,7 @@ window.getItemTypeName = function(type) {
             return type;
     }
 };
+
+// Make chest spawner functions globally available for use in game.js
+import { spawnChestsInDungeon } from './entities/items/chestSpawner.js';
+window.spawnChestsInDungeon = spawnChestsInDungeon;
