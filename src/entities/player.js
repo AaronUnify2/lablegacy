@@ -66,6 +66,13 @@ export class Player {
             }
         };
         
+        // Player light
+        this.playerLight = null;
+        this.lightIntensity = 1.5;
+        this.lightRadius = 12;
+        this.lightColor = 0xf2dfa7; // Warm white light
+        this.lightHeight = 2.0; // Position light above player's head
+        
         // Ranged attack properties
         this.projectiles = [];
         this.maxProjectiles = 10; // Maximum number of projectiles active at once
@@ -121,6 +128,31 @@ export class Player {
         
         // Create collider
         this.updateCollider();
+        
+        // Create player light
+        this.playerLight = new THREE.PointLight(this.lightColor, this.lightIntensity, this.lightRadius);
+        this.playerLight.position.set(0, this.lightHeight, 0); // Position light above player's head
+        this.playerLight.castShadow = true;
+
+        // Configure shadows for better quality
+        this.playerLight.shadow.mapSize.width = 512;
+        this.playerLight.shadow.mapSize.height = 512;
+        this.playerLight.shadow.camera.near = 0.5;
+        this.playerLight.shadow.camera.far = 15;
+
+        // Add a subtle ambient glow sphere around the player
+        const glowGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: this.lightColor,
+            transparent: true,
+            opacity: 0.4
+        });
+        this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.glowMesh.position.set(0, this.lightHeight, 0);
+        this.playerLight.add(this.glowMesh); // Add glow as child of light
+
+        // Add light to player object
+        this.object.add(this.playerLight);
         
         // Initialize inventory in UI if the global function exists
         if (window.updatePauseMenuInventory) {
@@ -196,76 +228,69 @@ export class Player {
         this.object.add(this.weapons.staff.mesh);
     }
     
-    
-// This is a more comprehensive fix for the createProjectile method in src/entities/player.js
-
-// Replace the createProjectile method in src/entities/player.js with this version
-
-// Create a magic projectile from the staff
-createProjectile() {
-    // Create projectile geometry and material
-    const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-    const projectileMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x4040ff,
-        emissive: 0x0000ff,
-        emissiveIntensity: 1.0
-    });
-    
-    // Create projectile mesh
-    const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    
-    // Create a light for the projectile
-    const projectileLight = new THREE.PointLight(0x4040ff, 1, 5);
-    projectileLight.position.set(0, 0, 0);
-    projectileMesh.add(projectileLight);
-    
-    // Get staff position in world coordinates
-    const staffWorldPosition = new THREE.Vector3();
-    this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
-    
-    // Create direction vector - use player's movement direction
-    let direction = new THREE.Vector3();
-    
-    // SOLUTION: Use the same logic that moves the player
-    // If the player is moving, use that direction
-    if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
-        // The player's velocity already points in the correct direction
-        direction.copy(this.velocity).normalize();
-    } else {
-        // Player is standing still, use rotation
-        // The key insight: Player's rotation is based on atan2(velocity.x, velocity.z)
-        // This means rotation 0 corresponds to -Z, so:
-        const angleRadians = this.rotation;
-        direction.x = Math.sin(angleRadians);
-        direction.z = Math.cos(angleRadians);
+    // Create a magic projectile from the staff
+    createProjectile() {
+        // Create projectile geometry and material
+        const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const projectileMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x4040ff,
+            emissive: 0x0000ff,
+            emissiveIntensity: 1.0
+        });
+        
+        // Create projectile mesh
+        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        
+        // Create a light for the projectile
+        const projectileLight = new THREE.PointLight(0x4040ff, 1, 5);
+        projectileLight.position.set(0, 0, 0);
+        projectileMesh.add(projectileLight);
+        
+        // Get staff position in world coordinates
+        const staffWorldPosition = new THREE.Vector3();
+        this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
+        
+        // Create direction vector - use player's movement direction
+        let direction = new THREE.Vector3();
+        
+        // SOLUTION: Use the same logic that moves the player
+        // If the player is moving, use that direction
+        if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
+            // The player's velocity already points in the correct direction
+            direction.copy(this.velocity).normalize();
+        } else {
+            // Player is standing still, use rotation
+            // The key insight: Player's rotation is based on atan2(velocity.x, velocity.z)
+            // This means rotation 0 corresponds to -Z, so:
+            const angleRadians = this.rotation;
+            direction.x = Math.sin(angleRadians);
+            direction.z = Math.cos(angleRadians);
+        }
+        
+        // Set initial position slightly in front of the staff
+        const startPosition = new THREE.Vector3(
+            staffWorldPosition.x + direction.x * 0.7,
+            staffWorldPosition.y + 0.65, // Position at the staff top
+            staffWorldPosition.z + direction.z * 0.7
+        );
+        
+        projectileMesh.position.copy(startPosition);
+        
+        // Create projectile object with necessary properties
+        const projectile = {
+            mesh: projectileMesh,
+            direction: direction,
+            speed: this.weapons.staff.projectileSpeed,
+            damage: this.weapons.staff.damage,
+            lifeTime: 3.0, // Seconds before projectile disappears
+            timeAlive: 0
+        };
+        
+        this.projectiles.push(projectile);
+        
+        // Add projectile to scene
+        return projectileMesh;
     }
-    
-    // Set initial position slightly in front of the staff
-    const startPosition = new THREE.Vector3(
-        staffWorldPosition.x + direction.x * 0.7,
-        staffWorldPosition.y + 0.65, // Position at the staff top
-        staffWorldPosition.z + direction.z * 0.7
-    );
-    
-    projectileMesh.position.copy(startPosition);
-    
-    // Create projectile object with necessary properties
-    const projectile = {
-        mesh: projectileMesh,
-        direction: direction,
-        speed: this.weapons.staff.projectileSpeed,
-        damage: this.weapons.staff.damage,
-        lifeTime: 3.0, // Seconds before projectile disappears
-        timeAlive: 0
-    };
-    
-    this.projectiles.push(projectile);
-    
-    // Add projectile to scene
-    return projectileMesh;
-}
-
-
 
     // Update projectiles
     updateProjectiles(deltaTime, scene) {
@@ -389,6 +414,31 @@ createProjectile() {
         
         // Update collider
         this.updateCollider();
+        
+        // Update player light
+        if (this.playerLight) {
+            // Apply subtle flicker/breathing effect to light
+            const flickerAmount = Math.sin(Date.now() * 0.002) * 0.1; // Subtle oscillation
+            this.playerLight.intensity = this.lightIntensity + flickerAmount;
+            
+            // Make light brighter when dashing or jumping
+            if (this.isDashing) {
+                this.playerLight.intensity = this.lightIntensity + 0.4;
+                this.playerLight.distance = this.lightRadius + 3;
+            } else if (this.isJumping || this.isFalling) {
+                this.playerLight.intensity = this.lightIntensity + 0.2;
+                this.playerLight.distance = this.lightRadius + 1;
+            } else {
+                this.playerLight.distance = this.lightRadius;
+            }
+            
+            // Change light color slightly if player is attacking
+            if (this.isAttacking) {
+                this.playerLight.color.setHex(0xffe0bd); // Slightly warmer during attack
+            } else {
+                this.playerLight.color.setHex(this.lightColor);
+            }
+        }
         
         // Debug logging of movement states (only when moving or paused/unpaused)
         if (this.velocity.x !== 0 || this.velocity.z !== 0 || window.game?.state === 'paused') {
@@ -662,6 +712,43 @@ createProjectile() {
             scene.remove(projectile.mesh);
         }
         this.projectiles = [];
+        
+        // Ensure light is properly disposed
+        if (this.playerLight) {
+            this.object.remove(this.playerLight);
+            if (this.glowMesh) {
+                this.playerLight.remove(this.glowMesh);
+                this.glowMesh.material.dispose();
+                this.glowMesh.geometry.dispose();
+                this.glowMesh = null;
+            }
+            this.playerLight = null;
+        }
+    }
+    
+    // Set player light properties
+    setLightProperties(intensity, radius, color) {
+        if (!this.playerLight) return;
+        
+        if (intensity !== undefined) this.lightIntensity = intensity;
+        if (radius !== undefined) this.lightRadius = radius;
+        if (color !== undefined) this.lightColor = color;
+        
+        this.playerLight.intensity = this.lightIntensity;
+        this.playerLight.distance = this.lightRadius;
+        this.playerLight.color.setHex(this.lightColor);
+        
+        // Update glow color too
+        if (this.glowMesh) {
+            this.glowMesh.material.color.setHex(this.lightColor);
+        }
+    }
+
+    // Toggle player light on/off
+    toggleLight(enabled) {
+        if (this.playerLight) {
+            this.playerLight.visible = enabled;
+        }
     }
     
     // Set the ground level for the player
@@ -697,9 +784,10 @@ createProjectile() {
         // Cap health at 0
         if (this.health < 0) {
             this.health = 0;
+
         }
-        
-        // Set invulnerability time after taking damage
+
+    // Set invulnerability time after taking damage
         this.invulnerabilityTime = 1.0;
         
         // Update UI
