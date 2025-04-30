@@ -8,6 +8,9 @@ import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
 import { toggleMenu } from './pauseMenu.js'; // Use toggleMenu instead of togglePauseMenu
+import { enemySpawner } from '../entities/enemies/enemySpawner.js';
+import { projectileSystem } from '../entities/enemies/projectileSystem.js';
+import { enemyRegistry } from '../entities/enemies/enemyRegistry.js';
 
 // Game states - removed PAUSED state since we don't pause anymore
 const GameState = {
@@ -66,6 +69,19 @@ export class Game {
         this.player.init();
         addToScene(this.player.getObject());
         
+        // Initialize systems
+        try {
+            // Initialize projectile system
+            console.log('Initializing projectile system...');
+            projectileSystem.init(this.scene);
+            
+            // Initialize enemy spawner
+            console.log('Initializing enemy spawner...');
+            enemySpawner.init(this.currentFloor);
+        } catch (error) {
+            console.error('Error initializing enemy systems:', error);
+        }
+        
         // Generate first dungeon floor
         this.generateNewFloor(this.currentFloor);
         
@@ -77,6 +93,9 @@ export class Game {
         
         // Set game state to playing
         this.state = GameState.PLAYING;
+        
+        // Make the game object available globally for debugging
+        window.game = this;
         
         console.log('Game initialized!');
     }
@@ -103,6 +122,23 @@ export class Game {
         this.currentDungeon = generateDungeon(floorNumber);
         addToScene(this.currentDungeon.getObject());
         
+        try {
+            // Clean up existing enemies
+            console.log('Clearing enemy spawner...');
+            if (typeof enemySpawner.clearEnemies === 'function') {
+                enemySpawner.clearEnemies(this.scene);
+            } else if (typeof enemySpawner.clear === 'function') {
+                enemySpawner.clear();
+            }
+            
+            // Spawn enemies in the dungeon with error handling
+            console.log('Spawning enemies in dungeon...');
+            enemySpawner.init(floorNumber); // Re-initialize with new floor number
+            enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
+        } catch (error) {
+            console.error('Error spawning enemies:', error);
+        }
+        
         // Get player spawn position from dungeon
         const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
         this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
@@ -114,44 +150,54 @@ export class Game {
         window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
         
         // Debug: Log the number of chests created
-        console.log(`Floor ${floorNumber} generated with ${this.currentDungeon.chests.length} chests`);
+        console.log(`Floor ${floorNumber} generated with ${this.currentDungeon.chests?.length || 0} chests`);
         
         console.log(`Floor ${floorNumber} generated`);
     }
     
-    // Look for this section in the update method of the Game class in src/game/game.js
-
-update(timestamp, inputState) {
-    // Calculate delta time
-    const deltaTime = (timestamp - this.lastTimestamp) / 1000;
-    this.lastTimestamp = timestamp;
-    
-    // Cap delta time to prevent huge jumps after tab switch or similar
-    const cappedDeltaTime = Math.min(deltaTime, 0.1);
-    
-    // Handle menu toggling
-    if (inputState.justPressed.menu) {
-        this.toggleMenu();
-    }
-    
-    // Update player - game always runs now
-    this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
-    
-    // Check for interactions with chests
-    if (inputState.justPressed.interact) {
-        // Find a chest to interact with
-        const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
-        if (interactableChest) {
-            this.player.interactWithChest(interactableChest);
+    update(timestamp, inputState) {
+        // Calculate delta time
+        const deltaTime = (timestamp - this.lastTimestamp) / 1000;
+        this.lastTimestamp = timestamp;
+        
+        // Cap delta time to prevent huge jumps after tab switch or similar
+        const cappedDeltaTime = Math.min(deltaTime, 0.1);
+        
+        // Handle menu toggling
+        if (inputState.justPressed.menu) {
+            this.toggleMenu();
         }
-    }
-    
-    // Update dungeon (includes chest animations)
-    if (this.currentDungeon) {
-        this.currentDungeon.update(cappedDeltaTime);
-    }
-    
-
+        
+        // Update player - game always runs now
+        this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
+        
+        // Check for interactions with chests
+        if (inputState.justPressed.interact) {
+            // Find a chest to interact with
+            const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
+            if (interactableChest) {
+                this.player.interactWithChest(interactableChest);
+            }
+        }
+        
+        // Update dungeon (includes chest animations)
+        if (this.currentDungeon) {
+            this.currentDungeon.update(cappedDeltaTime);
+        }
+        
+        try {
+            // Update enemy spawner with error handling
+            if (enemySpawner && typeof enemySpawner.update === 'function') {
+                enemySpawner.update(cappedDeltaTime, this.player, this.currentDungeon);
+            }
+            
+            // Update projectile system with error handling
+            if (projectileSystem && typeof projectileSystem.update === 'function') {
+                projectileSystem.update(cappedDeltaTime, this.player);
+            }
+        } catch (error) {
+            console.error('Error updating enemy systems:', error);
+        }
         
         // Update camera to follow player
         this.updateCamera(cappedDeltaTime);
@@ -167,8 +213,14 @@ update(timestamp, inputState) {
         // Check for collisions
         this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
         
-        // Check for projectile collisions with enemies
-        this.player.checkProjectileCollisions(this.entities);
+        try {
+            // Check for projectile collisions with enemies
+            if (enemySpawner.enemies && Array.isArray(enemySpawner.enemies)) {
+                this.player.checkProjectileCollisions(enemySpawner.enemies);
+            }
+        } catch (error) {
+            console.error('Error checking projectile collisions:', error);
+        }
         
         // Update UI
         updateUI(this.player, this.currentFloor);
