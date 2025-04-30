@@ -1,4 +1,4 @@
-// src/game/game.js - Main game class and loop with non-pausing menu
+// src/game/game.js - Modified with loading screen transitions
 import * as THREE from 'three';
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
@@ -8,6 +8,7 @@ import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
 import { toggleMenu } from './pauseMenu.js';
+import { loadingScreen } from './loadingScreen.js'; // Import loading screen
 
 // Added enemy-related imports
 import { enemyRegistry } from '../entities/enemies/enemyRegistry.js';
@@ -19,6 +20,7 @@ const GameState = {
     LOADING: 'loading',
     MENU: 'menu',
     PLAYING: 'playing',
+    TRANSITIONING: 'transitioning', // New state for floor transitions
     GAME_OVER: 'gameOver'
 };
 
@@ -52,11 +54,25 @@ export class Game {
         // Added reference to enemy systems
         this.enemySpawner = enemySpawner;
         this.projectileSystem = projectileSystem;
+        
+        // Floor transition timers and flags
+        this.transitionDelay = {
+            dungeonBuild: 1000,    // Time to build dungeon mesh
+            chestSpawn: 1500,      // Time to wait before spawning chests
+            enemySpawn: 3000       // Time to wait before spawning enemies
+        };
     }
     
     // Initialize the game
     init() {
         console.log('Initializing game...');
+        
+        // Initialize loading screen
+        loadingScreen.init();
+        
+        // Show loading screen for initial load
+        loadingScreen.show('Initializing Game...');
+        loadingScreen.updateProgress(10);
         
         // Get references to Three.js objects
         const { scene, camera, renderer } = getRenderer();
@@ -64,11 +80,15 @@ export class Game {
         this.camera = camera;
         this.renderer = renderer;
         
+        loadingScreen.updateProgress(30);
+        
         // Initialize physics
         this.physics = new Physics();
         
         // Initialize minimap
         this.minimapContext = initMinimap();
+        
+        loadingScreen.updateProgress(50);
         
         // Create player
         this.player = new Player();
@@ -79,6 +99,8 @@ export class Game {
         
         addToScene(this.player.getObject());
         
+        loadingScreen.updateProgress(70);
+        
         // Initialize projectile system for enemies
         this.projectileSystem.init(this.scene);
         
@@ -88,17 +110,12 @@ export class Game {
         // Apply enemy spawner patches
         this.patchEnemySpawner();
         
-        // Generate first dungeon floor
-        this.generateNewFloor(this.currentFloor);
+        loadingScreen.updateProgress(80);
         
-        // Set initial camera position
-        camera.position.copy(this.player.getPosition());
-        camera.position.y += 8; // Position camera above player
-        camera.position.z += 10; // Position camera behind player
-        camera.lookAt(this.player.getPosition());
+        // Generate first dungeon floor with loading screen
+        this.generateNewFloorWithLoading(this.currentFloor);
         
-        // Set game state to playing
-        this.state = GameState.PLAYING;
+        // Loading screen will complete after dungeon is generated
         
         console.log('Game initialized!');
     }
@@ -350,58 +367,125 @@ export class Game {
         };
     }
 
-    // Generate a new dungeon floor
-    generateNewFloor(floorNumber) {
-        console.log(`Generating floor ${floorNumber}...`);
+    // Generate a new dungeon floor with loading screen
+    generateNewFloorWithLoading(floorNumber) {
+        // Set game state to transitioning
+        this.state = GameState.TRANSITIONING;
         
-        // Remove old dungeon if it exists
-        if (this.currentDungeon) {
-            this.currentDungeon.dispose();
-            removeFromScene(this.currentDungeon.getObject());
-        }
+        // Show loading screen
+        loadingScreen.show(`Preparing Floor ${floorNumber}...`);
+        loadingScreen.updateProgress(10);
         
-        // Clean up projectiles
-        this.projectileSystem.clear();
+        // Function to continue after loading screen is ready
+        const continueGeneration = () => {
+            console.log(`Generating floor ${floorNumber} with loading...`);
+            
+            // Remove old dungeon if it exists
+            if (this.currentDungeon) {
+                this.currentDungeon.dispose();
+                removeFromScene(this.currentDungeon.getObject());
+                loadingScreen.updateProgress(20);
+            } else {
+                loadingScreen.updateProgress(20);
+            }
+            
+            // Clean up projectiles
+            this.projectileSystem.clear();
+            
+            // Clean up player projectiles
+            if (this.player) {
+                this.player.cleanupProjectiles(this.scene);
+            }
+            
+            // Clear enemies
+            this.enemySpawner.clearEnemies(this.scene);
+            
+            // Clear entities list
+            this.entities = [];
+            
+            loadingScreen.updateProgress(40);
+            loadingScreen.setMessage(`Generating Floor ${floorNumber}...`);
+            
+            // Generate new dungeon
+            this.currentDungeon = generateDungeon(floorNumber);
+            addToScene(this.currentDungeon.getObject());
+            
+            loadingScreen.updateProgress(60);
+            
+            // Get player spawn position from dungeon
+            const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
+            this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
+            
+            // Initialize enemy spawner with current floor
+            this.enemySpawner.init(floorNumber);
+            
+            loadingScreen.updateProgress(70);
+            loadingScreen.setMessage(`Building Floor ${floorNumber}...`);
+            
+            // Update UI
+            document.getElementById('floor-number').textContent = floorNumber;
+            
+            // Update camera to focus on player's new position
+            this.camera.position.copy(this.player.getPosition());
+            this.camera.position.y += 8;
+            this.camera.position.z += 10;
+            this.camera.lookAt(this.player.getPosition());
+            
+            // Sequence the spawning of items using setTimeout for proper sequencing
+            setTimeout(() => {
+                loadingScreen.updateProgress(80);
+                loadingScreen.setMessage(`Adding Treasure to Floor ${floorNumber}...`);
+                
+                // Try to add chests with delayed spawning
+                try {
+                    // Use our standalone chest spawner from chestSpawner.js
+                    // It already has a built-in delay mechanism
+                    if (window.spawnChestsInDungeon) {
+                        window.spawnChestsInDungeon(this.currentDungeon);
+                    } else {
+                        // Fallback to the imported function if global isn't available
+                        const { spawnChestsInDungeon } = require('../entities/items/chestSpawner.js');
+                        spawnChestsInDungeon(this.currentDungeon);
+                    }
+                } catch (error) {
+                    console.error('Error spawning chests:', error);
+                }
+                
+                // Spawn enemies after another delay
+                setTimeout(() => {
+                    loadingScreen.updateProgress(90);
+                    loadingScreen.setMessage(`Spawning Enemies on Floor ${floorNumber}...`);
+                    
+                    try {
+                        // Spawn enemies with a delay
+                        this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
+                    } catch (error) {
+                        console.error('Error spawning enemies:', error);
+                    }
+                    
+                    // Complete loading
+                    setTimeout(() => {
+                        loadingScreen.updateProgress(100);
+                        
+                        // Add callback to reset game state after loading screen is hidden
+                        loadingScreen.addCallback(() => {
+                            // Show floor transition message
+                            window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
+                            
+                            // Set game state back to playing
+                            this.state = GameState.PLAYING;
+                            console.log(`Floor ${floorNumber} fully loaded and ready`);
+                        });
+                    }, 500);
+                }, this.transitionDelay.enemySpawn - this.transitionDelay.chestSpawn);
+            }, this.transitionDelay.chestSpawn);
+        };
         
-        // Clean up player projectiles
-        if (this.player) {
-            this.player.cleanupProjectiles(this.scene);
-        }
-        
-        // Clear enemies
-        this.enemySpawner.clearEnemies(this.scene);
-        
-        // Clear entities list
-        this.entities = [];
-        
-        // Generate new dungeon
-        this.currentDungeon = generateDungeon(floorNumber);
-        addToScene(this.currentDungeon.getObject());
-        
-        // Get player spawn position from dungeon
-        const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
-        this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
-        
-        // Initialize enemy spawner with current floor
-        this.enemySpawner.init(floorNumber);
-        
-        try {
-            // Spawn enemies in the dungeon with a delay and error handling
-            this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
-        } catch (error) {
-            console.error('Error spawning enemies:', error);
-        }
-        
-        // Update UI
-        document.getElementById('floor-number').textContent = floorNumber;
-        
-        // Show floor transition message
-        window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
-        
-        console.log(`Floor ${floorNumber} generated`);
+        // Start the generation process after a short delay
+        setTimeout(continueGeneration, 200);
     }
     
-    // Update method
+    // Update method - modified to handle transitioning state
     update(timestamp, inputState) {
         // Calculate delta time
         const deltaTime = (timestamp - this.lastTimestamp) / 1000;
@@ -409,6 +493,12 @@ export class Game {
         
         // Cap delta time to prevent huge jumps after tab switch or similar
         const cappedDeltaTime = Math.min(deltaTime, 0.1);
+        
+        // Skip updates if we're in transitioning state
+        if (this.state === GameState.TRANSITIONING) {
+            // Only render the scene, don't update gameplay
+            return;
+        }
         
         // Handle menu toggling
         if (inputState.justPressed.menu) {
@@ -478,10 +568,13 @@ export class Game {
             updateMinimap(this.minimapContext, this.currentDungeon, this.player);
         }
         
-        // Check for floor progression
+        // Check for floor progression - updated to use loading screen
         if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
+            // Increment floor number
             this.currentFloor++;
-            this.generateNewFloor(this.currentFloor);
+            
+            // Generate new floor with loading screen
+            this.generateNewFloorWithLoading(this.currentFloor);
         }
     }
     
@@ -498,6 +591,9 @@ export class Game {
     
     // Update camera position to follow player
     updateCamera(deltaTime) {
+        // Skip camera updates during transitions
+        if (this.state === GameState.TRANSITIONING) return;
+        
         const playerPosition = this.player.getPosition();
         const isPlayerInAir = this.player.isInAir();
         
