@@ -1,367 +1,285 @@
-// src/entities/enemies/enemySpawner.js - Enemy spawning system
+// src/entities/enemies/enemySpawner.js - System for spawning enemies in the dungeon
+
 import * as THREE from 'three';
-import { EnemyType } from './enemyBase.js';
-import { EnemyRegistry } from './enemyRegistry.js';
+import { enemyRegistry } from './enemyRegistry.js';
+import { applyAIController } from './enemyAI.js';
 
-// Spawn point types
-export const SpawnPointType = {
-    STANDARD: 'standard',    // Regular spawn point that respawns enemies
-    FIXED: 'fixed',          // One-time spawn that doesn't respawn
-    BOSS: 'boss',            // Special boss spawn point
-    SPECIAL: 'special'       // Special event spawn point
-};
-
-// Spawn manager class
+// Enemy spawner class
 export class EnemySpawner {
     constructor() {
-        this.spawnPoints = [];
-        this.activeEnemies = [];
-        this.maxEnemiesPerFloor = 15; // Maximum enemies active at once
-        this.respawnTime = 30; // Seconds before respawning enemies
-        this.debug = false;
-        
-        // Configuration
-        this.spawnDistributionByFloor = [
-            // Floor 1-3
-            {
-                [EnemyType.MOB]: 1.0,
-                [EnemyType.MINI_BOSS]: 0.0,
-                [EnemyType.BOSS]: 0.0
-            },
-            // Floor 4-7
-            {
-                [EnemyType.MOB]: 0.8,
-                [EnemyType.MINI_BOSS]: 0.2,
-                [EnemyType.BOSS]: 0.0
-            },
-            // Floor 8+
-            {
-                [EnemyType.MOB]: 0.7,
-                [EnemyType.MINI_BOSS]: 0.25,
-                [EnemyType.BOSS]: 0.05
-            }
-        ];
+        this.enemies = [];
+        this.isSpawning = false;
+        this.currentFloor = 1;
+        this.maxEnemiesPerRoom = 3; // Maximum enemies to spawn in a room
+        this.spawnDelay = 3000; // 3 second delay as requested
     }
     
-    // Generate spawn points for a dungeon floor
-    generateSpawnPoints(dungeon, floorNumber) {
-        this.spawnPoints = [];
-        this.activeEnemies = [];
+    // Initialize the spawner with the current floor
+    init(floorNumber) {
+        this.currentFloor = floorNumber;
+        this.enemies = [];
+        console.log(`Enemy spawner initialized for floor ${floorNumber}`);
+    }
+    
+    // Spawn enemies in a dungeon
+    spawnEnemiesInDungeon(dungeon, scene) {
+        // If already spawning, don't spawn again
+        if (this.isSpawning) return;
         
-        // Create a container for the enemies in the scene
-        this.enemyContainer = new THREE.Object3D();
-        this.enemyContainer.name = "Enemies";
-        dungeon.getObject().add(this.enemyContainer);
+        // Mark as spawning to prevent multiple calls
+        this.isSpawning = true;
         
+        console.log(`Scheduling enemy spawning in ${this.spawnDelay/1000} seconds...`);
+        
+        // Wait for the specified delay before spawning
+        setTimeout(() => {
+            this.performSpawning(dungeon, scene);
+            this.isSpawning = false;
+        }, this.spawnDelay);
+    }
+    
+    // Actually perform the spawning after delay
+    performSpawning(dungeon, scene) {
+        if (!dungeon || !scene) {
+            console.error('Dungeon or scene not provided for enemy spawning');
+            return;
+        }
+        
+        console.log('Beginning enemy spawning...');
+        
+        // Get all rooms
         const rooms = dungeon.getRooms();
         
-        // Track how many spawn points we've created
-        let spawnPointCount = 0;
-        let mobCount = 0;
-        let miniBossCount = 0;
-        let bossCount = 0;
+        // Separate rooms by type
+        const centerRoom = rooms.find(room => room.isSpawnRoom);
+        const radialRooms = rooms.filter(room => room.roomType === 'radial');
+        const cardinalRooms = rooms.filter(room => room.roomType === 'cardinal');
+        const corridors = dungeon.corridors || [];
         
-        // Determine maximum counts based on floor number
-        const maxSpawnPoints = Math.min(10 + Math.floor(floorNumber * 1.5), 25);
-        const maxMiniBosses = Math.floor(floorNumber / 3);
-        const maxBosses = floorNumber >= 8 ? 1 : 0;
+        // Placeholder for availabe enemy tracking
+        let availableEnemies = {};
         
-        console.log(`Generating up to ${maxSpawnPoints} spawn points for floor ${floorNumber}`);
-        
-        // Place enemies in appropriate rooms based on room type
-        rooms.forEach(room => {
-            // Skip corridors and very small rooms
-            if (room.isCorridor || room.width < 8 || room.height < 8) return;
+        // Track which enemy types can spawn in which room types
+        for (const roomType of ['spawnRoom', 'radial', 'cardinal', 'corridor']) {
+            availableEnemies[roomType] = enemyRegistry.getEnemiesForSpawn(this.currentFloor, roomType);
             
-            // Get room center
-            const roomCenter = {
-                x: room.x + room.width / 2,
-                z: room.z + room.height / 2
-            };
-            
-            // Determine number of enemies based on room size and type
-            let spawnCount = 0;
-            let shouldSpawnMiniBoss = false;
-            let shouldSpawnBoss = false;
-            
-            if (room.isSpawnRoom) {
-                // No enemies in spawn room
-                return;
-            } else if (room.roomType === 'radial') {
-                // Radial rooms have mobs and maybe mini-bosses
-                spawnCount = 2 + Math.floor(Math.random() * 2);
-                shouldSpawnMiniBoss = miniBossCount < maxMiniBosses && Math.random() < 0.4;
-            } else if (room.roomType === 'cardinal') {
-                // Cardinal rooms often have mini-bosses
-                spawnCount = 1 + Math.floor(Math.random() * 2);
-                shouldSpawnMiniBoss = miniBossCount < maxMiniBosses && Math.random() < 0.7;
-            } else if (room.roomType === 'cardinalPlus') {
-                // Cardinal+ rooms can have bosses or mini-bosses
-                spawnCount = 1;
-                shouldSpawnBoss = bossCount < maxBosses && Math.random() < 0.8;
-                shouldSpawnMiniBoss = !shouldSpawnBoss && miniBossCount < maxMiniBosses;
-            } else if (room.roomType === 'alcove') {
-                // Alcoves have fewer enemies
-                spawnCount = Math.random() < 0.5 ? 1 : 0;
-            } else {
-                // Normal rooms
-                const roomArea = room.width * room.height;
-                spawnCount = Math.floor(roomArea / 100) + Math.floor(Math.random() * 2);
+            // If no specific enemies for this room type, use general floor enemies
+            if (availableEnemies[roomType].length === 0) {
+                availableEnemies[roomType] = enemyRegistry.getEnemiesForFloor(this.currentFloor);
             }
-            
-            // Cap total spawn points
-            spawnCount = Math.min(spawnCount, maxSpawnPoints - spawnPointCount);
-            
-            // Create boss spawn if needed
-            if (shouldSpawnBoss && bossCount < maxBosses) {
-                this.createSpawnPoint({
-                    position: new THREE.Vector3(roomCenter.x, room.floorHeight, roomCenter.z),
-                    type: SpawnPointType.BOSS,
-                    enemyType: EnemyType.BOSS,
-                    respawn: false,
-                    floorNumber: floorNumber
-                });
-                
-                spawnPointCount++;
-                bossCount++;
-                
-                // Reduce regular spawn count in boss rooms
-                spawnCount = Math.max(0, spawnCount - 2);
-            }
-            
-            // Create mini-boss spawn if needed
-            if (shouldSpawnMiniBoss && miniBossCount < maxMiniBosses) {
-                // Find a suitable position near the room center
-                const miniBossPos = this.findSpawnPosition(room, roomCenter);
-                
-                this.createSpawnPoint({
-                    position: new THREE.Vector3(miniBossPos.x, room.floorHeight, miniBossPos.z),
-                    type: SpawnPointType.FIXED,
-                    enemyType: EnemyType.MINI_BOSS,
-                    respawn: false,
-                    floorNumber: floorNumber
-                });
-                
-                spawnPointCount++;
-                miniBossCount++;
-                
-                // Reduce regular spawn count in mini-boss rooms
-                spawnCount = Math.max(0, spawnCount - 1);
-            }
-            
-            // Create regular spawn points
-            for (let i = 0; i < spawnCount; i++) {
-                // Find a suitable position
-                const spawnPos = this.findSpawnPosition(room, roomCenter);
-                
-                this.createSpawnPoint({
-                    position: new THREE.Vector3(spawnPos.x, room.floorHeight, spawnPos.z),
-                    type: SpawnPointType.STANDARD,
-                    enemyType: EnemyType.MOB,
-                    respawn: true,
-                    floorNumber: floorNumber
-                });
-                
-                spawnPointCount++;
-                mobCount++;
-                
-                // Stop if we've reached the maximum
-                if (spawnPointCount >= maxSpawnPoints) break;
-            }
-        });
-        
-        console.log(`Generated ${spawnPointCount} spawn points: ${mobCount} mobs, ${miniBossCount} mini-bosses, ${bossCount} bosses`);
-        
-        return this.spawnPoints;
-    }
-    
-    // Find a suitable spawn position in a room
-    findSpawnPosition(room, roomCenter) {
-        const margin = 2; // Distance from walls
-        
-        // Start with a position near the center
-        const centerWeight = 0.3; // How much to weight toward center vs random
-        
-        // Calculate random position with center weighting
-        const randomX = room.x + margin + Math.random() * (room.width - margin * 2);
-        const randomZ = room.z + margin + Math.random() * (room.height - margin * 2);
-        
-        return {
-            x: randomX * (1 - centerWeight) + roomCenter.x * centerWeight,
-            z: randomZ * (1 - centerWeight) + roomCenter.z * centerWeight
-        };
-    }
-    
-    // Create a spawn point
-    createSpawnPoint(options) {
-        const spawnPoint = {
-            position: options.position || new THREE.Vector3(),
-            type: options.type || SpawnPointType.STANDARD,
-            enemyType: options.enemyType || EnemyType.MOB,
-            respawn: options.respawn !== undefined ? options.respawn : true,
-            respawnTime: options.respawnTime || this.respawnTime,
-            respawnTimer: 0,
-            hasSpawned: false,
-            enemy: null,
-            floorNumber: options.floorNumber || 1,
-            active: true
-        };
-        
-        this.spawnPoints.push(spawnPoint);
-        return spawnPoint;
-    }
-    
-    // Spawn enemies based on player position
-    update(deltaTime, player, scene, dungeon) {
-        const playerPos = player.getPosition();
-        
-        // Update each spawn point
-        this.spawnPoints.forEach(spawnPoint => {
-            // Skip inactive spawn points
-            if (!spawnPoint.active) return;
-            
-            // If spawn point has an enemy, check if it's still alive
-            if (spawnPoint.enemy) {
-                if (spawnPoint.enemy.isDead) {
-                    // Clear reference to dead enemy
-                    spawnPoint.enemy = null;
-                    
-                    // Start respawn timer if this point respawns
-                    if (spawnPoint.respawn) {
-                        spawnPoint.respawnTimer = spawnPoint.respawnTime;
-                    } else {
-                        // Deactivate non-respawning points
-                        spawnPoint.active = false;
-                    }
-                }
-            } else {
-                // No active enemy, check if we should spawn one
-                
-                // If it's already spawned once and doesn't respawn, skip
-                if (spawnPoint.hasSpawned && !spawnPoint.respawn) return;
-                
-                // If respawn timer is active, count it down
-                if (spawnPoint.respawnTimer > 0) {
-                    spawnPoint.respawnTimer -= deltaTime;
-                    return;
-                }
-                
-                // Check if we're under the enemy limit
-                if (this.activeEnemies.length >= this.maxEnemiesPerFloor) return;
-                
-                // Check player distance for spawning
-                const distToPlayer = this.distanceTo(playerPos, spawnPoint.position);
-                
-                // Only spawn if player is in a reasonable range (not too close or too far)
-                const minSpawnDistance = 10; // Minimum distance to spawn enemies
-                const maxSpawnDistance = 50; // Maximum distance to consider spawning
-                
-                if (distToPlayer > minSpawnDistance && distToPlayer < maxSpawnDistance) {
-                    // Chance to spawn based on distance (more likely when further from spawn point)
-                    const spawnChance = 0.1 + ((distToPlayer - minSpawnDistance) / (maxSpawnDistance - minSpawnDistance)) * 0.9;
-                    
-                    if (Math.random() < spawnChance * deltaTime * 2) { // Adjust for framerate
-                        this.spawnEnemy(spawnPoint, scene);
-                    }
-                }
-            }
-        });
-        
-        // Clean up any dead enemies from the array
-        this.activeEnemies = this.activeEnemies.filter(enemy => !enemy.isDead);
-    }
-    
-    // Spawn an enemy at a spawn point
-    spawnEnemy(spawnPoint, scene) {
-        // Determine which enemy to spawn
-        let enemyId = "";
-        
-        // Get available enemies based on enemy type and floor
-        const availableEnemies = EnemyRegistry.getEnemiesByType(
-            spawnPoint.enemyType,
-            spawnPoint.floorNumber
-        );
-        
-        if (availableEnemies.length === 0) {
-            console.warn(`No ${spawnPoint.enemyType} enemies available for floor ${spawnPoint.floorNumber}`);
-            return null;
         }
         
-        // Choose a random enemy from the available ones
-        enemyId = availableEnemies[Math.floor(Math.random() * availableEnemies.length)].id;
+        console.log(`Available enemy types for floor ${this.currentFloor}:`, availableEnemies);
         
-        // Create the enemy
-        const enemy = EnemyRegistry.createEnemy(enemyId, {
-            level: spawnPoint.floorNumber,
-            position: spawnPoint.position.clone()
+        // Determine number of enemies based on floor
+        const baseEnemyCount = 3 + Math.floor(this.currentFloor / 2);
+        let remainingEnemies = baseEnemyCount;
+        
+        // Track which rooms already have enemies
+        const roomsWithEnemies = new Set();
+        
+        // 1. Spawn in cardinal rooms first (center position)
+        cardinalRooms.forEach(room => {
+            if (remainingEnemies <= 0 || Math.random() > 0.7) return; // 70% chance to spawn
+            
+            // Spawn 1-2 enemies in center of cardinal rooms
+            const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * 2));
+            this.spawnEnemiesInCardinalRoom(room, count, enemyTypes, scene);
+            
+            remainingEnemies -= count;
+            roomsWithEnemies.add(room);
         });
         
-        if (!enemy) {
-            console.error(`Failed to create enemy ${enemyId}`);
-            return null;
+        // 2. Spawn in radial rooms (random position)
+        radialRooms.forEach(room => {
+            if (remainingEnemies <= 0 || Math.random() > 0.6) return; // 60% chance to spawn
+            
+            // Spawn 1-3 enemies in radial rooms
+            const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * this.maxEnemiesPerRoom));
+            this.spawnEnemiesInRoom(room, count, enemyTypes, scene);
+            
+            remainingEnemies -= count;
+            roomsWithEnemies.add(room);
+        });
+        
+        // 3. Maybe spawn in center room last (they'll be immediately active)
+        if (centerRoom && remainingEnemies > 0 && Math.random() > 0.7) { // 30% chance to spawn in center
+            // Spawn 1-2 enemies in center room
+            const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * 2));
+            this.spawnEnemiesInRoom(centerRoom, count, enemyTypes, scene);
+            
+            remainingEnemies -= count;
+            roomsWithEnemies.add(centerRoom);
         }
         
-        // Initialize enemy
-        enemy.init();
+        // 4. Finally, maybe spawn a few in corridors
+        if (remainingEnemies > 0 && corridors.length > 0) {
+            // Only spawn in a few random corridors
+            const randomCorridors = this.shuffleArray([...corridors])
+                .slice(0, Math.min(corridors.length, 2));
+            
+            randomCorridors.forEach(corridor => {
+                if (remainingEnemies <= 0 || Math.random() > 0.4) return; // 40% chance to spawn
+                
+                // Spawn 1 enemy per corridor
+                const count = Math.min(remainingEnemies, 1);
+                this.spawnEnemiesInRoom(corridor, count, enemyTypes, scene);
+                
+                remainingEnemies -= count;
+            });
+        }
         
-        // Add to scene
-        if (this.enemyContainer) {
-            this.enemyContainer.add(enemy.getObject());
-        } else {
+        console.log(`Spawned ${baseEnemyCount - remainingEnemies} enemies on floor ${this.currentFloor}`);
+    }
+    
+    // Spawn enemies in a regular room (random positions)
+    spawnEnemiesInRoom(room, count, availableEnemies, scene) {
+        // Determine the room type for enemy selection
+        let roomType = 'corridor';
+        if (room.isSpawnRoom) {
+            roomType = 'spawnRoom';
+        } else if (room.roomType === 'radial') {
+            roomType = 'radial';
+        } else if (room.roomType === 'cardinal') {
+            roomType = 'cardinal';
+        } else if (!room.isCorridor) {
+            roomType = 'radial'; // Default for other room types
+        }
+        
+        // Get the appropriate enemy types for this room
+        const enemyTypes = availableEnemies[roomType] || availableEnemies['radial'];
+        
+        for (let i = 0; i < count; i++) {
+            // Get random position in room (with margin from walls)
+            const margin = 2;
+            const x = room.x + margin + Math.random() * (room.width - margin * 2);
+            const z = room.z + margin + Math.random() * (room.height - margin * 2);
+            
+            // Pick random enemy type
+            const enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            
+            // Create and spawn enemy
+            this.spawnEnemy(enemyType, x, room.floorHeight + 1, z, scene);
+        }
+    }
+    
+    // Spawn enemies in cardinal rooms (center position)
+    spawnEnemiesInCardinalRoom(room, count, availableEnemies, scene) {
+        // Get the appropriate enemy types for cardinal rooms
+        const enemyTypes = availableEnemies['cardinal'] || availableEnemies['radial'];
+        
+        // Get center position
+        const centerX = room.x + room.width / 2;
+        const centerZ = room.z + room.height / 2;
+        
+        for (let i = 0; i < count; i++) {
+            // Pick random enemy type
+            const enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+            
+            // For multiple enemies, add slight offset from center
+            let x = centerX;
+            let z = centerZ;
+            
+            if (count > 1) {
+                // Small random offset if more than one enemy
+                x += (Math.random() * 2 - 1) * (room.width / 6);
+                z += (Math.random() * 2 - 1) * (room.height / 6);
+            }
+            
+            // Create and spawn enemy
+            this.spawnEnemy(enemyType, x, room.floorHeight + 1, z, scene);
+        }
+    }
+    
+    // Spawn a single enemy
+    spawnEnemy(enemyType, x, y, z, scene) {
+        try {
+            // Create the enemy from registry
+            const enemy = enemyRegistry.createEnemy(enemyType, x, y, z);
+            
+            if (!enemy) {
+                console.error(`Failed to create enemy of type ${enemyType}`);
+                return null;
+            }
+            
+            // Apply AI controller
+            applyAIController(enemy);
+            
+            // Add enemy to scene
             scene.add(enemy.getObject());
+            
+            // Add to enemies list
+            this.enemies.push(enemy);
+            
+            console.log(`Spawned ${enemyType} enemy at (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)})`);
+            
+            return enemy;
+        } catch (error) {
+            console.error(`Error spawning enemy of type ${enemyType}:`, error);
+            return null;
         }
-        
-        // Update spawn point
-        spawnPoint.enemy = enemy;
-        spawnPoint.hasSpawned = true;
-        
-        // Add to active enemies
-        this.activeEnemies.push(enemy);
-        
-        if (this.debug) {
-            console.log(`Spawned ${enemy.name} at position:`, spawnPoint.position);
-        }
-        
-        return enemy;
     }
     
-    // Handle floor transition - clean up all enemies
-    onFloorChange() {
-        // Remove all enemies
-        this.activeEnemies.forEach(enemy => {
-            if (enemy.getObject().parent) {
-                enemy.getObject().parent.remove(enemy.getObject());
+    // Update all enemies
+    update(deltaTime, player, dungeon) {
+        // Update each enemy
+        for (let i = this.enemies.length - 1; i >= 0; i--) {
+            const enemy = this.enemies[i];
+            
+            // Skip destroyed enemies
+            if (!enemy || enemy.state === 'removed') {
+                this.enemies.splice(i, 1);
+                continue;
             }
-        });
-        
-        // Clear arrays
-        this.activeEnemies = [];
-        this.spawnPoints = [];
-        
-        if (this.enemyContainer && this.enemyContainer.parent) {
-            this.enemyContainer.parent.remove(this.enemyContainer);
-            this.enemyContainer = null;
+            
+            // Update enemy
+            enemy.update(deltaTime, player, dungeon);
+            
+            // Remove dead enemies after their death animation
+            if (enemy.state === 'dead' && enemy.mesh && enemy.mesh.scale.y <= 0.1) {
+                const enemyObject = enemy.getObject();
+                if (enemyObject && enemyObject.parent) {
+                    enemyObject.parent.remove(enemyObject);
+                }
+                
+                this.enemies.splice(i, 1);
+            }
         }
     }
     
     // Get all active enemies
-    getActiveEnemies() {
-        return this.activeEnemies;
+    getEnemies() {
+        return this.enemies;
     }
     
-    // Calculate distance between points
-    distanceTo(pointA, pointB) {
-        return Math.sqrt(
-            Math.pow(pointA.x - pointB.x, 2) +
-            Math.pow(pointA.z - pointB.z, 2)
-        );
+    // Get enemy count
+    getEnemyCount() {
+        return this.enemies.length;
     }
     
-    // Toggle debug mode
-    setDebug(enabled) {
-        this.debug = enabled;
+    // Clear all enemies
+    clearEnemies(scene) {
+        // Remove all enemies from scene
+        for (const enemy of this.enemies) {
+            if (enemy && enemy.getObject() && enemy.getObject().parent) {
+                enemy.getObject().parent.remove(enemy.getObject());
+            }
+        }
+        
+        // Clear array
+        this.enemies = [];
+        console.log('All enemies cleared');
+    }
+    
+    // Utility: Shuffle array (Fisher-Yates algorithm)
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
 }
 
-// Create a singleton instance
+// Export singleton instance
 export const enemySpawner = new EnemySpawner();
