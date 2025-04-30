@@ -131,6 +131,9 @@ export class Game {
         // Initialize enemy spawner with current floor
         this.enemySpawner.init(floorNumber);
         
+        // Custom spawning function for testing - ONLY spawn Sphere enemies
+        this.spawnTestSphereEnemies();
+        
         // Update UI
         document.getElementById('floor-number').textContent = floorNumber;
         
@@ -138,6 +141,54 @@ export class Game {
         window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
         
         console.log(`Floor ${floorNumber} generated`);
+    }
+    
+    // Custom function to test spawning only spheres
+    spawnTestSphereEnemies() {
+        console.log('Spawning test sphere enemies only...');
+        if (!this.currentDungeon || !this.scene) return;
+        
+        try {
+            // Get rooms
+            const rooms = this.currentDungeon.getRooms();
+            if (!rooms || rooms.length === 0) {
+                console.error('No rooms found in dungeon');
+                return;
+            }
+            
+            // Get a non-spawn room
+            const targetRoom = rooms.find(room => !room.isSpawnRoom);
+            if (!targetRoom) {
+                console.error('No suitable room found for enemy spawning');
+                return;
+            }
+            
+            // Calculate spawn position in center of room
+            const x = targetRoom.x + targetRoom.width / 2;
+            const y = targetRoom.floorHeight + 1;
+            const z = targetRoom.z + targetRoom.height / 2;
+            
+            // Spawn a single test sphere
+            const enemy = enemyRegistry.createEnemy('sphere', x, y, z);
+            if (!enemy) {
+                console.error('Failed to create sphere enemy');
+                return;
+            }
+            
+            // Apply AI controller
+            const { applyAIController } = require('../entities/enemies/enemyAI.js');
+            applyAIController(enemy);
+            
+            // Add to scene
+            this.scene.add(enemy.getObject());
+            
+            // Add to spawner's enemies list
+            this.enemySpawner.enemies.push(enemy);
+            
+            console.log(`Test sphere enemy spawned at (${x}, ${y}, ${z})`);
+        } catch (error) {
+            console.error('Error spawning test sphere enemy:', error);
+        }
     }
     
     // Update method
@@ -170,15 +221,24 @@ export class Game {
             this.currentDungeon.update(cappedDeltaTime);
         }
         
+        // Update enemies
+        this.enemySpawner.update(cappedDeltaTime, this.player, this.currentDungeon);
+        
+        // Update enemy projectiles
+        this.projectileSystem.update(cappedDeltaTime, this.player);
+        
         // Update camera to follow player
         this.updateCamera(cappedDeltaTime);
         
         // Update physics
         this.physics.update(cappedDeltaTime);
         
-        // Update all entities
+        // Update all entities (merged with enemySpawner.enemies)
+        this.entities = [...this.enemySpawner.getEnemies()];
         for (const entity of this.entities) {
-            entity.update(cappedDeltaTime, this.player);
+            if (entity && typeof entity.update === 'function') {
+                entity.update(cappedDeltaTime, this.player, this.currentDungeon);
+            }
         }
         
         // Check for collisions
