@@ -128,6 +128,6 @@ export class Cylinder {
         // Which room types this enemy can spawn in
         roomTypes: ['cardinal'], // Only spawn in cardinal rooms as mini-bosses
         // Spawn weight (lower = less common)
-        weight: 1
+        weight: 5
     };
 }
