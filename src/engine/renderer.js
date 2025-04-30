@@ -1,4 +1,3 @@
-
 // src/engine/renderer.js - Three.js renderer setup and management
 
 
@@ -17,7 +16,7 @@ export function setupRenderer() {
     scene.background = new THREE.Color(0x000000);
     
     // Setup fog for atmosphere and to hide distant objects
-    scene.fog = new THREE.FogExp2(0x000000, 0.05);
+    scene.fog = new THREE.FogExp2(0x000000, 0.07); // Increased density for darker environment
     
     // Create perspective camera
     const aspectRatio = window.innerWidth / window.innerHeight;
@@ -50,12 +49,12 @@ export function setupRenderer() {
 
 // Set up basic lighting for the scene
 function setupLighting() {
-    // Ambient light for basic illumination
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    // Ambient light for basic illumination - reduced intensity for darker dungeons
+    const ambientLight = new THREE.AmbientLight(0x222222, 0.3); // Darker ambient for better contrast with player light
     scene.add(ambientLight);
     
-    // Directional light for shadows and directional illumination
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    // Directional light for subtle shadows and directional illumination
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5); // Reduced intensity
     directionalLight.position.set(5, 10, 7);
     directionalLight.castShadow = true;
     
