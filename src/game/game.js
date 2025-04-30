@@ -7,11 +7,14 @@ import { Player } from '../entities/player.js';
 import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
-import { toggleMenu } from './pauseMenu.js'; // Use toggleMenu instead of togglePauseMenu
+import { toggleMenu } from './pauseMenu.js';
+
+// Added enemy-related imports
+import { enemyRegistry } from '../entities/enemies/enemyRegistry.js';
 import { enemySpawner } from '../entities/enemies/enemySpawner.js';
 import { projectileSystem } from '../entities/enemies/projectileSystem.js';
 
-// Game states - removed PAUSED state since we don't pause anymore
+// Game states
 const GameState = {
     LOADING: 'loading',
     MENU: 'menu',
@@ -45,6 +48,10 @@ export class Game {
         
         // Menu visibility tracking
         this.isMenuVisible = false;
+        
+        // Added reference to enemy systems
+        this.enemySpawner = enemySpawner;
+        this.projectileSystem = projectileSystem;
     }
     
     // Initialize the game
@@ -68,8 +75,11 @@ export class Game {
         this.player.init();
         addToScene(this.player.getObject());
         
-        // Initialize projectile system
-        projectileSystem.init(this.scene);
+        // Initialize projectile system for enemies
+        this.projectileSystem.init(this.scene);
+        
+        // Make game instance globally available for enemy systems
+        window.game = this;
         
         // Generate first dungeon floor
         this.generateNewFloor(this.currentFloor);
@@ -96,10 +106,16 @@ export class Game {
             removeFromScene(this.currentDungeon.getObject());
         }
         
+        // Clean up projectiles
+        this.projectileSystem.clear();
+        
         // Clean up player projectiles
         if (this.player) {
             this.player.cleanupProjectiles(this.scene);
         }
+        
+        // Clear enemies
+        this.enemySpawner.clearEnemies(this.scene);
         
         // Clear entities list
         this.entities = [];
@@ -108,15 +124,12 @@ export class Game {
         this.currentDungeon = generateDungeon(floorNumber);
         addToScene(this.currentDungeon.getObject());
         
-        // Clear enemy spawner
-        enemySpawner.clear();
-        
-        // Spawn enemies in the dungeon
-        enemySpawner.spawnEnemiesInDungeon(this.currentDungeon);
-        
         // Get player spawn position from dungeon
         const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
         this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
+        
+        // Initialize enemy spawner with current floor
+        this.enemySpawner.init(floorNumber);
         
         // Update UI
         document.getElementById('floor-number').textContent = floorNumber;
@@ -124,12 +137,10 @@ export class Game {
         // Show floor transition message
         window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
         
-        // Debug: Log the number of chests created
-        console.log(`Floor ${floorNumber} generated with ${this.currentDungeon.chests.length} chests`);
-        
         console.log(`Floor ${floorNumber} generated`);
     }
     
+    // Update method
     update(timestamp, inputState) {
         // Calculate delta time
         const deltaTime = (timestamp - this.lastTimestamp) / 1000;
@@ -148,7 +159,6 @@ export class Game {
         
         // Check for interactions with chests
         if (inputState.justPressed.interact) {
-            // Find a chest to interact with
             const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
             if (interactableChest) {
                 this.player.interactWithChest(interactableChest);
@@ -159,12 +169,6 @@ export class Game {
         if (this.currentDungeon) {
             this.currentDungeon.update(cappedDeltaTime);
         }
-        
-        // Update enemy spawner
-        enemySpawner.update(cappedDeltaTime, this.player);
-        
-        // Update projectile system
-        projectileSystem.update(cappedDeltaTime);
         
         // Update camera to follow player
         this.updateCamera(cappedDeltaTime);
@@ -181,7 +185,7 @@ export class Game {
         this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
         
         // Check for projectile collisions with enemies
-        this.player.checkProjectileCollisions(enemySpawner.enemies);
+        this.player.checkProjectileCollisions(this.entities);
         
         // Update UI
         updateUI(this.player, this.currentFloor);
@@ -200,7 +204,7 @@ export class Game {
     
     // Toggle menu overlay without pausing the game
     toggleMenu() {
-        this.isMenuVisible = toggleMenu(); // Using toggleMenu instead of togglePauseMenu
+        this.isMenuVisible = toggleMenu();
         
         // The game continues to run - we just show/hide the menu
         console.log(this.isMenuVisible ? "Menu opened" : "Menu closed");
