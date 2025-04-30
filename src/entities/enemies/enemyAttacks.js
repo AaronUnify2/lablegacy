@@ -1,348 +1,417 @@
-// src/entities/enemies/enemyAttacks.js - Attack behaviors for enemies
+// src/entities/enemies/enemyAttacks.js - Basic attack types for enemies
+
 import * as THREE from 'three';
 
-// Attack types
+// Attack type enum
 export const AttackType = {
     MELEE: 'melee',
     RANGED: 'ranged',
-    AREA: 'area',
-    SPECIAL: 'special'
+    SLAM: 'slam',
 };
 
-// Base class for all attack behaviors
-export class AttackBehavior {
-    constructor(enemy, options = {}) {
-        this.enemy = enemy;
-        this.damage = options.damage || enemy.baseDamage;
-        this.damageVariance = options.damageVariance || enemy.damageVariance;
-        this.cooldown = options.cooldown || enemy.attackCooldown;
-        this.range = options.range || enemy.attackRange;
-        this.type = AttackType.MELEE; // Default type
-        this.effectChance = options.effectChance || 0;
-        this.statusEffect = options.statusEffect || null;
-        this.statusDuration = options.statusDuration || 2.0;
-        
-        // Animation properties
-        this.animationDuration = options.animationDuration || 0.5;
-        this.animationTimer = 0;
-        this.isAnimating = false;
-        
-        // Attack state
-        this.isActive = false;
-        this.hitEntities = new Set(); // Track entities hit to prevent multi-hits
+// Main attack controller class
+export class AttackSystem {
+    constructor() {
+        // Store active projectiles
+        this.projectiles = [];
     }
     
-    // Initialize attack (called when attack starts)
-    start() {
-        this.isActive = true;
-        this.isAnimating = true;
-        this.animationTimer = this.animationDuration;
-        this.hitEntities.clear();
-        return true;
-    }
-    
-    // Update attack state (called each frame)
-    update(deltaTime, player, projectiles) {
-        if (!this.isActive) return false;
-        
-        // Update animation timer
-        if (this.isAnimating) {
-            this.animationTimer -= deltaTime;
-            if (this.animationTimer <= 0) {
-                this.isAnimating = false;
-            }
+    // Execute an attack based on type
+    executeAttack(enemy, player, attackType, attackParams = {}) {
+        switch(attackType) {
+            case AttackType.MELEE:
+                return this.executeMeleeAttack(enemy, player, attackParams);
+            
+            case AttackType.RANGED:
+                return this.executeRangedAttack(enemy, player, attackParams);
+                
+            case AttackType.SLAM:
+                return this.executeSlamAttack(enemy, player, attackParams);
+                
+            default:
+                console.warn(`Unknown attack type: ${attackType}`);
+                return false;
         }
-        
-        // Check if attack is complete
-        if (!this.isAnimating) {
-            this.isActive = false;
-            return false;
-        }
-        
-        return true;
     }
     
-    // Apply damage to a target
-    applyDamage(target) {
-        // Skip if already hit
-        if (this.hitEntities.has(target.id)) return 0;
-        
-        // Calculate damage with variance
-        const variance = this.damage * this.damageVariance;
-        const actualDamage = this.damage + (Math.random() * variance * 2 - variance);
-        
-        // Apply damage to target
-        const damageDealt = target.takeDamage(Math.round(actualDamage));
-        
-        // Mark as hit
-        this.hitEntities.add(target.id);
-        
-        // Apply status effect if applicable
-        if (this.statusEffect && Math.random() < this.effectChance) {
-            this.applyStatusEffect(target);
-        }
-        
-        return damageDealt;
-    }
-    
-    // Apply status effect to target
-    applyStatusEffect(target) {
-        // To be implemented by specific attack types
-    }
-    
-    // Check if entity is in attack range
-    isInRange(entity) {
-        const distance = this.enemy.distanceToEntity(entity);
-        return distance <= this.range;
-    }
-    
-    // Cancel the attack
-    cancel() {
-        this.isActive = false;
-        this.isAnimating = false;
-    }
-}
-
-// Melee attack implementation
-export class MeleeAttack extends AttackBehavior {
-    constructor(enemy, options = {}) {
-        super(enemy, options);
-        this.type = AttackType.MELEE;
-        this.hitboxRadius = options.hitboxRadius || this.range;
-        this.knockbackForce = options.knockbackForce || 2.0;
-        this.angleRange = options.angleRange || Math.PI / 2; // Attack angle in front (90 degrees)
-    }
-    
-    // Override update to implement melee attack logic
-    update(deltaTime, player, projectiles) {
-        // Call base update for animation handling
-        if (!super.update(deltaTime, player, projectiles)) return false;
+    // Execute a melee attack
+    executeMeleeAttack(enemy, player, params = {}) {
+        // Extract parameters with defaults
+        const range = params.range || enemy.attackRange || 2;
+        const damage = params.damage || enemy.baseDamage || 10;
+        const variance = params.variance || enemy.damageVariance || 0.2;
+        const knockback = params.knockback || 2;
         
         // Check if player is in range
-        if (this.isInMeleeRange(player)) {
-            this.applyDamage(player);
-            
-            // Apply knockback
-            if (this.knockbackForce > 0) {
-                this.applyKnockback(player);
-            }
+        const distance = enemy.getDistanceToPlayer(player);
+        if (distance > range) {
+            return false; // Attack missed
         }
         
-        return true;
-    }
-    
-    // Check if entity is in melee range (considers angle)
-    isInMeleeRange(entity) {
-        // Check distance
-        if (!this.isInRange(entity)) return false;
+        // Calculate actual damage with variance
+        const damageVariance = 1 + (Math.random() * variance * 2 - variance);
+        const actualDamage = Math.round(damage * damageVariance);
         
-        // Check angle
-        const angleToEntity = this.enemy.angleToEntity(entity);
-        const angleDiff = Math.abs(normalizeAngle(angleToEntity - this.enemy.rotation));
+        // Apply damage to player
+        player.takeDamage(actualDamage);
         
-        // Entity must be in front of the enemy within the angle range
-        return angleDiff <= this.angleRange / 2;
-    }
-    
-    // Apply knockback to player
-    applyKnockback(player) {
-        // Calculate knockback direction
-        const direction = new THREE.Vector3(
-            player.position.x - this.enemy.position.x,
+        // Apply knockback to player
+        const knockbackDirection = new THREE.Vector3(
+            player.position.x - enemy.position.x,
             0,
-            player.position.z - this.enemy.position.z
+            player.position.z - enemy.position.z
         ).normalize();
         
-        // Apply knockback
-        player.applyKnockback(direction, this.knockbackForce);
-    }
-}
-
-// Ranged attack implementation
-export class RangedAttack extends AttackBehavior {
-    constructor(enemy, options = {}) {
-        super(enemy, options);
-        this.type = AttackType.RANGED;
-        this.projectileSpeed = options.projectileSpeed || 8.0;
-        this.projectileSize = options.projectileSize || 0.3;
-        this.projectileColor = options.projectileColor || 0xff0000;
-        this.projectileLifetime = options.projectileLifetime || 5.0;
-        this.accuracy = options.accuracy || 0.9; // 0-1, higher is more accurate
-        this.burstCount = options.burstCount || 1;
-        this.burstDelay = options.burstDelay || 0.2;
-        this.currentBurst = 0;
-        this.burstTimer = 0;
+        player.applyKnockback(knockbackDirection, knockback);
+        
+        return true; // Attack hit
     }
     
-    // Override start to implement ranged attack logic
-    start() {
-        super.start();
-        this.currentBurst = 0;
-        this.burstTimer = 0;
+    // Execute a ranged attack
+    executeRangedAttack(enemy, player, params = {}) {
+        // Extract parameters with defaults
+        const projectileSpeed = params.projectileSpeed || enemy.projectileSpeed || 8;
+        const damage = params.damage || enemy.baseDamage || 8;
+        const variance = params.variance || enemy.damageVariance || 0.2;
+        const lifetime = params.lifetime || enemy.projectileLifetime || 3;
+        const projectileSize = params.projectileSize || 0.3;
+        const projectileColor = params.projectileColor || enemy.color || 0xff0000;
+        
+        // Get direction to player
+        const playerPos = player.getPosition();
+        const direction = new THREE.Vector3(
+            playerPos.x - enemy.position.x,
+            0,
+            playerPos.z - enemy.position.z
+        ).normalize();
+        
+        // Adjust starting position to be in front of the enemy
+        const startPosition = new THREE.Vector3(
+            enemy.position.x + direction.x * (enemy.size / 2 + 0.2),
+            enemy.position.y + enemy.size / 2,
+            enemy.position.z + direction.z * (enemy.size / 2 + 0.2)
+        );
+        
+        // Create projectile in the projectile system
+        if (window.game && window.game.projectileSystem) {
+            window.game.projectileSystem.createEnemyProjectile(
+                startPosition,
+                direction,
+                projectileSpeed,
+                damage,
+                lifetime,
+                projectileColor,
+                projectileSize,
+                variance
+            );
+            return true;
+        } else {
+            // Fallback: Create projectile directly
+            this.createProjectile(
+                startPosition,
+                direction,
+                projectileSpeed,
+                damage,
+                lifetime,
+                projectileColor,
+                projectileSize,
+                variance
+            );
+            return true;
+        }
+    }
+    
+    // Execute a slam attack
+    executeSlamAttack(enemy, player, params = {}) {
+        // Extract parameters with defaults
+        const range = params.range || enemy.attackRange * 1.5 || 3;
+        const damage = params.damage || enemy.baseDamage * 1.5 || 15;
+        const variance = params.variance || enemy.damageVariance || 0.2;
+        const knockback = params.knockback || 4;
+        const jumpHeight = params.jumpHeight || 3;
+        const jumpDuration = params.jumpDuration || 0.5; // seconds
+        
+        // Save original position for animation
+        const originalY = enemy.position.y;
+        
+        // Make enemy temporarily invulnerable during animation
+        enemy.isInvulnerable = true;
+        
+        // Animation to jump up
+        const startTime = Date.now();
+        const jumpInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000; // convert to seconds
+            const progress = Math.min(elapsed / jumpDuration, 1);
+            
+            // Parabolic jump - up then down
+            const jumpOffset = Math.sin(progress * Math.PI) * jumpHeight;
+            enemy.position.y = originalY + jumpOffset;
+            
+            if (progress >= 1) {
+                clearInterval(jumpInterval);
+                
+                // Apply slam damage and knockback when landing
+                this.applySlamEffect(enemy, player, range, damage, variance, knockback);
+                
+                // Reset position and vulnerability
+                enemy.position.y = originalY;
+                enemy.isInvulnerable = false;
+            }
+        }, 16); // ~60fps
+        
         return true;
     }
     
-    // Override update to implement ranged attack logic
-    update(deltaTime, player, projectiles) {
-        // Call base update for animation handling
-        if (!super.update(deltaTime, player, projectiles)) return false;
+    // Apply slam damage and effects when landing
+    applySlamEffect(enemy, player, range, damage, variance, knockback) {
+        // Check if player is in range
+        const distance = enemy.getDistanceToPlayer(player);
+        if (distance > range) {
+            return false; // Slam missed
+        }
         
-        // Update burst timer
-        if (this.currentBurst < this.burstCount) {
-            this.burstTimer -= deltaTime;
-            
-            if (this.burstTimer <= 0) {
-                // Fire next projectile in burst
-                this.fireProjectile(player, projectiles);
-                this.currentBurst++;
-                
-                // Reset burst timer if more projectiles to fire
-                if (this.currentBurst < this.burstCount) {
-                    this.burstTimer = this.burstDelay;
-                }
-            }
+        // Calculate damage based on distance (more damage closer to center)
+        const damageMultiplier = 1 - (distance / range);
+        const damageVariance = 1 + (Math.random() * variance * 2 - variance);
+        const actualDamage = Math.round(damage * damageMultiplier * damageVariance);
+        
+        // Apply damage to player
+        player.takeDamage(actualDamage);
+        
+        // Apply knockback away from slam center
+        const knockbackDirection = new THREE.Vector3(
+            player.position.x - enemy.position.x,
+            0,
+            player.position.z - enemy.position.z
+        ).normalize();
+        
+        player.applyKnockback(knockbackDirection, knockback);
+        
+        // Visual effect for the slam (created in the scene)
+        if (window.game && window.game.scene) {
+            this.createSlamEffect(enemy.position, range, enemy.color);
         }
         
         return true;
     }
     
-    // Fire a projectile toward the target
-    fireProjectile(player, projectiles) {
-        // Calculate direction to player with accuracy variation
-        const accuracy = this.accuracy;
-        const accuracyVariance = (1 - accuracy) * Math.PI;
-        const angle = this.enemy.angleToEntity(player) + (Math.random() * accuracyVariance * 2 - accuracyVariance);
+    // Create a visual effect for the slam attack
+    createSlamEffect(position, radius, color) {
+        // Create a ring geometry for the shockwave
+        const segments = 32;
+        const ringGeometry = new THREE.RingGeometry(0, radius, segments);
         
-        const direction = new THREE.Vector3(
-            Math.sin(angle),
-            0,
-            Math.cos(angle)
-        );
+        // Shockwave material
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: color || 0xff0000,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
         
-        // Create projectile starting position (slightly offset from enemy)
-        const startPosition = this.enemy.position.clone().add(
-            direction.clone().multiplyScalar(1.0)
-        );
-        startPosition.y += 1.0; // Adjust height
+        // Create mesh
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
         
-        // Create projectile
+        // Position at ground level
+        ring.position.set(position.x, 0.1, position.z);
+        ring.rotation.x = -Math.PI / 2; // Lay flat on ground
+        
+        // Add to scene
+        window.game.scene.add(ring);
+        
+        // Animate the shockwave
+        const duration = 0.5; // seconds
+        const startTime = Date.now();
+        
+        const expandInterval = setInterval(() => {
+            const elapsed = (Date.now() - startTime) / 1000; // convert to seconds
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Expand the ring
+            ringGeometry.dispose(); // Clean up old geometry
+            ring.geometry = new THREE.RingGeometry(
+                progress * radius, 
+                progress * radius + 0.3, 
+                segments
+            );
+            
+            // Fade out
+            ringMaterial.opacity = 0.7 * (1 - progress);
+            
+            if (progress >= 1) {
+                clearInterval(expandInterval);
+                
+                // Clean up
+                window.game.scene.remove(ring);
+                ringGeometry.dispose();
+                ringMaterial.dispose();
+            }
+        }, 16); // ~60fps
+    }
+    
+    // Create a projectile directly (fallback if projectileSystem isn't available)
+    createProjectile(position, direction, speed, damage, lifetime, color, size, damageVariance) {
+        // Create projectile geometry
+        const geometry = new THREE.SphereGeometry(size, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ 
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.5
+        });
+        
+        // Create mesh
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.copy(position);
+        
+        // Create light
+        const light = new THREE.PointLight(color, 1, 3);
+        light.position.set(0, 0, 0);
+        mesh.add(light);
+        
+        // Add to scene
+        if (window.game && window.game.scene) {
+            window.game.scene.add(mesh);
+        }
+        
+        // Create projectile object
         const projectile = {
-            position: startPosition,
-            velocity: direction.multiplyScalar(this.projectileSpeed),
-            size: this.projectileSize,
-            color: this.projectileColor,
-            lifetime: this.projectileLifetime,
-            damage: this.calculateProjectileDamage(),
-            owner: this.enemy
+            mesh: mesh,
+            direction: direction,
+            speed: speed,
+            damage: damage,
+            damageVariance: damageVariance,
+            timeAlive: 0,
+            lifetime: lifetime,
+            active: true
         };
         
         // Add to projectiles array
-        projectiles.push(projectile);
+        this.projectiles.push(projectile);
         
-        // Create projectile visual (if in a real implementation)
-        // This would be handled by the game's projectile system
+        return projectile;
     }
     
-    // Calculate projectile damage with variance
-    calculateProjectileDamage() {
-        const variance = this.damage * this.damageVariance;
-        return Math.round(this.damage + (Math.random() * variance * 2 - variance));
-    }
-}
-
-// Area attack implementation
-export class AreaAttack extends AttackBehavior {
-    constructor(enemy, options = {}) {
-        super(enemy, options);
-        this.type = AttackType.AREA;
-        this.areaRadius = options.areaRadius || this.range;
-        this.chargeTime = options.chargeTime || 1.0;
-        this.isCharging = false;
-        this.chargeTimer = 0;
-        this.damageMultiplier = options.damageMultiplier || 1.5;
-        this.visualEffect = options.visualEffect || null;
-    }
-    
-    // Override start to implement area attack logic
-    start() {
-        super.start();
-        this.isCharging = true;
-        this.chargeTimer = this.chargeTime;
-        return true;
-    }
-    
-    // Override update to implement area attack logic
-    update(deltaTime, player, projectiles) {
-        // Call base update for animation handling
-        if (!super.update(deltaTime, player, projectiles)) return false;
-        
-        // Update charge timer
-        if (this.isCharging) {
-            this.chargeTimer -= deltaTime;
+    // Update all projectiles
+    update(deltaTime, player) {
+        // Update each projectile
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const projectile = this.projectiles[i];
             
-            // Create charging effect (would be implemented in full version)
+            // Skip inactive projectiles
+            if (!projectile.active) {
+                continue;
+            }
             
-            if (this.chargeTimer <= 0) {
-                this.isCharging = false;
-                this.releaseAreaAttack(player);
+            // Update position
+            projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+            projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
+            
+            // Update lifetime
+            projectile.timeAlive += deltaTime;
+            if (projectile.timeAlive >= projectile.lifetime) {
+                this.destroyProjectile(projectile);
+                this.projectiles.splice(i, 1);
+                continue;
+            }
+            
+            // Check for collision with player
+            const projectilePos = projectile.mesh.position;
+            const playerPos = player.getPosition();
+            const dx = projectilePos.x - playerPos.x;
+            const dz = projectilePos.z - playerPos.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            
+            if (distance < player.collisionRadius + 0.3) {
+                // Calculate damage with variance
+                const variance = 1 + (Math.random() * projectile.damageVariance * 2 - projectile.damageVariance);
+                const damage = Math.round(projectile.damage * variance);
+                
+                // Apply damage to player
+                player.takeDamage(damage);
+                
+                // Apply knockback
+                const knockbackDirection = new THREE.Vector3(dx, 0, dz).normalize();
+                player.applyKnockback(knockbackDirection, 1);
+                
+                // Destroy projectile
+                this.destroyProjectile(projectile);
+                this.projectiles.splice(i, 1);
             }
         }
-        
-        return true;
     }
     
-    // Release the area attack
-    releaseAreaAttack(player) {
-        // Check if player is in area
-        const distance = this.enemy.distanceToEntity(player);
+    // Destroy a projectile
+    destroyProjectile(projectile) {
+        projectile.active = false;
         
-        if (distance <= this.areaRadius) {
-            // Apply damage with area multiplier
-            const areaDamage = this.damage * this.damageMultiplier;
-            this.damage = areaDamage; // Temporarily set damage higher
-            this.applyDamage(player);
-            this.damage = areaDamage / this.damageMultiplier; // Reset damage
+        if (projectile.mesh && projectile.mesh.parent) {
+            projectile.mesh.parent.remove(projectile.mesh);
+            
+            // Dispose of resources
+            if (projectile.mesh.geometry) {
+                projectile.mesh.geometry.dispose();
+            }
+            
+            if (projectile.mesh.material) {
+                if (Array.isArray(projectile.mesh.material)) {
+                    projectile.mesh.material.forEach(material => material.dispose());
+                } else {
+                    projectile.mesh.material.dispose();
+                }
+            }
         }
-        
-        // Create area effect visual (would be implemented in full version)
-    }
-}
-
-// Special attack base class (to be extended for specific enemy types)
-export class SpecialAttack extends AttackBehavior {
-    constructor(enemy, options = {}) {
-        super(enemy, options);
-        this.type = AttackType.SPECIAL;
-        this.specialCooldown = options.specialCooldown || 10.0;
     }
     
-    // Override start to implement special attack logic
-    start() {
-        super.start();
-        // Special attack implementation would go here
-        return true;
+    // Clean up all projectiles
+    clear() {
+        for (const projectile of this.projectiles) {
+            this.destroyProjectile(projectile);
+        }
+        this.projectiles = [];
     }
 }
 
-// Helper function to normalize angle to -PI to PI
-function normalizeAngle(angle) {
-    while (angle > Math.PI) angle -= Math.PI * 2;
-    while (angle < -Math.PI) angle += Math.PI * 2;
-    return angle;
+// Helper functions to create attack configurations
+
+// Create a melee attack configuration
+export function createMeleeAttack(params = {}) {
+    return {
+        type: AttackType.MELEE,
+        range: params.range || 2,
+        damage: params.damage || 10,
+        variance: params.variance || 0.2,
+        knockback: params.knockback || 2,
+        cooldown: params.cooldown || 1.5
+    };
 }
 
-// Create an attack behavior for an enemy
-export function createAttackBehavior(enemy, type, options = {}) {
-    switch (type) {
-        case AttackType.MELEE:
-            return new MeleeAttack(enemy, options);
-        case AttackType.RANGED:
-            return new RangedAttack(enemy, options);
-        case AttackType.AREA:
-            return new AreaAttack(enemy, options);
-        case AttackType.SPECIAL:
-            return new SpecialAttack(enemy, options);
-        default:
-            return new MeleeAttack(enemy, options); // Default to melee
-    }
+// Create a ranged attack configuration
+export function createRangedAttack(params = {}) {
+    return {
+        type: AttackType.RANGED,
+        projectileSpeed: params.projectileSpeed || 8,
+        damage: params.damage || 8,
+        variance: params.variance || 0.2,
+        lifetime: params.lifetime || 3,
+        projectileSize: params.projectileSize || 0.3,
+        projectileColor: params.projectileColor || 0xff0000,
+        cooldown: params.cooldown || 2
+    };
 }
+
+// Create a slam attack configuration
+export function createSlamAttack(params = {}) {
+    return {
+        type: AttackType.SLAM,
+        range: params.range || 3,
+        damage: params.damage || 15,
+        variance: params.variance || 0.2,
+        knockback: params.knockback || 4,
+        jumpHeight: params.jumpHeight || 3,
+        jumpDuration: params.jumpDuration || 0.5,
+        cooldown: params.cooldown || 5
+    };
+}
+
+// Export a singleton instance for global use
+export const enemyAttacks = new AttackSystem();
