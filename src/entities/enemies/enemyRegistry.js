@@ -1,13 +1,9 @@
 // src/entities/enemies/enemyRegistry.js - Central registry for all enemy types
 
-// This file will import all enemy variants once they're created
-// For now we'll set up the structure with placeholder imports
-// that will be replaced when the variant files are created
-
-// Import enemy variants (will be uncommented when variants are created)
-// import { Sphere } from './variants/Sphere.js';
-// import { Cube } from './variants/Cube.js';
-// import { Cylinder } from './variants/Cylinder.js';
+// Import the enemy variants
+import { Sphere } from './variants/Sphere.js';
+import { Cube } from './variants/Cube.js';
+import { Cylinder } from './variants/Cylinder.js';
 
 // Enemy registry class
 export class EnemyRegistry {
@@ -21,18 +17,12 @@ export class EnemyRegistry {
     
     // Initialize registry with all enemy types
     initRegistry() {
-        // When variant files are created, we'll uncomment these registrations
+        // Register all enemy variants
+        this.register('sphere', Sphere);
+        this.register('cube', Cube);
+        this.register('cylinder', Cylinder);
         
-        // PLACEHOLDER: Register sphere enemy
-        // this.register('sphere', Sphere);
-        
-        // PLACEHOLDER: Register cube enemy
-        // this.register('cube', Cube);
-        
-        // PLACEHOLDER: Register cylinder enemy (mini-boss)
-        // this.register('cylinder', Cylinder);
-        
-        // For now, add a basic placeholder enemy to test with
+        // Keep placeholder for backward compatibility during testing
         this.register('placeholder', {
             create: (x, y, z, params) => {
                 // Import dynamically to avoid circular dependencies
@@ -63,7 +53,7 @@ export class EnemyRegistry {
             }
         });
         
-        console.log('Enemy registry initialized with placeholder enemy');
+        console.log('Enemy registry initialized with enemy variants');
     }
     
     // Register a new enemy type
