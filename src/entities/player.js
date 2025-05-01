@@ -129,22 +129,6 @@ export class Player {
         // Create collider
         this.updateCollider();
         
-        // Create player light with a delay
-        console.log("Scheduling player light creation with delay...");
-        setTimeout(() => {
-            this.createPlayerLight();
-        }, 1000); // 1 second delay
-        
-        // Initialize inventory in UI if the global function exists
-        if (window.updatePauseMenuInventory) {
-            window.updatePauseMenuInventory(this.inventory);
-            console.log("Player inventory synchronized with menu system");
-        }
-    }
-    
-    // New method to create the player light
-    createPlayerLight() {
-        console.log("Creating player light...");
         // Create player light
         this.playerLight = new THREE.PointLight(this.lightColor, this.lightIntensity, this.lightRadius);
         this.playerLight.position.set(0, this.lightHeight, 0); // Position light above player's head
@@ -169,7 +153,12 @@ export class Player {
 
         // Add light to player object
         this.object.add(this.playerLight);
-        console.log("Player light created successfully");
+        
+        // Initialize inventory in UI if the global function exists
+        if (window.updatePauseMenuInventory) {
+            window.updatePauseMenuInventory(this.inventory);
+            console.log("Player inventory synchronized with menu system");
+        }
     }
     
     // Create visual representations of the player's weapons
