@@ -243,67 +243,27 @@ export class Dungeon {
     }
     
     // Build the 3D mesh representation of the dungeon
-    // Simplified fix for the buildMesh method in src/dungeon/floor.js
-
-// Replace only the buildMesh method with this simpler version
-buildMesh() {
-    // Create object to hold all dungeon meshes
-    this.object = new THREE.Object3D();
-    
-    console.log("Building dungeon floors...");
-    // Create floor
-    this.buildFloors();
-    
-    console.log("Building dungeon decorations...");
-    // Create decorations
-    this.buildDecorations();
-    
-    console.log("Building key and exit...");
-    // Create key and exit
-    this.buildKeyAndExit();
-    
-    // Build walls directly but with simplified settings
-    try {
-        console.log("Building walls with simplified settings...");
+    buildMesh() {
+        console.log("Building dungeon mesh with delayed wall generation...");
         
-        // Create wall builder
-        this.wallBuilder = new WallBuilder(this);
+        // Create object to hold all dungeon meshes
+        this.object = new THREE.Object3D();
         
-        // Use a try-catch block just for the walls
-        try {
-            const { meshes, colliders } = this.wallBuilder.buildWalls();
-            
-            // Add walls in small batches to avoid overwhelming THREE.js
-            let wallsAdded = 0;
-            
-            // Process walls in smaller batches
-            for (let i = 0; i < meshes.length; i++) {
-                // Add with a slight delay between batches
-                if (i % 10 === 0 && i > 0) {
-                    console.log(`Added ${i} wall segments of ${meshes.length}`);
-                }
-                
-                // Add to main object
-                this.object.add(meshes[i]);
-                this.meshes.push(meshes[i]);
-                wallsAdded++;
-                
-                // Add colliders
-                if (i < colliders.length) {
-                    this.colliders.push(colliders[i]);
-                }
-            }
-            
-            console.log(`Successfully built ${wallsAdded} wall segments`);
-        } catch (wallError) {
-            console.error("Error during wall building:", wallError);
-            // Continue without walls if there's an error
-        }
-    } catch (builderError) {
-        console.error("Error creating wall builder:", builderError);
-        // Continue without walls if there's an error
+        // Create floor
+        this.buildFloors();
+        
+        // Create decorations
+        this.buildDecorations();
+        
+        // Create key and exit
+        this.buildKeyAndExit();
+        
+        // Create walls using the WallBuilder after a delay
+        console.log("Scheduling wall building with delay...");
+        setTimeout(() => {
+            this.buildWallsDelayed();
+        }, 1000); // 1 second delay after floor creation
     }
-}
     
     // New method to build walls after a delay
     buildWallsDelayed() {
