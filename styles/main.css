@@ -269,13 +269,17 @@ canvas {
 
 
 /* Loading screen - Add to styles/main.css */
+/* Enhanced loading screen styles to add to styles/main.css */
+
+/* Loading screen - with improved visuals */
 #loading-screen {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #000;
+    background-color: #0a0a0a;
+    background-image: radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 70%);
     z-index: 9999;
     display: flex;
     flex-direction: column;
@@ -291,12 +295,15 @@ canvas {
     color: #f0a000;
     text-shadow: 0 0 15px rgba(240, 160, 0, 0.7);
     letter-spacing: 3px;
+    text-transform: uppercase;
+    animation: pulse-title 2s infinite;
 }
 
 #loading-screen h2 {
     font-size: 1.5em;
     margin-bottom: 30px;
     color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 #loading-bar-container {
@@ -307,6 +314,7 @@ canvas {
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    position: relative;
 }
 
 #loading-bar {
@@ -315,6 +323,23 @@ canvas {
     background: linear-gradient(to right, #f04040, #f0a000);
     transition: width 0.3s ease-out;
     box-shadow: 0 0 8px rgba(240, 64, 64, 0.7);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add a moving light effect to the loading bar */
+#loading-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(to right, 
+        rgba(255, 255, 255, 0), 
+        rgba(255, 255, 255, 0.3), 
+        rgba(255, 255, 255, 0));
+    animation: loading-shimmer 1.5s infinite;
 }
 
 /* Mobile adjustments for loading screen */
@@ -331,4 +356,17 @@ canvas {
         width: 80%;
         max-width: 280px;
     }
+}
+
+/* Animation for the loading bar shimmer effect */
+@keyframes loading-shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Pulsing animation for the title */
+@keyframes pulse-title {
+    0% { text-shadow: 0 0 10px rgba(240, 160, 0, 0.5); }
+    50% { text-shadow: 0 0 20px rgba(240, 160, 0, 0.8); }
+    100% { text-shadow: 0 0 10px rgba(240, 160, 0, 0.5); }
 }
