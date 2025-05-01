@@ -244,51 +244,20 @@ export class Dungeon {
     
     // Build the 3D mesh representation of the dungeon
     buildMesh() {
-        console.log("Building dungeon mesh with delayed wall generation...");
-        
         // Create object to hold all dungeon meshes
         this.object = new THREE.Object3D();
         
         // Create floor
         this.buildFloors();
         
+        // Create walls using the WallBuilder
+        this.buildWalls();
+        
         // Create decorations
         this.buildDecorations();
         
         // Create key and exit
         this.buildKeyAndExit();
-        
-        // Create walls using the WallBuilder after a delay
-        console.log("Scheduling wall building with delay...");
-        setTimeout(() => {
-            this.buildWallsDelayed();
-        }, 1000); // 1 second delay after floor creation
-    }
-    
-    // New method to build walls after a delay
-    buildWallsDelayed() {
-        console.log("Now building walls after delay...");
-        
-        // Create wall builder
-        this.wallBuilder = new WallBuilder(this);
-        
-        // Build all walls
-        try {
-            const { meshes, colliders } = this.wallBuilder.buildWalls();
-            
-            // Add wall meshes to the dungeon object
-            meshes.forEach(mesh => {
-                this.object.add(mesh);
-                this.meshes.push(mesh);
-            });
-            
-            // Add wall colliders to dungeon colliders
-            this.colliders.push(...colliders);
-            
-            console.log(`Successfully built ${meshes.length} wall segments`);
-        } catch (error) {
-            console.error("Error building walls:", error);
-        }
     }
     
     // Build floor meshes
@@ -329,8 +298,7 @@ export class Dungeon {
         });
     }
     
-    // Original buildWalls method - now replaced by the delayed version
-    // Kept for reference
+    // Build walls using the WallBuilder
     buildWalls() {
         // Create wall builder
         this.wallBuilder = new WallBuilder(this);
