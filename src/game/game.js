@@ -378,7 +378,7 @@ export class Game {
         
         // Function to continue after loading screen is ready
         const continueGeneration = () => {
-            console.log(`Generating floor ${floorNumber} with loading...`);
+            console.log(`Generating floor ${floorNumber} with improved loading sequence...`);
             
             // Remove old dungeon if it exists
             if (this.currentDungeon) {
@@ -431,54 +431,61 @@ export class Game {
             this.camera.position.z += 10;
             this.camera.lookAt(this.player.getPosition());
             
-            // Sequence the spawning of items using setTimeout for proper sequencing
+            // Extended sequence with improved timing:
+            // 1. First wait for dungeon mesh (floors) to be created and rendered
             setTimeout(() => {
-                loadingScreen.updateProgress(80);
-                loadingScreen.setMessage(`Adding Treasure to Floor ${floorNumber}...`);
+                loadingScreen.updateProgress(75);
+                loadingScreen.setMessage(`Adding Structures to Floor ${floorNumber}...`);
                 
-                // Try to add chests with delayed spawning
-                try {
-                    // Use our standalone chest spawner from chestSpawner.js
-                    // It already has a built-in delay mechanism
-                    if (window.spawnChestsInDungeon) {
-                        window.spawnChestsInDungeon(this.currentDungeon);
-                    } else {
-                        // Fallback to the imported function if global isn't available
-                        const { spawnChestsInDungeon } = require('../entities/items/chestSpawner.js');
-                        spawnChestsInDungeon(this.currentDungeon);
-                    }
-                } catch (error) {
-                    console.error('Error spawning chests:', error);
-                }
-                
-                // Spawn enemies after another delay
+                // After short delay, go to next step
                 setTimeout(() => {
-                    loadingScreen.updateProgress(90);
-                    loadingScreen.setMessage(`Spawning Enemies on Floor ${floorNumber}...`);
+                    loadingScreen.updateProgress(80);
+                    loadingScreen.setMessage(`Adding Treasure to Floor ${floorNumber}...`);
                     
+                    // Try to add chests with delayed spawning
                     try {
-                        // Spawn enemies with a delay
-                        this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
+                        // Use our standalone chest spawner from chestSpawner.js
+                        // It already has a built-in delay mechanism
+                        if (window.spawnChestsInDungeon) {
+                            window.spawnChestsInDungeon(this.currentDungeon);
+                        } else {
+                            // Fallback to the imported function if global isn't available
+                            const { spawnChestsInDungeon } = require('../entities/items/chestSpawner.js');
+                            spawnChestsInDungeon(this.currentDungeon);
+                        }
                     } catch (error) {
-                        console.error('Error spawning enemies:', error);
+                        console.error('Error spawning chests:', error);
                     }
                     
-                    // Complete loading
+                    // Spawn enemies after another delay
                     setTimeout(() => {
-                        loadingScreen.updateProgress(100);
+                        loadingScreen.updateProgress(90);
+                        loadingScreen.setMessage(`Spawning Enemies on Floor ${floorNumber}...`);
                         
-                        // Add callback to reset game state after loading screen is hidden
-                        loadingScreen.addCallback(() => {
-                            // Show floor transition message
-                            window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
+                        try {
+                            // Spawn enemies with a delay
+                            this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
+                        } catch (error) {
+                            console.error('Error spawning enemies:', error);
+                        }
+                        
+                        // Complete loading
+                        setTimeout(() => {
+                            loadingScreen.updateProgress(100);
                             
-                            // Set game state back to playing
-                            this.state = GameState.PLAYING;
-                            console.log(`Floor ${floorNumber} fully loaded and ready`);
-                        });
-                    }, 500);
-                }, this.transitionDelay.enemySpawn - this.transitionDelay.chestSpawn);
-            }, this.transitionDelay.chestSpawn);
+                            // Add callback to reset game state after loading screen is hidden
+                            loadingScreen.addCallback(() => {
+                                // Show floor transition message
+                                window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
+                                
+                                // Set game state back to playing
+                                this.state = GameState.PLAYING;
+                                console.log(`Floor ${floorNumber} fully loaded and ready`);
+                            });
+                        }, 1000); // Extended final delay
+                    }, this.transitionDelay.enemySpawn - this.transitionDelay.chestSpawn);
+                }, this.transitionDelay.chestSpawn);
+            }, 1500); // Add a longer initial delay for dungeon mesh rendering
         };
         
         // Start the generation process after a short delay
