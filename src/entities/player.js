@@ -108,38 +108,65 @@ export class Player {
         this._wasUnpaused = false;
         this._prePauseState = null;
     }
+    // Simplified fix for Player light in the Player.js file
+
+// Modify just the initial light creation in init() method:
+init() {
+    // Create simple player mesh
+    const geometry = new THREE.BoxGeometry(0.8, 1.8, 0.8);
+    const material = new THREE.MeshLambertMaterial({ color: 0x00aaff });
+    this.mesh = new THREE.Mesh(geometry, material);
+    this.mesh.castShadow = true;
+    this.mesh.receiveShadow = true;
     
-    // Initialize player's 3D model and physics
-    init() {
-        // Create simple player mesh
-        const geometry = new THREE.BoxGeometry(0.8, 1.8, 0.8);
-        const material = new THREE.MeshLambertMaterial({ color: 0x00aaff });
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.castShadow = true;
-        this.mesh.receiveShadow = true;
+    // Create player container to handle rotations better
+    this.object = new THREE.Object3D();
+    this.object.position.set(this.position.x, this.position.y, this.position.z);
+    this.object.add(this.mesh);
+    
+    // Add weapon models
+    this.createWeaponModels();
+    
+    // Create collider
+    this.updateCollider();
+    
+    // Create a simplified player light for better compatibility
+    try {
+        // Create a light with less intensity and simpler configuration
+        this.playerLight = new THREE.PointLight(this.lightColor, 1.0, 8); // Reduced intensity and range
+        this.playerLight.position.set(0, this.lightHeight, 0);
+        this.playerLight.castShadow = true;
         
-        // Create player container to handle rotations better
-        this.object = new THREE.Object3D();
-        this.object.position.set(this.position.x, this.position.y, this.position.z);
-        this.object.add(this.mesh);
+        // Only use the essential shadow settings
+        this.playerLight.shadow.mapSize.width = 256; // Reduced from 512
+        this.playerLight.shadow.mapSize.height = 256; // Reduced from 512
         
-        // Add weapon models
-        this.createWeaponModels();
+        // Add a simpler glow sphere
+        const glowGeometry = new THREE.SphereGeometry(0.15, 8, 8); // Smaller and with fewer segments
+        const glowMaterial = new THREE.MeshBasicMaterial({
+            color: this.lightColor,
+            transparent: true,
+            opacity: 0.3
+        });
+        this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+        this.glowMesh.position.set(0, this.lightHeight, 0);
         
-        // Create collider
-        this.updateCollider();
+        // Add to player
+        this.object.add(this.playerLight);
+        this.object.add(this.glowMesh); // Add separately instead of as child of light
         
-        // Create player light with a delay
-        console.log("Scheduling player light creation with delay...");
-        setTimeout(() => {
-            this.createPlayerLight();
-        }, 1000); // 1 second delay
-        
-        // Initialize inventory in UI if the global function exists
-        if (window.updatePauseMenuInventory) {
-            window.updatePauseMenuInventory(this.inventory);
-            console.log("Player inventory synchronized with menu system");
-        }
+        console.log("Basic player light created successfully");
+    } catch (error) {
+        console.error("Failed to create player light:", error);
+        // Continue without light if there's an error
+    }
+    
+    // Initialize inventory in UI if the global function exists
+    if (window.updatePauseMenuInventory) {
+        window.updatePauseMenuInventory(this.inventory);
+        console.log("Player inventory synchronized with menu system");
+    }
+}
     }
     
     // New method to create the player light
