@@ -303,106 +303,229 @@ export class Dungeon {
         // Create wall builder
         this.wallBuilder = new WallBuilder(this);
         
-        // Build all walls
-        const { meshes, colliders } = this.wallBuilder.buildWalls();
+        try {
+            // Build all walls
+            const result = this.wallBuilder.buildWalls();
+            
+            // Check if the result is valid
+            if (result && Array.isArray(result.meshes)) {
+                // Add wall meshes to the dungeon object
+                result.meshes.forEach(mesh => {
+                    if (mesh) {
+                        this.object.add(mesh);
+                        this.meshes.push(mesh);
+                    }
+                });
+                
+                // Add wall colliders to dungeon colliders if they exist
+                if (Array.isArray(result.colliders)) {
+                    this.colliders.push(...result.colliders);
+                }
+            } else {
+                console.error("WallBuilder did not return valid meshes and colliders");
+                // Create fallback walls - simple box around the entire dungeon
+                this.createFallbackWalls();
+            }
+        } catch (error) {
+            console.error("Error building walls:", error);
+            // Create fallback walls if there's an error
+            this.createFallbackWalls();
+        }
+    }
+    
+    // Add this new method to create fallback walls if regular wall building fails
+    createFallbackWalls() {
+        console.log("Creating fallback walls...");
         
-        // Add wall meshes to the dungeon object
-        meshes.forEach(mesh => {
-            this.object.add(mesh);
-            this.meshes.push(mesh);
+        const size = this.size;
+        const wallMaterial = new THREE.MeshLambertMaterial({
+            color: this.theme.wallColor || 0x333333,
+            map: this.theme.wallTexture
         });
         
-        // Add wall colliders to dungeon colliders
-        this.colliders.push(...colliders);
+        // Wall dimensions
+        const wallHeight = 3;
+        const wallThickness = 0.5;
+        
+        // Create outer walls for the entire dungeon
+        // North wall
+        const northWall = new THREE.BoxGeometry(size.width, wallHeight, wallThickness);
+        const northWallMesh = new THREE.Mesh(northWall, wallMaterial);
+        northWallMesh.position.set(size.width / 2, wallHeight / 2, -wallThickness / 2);
+        this.object.add(northWallMesh);
+        this.meshes.push(northWallMesh);
+        
+        // South wall
+        const southWall = new THREE.BoxGeometry(size.width, wallHeight, wallThickness);
+        const southWallMesh = new THREE.Mesh(southWall, wallMaterial);
+        southWallMesh.position.set(size.width / 2, wallHeight / 2, size.height + wallThickness / 2);
+        this.object.add(southWallMesh);
+        this.meshes.push(southWallMesh);
+        
+        // East wall
+        const eastWall = new THREE.BoxGeometry(wallThickness, wallHeight, size.height);
+        const eastWallMesh = new THREE.Mesh(eastWall, wallMaterial);
+        eastWallMesh.position.set(size.width + wallThickness / 2, wallHeight / 2, size.height / 2);
+        this.object.add(eastWallMesh);
+        this.meshes.push(eastWallMesh);
+        
+        // West wall
+        const westWall = new THREE.BoxGeometry(wallThickness, wallHeight, size.height);
+        const westWallMesh = new THREE.Mesh(westWall, wallMaterial);
+        westWallMesh.position.set(-wallThickness / 2, wallHeight / 2, size.height / 2);
+        this.object.add(westWallMesh);
+        this.meshes.push(westWallMesh);
+        
+        // Add colliders for these walls
+        this.colliders.push(
+            // North wall collider
+            {
+                min: new THREE.Vector3(0, 0, -wallThickness),
+                max: new THREE.Vector3(size.width, wallHeight, 0)
+            },
+            // South wall collider
+            {
+                min: new THREE.Vector3(0, 0, size.height),
+                max: new THREE.Vector3(size.width, wallHeight, size.height + wallThickness)
+            },
+            // East wall collider
+            {
+                min: new THREE.Vector3(size.width, 0, 0),
+                max: new THREE.Vector3(size.width + wallThickness, wallHeight, size.height)
+            },
+            // West wall collider
+            {
+                min: new THREE.Vector3(-wallThickness, 0, 0),
+                max: new THREE.Vector3(0, wallHeight, size.height)
+            }
+        );
+        
+        console.log("Fallback walls created");
     }
     
     // Check if there's a passage in a given direction from a room
     hasPassageAt(room, direction) {
+        if (!room) {
+            console.error("Cannot check passage: room is undefined");
+            return false;
+        }
+        
         // Expand room slightly to ensure we find connecting corridors
         const buffer = 1;
         
-        // Check if any corridor or room overlaps with the edge
-        for (const corridor of this.corridors) {
-            // Skip the room itself
-            if (corridor === room) continue;
-            
-            // Check if corridor connects to the room's edge
-            switch (direction) {
-                case 'north':
-                    if (corridor.z <= room.z && 
-                        corridor.z + corridor.height >= room.z &&
-                        corridor.x < room.x + room.width + buffer &&
-                        corridor.x + corridor.width > room.x - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'south':
-                    if (corridor.z <= room.z + room.height && 
-                        corridor.z + corridor.height >= room.z + room.height &&
-                        corridor.x < room.x + room.width + buffer &&
-                        corridor.x + corridor.width > room.x - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'east':
-                    if (corridor.x <= room.x + room.width && 
-                        corridor.x + corridor.width >= room.x + room.width &&
-                        corridor.z < room.z + room.height + buffer &&
-                        corridor.z + corridor.height > room.z - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'west':
-                    if (corridor.x <= room.x && 
-                        corridor.x + corridor.width >= room.x &&
-                        corridor.z < room.z + room.height + buffer &&
-                        corridor.z + corridor.height > room.z - buffer) {
-                        return true;
-                    }
-                    break;
+        try {
+            // Make sure we have corridors to check
+            if (!Array.isArray(this.corridors)) {
+                console.error("Cannot check passages: corridors is not an array");
+                return false;
             }
-        }
-        
-        // Check for adjacent rooms too
-        for (const otherRoom of this.rooms) {
-            // Skip the room itself
-            if (otherRoom === room) continue;
             
-            // Check if room connects to the room's edge
-            switch (direction) {
-                case 'north':
-                    if (otherRoom.z + otherRoom.height >= room.z - buffer && 
-                        otherRoom.z <= room.z &&
-                        otherRoom.x < room.x + room.width + buffer &&
-                        otherRoom.x + otherRoom.width > room.x - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'south':
-                    if (otherRoom.z <= room.z + room.height + buffer && 
-                        otherRoom.z + otherRoom.height >= room.z + room.height &&
-                        otherRoom.x < room.x + room.width + buffer &&
-                        otherRoom.x + otherRoom.width > room.x - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'east':
-                    if (otherRoom.x <= room.x + room.width + buffer && 
-                        otherRoom.x + otherRoom.width >= room.x + room.width &&
-                        otherRoom.z < room.z + room.height + buffer &&
-                        otherRoom.z + otherRoom.height > room.z - buffer) {
-                        return true;
-                    }
-                    break;
-                case 'west':
-                    if (otherRoom.x + otherRoom.width >= room.x - buffer && 
-                        otherRoom.x <= room.x &&
-                        otherRoom.z < room.z + room.height + buffer &&
-                        otherRoom.z + otherRoom.height > room.z - buffer) {
-                        return true;
-                    }
-                    break;
+            // Check if any corridor or room overlaps with the edge
+            for (const corridor of this.corridors) {
+                // Skip the room itself
+                if (corridor === room) continue;
+                if (!corridor) continue; // Skip undefined corridors
+                
+                // Make sure corridor has all required properties
+                if (typeof corridor.x !== 'number' || typeof corridor.z !== 'number' ||
+                    typeof corridor.width !== 'number' || typeof corridor.height !== 'number') {
+                    continue;
+                }
+                
+                // Check if corridor connects to the room's edge
+                switch (direction) {
+                    case 'north':
+                        if (corridor.z <= room.z && 
+                            corridor.z + corridor.height >= room.z &&
+                            corridor.x < room.x + room.width + buffer &&
+                            corridor.x + corridor.width > room.x - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'south':
+                        if (corridor.z <= room.z + room.height && 
+                            corridor.z + corridor.height >= room.z + room.height &&
+                            corridor.x < room.x + room.width + buffer &&
+                            corridor.x + corridor.width > room.x - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'east':
+                        if (corridor.x <= room.x + room.width && 
+                            corridor.x + corridor.width >= room.x + room.width &&
+                            corridor.z < room.z + room.height + buffer &&
+                            corridor.z + corridor.height > room.z - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'west':
+                        if (corridor.x <= room.x && 
+                            corridor.x + corridor.width >= room.x &&
+                            corridor.z < room.z + room.height + buffer &&
+                            corridor.z + corridor.height > room.z - buffer) {
+                            return true;
+                        }
+                        break;
+                }
             }
+            
+            // Make sure we have rooms to check
+            if (!Array.isArray(this.rooms)) {
+                console.error("Cannot check passages: rooms is not an array");
+                return false;
+            }
+            
+            // Check for adjacent rooms too
+            for (const otherRoom of this.rooms) {
+                // Skip the room itself
+                if (otherRoom === room) continue;
+                if (!otherRoom) continue; // Skip undefined rooms
+                
+                // Make sure otherRoom has all required properties
+                if (typeof otherRoom.x !== 'number' || typeof otherRoom.z !== 'number' ||
+                    typeof otherRoom.width !== 'number' || typeof otherRoom.height !== 'number') {
+                    continue;
+                }
+                
+                // Check if room connects to the room's edge
+                switch (direction) {
+                    case 'north':
+                        if (otherRoom.z + otherRoom.height >= room.z - buffer && 
+                            otherRoom.z <= room.z &&
+                            otherRoom.x < room.x + room.width + buffer &&
+                            otherRoom.x + otherRoom.width > room.x - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'south':
+                        if (otherRoom.z <= room.z + room.height + buffer && 
+                            otherRoom.z + otherRoom.height >= room.z + room.height &&
+                            otherRoom.x < room.x + room.width + buffer &&
+                            otherRoom.x + otherRoom.width > room.x - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'east':
+                        if (otherRoom.x <= room.x + room.width + buffer && 
+                            otherRoom.x + otherRoom.width >= room.x + room.width &&
+                            otherRoom.z < room.z + room.height + buffer &&
+                            otherRoom.z + otherRoom.height > room.z - buffer) {
+                            return true;
+                        }
+                        break;
+                    case 'west':
+                        if (otherRoom.x + otherRoom.width >= room.x - buffer && 
+                            otherRoom.x <= room.x &&
+                            otherRoom.z < room.z + room.height + buffer &&
+                            otherRoom.z + otherRoom.height > room.z - buffer) {
+                            return true;
+                        }
+                        break;
+                }
+            }
+        } catch (error) {
+            console.error("Error checking for passages:", error);
+            return false; // Default to no passage if there's an error
         }
         
         return false;
