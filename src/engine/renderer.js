@@ -16,7 +16,7 @@ export function setupRenderer() {
     scene.background = new THREE.Color(0x000000);
     
     // Setup fog for atmosphere and to hide distant objects
-    scene.fog = new THREE.FogExp2(0x000000, 0.07); // Increased density for darker environment
+    scene.fog = new THREE.FogExp2(0x000000, 0.04); // Reduced density from 0.07 to 0.04
     
     // Create perspective camera
     const aspectRatio = window.innerWidth / window.innerHeight;
@@ -49,12 +49,12 @@ export function setupRenderer() {
 
 // Set up basic lighting for the scene
 function setupLighting() {
-    // Ambient light for basic illumination - reduced intensity for darker dungeons
-    const ambientLight = new THREE.AmbientLight(0x222222, 0.3); // Darker ambient for better contrast with player light
+    // Ambient light for basic illumination - increased intensity
+    const ambientLight = new THREE.AmbientLight(0x333333, 0.5); // Increased from 0.3 to 0.5
     scene.add(ambientLight);
     
     // Directional light for subtle shadows and directional illumination
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5); // Reduced intensity
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Increased from 0.5 to 0.7
     directionalLight.position.set(5, 10, 7);
     directionalLight.castShadow = true;
     
