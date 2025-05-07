@@ -258,6 +258,9 @@ export class Dungeon {
         
         // Create key and exit
         this.buildKeyAndExit();
+        
+        // Add center lights to rooms and corridors
+        this.addCenterLights();
     }
     
     // Build floor meshes
@@ -581,6 +584,52 @@ export class Dungeon {
                 this.object.add(mesh);
                 this.meshes.push(mesh);
             }
+        });
+    }
+    
+    // Add center lights to all rooms
+    addCenterLights() {
+        // Add a light to each room center
+        this.rooms.forEach(room => {
+            // Skip small rooms and corridors
+            if (room.isCorridor || room.width < 8 || room.height < 8) return;
+            
+            // Calculate room center
+            const centerX = room.x + room.width / 2;
+            const centerY = room.floorHeight + 2.5; // Position light higher than player
+            const centerZ = room.z + room.height / 2;
+            
+            // Create a point light
+            const light = new THREE.PointLight(0xffffff, 0.7, 30); // Color, intensity, distance
+            light.position.set(centerX, centerY, centerZ);
+            
+            // Add shadow capabilities
+            light.castShadow = true;
+            light.shadow.mapSize.width = 512;
+            light.shadow.mapSize.height = 512;
+            light.shadow.camera.near = 0.5;
+            light.shadow.camera.far = 50;
+            
+            // Add to dungeon object
+            this.object.add(light);
+        });
+        
+        // Add lights to corridor intersections for better navigation
+        this.corridors.forEach(corridor => {
+            // Only add lights to longer corridors
+            if (corridor.width < 10 && corridor.height < 10) return;
+            
+            // Calculate corridor center
+            const centerX = corridor.x + corridor.width / 2;
+            const centerY = corridor.floorHeight + 2; // Slightly lower than room lights
+            const centerZ = corridor.z + corridor.height / 2;
+            
+            // Create a dimmer point light for corridors
+            const light = new THREE.PointLight(0xf5deb3, 0.5, 15); // Wheat color, lower intensity
+            light.position.set(centerX, centerY, centerZ);
+            
+            // Add to dungeon object
+            this.object.add(light);
         });
     }
     
