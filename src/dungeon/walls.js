@@ -395,13 +395,40 @@ export class WallBuilder {
     
     // Handle wall intersections and resolve overlapping sections
     resolveWallOverlaps() {
-        // For now, we're using the wallId tracking to avoid building duplicate walls
-        // This is a simple approach that works for most cases
+        // Create a map to track unique wall segments by their position
+        const wallPositionMap = new Map();
+        const wallsToKeep = [];
         
-        // For future enhancement: 
-        // 1. We could use raycasting to detect actual intersections
-        // 2. We could use a more sophisticated wall merging algorithm
-        // 3. We could use BSP (Binary Space Partitioning) for perfect wall joins
+        for (const wall of this.wallMeshes) {
+            // Create a unique position key for this wall
+            const posKey = `${wall.position.x.toFixed(2)},${wall.position.y.toFixed(2)},${wall.position.z.toFixed(2)}`;
+            
+            // If we haven't seen this position before, keep the wall
+            if (!wallPositionMap.has(posKey)) {
+                wallPositionMap.set(posKey, true);
+                wallsToKeep.push(wall);
+            }
+        }
+        
+        // Update the wall meshes and colliders arrays
+        this.wallMeshes = wallsToKeep;
+        
+        // Also clean up colliders to match
+        const collidersToKeep = [];
+        const colliderPositionMap = new Map();
+        
+        for (const collider of this.wallColliders) {
+            const minKey = `${collider.min.x.toFixed(2)},${collider.min.y.toFixed(2)},${collider.min.z.toFixed(2)}`;
+            const maxKey = `${collider.max.x.toFixed(2)},${collider.max.y.toFixed(2)},${collider.max.z.toFixed(2)}`;
+            const colliderKey = minKey + '|' + maxKey;
+            
+            if (!colliderPositionMap.has(colliderKey)) {
+                colliderPositionMap.set(colliderKey, true);
+                collidersToKeep.push(collider);
+            }
+        }
+        
+        this.wallColliders = collidersToKeep;
         
         console.log(`Wall overlap resolution complete: ${this.wallMeshes.length} walls remaining`);
     }
