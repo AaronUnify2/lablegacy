@@ -1,5 +1,5 @@
 // src/main.js - Updated with improved error handling and integration with DungeonLoader
-import { setupRenderer, resizeRenderer } from './engine/renderer.js';
+import { setupRenderer, resizeRenderer, getRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
 import { initUI, showMessage } from './game/ui.js';
@@ -85,6 +85,7 @@ function init() {
         window.addEventListener('resize', onWindowResize);
         
         // Add recovery handler for potential Three.js WebGL context loss
+        const { renderer } = getRenderer();
         if (renderer && renderer.domElement) {
             renderer.domElement.addEventListener('webglcontextlost', handleWebGLContextLost);
         }
@@ -152,6 +153,7 @@ function handleWebGLContextLost(event) {
             setupRenderer();
             // After renderer is recreated, reinitialize scene
             if (game) {
+                const { scene, camera, renderer } = getRenderer();
                 game.scene = scene;
                 game.camera = camera;
                 game.renderer = renderer;
@@ -200,6 +202,7 @@ window.addEventListener('error', function(event) {
                 // Force renderer reset
                 window.game.renderer.dispose();
                 setupRenderer();
+                const { renderer } = getRenderer();
                 window.game.renderer = renderer;
                 
                 // Show recovery message
