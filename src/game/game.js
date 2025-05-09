@@ -1,26 +1,28 @@
-// src/game/game.js - Modified with loading screen transitions
+// src/game/game.js - Refactored with DungeonLoader for stable generation
 import * as THREE from 'three';
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
-import { generateDungeon } from '../dungeon/generator.js';
 import { Player } from '../entities/player.js';
 import { updateUI } from './ui.js';
 import { Physics } from '../engine/physics.js';
 import { initMinimap, updateMinimap } from './minimap.js'; 
 import { toggleMenu } from './pauseMenu.js';
-import { loadingScreen } from './loadingScreen.js'; // Import loading screen
+import { loadingScreen } from './loadingScreen.js';
 
 // Added enemy-related imports
 import { enemyRegistry } from '../entities/enemies/enemyRegistry.js';
 import { enemySpawner } from '../entities/enemies/enemySpawner.js';
 import { projectileSystem } from '../entities/enemies/projectileSystem.js';
 
+// Import DungeonLoader
+import { DungeonLoader } from '../dungeon/dungeonLoader.js';
+
 // Game states
-const GameState = {
+export const GameState = {
     LOADING: 'loading',
     MENU: 'menu',
     PLAYING: 'playing',
-    TRANSITIONING: 'transitioning', // New state for floor transitions
+    TRANSITIONING: 'transitioning',
     GAME_OVER: 'gameOver'
 };
 
@@ -31,6 +33,9 @@ export class Game {
         this.state = GameState.LOADING;
         this.currentFloor = 1;
         this.lastTimestamp = 0;
+        
+        // Make GameState available to other components
+        this.GameState = GameState;
         
         // Game objects
         this.player = null;
@@ -55,12 +60,8 @@ export class Game {
         this.enemySpawner = enemySpawner;
         this.projectileSystem = projectileSystem;
         
-        // Floor transition timers and flags
-        this.transitionDelay = {
-            dungeonBuild: 1000,    // Time to build dungeon mesh
-            chestSpawn: 1500,      // Time to wait before spawning chests
-            enemySpawn: 3000       // Time to wait before spawning enemies
-        };
+        // Create new dungeon loader for stable generation
+        this.dungeonLoader = null;
     }
     
     // Initialize the game
@@ -112,12 +113,25 @@ export class Game {
         
         loadingScreen.updateProgress(80);
         
-        // Generate first dungeon floor with loading screen
-        this.generateNewFloorWithLoading(this.currentFloor);
+        // Initialize dungeon loader
+        this.dungeonLoader = new DungeonLoader(this);
         
-        // Loading screen will complete after dungeon is generated
+        // Generate first dungeon floor with loading screen
+        this.generateNewFloor(this.currentFloor);
         
         console.log('Game initialized!');
+    }
+    
+    // Generate a new dungeon floor using the DungeonLoader
+    generateNewFloor(floorNumber) {
+        // Set game state to transitioning
+        this.state = GameState.TRANSITIONING;
+        
+        // Use the dungeon loader to generate the floor
+        this.dungeonLoader.generateDungeon(floorNumber);
+        
+        // Return immediately - the dungeon loader will handle the loading screen
+        // and state transitions asynchronously
     }
     
     // Add compatibility layer to handle differences between player and enemy systems
@@ -310,9 +324,6 @@ export class Game {
                 // Track which rooms already have enemies
                 const roomsWithEnemies = new Set();
                 
-                // The rest of the spawning logic - using the safer overridden methods
-                // ... (original code for spawning in different room types)
-                
                 // 1. Spawn in cardinal rooms first (center position)
                 if (cardinalRooms.length > 0) {
                     cardinalRooms.forEach(room => {
@@ -336,7 +347,7 @@ export class Game {
                         if (remainingEnemies <= 0 || Math.random() > 0.6) return; // 60% chance to spawn
                         
                         // Spawn 1-3 enemies in radial rooms
-                        const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * this.maxEnemiesPerRoom));
+                        const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * (this.maxEnemiesPerRoom || 3)));
                         try {
                             this.spawnEnemiesInRoom(room, count, availableEnemies, scene);
                             remainingEnemies -= count;
@@ -366,133 +377,8 @@ export class Game {
             }
         };
     }
-
-    // Generate a new dungeon floor with loading screen
-    generateNewFloorWithLoading(floorNumber) {
-        // Set game state to transitioning
-        this.state = GameState.TRANSITIONING;
-        
-        // Show loading screen
-        loadingScreen.show(`Preparing Floor ${floorNumber}...`);
-        loadingScreen.updateProgress(10);
-        
-        // Function to continue after loading screen is ready
-        const continueGeneration = () => {
-            console.log(`Generating floor ${floorNumber} with improved loading sequence...`);
-            
-            // Remove old dungeon if it exists
-            if (this.currentDungeon) {
-                this.currentDungeon.dispose();
-                removeFromScene(this.currentDungeon.getObject());
-                loadingScreen.updateProgress(20);
-            } else {
-                loadingScreen.updateProgress(20);
-            }
-            
-            // Clean up projectiles
-            this.projectileSystem.clear();
-            
-            // Clean up player projectiles
-            if (this.player) {
-                this.player.cleanupProjectiles(this.scene);
-            }
-            
-            // Clear enemies
-            this.enemySpawner.clearEnemies(this.scene);
-            
-            // Clear entities list
-            this.entities = [];
-            
-            loadingScreen.updateProgress(40);
-            loadingScreen.setMessage(`Generating Floor ${floorNumber}...`);
-            
-            // Generate new dungeon
-            this.currentDungeon = generateDungeon(floorNumber);
-            addToScene(this.currentDungeon.getObject());
-            
-            loadingScreen.updateProgress(60);
-            
-            // Get player spawn position from dungeon
-            const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
-            this.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
-            
-            // Initialize enemy spawner with current floor
-            this.enemySpawner.init(floorNumber);
-            
-            loadingScreen.updateProgress(70);
-            loadingScreen.setMessage(`Building Floor ${floorNumber}...`);
-            
-            // Update UI
-            document.getElementById('floor-number').textContent = floorNumber;
-            
-            // Update camera to focus on player's new position
-            this.camera.position.copy(this.player.getPosition());
-            this.camera.position.y += 8;
-            this.camera.position.z += 10;
-            this.camera.lookAt(this.player.getPosition());
-            
-            // Extended sequence with improved timing:
-            // 1. First wait for dungeon mesh (floors) to be created and rendered
-            setTimeout(() => {
-                loadingScreen.updateProgress(75);
-                loadingScreen.setMessage(`Adding Structures to Floor ${floorNumber}...`);
-                
-                // After short delay, go to next step
-                setTimeout(() => {
-                    loadingScreen.updateProgress(80);
-                    loadingScreen.setMessage(`Adding Treasure to Floor ${floorNumber}...`);
-                    
-                    // Try to add chests with delayed spawning
-                    try {
-                        // Use our standalone chest spawner from chestSpawner.js
-                        // It already has a built-in delay mechanism
-                        if (window.spawnChestsInDungeon) {
-                            window.spawnChestsInDungeon(this.currentDungeon);
-                        } else {
-                            // Fallback to the imported function if global isn't available
-                            const { spawnChestsInDungeon } = require('../entities/items/chestSpawner.js');
-                            spawnChestsInDungeon(this.currentDungeon);
-                        }
-                    } catch (error) {
-                        console.error('Error spawning chests:', error);
-                    }
-                    
-                    // Spawn enemies after another delay
-                    setTimeout(() => {
-                        loadingScreen.updateProgress(90);
-                        loadingScreen.setMessage(`Spawning Enemies on Floor ${floorNumber}...`);
-                        
-                        try {
-                            // Spawn enemies with a delay
-                            this.enemySpawner.spawnEnemiesInDungeon(this.currentDungeon, this.scene);
-                        } catch (error) {
-                            console.error('Error spawning enemies:', error);
-                        }
-                        
-                        // Complete loading
-                        setTimeout(() => {
-                            loadingScreen.updateProgress(100);
-                            
-                            // Add callback to reset game state after loading screen is hidden
-                            loadingScreen.addCallback(() => {
-                                // Show floor transition message
-                                window.showMessage?.(`Entered Floor ${floorNumber}`, 3000);
-                                
-                                // Set game state back to playing
-                                this.state = GameState.PLAYING;
-                                console.log(`Floor ${floorNumber} fully loaded and ready`);
-                            });
-                        }, 1000); // Extended final delay
-                    }, this.transitionDelay.enemySpawn - this.transitionDelay.chestSpawn);
-                }, this.transitionDelay.chestSpawn);
-            }, 1500); // Add a longer initial delay for dungeon mesh rendering
-        };
-        
-        // Start the generation process after a short delay
-        setTimeout(continueGeneration, 200);
-    }
     
-    // Update method - modified to handle transitioning state
+    // Update method
     update(timestamp, inputState) {
         // Calculate delta time
         const deltaTime = (timestamp - this.lastTimestamp) / 1000;
@@ -575,13 +461,13 @@ export class Game {
             updateMinimap(this.minimapContext, this.currentDungeon, this.player);
         }
         
-        // Check for floor progression - updated to use loading screen
+        // Check for floor progression
         if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
             // Increment floor number
             this.currentFloor++;
             
-            // Generate new floor with loading screen
-            this.generateNewFloorWithLoading(this.currentFloor);
+            // Generate new floor using the stable DungeonLoader
+            this.generateNewFloor(this.currentFloor);
         }
     }
     
