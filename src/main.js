@@ -1,12 +1,11 @@
-// src/main.js - Updated with loading screen integration and error handling
+// src/main.js - Updated with improved error handling and integration with DungeonLoader
 import { setupRenderer, resizeRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
 import { initUI, showMessage } from './game/ui.js';
 import { initMenu } from './game/pauseMenu.js';
-import { loadingScreen } from './game/loadingScreen.js'; // Import loading screen
-import { ItemDatabase, ItemType } from './entities/items/inventory.js';
-import { spawnChestsInDungeon } from './entities/items/chestSpawner.js'; // Import chest spawner here
+import { loadingScreen } from './game/loadingScreen.js';
+import { spawnChestsInDungeon, getSpawnedChests, clearSpawnedChests } from './entities/items/chestSpawner.js';
 
 // Main game instance
 let game;
@@ -26,8 +25,7 @@ function init() {
             setupRenderer();
         } catch (rendererError) {
             console.error("Error setting up renderer:", rendererError);
-            // Show an alert as this is critical
-            alert("Failed to initialize graphics renderer. The game cannot start.");
+            showFatalError("Failed to initialize graphics renderer. The game cannot start.");
             return;
         }
         
@@ -35,6 +33,7 @@ function init() {
             setupInput();
         } catch (inputError) {
             console.error("Error setting up input:", inputError);
+            showWarning("Input system initialization failed. Controls may not work correctly.");
         }
         
         loadingScreen.updateProgress(30);
@@ -44,6 +43,7 @@ function init() {
             initUI();
         } catch (uiError) {
             console.error("Error initializing UI:", uiError);
+            showWarning("UI initialization failed. Game interface may not display correctly.");
         }
         
         // Initialize menu system
@@ -51,6 +51,7 @@ function init() {
             initMenu();
         } catch (menuError) {
             console.error("Error initializing menu:", menuError);
+            showWarning("Menu system initialization failed. In-game menu may not function correctly.");
         }
         
         loadingScreen.updateProgress(50);
@@ -64,7 +65,7 @@ function init() {
             game.init();
         } catch (gameInitError) {
             console.error("Error initializing game:", gameInitError);
-            loadingScreen.setMessage("Error starting game. Please refresh.");
+            showFatalError("Error starting game: " + gameInitError.message);
             return;
         }
         
@@ -73,11 +74,11 @@ function init() {
         
         // Expose necessary functions globally
         window.showMessage = showMessage;
-        window.spawnChestsInDungeon = spawnChestsInDungeon; // Make chest spawner available globally
-        if (typeof ItemDatabase !== 'undefined') window.ItemDatabase = ItemDatabase;
-        if (typeof ItemType !== 'undefined') window.ItemType = ItemType;
+        window.spawnChestsInDungeon = spawnChestsInDungeon;
+        window.getSpawnedChests = getSpawnedChests;
+        window.clearSpawnedChests = clearSpawnedChests;
         
-        // Start the game loop - this will run even while the loading screen is showing
+        // Start the game loop
         requestAnimationFrame(gameLoop);
         
         // Handle window resize
@@ -85,40 +86,16 @@ function init() {
         
         // Add recovery handler for potential Three.js WebGL context loss
         if (renderer && renderer.domElement) {
-            renderer.domElement.addEventListener('webglcontextlost', function(event) {
-                console.error("WebGL context lost:", event);
-                // Prevent default behavior
-                event.preventDefault();
-                // Show message
-                if (window.showMessage) {
-                    showMessage('Graphics context lost. Attempting to recover...', 5000);
-                }
-                // Try to restart renderer after a delay
-                setTimeout(() => {
-                    try {
-                        setupRenderer();
-                        // After renderer is recreated, reinitialize scene
-                        if (game) {
-                            game.scene = scene;
-                            game.camera = camera;
-                            game.renderer = renderer;
-                        }
-                    } catch (e) {
-                        console.error("Failed to recover from context loss:", e);
-                    }
-                }, 2000);
-            });
+            renderer.domElement.addEventListener('webglcontextlost', handleWebGLContextLost);
         }
         
-        // Loading screen will finish in game.init()
     } catch (error) {
         console.error("Critical initialization error:", error);
-        loadingScreen.setMessage("Fatal error. Please refresh your browser.");
-        alert("A critical error occurred during game initialization. Please refresh your browser.");
+        showFatalError("A critical error occurred during game initialization: " + error.message);
     }
 }
 
-// Game loop function with error handling
+// Game loop function with improved error handling
 function gameLoop(timestamp) {
     try {
         // Get current input state
@@ -141,9 +118,7 @@ function gameLoop(timestamp) {
             } catch (gameError) {
                 console.error("Error during game update or render:", gameError);
                 // Show error message to user
-                if (window.showMessage) {
-                    showMessage('Game error: ' + gameError.message, 5000);
-                }
+                showWarning('Game error: ' + gameError.message);
                 // Don't re-throw to keep the game loop running
             }
         }
@@ -153,9 +128,7 @@ function gameLoop(timestamp) {
     } catch (criticalError) {
         console.error("Critical error in game loop:", criticalError);
         // Try to recover by restarting the loop
-        if (window.showMessage) {
-            showMessage('Critical error occurred. Attempting to recover...', 5000);
-        }
+        showWarning('Critical error occurred. Attempting to recover...');
         setTimeout(() => requestAnimationFrame(gameLoop), 1000);
     }
 }
@@ -166,10 +139,50 @@ function onWindowResize() {
     if (game) game.onResize();
 }
 
+// WebGL context loss handler
+function handleWebGLContextLost(event) {
+    console.error("WebGL context lost:", event);
+    // Prevent default behavior
+    event.preventDefault();
+    // Show message
+    showWarning('Graphics context lost. Attempting to recover...');
+    // Try to restart renderer after a delay
+    setTimeout(() => {
+        try {
+            setupRenderer();
+            // After renderer is recreated, reinitialize scene
+            if (game) {
+                game.scene = scene;
+                game.camera = camera;
+                game.renderer = renderer;
+            }
+            showMessage('Graphics system recovered', 3000);
+        } catch (e) {
+            console.error("Failed to recover from context loss:", e);
+            showFatalError("Failed to recover graphics context. Please refresh the page.");
+        }
+    }, 2000);
+}
+
+// Show a fatal error with alert and loading screen
+function showFatalError(message) {
+    loadingScreen.setMessage("Fatal error! Please refresh your browser.");
+    alert(message);
+}
+
+// Show a warning but allow the game to continue
+function showWarning(message) {
+    if (window.showMessage) {
+        window.showMessage(message, 5000);
+    } else {
+        console.warn(message);
+    }
+}
+
 // Start the game when the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', init);
 
-// Add a global error handler for Three.js specific errors
+// Add a global error handler
 window.addEventListener('error', function(event) {
     // Check if this is a Three.js related error
     const errorMessage = event.message || '';
@@ -179,6 +192,7 @@ window.addEventListener('error', function(event) {
         errorMessage.includes('shader')) {
         
         console.error('Graphics error caught:', event.error);
+        showWarning('A graphics error occurred. The game will attempt to recover.');
         
         // Try to recover the renderer
         if (window.game && window.game.renderer) {
@@ -189,19 +203,16 @@ window.addEventListener('error', function(event) {
                 window.game.renderer = renderer;
                 
                 // Show recovery message
-                if (window.showMessage) {
-                    showMessage('Graphics system recovered after error', 3000);
-                }
+                showMessage('Graphics system recovered after error', 3000);
             } catch (e) {
                 console.error("Failed to recover renderer:", e);
+                showFatalError("Failed to recover from graphics error. Please refresh the page.");
             }
         }
     } else {
         // Handle other errors
         console.error('Error caught:', event.error);
-        if (window.showMessage) {
-            showMessage('An error occurred: ' + event.error.message, 5000);
-        }
+        showWarning('An error occurred: ' + event.error.message);
     }
 });
 
@@ -215,19 +226,14 @@ window.formatString = function(str, vars) {
 // Utility function to get a readable name for item types
 window.getItemTypeName = function(type) {
     switch(type) {
-        case ItemType.HEALTH_POTION:
         case 'healthPotion':
             return 'Health Potion';
-        case ItemType.STAMINA_POTION:
         case 'staminaPotion':
             return 'Stamina Potion';
-        case ItemType.STAFF_CRYSTAL:
         case 'staffCrystal':
             return 'Staff Crystal';
-        case ItemType.KEY:
         case 'key':
             return 'Key';
-        case ItemType.SCROLL:
         case 'scroll':
             return 'Scroll';
         default:
