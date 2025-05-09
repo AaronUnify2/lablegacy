@@ -6,6 +6,7 @@ import { Room } from './room.js';
 import { getDungeonTheme } from './themes.js';
 import { addToScene, removeFromScene } from '../engine/renderer.js';
 import { loadingScreen } from '../game/loadingScreen.js';
+import { spawnChestsInDungeon } from '../entities/items/chestSpawner.js';
 
 // DungeonLoader class handles the step-by-step dungeon generation process
 export class DungeonLoader {
@@ -433,19 +434,8 @@ export class DungeonLoader {
         loadingScreen.updateProgress(70);
         
         try {
-            // Import needed for chest spawning
-            const { spawnChestsInDungeon } = require('../entities/items/chestSpawner.js');
-            
-            // Check if the function exists
-            if (typeof spawnChestsInDungeon !== 'function') {
-                console.warn("Chest spawner function not found, skipping chest spawning");
-                this.steps.chestsSpawned = true;
-                this.executeNextStep();
-                return;
-            }
-            
-            // Spawn chests now - directly, not with timers
-            const chests = spawnChestsInDungeon(this.currentDungeon, true); // Pass true to skip timers
+            // Use the spawnChestsInDungeon function with skipTimers=true for deterministic operation
+            const chests = spawnChestsInDungeon(this.currentDungeon, true);
             
             console.log(`Spawned ${chests.length} chests successfully`);
             
