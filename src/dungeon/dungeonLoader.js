@@ -140,45 +140,48 @@ export class DungeonLoader {
         }
     }
     
-    // STEP 2: Remove old dungeon if it exists
-    removeOldDungeon() {
-        console.log("[Step 2/10] Removing old dungeon");
-        loadingScreen.setMessage("Clearing previous floor...");
-        loadingScreen.updateProgress(15);
-        
-        try {
-            // Remove old dungeon if it exists
-            if (this.game.currentDungeon) {
-                this.game.currentDungeon.dispose();
-                removeFromScene(this.game.currentDungeon.getObject());
-                console.log("Old dungeon removed successfully");
-            }
-            
-            // Clean up projectiles
-            this.game.projectileSystem.clear();
-            
-            // Clean up player projectiles
-            if (this.game.player) {
-                this.game.player.cleanupProjectiles(this.game.scene);
-            }
-            
-            // Clear enemies
-            this.game.enemySpawner.clearEnemies(this.game.scene);
-            
-            // Clear entities list
-            this.game.entities = [];
-            
-            // Mark step as complete
-            this.steps.oldDungeonRemoved = true;
-            
-            // Continue to next step
-            this.executeNextStep();
-        } catch (error) {
-            console.error("Error removing old dungeon:", error);
-            this.errorMessages.push(`Cleanup error: ${error.message}`);
-            this.handleGenerationFailure();
+
+// STEP 2: Remove old dungeon if it exists
+removeOldDungeon() {
+    console.log("[Step 2/10] Removing old dungeon");
+    loadingScreen.setMessage("Clearing previous floor...");
+    loadingScreen.updateProgress(15);
+    
+    try {
+        // Remove old dungeon if it exists
+        if (this.game.currentDungeon) {
+            this.game.currentDungeon.dispose();
+            removeFromScene(this.game.currentDungeon.getObject());
+            console.log("Old dungeon removed successfully");
         }
+        
+        // Clean up projectiles - both player's and enemy's
+        this.game.projectileSystem.clear();
+        
+        // Clean up player projectiles - WITHOUT removing the light!
+        if (this.game.player) {
+            this.game.player.cleanupProjectiles(this.game.scene);
+        }
+        
+        // Clear enemies
+        this.game.enemySpawner.clearEnemies(this.game.scene);
+        
+        // Clear entities list
+        this.game.entities = [];
+        
+        // Mark step as complete
+        this.steps.oldDungeonRemoved = true;
+        
+        // Continue to next step
+        this.executeNextStep();
+    } catch (error) {
+        console.error("Error removing old dungeon:", error);
+        this.errorMessages.push(`Cleanup error: ${error.message}`);
+        this.handleGenerationFailure();
     }
+}
+
+
     
     // STEP 3: Select and apply dungeon theme
     selectTheme() {
@@ -483,52 +486,55 @@ export class DungeonLoader {
         }
     }
     
-    // STEP 10: Finalize dungeon generation
-    finalizeGeneration() {
-        console.log("[Step 10/10] Finalizing dungeon generation");
-        loadingScreen.setMessage("Finalizing floor...");
-        loadingScreen.updateProgress(95);
+// STEP 10: Finalize dungeon generation
+finalizeGeneration() {
+    console.log("[Step 10/10] Finalizing dungeon generation");
+    loadingScreen.setMessage("Finalizing floor...");
+    loadingScreen.updateProgress(95);
+    
+    try {
+        // Set the dungeon in the game
+        this.game.currentDungeon = this.currentDungeon;
         
-        try {
-            // Set the dungeon in the game
-            this.game.currentDungeon = this.currentDungeon;
+        // Get player spawn position from dungeon
+        const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
+        this.game.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
+        
+        // ENSURE player light is active after dungeon transition
+        this.game.player.recreatePlayerLight();
+        
+        // Update UI
+        document.getElementById('floor-number').textContent = this.currentFloor;
+        
+        // Update camera to focus on player's new position
+        this.game.camera.position.copy(this.game.player.getPosition());
+        this.game.camera.position.y += 8;
+        this.game.camera.position.z += 10;
+        this.game.camera.lookAt(this.game.player.getPosition());
+        
+        // Mark generation as complete
+        this.steps.completed = true;
+        this.isGenerating = false;
+        
+        console.log(`Floor ${this.currentFloor} generation completed successfully`);
+        loadingScreen.updateProgress(100);
+        
+        // Add callback to change game state after loading screen is hidden
+        loadingScreen.addCallback(() => {
+            // Show floor transition message
+            if (window.showMessage) {
+                window.showMessage(`Entered Floor ${this.currentFloor}`, 3000);
+            }
             
-            // Get player spawn position from dungeon
-            const spawnPosition = this.currentDungeon.getPlayerSpawnPosition();
-            this.game.player.setPosition(spawnPosition.x, spawnPosition.y, spawnPosition.z);
-            
-            // Update UI
-            document.getElementById('floor-number').textContent = this.currentFloor;
-            
-            // Update camera to focus on player's new position
-            this.game.camera.position.copy(this.game.player.getPosition());
-            this.game.camera.position.y += 8;
-            this.game.camera.position.z += 10;
-            this.game.camera.lookAt(this.game.player.getPosition());
-            
-            // Mark generation as complete
-            this.steps.completed = true;
-            this.isGenerating = false;
-            
-            console.log(`Floor ${this.currentFloor} generation completed successfully`);
-            loadingScreen.updateProgress(100);
-            
-            // Add callback to change game state after loading screen is hidden
-            loadingScreen.addCallback(() => {
-                // Show floor transition message
-                if (window.showMessage) {
-                    window.showMessage(`Entered Floor ${this.currentFloor}`, 3000);
-                }
-                
-                // Set game state back to playing
-                this.game.state = this.game.GameState.PLAYING;
-            });
-        } catch (error) {
-            console.error("Error finalizing dungeon:", error);
-            this.errorMessages.push(`Finalization error: ${error.message}`);
-            this.handleGenerationFailure();
-        }
+            // Set game state back to playing
+            this.game.state = this.game.GameState.PLAYING;
+        });
+    } catch (error) {
+        console.error("Error finalizing dungeon:", error);
+        this.errorMessages.push(`Finalization error: ${error.message}`);
+        this.handleGenerationFailure();
     }
+}
     
     // Handle generation failure
     handleGenerationFailure() {
