@@ -66,12 +66,12 @@ export class Player {
             }
         };
         
-        // Player light
+        // Player light - ENHANCED properties
         this.playerLight = null;
-        this.lightIntensity = 1.5;
-        this.lightRadius = 12;
-        this.lightColor = 0xf2dfa7; // Warm white light
-        this.lightHeight = 2.0; // Position light above player's head
+        this.lightIntensity = 2.0;      // Increased from 1.5
+        this.lightRadius = 15;          // Increased from 12
+        this.lightColor = 0xf8e0a7;     // Slightly warmer white light
+        this.lightHeight = 2.0;         // Position light above player's head
         
         // Ranged attack properties
         this.projectiles = [];
@@ -130,29 +130,7 @@ export class Player {
         this.updateCollider();
         
         // Create player light
-        this.playerLight = new THREE.PointLight(this.lightColor, this.lightIntensity, this.lightRadius);
-        this.playerLight.position.set(0, this.lightHeight, 0); // Position light above player's head
-        this.playerLight.castShadow = true;
-
-        // Configure shadows for better quality
-        this.playerLight.shadow.mapSize.width = 512;
-        this.playerLight.shadow.mapSize.height = 512;
-        this.playerLight.shadow.camera.near = 0.5;
-        this.playerLight.shadow.camera.far = 15;
-
-        // Add a subtle ambient glow sphere around the player
-        const glowGeometry = new THREE.SphereGeometry(0.2, 16, 16);
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: this.lightColor,
-            transparent: true,
-            opacity: 0.4
-        });
-        this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-        this.glowMesh.position.set(0, this.lightHeight, 0);
-        this.playerLight.add(this.glowMesh); // Add glow as child of light
-
-        // Add light to player object
-        this.object.add(this.playerLight);
+        this.recreatePlayerLight();
         
         // Initialize inventory in UI if the global function exists
         if (window.updatePauseMenuInventory) {
@@ -246,6 +224,19 @@ export class Player {
         projectileLight.position.set(0, 0, 0);
         projectileMesh.add(projectileLight);
         
+        // ENHANCEMENT: Add a trail effect to projectiles
+        const trailGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.3);
+        const trailMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4040ff,
+            transparent: true,
+            opacity: 0.6
+        });
+        
+        // Create trail mesh and set it behind the projectile
+        const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+        projectileMesh.add(trail);
+        trail.position.z = -0.4; // Position it behind the projectile
+        
         // Get staff position in world coordinates
         const staffWorldPosition = new THREE.Vector3();
         this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
@@ -299,7 +290,7 @@ export class Player {
             const projectile = this.projectiles[i];
             
             // Move projectile in its direction
-             projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+            projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
             projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
             
             // Update lifetime
@@ -308,40 +299,198 @@ export class Player {
             // Remove projectile if it's existed too long
             if (projectile.timeAlive >= projectile.lifeTime) {
                 scene.remove(projectile.mesh);
+                
+                // Properly dispose of Three.js resources
+                if (projectile.mesh) {
+                    // Dispose of geometries and materials
+                    if (projectile.mesh.geometry) {
+                        projectile.mesh.geometry.dispose();
+                    }
+                    
+                    if (projectile.mesh.material) {
+                        if (Array.isArray(projectile.mesh.material)) {
+                            projectile.mesh.material.forEach(mat => mat.dispose());
+                        } else {
+                            projectile.mesh.material.dispose();
+                        }
+                    }
+                }
+                
                 this.projectiles.splice(i, 1);
             }
         }
     }
     
-    // Check projectile collisions with enemies
-    checkProjectileCollisions(enemies) {
+    // FIXED: Check projectile collisions with enemies
+    checkProjectileCollisions(enemies, scene) {
+        let hitDetected = false;
+        
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const projectile = this.projectiles[i];
             const projectilePos = projectile.mesh.position;
             
             // Check collision with each enemy
             for (const enemy of enemies) {
+                // Skip if enemy is dead or doesn't have a position method
+                if (!enemy || enemy.state === 'dead' || !enemy.getPosition) continue;
+                
                 const enemyPos = enemy.getPosition();
+                // Skip if enemy position is invalid
+                if (!enemyPos) continue;
+                
                 const distance = Math.sqrt(
                     Math.pow(projectilePos.x - enemyPos.x, 2) +
                     Math.pow(projectilePos.z - enemyPos.z, 2)
                 );
                 
+                // Calculate enemy collision radius - if not defined, use 1.0 as default
+                const enemyRadius = enemy.collisionRadius || 1.0;
+                
                 // If collision detected
-                if (distance < 1.0) { // Assuming enemy has ~1 unit radius
+                if (distance < enemyRadius + 0.3) { // 0.3 is projectile approximate radius
                     // Damage the enemy
-                    enemy.takeDamage(projectile.damage);
+                    if (enemy.takeDamage) {
+                        enemy.takeDamage(projectile.damage);
+                    }
                     
-                    // Remove the projectile
+                    // Remove the projectile from scene
+                    if (projectile.mesh && projectile.mesh.parent) {
+                        projectile.mesh.parent.remove(projectile.mesh);
+                    }
+                    
+                    // Properly dispose of Three.js resources
+                    if (projectile.mesh) {
+                        // Dispose of geometries and materials
+                        if (projectile.mesh.geometry) {
+                            projectile.mesh.geometry.dispose();
+                        }
+                        
+                        if (projectile.mesh.material) {
+                            if (Array.isArray(projectile.mesh.material)) {
+                                projectile.mesh.material.forEach(mat => mat.dispose());
+                            } else {
+                                projectile.mesh.material.dispose();
+                            }
+                        }
+                    }
+                    
+                    // Remove from projectiles array
                     this.projectiles.splice(i, 1);
                     
-                    // Return true to indicate a hit
-                    return true;
+                    // Create hit effect
+                    this.createHitEffect(projectilePos.clone(), scene);
+                    
+                    hitDetected = true;
+                    break; // Once we've hit an enemy, no need to check others for this projectile
                 }
             }
         }
         
-        return false;
+        return hitDetected;
+    }
+    
+    // NEW METHOD: Create a hit effect when a projectile hits an enemy
+    createHitEffect(position, scene) {
+        // Skip if scene is not provided
+        if (!scene) return;
+        
+        // Create a flash of light at the impact point
+        const impactLight = new THREE.PointLight(0x4040ff, 2, 4);
+        impactLight.position.copy(position);
+        scene.add(impactLight);
+        
+        // Remove the light after a short delay
+        setTimeout(() => {
+            scene.remove(impactLight);
+        }, 200);
+        
+        // Create particle effect for visual splash
+        const particleCount = 8;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle geometry
+            const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+            const particleMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x4080ff,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            // Create mesh
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(position);
+            
+            // Add to scene
+            scene.add(particle);
+            particles.push(particle);
+            
+            // Give random direction
+            const angle = (i / particleCount) * Math.PI * 2;
+            const speed = 3 + Math.random() * 2;
+            
+            // Store direction and speed on particle
+            particle.userData.velocity = new THREE.Vector3(
+                Math.cos(angle) * speed,
+                Math.random() * 3,  // Some upward velocity
+                Math.sin(angle) * speed
+            );
+            
+            // Make particles fade out and shrink
+            particle.userData.fadeSpeed = 3 + Math.random() * 2;
+        }
+        
+        // Animate particles
+        const startTime = Date.now();
+        const duration = 0.4; // seconds
+        
+        const animateParticles = () => {
+            const elapsed = (Date.now() - startTime) / 1000;
+            
+            if (elapsed > duration) {
+                // Clean up particles
+                particles.forEach(particle => {
+                    if (particle.parent) {
+                        scene.remove(particle);
+                    }
+                    if (particle.geometry) {
+                        particle.geometry.dispose();
+                    }
+                    if (particle.material) {
+                        particle.material.dispose();
+                    }
+                });
+                
+                // Stop animation
+                return;
+            }
+            
+            // Update particles
+            const progress = elapsed / duration;
+            
+            particles.forEach(particle => {
+                // Move particle
+                particle.position.x += particle.userData.velocity.x * 0.016;
+                particle.position.y += particle.userData.velocity.y * 0.016;
+                particle.position.z += particle.userData.velocity.z * 0.016;
+                
+                // Slow down
+                particle.userData.velocity.multiplyScalar(0.92);
+                
+                // Fade out
+                particle.material.opacity = 0.8 * (1 - progress);
+                
+                // Shrink
+                const scale = 1 - progress;
+                particle.scale.set(scale, scale, scale);
+            });
+            
+            // Continue animation
+            requestAnimationFrame(animateParticles);
+        };
+        
+        // Start animation
+        animateParticles();
     }
     
     // Update the player's bounding box (collider)
@@ -706,14 +855,43 @@ export class Player {
         }
     }
     
-    // Clean up all projectiles
+    // FIXED: Clean up all projectiles without removing player light
     cleanupProjectiles(scene) {
         for (const projectile of this.projectiles) {
+            // Make sure to remove from scene
             scene.remove(projectile.mesh);
+            
+            // Proper cleanup of Three.js resources
+            if (projectile.mesh) {
+                // Dispose of geometries and materials to prevent memory leaks
+                if (projectile.mesh.geometry) {
+                    projectile.mesh.geometry.dispose();
+                }
+                
+                if (projectile.mesh.material) {
+                    if (Array.isArray(projectile.mesh.material)) {
+                        projectile.mesh.material.forEach(mat => mat.dispose());
+                    } else {
+                        projectile.mesh.material.dispose();
+                    }
+                }
+                
+                // Remove any lights from the projectile
+                projectile.mesh.children.forEach(child => {
+                    if (child.isLight) {
+                        projectile.mesh.remove(child);
+                    }
+                });
+            }
         }
-        this.projectiles = [];
         
-        // Ensure light is properly disposed
+        // Clear projectile array
+        this.projectiles = [];
+        console.log("Projectiles cleaned up successfully");
+    }
+    
+    // NEW METHOD: For cleaning up player light if needed
+    cleanupPlayerLight() {
         if (this.playerLight) {
             this.object.remove(this.playerLight);
             if (this.glowMesh) {
@@ -726,9 +904,44 @@ export class Player {
         }
     }
     
+    // NEW METHOD: Recreate player light if needed
+    recreatePlayerLight() {
+        // Only create a new light if it doesn't exist
+        if (!this.playerLight) {
+            // Create player light
+            this.playerLight = new THREE.PointLight(this.lightColor, this.lightIntensity, this.lightRadius);
+            this.playerLight.position.set(0, this.lightHeight, 0); // Position light above player's head
+            this.playerLight.castShadow = true;
+
+            // Configure shadows for better quality
+            this.playerLight.shadow.mapSize.width = 512;
+            this.playerLight.shadow.mapSize.height = 512;
+            this.playerLight.shadow.camera.near = 0.5;
+            this.playerLight.shadow.camera.far = 15;
+
+            // Add a subtle ambient glow sphere around the player
+            const glowGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: this.lightColor,
+                transparent: true,
+                opacity: 0.4
+            });
+            this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+            this.glowMesh.position.set(0, this.lightHeight, 0);
+            this.playerLight.add(this.glowMesh); // Add glow as child of light
+
+            // Add light to player object
+            this.object.add(this.playerLight);
+            
+            console.log("Player light recreated successfully");
+        }
+    }
+    
     // Set player light properties
     setLightProperties(intensity, radius, color) {
-        if (!this.playerLight) return;
+        if (!this.playerLight) {
+            this.recreatePlayerLight();
+        }
         
         if (intensity !== undefined) this.lightIntensity = intensity;
         if (radius !== undefined) this.lightRadius = radius;
@@ -746,9 +959,14 @@ export class Player {
 
     // Toggle player light on/off
     toggleLight(enabled) {
-        if (this.playerLight) {
-            this.playerLight.visible = enabled;
+        if (!this.playerLight) {
+            if (enabled) {
+                this.recreatePlayerLight();
+            }
+            return;
         }
+        
+        this.playerLight.visible = enabled;
     }
     
     // Set the ground level for the player
@@ -784,10 +1002,9 @@ export class Player {
         // Cap health at 0
         if (this.health < 0) {
             this.health = 0;
-
         }
 
-    // Set invulnerability time after taking damage
+        // Set invulnerability time after taking damage
         this.invulnerabilityTime = 1.0;
         
         // Update UI
