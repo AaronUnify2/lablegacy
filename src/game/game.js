@@ -378,7 +378,6 @@ export class Game {
         };
     }
     
-    
     // Update method
     update(timestamp, inputState) {
         // Calculate delta time
@@ -453,101 +452,24 @@ export class Game {
         } catch (error) {
             console.error('Error handling entities:', error);
         }
-        // In src/game/game.js - Update the game update method
-
-// Update method with improved projectile collision handling
-update(timestamp, inputState) {
-    // Calculate delta time
-    const deltaTime = (timestamp - this.lastTimestamp) / 1000;
-    this.lastTimestamp = timestamp;
-    
-    // Cap delta time to prevent huge jumps after tab switch or similar
-    const cappedDeltaTime = Math.min(deltaTime, 0.1);
-    
-    // Skip updates if we're in transitioning state
-    if (this.state === GameState.TRANSITIONING) {
-        // Only render the scene, don't update gameplay
-        return;
-    }
-    
-    // Handle menu toggling
-    if (inputState.justPressed.menu) {
-        this.toggleMenu();
-    }
-    
-    // Update player - game always runs now
-    this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
-    
-    // Check for interactions with chests
-    if (inputState.justPressed.interact) {
-        // Find a chest to interact with
-        const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
-        if (interactableChest) {
-            this.player.interactWithChest(interactableChest);
-        }
-    }
-    
-    // Update dungeon (includes chest animations)
-    if (this.currentDungeon) {
-        this.currentDungeon.update(cappedDeltaTime);
-    }
-    
-    // Update enemies with error handling
-    try {
-        this.enemySpawner.update(cappedDeltaTime, this.player, this.currentDungeon);
-    } catch (error) {
-        console.error('Error updating enemies:', error);
-    }
-    
-    // Update enemy projectiles
-    try {
-        this.projectileSystem.update(cappedDeltaTime, this.player);
-    } catch (error) {
-        console.error('Error updating projectiles:', error);
-    }
-    
-    // Update camera to follow player
-    this.updateCamera(cappedDeltaTime);
-    
-    // Update physics
-    this.physics.update(cappedDeltaTime);
-    
-    // Update all entities (merged with enemySpawner.enemies)
-    try {
-        this.entities = [...this.enemySpawner.getEnemies()];
-        for (const entity of this.entities) {
-            if (entity && typeof entity.update === 'function') {
-                entity.update(cappedDeltaTime, this.player, this.currentDungeon);
-            }
-        }
-    
-        // Check for collisions
-        this.physics.checkCollisions(this.player, this.entities, this.currentDungeon);
-    
-        // Check for projectile collisions with enemies
-        // FIXED: Pass the scene to checkProjectileCollisions for hit effects
-        this.player.checkProjectileCollisions(this.entities, this.scene);
-    } catch (error) {
-        console.error('Error handling entities:', error);
-    }
-    
-    // Update UI
-    updateUI(this.player, this.currentFloor);
-    
-    // Update minimap
-    if (this.minimapContext) {
-        updateMinimap(this.minimapContext, this.currentDungeon, this.player);
-    }
-    
-    // Check for floor progression
-    if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
-        // Increment floor number
-        this.currentFloor++;
         
-        // Generate new floor using the stable DungeonLoader
-        this.generateNewFloor(this.currentFloor);
+        // Update UI
+        updateUI(this.player, this.currentFloor);
+        
+        // Update minimap
+        if (this.minimapContext) {
+            updateMinimap(this.minimapContext, this.currentDungeon, this.player);
+        }
+        
+        // Check for floor progression
+        if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
+            // Increment floor number
+            this.currentFloor++;
+            
+            // Generate new floor using the stable DungeonLoader
+            this.generateNewFloor(this.currentFloor);
+        }
     }
-}
     
     // Toggle menu overlay without pausing the game
     toggleMenu() {
