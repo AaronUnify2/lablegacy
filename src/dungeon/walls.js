@@ -7,7 +7,7 @@ export class WallBuilder {
         this.theme = dungeon.theme;
         this.wallMeshes = [];
         this.wallColliders = [];
-        this.wallHeight = 3; // Standard wall height
+        this.wallHeight = 2.5; // Reduced wall height to avoid camera issues
         this.wallThickness = 0.5; // Standard wall thickness
         
         // Keep track of built walls to avoid duplicates
@@ -44,10 +44,30 @@ export class WallBuilder {
         };
     }
     
-    // Build exterior walls around the entire dungeon area
+    // Build exterior walls around the actual dungeon bounds
     buildExteriorWalls() {
-        const size = this.dungeon.size;
-        if (!size) return;
+        // Calculate the actual bounds of all rooms and corridors
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        
+        // Check all rooms and corridors to find actual bounds
+        const allSpaces = [...this.dungeon.rooms, ...this.dungeon.corridors];
+        
+        if (allSpaces.length === 0) return; // No spaces to enclose
+        
+        allSpaces.forEach(space => {
+            if (!space) return;
+            minX = Math.min(minX, space.x);
+            maxX = Math.max(maxX, space.x + space.width);
+            minZ = Math.min(minZ, space.z);
+            maxZ = Math.max(maxZ, space.z + space.height);
+        });
+        
+        // Add some padding around the bounds
+        const padding = 5;
+        minX -= padding;
+        maxX += padding;
+        minZ -= padding;
+        maxZ += padding;
         
         const wallMaterial = new THREE.MeshLambertMaterial({
             color: this.theme.wallColor || 0x333333,
@@ -55,34 +75,38 @@ export class WallBuilder {
         });
         
         const wallY = this.wallHeight / 2;
+        const boundWidth = maxX - minX;
+        const boundHeight = maxZ - minZ;
         
         // North boundary wall
         this.buildWall(
-            size.width / 2, wallY, -this.wallThickness / 2,
-            size.width + this.wallThickness, this.wallHeight, this.wallThickness,
+            minX + boundWidth / 2, wallY, minZ - this.wallThickness / 2,
+            boundWidth + this.wallThickness, this.wallHeight, this.wallThickness,
             wallMaterial, true, 'exterior-north'
         );
         
         // South boundary wall
         this.buildWall(
-            size.width / 2, wallY, size.height + this.wallThickness / 2,
-            size.width + this.wallThickness, this.wallHeight, this.wallThickness,
+            minX + boundWidth / 2, wallY, maxZ + this.wallThickness / 2,
+            boundWidth + this.wallThickness, this.wallHeight, this.wallThickness,
             wallMaterial, true, 'exterior-south'
         );
         
         // East boundary wall
         this.buildWall(
-            size.width + this.wallThickness / 2, wallY, size.height / 2,
-            this.wallThickness, this.wallHeight, size.height + this.wallThickness,
+            maxX + this.wallThickness / 2, wallY, minZ + boundHeight / 2,
+            this.wallThickness, this.wallHeight, boundHeight + this.wallThickness,
             wallMaterial, false, 'exterior-east'
         );
         
         // West boundary wall
         this.buildWall(
-            -this.wallThickness / 2, wallY, size.height / 2,
-            this.wallThickness, this.wallHeight, size.height + this.wallThickness,
+            minX - this.wallThickness / 2, wallY, minZ + boundHeight / 2,
+            this.wallThickness, this.wallHeight, boundHeight + this.wallThickness,
             wallMaterial, false, 'exterior-west'
         );
+        
+        console.log(`Built exterior walls - bounds: X(${minX.toFixed(1)} to ${maxX.toFixed(1)}), Z(${minZ.toFixed(1)} to ${maxZ.toFixed(1)})`);
     }
     
     // Build walls for a single room with improved passage detection
