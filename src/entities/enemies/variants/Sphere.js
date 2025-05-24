@@ -17,7 +17,7 @@ export class Sphere {
             z: z,
             maxHealth: 60,
             baseDamage: 8,
-            moveSpeed: 3.5,
+            moveSpeed: 2.0,
             color: 0x4080ff, // Blue color
             attackType: 'melee',
             attackRange: 1.5,
