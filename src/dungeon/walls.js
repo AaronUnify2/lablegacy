@@ -1,4 +1,4 @@
-// src/dungeon/walls.js - Wall generation and management for dungeon rooms
+// src/dungeon/walls.js - Fixed wall generation with proper corridor and room wall handling
 import * as THREE from 'three';
 
 export class WallBuilder {
@@ -18,21 +18,23 @@ export class WallBuilder {
     buildWalls() {
         console.log("Building walls for dungeon...");
         
-        // First, process rooms
+        // Clear any previous walls
+        this.wallMeshes = [];
+        this.wallColliders = [];
+        this.builtWallSegments.clear();
+        
+        // First, build exterior walls around the entire dungeon
+        this.buildExteriorWalls();
+        
+        // Then, process rooms - but with improved logic
         this.dungeon.rooms.forEach(room => {
-            this.buildRoomWalls(room, false);
+            this.buildRoomWalls(room);
         });
         
-        // Then, process corridors (they may need special treatment)
+        // Finally, process corridors with special corridor logic
         this.dungeon.corridors.forEach(corridor => {
-            this.buildRoomWalls(corridor, true);
-            
-            // Add additional corridor-specific walls if needed
-            this.buildCorridorEntrances(corridor);
+            this.buildCorridorWalls(corridor);
         });
-        
-        // Resolve any overlapping wall segments
-        this.resolveWallOverlaps();
         
         console.log(`Built ${this.wallMeshes.length} wall segments`);
         
@@ -42,10 +44,50 @@ export class WallBuilder {
         };
     }
     
-    // Build walls for a single room or corridor
-    buildRoomWalls(room, isCorridor) {
-        // Skip corridors if they are marked as sloped (shouldn't happen anymore, but just in case)
-        if (room.isSloped) return;
+    // Build exterior walls around the entire dungeon area
+    buildExteriorWalls() {
+        const size = this.dungeon.size;
+        if (!size) return;
+        
+        const wallMaterial = new THREE.MeshLambertMaterial({
+            color: this.theme.wallColor || 0x333333,
+            map: this.theme.wallTexture
+        });
+        
+        const wallY = this.wallHeight / 2;
+        
+        // North boundary wall
+        this.buildWall(
+            size.width / 2, wallY, -this.wallThickness / 2,
+            size.width + this.wallThickness, this.wallHeight, this.wallThickness,
+            wallMaterial, true, 'exterior-north'
+        );
+        
+        // South boundary wall
+        this.buildWall(
+            size.width / 2, wallY, size.height + this.wallThickness / 2,
+            size.width + this.wallThickness, this.wallHeight, this.wallThickness,
+            wallMaterial, true, 'exterior-south'
+        );
+        
+        // East boundary wall
+        this.buildWall(
+            size.width + this.wallThickness / 2, wallY, size.height / 2,
+            this.wallThickness, this.wallHeight, size.height + this.wallThickness,
+            wallMaterial, false, 'exterior-east'
+        );
+        
+        // West boundary wall
+        this.buildWall(
+            -this.wallThickness / 2, wallY, size.height / 2,
+            this.wallThickness, this.wallHeight, size.height + this.wallThickness,
+            wallMaterial, false, 'exterior-west'
+        );
+    }
+    
+    // Build walls for a single room with improved passage detection
+    buildRoomWalls(room) {
+        if (room.isCorridor) return; // Skip corridors here, handle them separately
         
         const wallColor = this.theme.wallColor || 0x333333;
         const wallMaterial = new THREE.MeshLambertMaterial({ 
@@ -53,105 +95,218 @@ export class WallBuilder {
             map: this.theme.wallTexture 
         });
         
-        // Check if there's a corridor or connected room in each direction
-        const hasNorthPassage = this.dungeon.hasPassageAt(room, 'north');
-        const hasSouthPassage = this.dungeon.hasPassageAt(room, 'south');
-        const hasEastPassage = this.dungeon.hasPassageAt(room, 'east');
-        const hasWestPassage = this.dungeon.hasPassageAt(room, 'west');
-        
-        // Calculate wall positions - y is always at floor height
         const floorHeight = room.floorHeight || 0;
-        const northWallZ = room.z;
-        const southWallZ = room.z + room.height;
-        const westWallX = room.x;
-        const eastWallX = room.x + room.width;
         const wallY = floorHeight + this.wallHeight / 2;
         
-        const roomId = `${room.x},${room.z},${room.width},${room.height}`;
-        console.log(`Building walls for ${isCorridor ? 'corridor' : 'room'}: ${roomId}`);
+        // For each side of the room, check if there's a direct corridor connection
+        const sides = [
+            { name: 'north', x: room.x + room.width / 2, z: room.z, width: room.width, height: this.wallThickness },
+            { name: 'south', x: room.x + room.width / 2, z: room.z + room.height, width: room.width, height: this.wallThickness },
+            { name: 'east', x: room.x + room.width, z: room.z + room.height / 2, width: this.wallThickness, height: room.height },
+            { name: 'west', x: room.x, z: room.z + room.height / 2, width: this.wallThickness, height: room.height }
+        ];
         
-        // Build walls where there's no passage
-        // North wall
-        if (!hasNorthPassage) {
-            // Create a unique ID for this wall segment
-            const wallId = `north:${room.x},${room.z},${room.width}`;
+        sides.forEach(side => {
+            const hasConnection = this.hasDirectConnection(room, side.name);
             
-            // Only build if we haven't already built this wall
-            if (!this.builtWallSegments.has(wallId)) {
+            if (!hasConnection) {
+                const wallId = `room-${side.name}-${room.x}-${room.z}-${room.width}-${room.height}`;
+                
+                if (!this.builtWallSegments.has(wallId)) {
+                    // Adjust wall position based on side
+                    let wallX = side.x;
+                    let wallZ = side.z;
+                    
+                    if (side.name === 'north') wallZ -= this.wallThickness / 2;
+                    if (side.name === 'south') wallZ -= this.wallThickness / 2;
+                    if (side.name === 'east') wallX -= this.wallThickness / 2;
+                    if (side.name === 'west') wallX += this.wallThickness / 2;
+                    
+                    this.buildWall(
+                        wallX, wallY, wallZ,
+                        side.width, this.wallHeight, side.height,
+                        wallMaterial, side.name === 'north' || side.name === 'south', wallId
+                    );
+                    this.builtWallSegments.set(wallId, true);
+                }
+            }
+        });
+    }
+    
+    // Build walls for corridors with special logic
+    buildCorridorWalls(corridor) {
+        const wallColor = this.theme.wallColor || 0x333333;
+        const wallMaterial = new THREE.MeshLambertMaterial({ 
+            color: wallColor,
+            map: this.theme.wallTexture 
+        });
+        
+        const floorHeight = corridor.floorHeight || 0;
+        const wallY = floorHeight + this.wallHeight / 2;
+        
+        // Determine corridor orientation
+        const isHorizontal = corridor.width > corridor.height;
+        
+        if (isHorizontal) {
+            // Horizontal corridor - build north and south walls
+            // North wall
+            const northWallId = `corridor-north-${corridor.x}-${corridor.z}`;
+            if (!this.builtWallSegments.has(northWallId)) {
                 this.buildWall(
-                    room.x + room.width / 2, // Center of wall
+                    corridor.x + corridor.width / 2,
                     wallY,
-                    northWallZ + this.wallThickness / 2,
-                    room.width + this.wallThickness, // Extend slightly beyond room
+                    corridor.z - this.wallThickness / 2,
+                    corridor.width,
                     this.wallHeight,
                     this.wallThickness,
-                    wallMaterial,
-                    true,
-                    wallId
+                    wallMaterial, true, northWallId
                 );
-                this.builtWallSegments.set(wallId, true);
+                this.builtWallSegments.set(northWallId, true);
+            }
+            
+            // South wall
+            const southWallId = `corridor-south-${corridor.x}-${corridor.z}`;
+            if (!this.builtWallSegments.has(southWallId)) {
+                this.buildWall(
+                    corridor.x + corridor.width / 2,
+                    wallY,
+                    corridor.z + corridor.height + this.wallThickness / 2,
+                    corridor.width,
+                    this.wallHeight,
+                    this.wallThickness,
+                    wallMaterial, true, southWallId
+                );
+                this.builtWallSegments.set(southWallId, true);
+            }
+        } else {
+            // Vertical corridor - build east and west walls
+            // East wall
+            const eastWallId = `corridor-east-${corridor.x}-${corridor.z}`;
+            if (!this.builtWallSegments.has(eastWallId)) {
+                this.buildWall(
+                    corridor.x + corridor.width + this.wallThickness / 2,
+                    wallY,
+                    corridor.z + corridor.height / 2,
+                    this.wallThickness,
+                    this.wallHeight,
+                    corridor.height,
+                    wallMaterial, false, eastWallId
+                );
+                this.builtWallSegments.set(eastWallId, true);
+            }
+            
+            // West wall
+            const westWallId = `corridor-west-${corridor.x}-${corridor.z}`;
+            if (!this.builtWallSegments.has(westWallId)) {
+                this.buildWall(
+                    corridor.x - this.wallThickness / 2,
+                    wallY,
+                    corridor.z + corridor.height / 2,
+                    this.wallThickness,
+                    this.wallHeight,
+                    corridor.height,
+                    wallMaterial, false, westWallId
+                );
+                this.builtWallSegments.set(westWallId, true);
+            }
+        }
+    }
+    
+    // Improved connection detection - check for direct corridor connections
+    hasDirectConnection(room, direction) {
+        const connectionTolerance = 2; // How close corridors need to be to count as connected
+        
+        for (const corridor of this.dungeon.corridors) {
+            if (!corridor) continue;
+            
+            // Check if corridor directly connects to this side of the room
+            switch (direction) {
+                case 'north':
+                    // Corridor should be above (north of) the room and overlap horizontally
+                    if (corridor.z + corridor.height >= room.z - connectionTolerance &&
+                        corridor.z + corridor.height <= room.z + connectionTolerance &&
+                        corridor.x < room.x + room.width + connectionTolerance &&
+                        corridor.x + corridor.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'south':
+                    // Corridor should be below (south of) the room and overlap horizontally
+                    if (corridor.z >= room.z + room.height - connectionTolerance &&
+                        corridor.z <= room.z + room.height + connectionTolerance &&
+                        corridor.x < room.x + room.width + connectionTolerance &&
+                        corridor.x + corridor.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'east':
+                    // Corridor should be to the right (east of) the room and overlap vertically
+                    if (corridor.x >= room.x + room.width - connectionTolerance &&
+                        corridor.x <= room.x + room.width + connectionTolerance &&
+                        corridor.z < room.z + room.height + connectionTolerance &&
+                        corridor.z + corridor.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'west':
+                    // Corridor should be to the left (west of) the room and overlap vertically
+                    if (corridor.x + corridor.width >= room.x - connectionTolerance &&
+                        corridor.x + corridor.width <= room.x + connectionTolerance &&
+                        corridor.z < room.z + room.height + connectionTolerance &&
+                        corridor.z + corridor.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
             }
         }
         
-        // South wall
-        if (!hasSouthPassage) {
-            const wallId = `south:${room.x},${room.z + room.height},${room.width}`;
+        // Also check for connections to other rooms (for alcoves, etc.)
+        for (const otherRoom of this.dungeon.rooms) {
+            if (otherRoom === room || otherRoom.isCorridor) continue;
             
-            if (!this.builtWallSegments.has(wallId)) {
-                this.buildWall(
-                    room.x + room.width / 2,
-                    wallY,
-                    southWallZ - this.wallThickness / 2,
-                    room.width + this.wallThickness,
-                    this.wallHeight,
-                    this.wallThickness,
-                    wallMaterial,
-                    true,
-                    wallId
-                );
-                this.builtWallSegments.set(wallId, true);
+            switch (direction) {
+                case 'north':
+                    if (otherRoom.z + otherRoom.height >= room.z - connectionTolerance &&
+                        otherRoom.z + otherRoom.height <= room.z + connectionTolerance &&
+                        otherRoom.x < room.x + room.width + connectionTolerance &&
+                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'south':
+                    if (otherRoom.z >= room.z + room.height - connectionTolerance &&
+                        otherRoom.z <= room.z + room.height + connectionTolerance &&
+                        otherRoom.x < room.x + room.width + connectionTolerance &&
+                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'east':
+                    if (otherRoom.x >= room.x + room.width - connectionTolerance &&
+                        otherRoom.x <= room.x + room.width + connectionTolerance &&
+                        otherRoom.z < room.z + room.height + connectionTolerance &&
+                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'west':
+                    if (otherRoom.x + otherRoom.width >= room.x - connectionTolerance &&
+                        otherRoom.x + otherRoom.width <= room.x + connectionTolerance &&
+                        otherRoom.z < room.z + room.height + connectionTolerance &&
+                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
             }
         }
         
-        // East wall
-        if (!hasEastPassage) {
-            const wallId = `east:${room.x + room.width},${room.z},${room.height}`;
-            
-            if (!this.builtWallSegments.has(wallId)) {
-                this.buildWall(
-                    eastWallX - this.wallThickness / 2,
-                    wallY,
-                    room.z + room.height / 2,
-                    this.wallThickness,
-                    this.wallHeight,
-                    room.height + this.wallThickness,
-                    wallMaterial,
-                    false,
-                    wallId
-                );
-                this.builtWallSegments.set(wallId, true);
-            }
-        }
-        
-        // West wall
-        if (!hasWestPassage) {
-            const wallId = `west:${room.x},${room.z},${room.height}`;
-            
-            if (!this.builtWallSegments.has(wallId)) {
-                this.buildWall(
-                    westWallX + this.wallThickness / 2,
-                    wallY,
-                    room.z + room.height / 2,
-                    this.wallThickness,
-                    this.wallHeight,
-                    room.height + this.wallThickness,
-                    wallMaterial,
-                    false,
-                    wallId
-                );
-                this.builtWallSegments.set(wallId, true);
-            }
-        }
+        return false;
     }
     
     // Helper for building a single wall segment
@@ -188,248 +343,5 @@ export class WallBuilder {
         this.wallColliders.push(collider);
         
         return wall;
-    }
-    
-    // Build corridor entrances - add walls at the junction points where corridors meet rooms
-    buildCorridorEntrances(corridor) {
-        // Find rooms connected to this corridor
-        const connectedRooms = this.dungeon.findConnectedRooms(corridor);
-        
-        // For each connected room, build walls on the sides of the connection
-        for (const room of connectedRooms) {
-            // Determine intersection area
-            const overlapX = Math.max(0, Math.min(room.x + room.width, corridor.x + corridor.width) - Math.max(room.x, corridor.x));
-            const overlapZ = Math.max(0, Math.min(room.z + room.height, corridor.z + corridor.height) - Math.max(room.z, corridor.z));
-            
-            // Skip if there's no substantial overlap
-            if (overlapX < 1 && overlapZ < 1) continue;
-            
-            const wallMaterial = new THREE.MeshLambertMaterial({ 
-                color: this.theme.wallColor || 0x333333,
-                map: this.theme.wallTexture 
-            });
-            
-            const floorHeight = corridor.floorHeight || 0;
-            const wallY = floorHeight + this.wallHeight / 2;
-            
-            // Determine if this is a horizontal or vertical corridor connection
-            if (overlapX > overlapZ) {
-                // Horizontal connection (corridor connects east-west)
-                const minX = Math.max(room.x, corridor.x);
-                const maxX = Math.min(room.x + room.width, corridor.x + corridor.width);
-                const center = (minX + maxX) / 2;
-                
-                // Check if corridor is north or south of the room
-                if (corridor.z < room.z) {
-                    // Corridor is north of room - build walls on east and west sides of connection
-                    
-                    // Build west side wall
-                    if (minX > room.x + this.wallThickness && minX > corridor.x + this.wallThickness) {
-                        const wallId = `junction:west:${minX},${room.z},${corridor.height}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                minX - this.wallThickness / 2,
-                                wallY,
-                                room.z - corridor.height / 2,
-                                this.wallThickness,
-                                this.wallHeight,
-                                corridor.height,
-                                wallMaterial,
-                                false,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                    
-                    // Build east side wall
-                    if (maxX < room.x + room.width - this.wallThickness && maxX < corridor.x + corridor.width - this.wallThickness) {
-                        const wallId = `junction:east:${maxX},${room.z},${corridor.height}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                maxX + this.wallThickness / 2,
-                                wallY,
-                                room.z - corridor.height / 2,
-                                this.wallThickness,
-                                this.wallHeight,
-                                corridor.height,
-                                wallMaterial,
-                                false,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                } else if (corridor.z > room.z) {
-                    // Corridor is south of room - build walls on east and west sides of connection
-                    
-                    // Build west side wall
-                    if (minX > room.x + this.wallThickness && minX > corridor.x + this.wallThickness) {
-                        const wallId = `junction:west:${minX},${room.z + room.height},${corridor.height}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                minX - this.wallThickness / 2,
-                                wallY,
-                                room.z + room.height + corridor.height / 2,
-                                this.wallThickness,
-                                this.wallHeight,
-                                corridor.height,
-                                wallMaterial,
-                                false,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                    
-                    // Build east side wall
-                    if (maxX < room.x + room.width - this.wallThickness && maxX < corridor.x + corridor.width - this.wallThickness) {
-                        const wallId = `junction:east:${maxX},${room.z + room.height},${corridor.height}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                maxX + this.wallThickness / 2,
-                                wallY,
-                                room.z + room.height + corridor.height / 2,
-                                this.wallThickness,
-                                this.wallHeight,
-                                corridor.height,
-                                wallMaterial,
-                                false,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                }
-            } else {
-                // Vertical connection (corridor connects north-south)
-                const minZ = Math.max(room.z, corridor.z);
-                const maxZ = Math.min(room.z + room.height, corridor.z + corridor.height);
-                const center = (minZ + maxZ) / 2;
-                
-                // Check if corridor is east or west of the room
-                if (corridor.x < room.x) {
-                    // Corridor is west of room - build walls on north and south sides of connection
-                    
-                    // Build north side wall
-                    if (minZ > room.z + this.wallThickness && minZ > corridor.z + this.wallThickness) {
-                        const wallId = `junction:north:${room.x},${minZ},${corridor.width}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                room.x - corridor.width / 2,
-                                wallY,
-                                minZ - this.wallThickness / 2,
-                                corridor.width,
-                                this.wallHeight,
-                                this.wallThickness,
-                                wallMaterial,
-                                true,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                    
-                    // Build south side wall
-                    if (maxZ < room.z + room.height - this.wallThickness && maxZ < corridor.z + corridor.height - this.wallThickness) {
-                        const wallId = `junction:south:${room.x},${maxZ},${corridor.width}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                room.x - corridor.width / 2,
-                                wallY,
-                                maxZ + this.wallThickness / 2,
-                                corridor.width,
-                                this.wallHeight,
-                                this.wallThickness,
-                                wallMaterial,
-                                true,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                } else if (corridor.x > room.x) {
-                    // Corridor is east of room - build walls on north and south sides of connection
-                    
-                    // Build north side wall
-                    if (minZ > room.z + this.wallThickness && minZ > corridor.z + this.wallThickness) {
-                        const wallId = `junction:north:${room.x + room.width},${minZ},${corridor.width}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                room.x + room.width + corridor.width / 2,
-                                wallY,
-                                minZ - this.wallThickness / 2,
-                                corridor.width,
-                                this.wallHeight,
-                                this.wallThickness,
-                                wallMaterial,
-                                true,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                    
-                    // Build south side wall
-                    if (maxZ < room.z + room.height - this.wallThickness && maxZ < corridor.z + corridor.height - this.wallThickness) {
-                        const wallId = `junction:south:${room.x + room.width},${maxZ},${corridor.width}`;
-                        if (!this.builtWallSegments.has(wallId)) {
-                            this.buildWall(
-                                room.x + room.width + corridor.width / 2,
-                                wallY,
-                                maxZ + this.wallThickness / 2,
-                                corridor.width,
-                                this.wallHeight,
-                                this.wallThickness,
-                                wallMaterial,
-                                true,
-                                wallId
-                            );
-                            this.builtWallSegments.set(wallId, true);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Handle wall intersections and resolve overlapping sections
-    resolveWallOverlaps() {
-        // Create a map to track unique wall segments by their position
-        const wallPositionMap = new Map();
-        const wallsToKeep = [];
-        
-        for (const wall of this.wallMeshes) {
-            // Create a unique position key for this wall
-            const posKey = `${wall.position.x.toFixed(2)},${wall.position.y.toFixed(2)},${wall.position.z.toFixed(2)}`;
-            
-            // If we haven't seen this position before, keep the wall
-            if (!wallPositionMap.has(posKey)) {
-                wallPositionMap.set(posKey, true);
-                wallsToKeep.push(wall);
-            }
-        }
-        
-        // Update the wall meshes and colliders arrays
-        this.wallMeshes = wallsToKeep;
-        
-        // Also clean up colliders to match
-        const collidersToKeep = [];
-        const colliderPositionMap = new Map();
-        
-        for (const collider of this.wallColliders) {
-            const minKey = `${collider.min.x.toFixed(2)},${collider.min.y.toFixed(2)},${collider.min.z.toFixed(2)}`;
-            const maxKey = `${collider.max.x.toFixed(2)},${collider.max.y.toFixed(2)},${collider.max.z.toFixed(2)}`;
-            const colliderKey = minKey + '|' + maxKey;
-            
-            if (!colliderPositionMap.has(colliderKey)) {
-                colliderPositionMap.set(colliderKey, true);
-                collidersToKeep.push(collider);
-            }
-        }
-        
-        this.wallColliders = collidersToKeep;
-        
-        console.log(`Wall overlap resolution complete: ${this.wallMeshes.length} walls remaining`);
     }
 }
