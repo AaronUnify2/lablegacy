@@ -1,7 +1,7 @@
-// src/engine/renderer.js - Three.js renderer setup and management
-
+// src/engine/renderer.js - Three.js renderer setup and management with fixed lighting
 
 import * as THREE from 'three';
+
 // Global renderer variables
 let scene, camera, renderer;
 let canvas;
@@ -13,10 +13,10 @@ export function setupRenderer() {
     
     // Create scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+    scene.background = new THREE.Color(0x111111); // Slightly lighter background for better contrast
     
-    // Setup fog for atmosphere and to hide distant objects
-    scene.fog = new THREE.FogExp2(0x000000, 0.04); // Reduced density from 0.07 to 0.04
+    // Setup fog for atmosphere - REDUCED density to allow lighting to be visible
+    scene.fog = new THREE.FogExp2(0x000000, 0.015); // Reduced from 0.04 to 0.015
     
     // Create perspective camera
     const aspectRatio = window.innerWidth / window.innerHeight;
@@ -47,14 +47,14 @@ export function setupRenderer() {
     };
 }
 
-// Set up basic lighting for the scene
+// Set up basic lighting for the scene - ENHANCED VERSION
 function setupLighting() {
-    // Ambient light for basic illumination - increased intensity
-    const ambientLight = new THREE.AmbientLight(0x333333, 0.5); // Increased from 0.3 to 0.5
+    // SIGNIFICANTLY brighter ambient light for base illumination
+    const ambientLight = new THREE.AmbientLight(0x666666, 0.8); // Increased from 0x333333, 0.5
     scene.add(ambientLight);
     
-    // Directional light for subtle shadows and directional illumination
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Increased from 0.5 to 0.7
+    // Brighter directional light for better shadows and directional illumination
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 0.7
     directionalLight.position.set(5, 10, 7);
     directionalLight.castShadow = true;
     
@@ -69,6 +69,14 @@ function setupLighting() {
     directionalLight.shadow.camera.bottom = -20;
     
     scene.add(directionalLight);
+    
+    // Add an additional fill light to brighten the scene from another angle
+    const fillLight = new THREE.DirectionalLight(0x8888ff, 0.4);
+    fillLight.position.set(-5, 8, -7);
+    fillLight.castShadow = false; // Don't cast shadows to avoid conflicts
+    scene.add(fillLight);
+    
+    console.log("Enhanced lighting setup complete - lighting should now be visible");
 }
 
 // Handle window resize
