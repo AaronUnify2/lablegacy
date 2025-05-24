@@ -406,133 +406,140 @@ export class Dungeon {
         console.log("Fallback walls created");
     }
     
-    // Check if there's a passage in a given direction from a room
-    hasPassageAt(room, direction) {
-        if (!room) {
-            console.error("Cannot check passage: room is undefined");
+// Fixed hasPassageAt method for src/dungeon/floor.js
+// Replace the existing hasPassageAt method with this improved version
+
+// Check if there's a passage in a given direction from a room
+hasPassageAt(room, direction) {
+    if (!room) {
+        console.error("Cannot check passage: room is undefined");
+        return false;
+    }
+    
+    const connectionTolerance = 2; // How close corridors need to be to count as connected
+    
+    try {
+        // Make sure we have corridors to check
+        if (!Array.isArray(this.corridors)) {
+            console.error("Cannot check passages: corridors is not an array");
             return false;
         }
         
-        // Expand room slightly to ensure we find connecting corridors
-        const buffer = 1;
-        
-        try {
-            // Make sure we have corridors to check
-            if (!Array.isArray(this.corridors)) {
-                console.error("Cannot check passages: corridors is not an array");
-                return false;
+        // Check if any corridor directly connects to this side of the room
+        for (const corridor of this.corridors) {
+            if (!corridor) continue;
+            
+            // Make sure corridor has all required properties
+            if (typeof corridor.x !== 'number' || typeof corridor.z !== 'number' ||
+                typeof corridor.width !== 'number' || typeof corridor.height !== 'number') {
+                continue;
             }
             
-            // Check if any corridor or room overlaps with the edge
-            for (const corridor of this.corridors) {
-                // Skip the room itself
-                if (corridor === room) continue;
-                if (!corridor) continue; // Skip undefined corridors
-                
-                // Make sure corridor has all required properties
-                if (typeof corridor.x !== 'number' || typeof corridor.z !== 'number' ||
-                    typeof corridor.width !== 'number' || typeof corridor.height !== 'number') {
-                    continue;
-                }
-                
-                // Check if corridor connects to the room's edge
-                switch (direction) {
-                    case 'north':
-                        if (corridor.z <= room.z && 
-                            corridor.z + corridor.height >= room.z &&
-                            corridor.x < room.x + room.width + buffer &&
-                            corridor.x + corridor.width > room.x - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'south':
-                        if (corridor.z <= room.z + room.height && 
-                            corridor.z + corridor.height >= room.z + room.height &&
-                            corridor.x < room.x + room.width + buffer &&
-                            corridor.x + corridor.width > room.x - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'east':
-                        if (corridor.x <= room.x + room.width && 
-                            corridor.x + corridor.width >= room.x + room.width &&
-                            corridor.z < room.z + room.height + buffer &&
-                            corridor.z + corridor.height > room.z - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'west':
-                        if (corridor.x <= room.x && 
-                            corridor.x + corridor.width >= room.x &&
-                            corridor.z < room.z + room.height + buffer &&
-                            corridor.z + corridor.height > room.z - buffer) {
-                            return true;
-                        }
-                        break;
-                }
+            // Check if corridor directly connects to this side of the room
+            switch (direction) {
+                case 'north':
+                    // Corridor should be above (north of) the room and overlap horizontally
+                    if (corridor.z + corridor.height >= room.z - connectionTolerance &&
+                        corridor.z + corridor.height <= room.z + connectionTolerance &&
+                        corridor.x < room.x + room.width + connectionTolerance &&
+                        corridor.x + corridor.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'south':
+                    // Corridor should be below (south of) the room and overlap horizontally
+                    if (corridor.z >= room.z + room.height - connectionTolerance &&
+                        corridor.z <= room.z + room.height + connectionTolerance &&
+                        corridor.x < room.x + room.width + connectionTolerance &&
+                        corridor.x + corridor.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'east':
+                    // Corridor should be to the right (east of) the room and overlap vertically
+                    if (corridor.x >= room.x + room.width - connectionTolerance &&
+                        corridor.x <= room.x + room.width + connectionTolerance &&
+                        corridor.z < room.z + room.height + connectionTolerance &&
+                        corridor.z + corridor.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'west':
+                    // Corridor should be to the left (west of) the room and overlap vertically
+                    if (corridor.x + corridor.width >= room.x - connectionTolerance &&
+                        corridor.x + corridor.width <= room.x + connectionTolerance &&
+                        corridor.z < room.z + room.height + connectionTolerance &&
+                        corridor.z + corridor.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
             }
-            
-            // Make sure we have rooms to check
-            if (!Array.isArray(this.rooms)) {
-                console.error("Cannot check passages: rooms is not an array");
-                return false;
-            }
-            
-            // Check for adjacent rooms too
-            for (const otherRoom of this.rooms) {
-                // Skip the room itself
-                if (otherRoom === room) continue;
-                if (!otherRoom) continue; // Skip undefined rooms
-                
-                // Make sure otherRoom has all required properties
-                if (typeof otherRoom.x !== 'number' || typeof otherRoom.z !== 'number' ||
-                    typeof otherRoom.width !== 'number' || typeof otherRoom.height !== 'number') {
-                    continue;
-                }
-                
-                // Check if room connects to the room's edge
-                switch (direction) {
-                    case 'north':
-                        if (otherRoom.z + otherRoom.height >= room.z - buffer && 
-                            otherRoom.z <= room.z &&
-                            otherRoom.x < room.x + room.width + buffer &&
-                            otherRoom.x + otherRoom.width > room.x - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'south':
-                        if (otherRoom.z <= room.z + room.height + buffer && 
-                            otherRoom.z + otherRoom.height >= room.z + room.height &&
-                            otherRoom.x < room.x + room.width + buffer &&
-                            otherRoom.x + otherRoom.width > room.x - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'east':
-                        if (otherRoom.x <= room.x + room.width + buffer && 
-                            otherRoom.x + otherRoom.width >= room.x + room.width &&
-                            otherRoom.z < room.z + room.height + buffer &&
-                            otherRoom.z + otherRoom.height > room.z - buffer) {
-                            return true;
-                        }
-                        break;
-                    case 'west':
-                        if (otherRoom.x + otherRoom.width >= room.x - buffer && 
-                            otherRoom.x <= room.x &&
-                            otherRoom.z < room.z + room.height + buffer &&
-                            otherRoom.z + otherRoom.height > room.z - buffer) {
-                            return true;
-                        }
-                        break;
-                }
-            }
-        } catch (error) {
-            console.error("Error checking for passages:", error);
-            return false; // Default to no passage if there's an error
         }
         
-        return false;
+        // Also check for connections to other rooms (for alcoves, etc.)
+        if (!Array.isArray(this.rooms)) {
+            console.error("Cannot check passages: rooms is not an array");
+            return false;
+        }
+        
+        for (const otherRoom of this.rooms) {
+            if (otherRoom === room || otherRoom.isCorridor) continue;
+            if (!otherRoom) continue;
+            
+            // Make sure otherRoom has all required properties
+            if (typeof otherRoom.x !== 'number' || typeof otherRoom.z !== 'number' ||
+                typeof otherRoom.width !== 'number' || typeof otherRoom.height !== 'number') {
+                continue;
+            }
+            
+            switch (direction) {
+                case 'north':
+                    if (otherRoom.z + otherRoom.height >= room.z - connectionTolerance &&
+                        otherRoom.z + otherRoom.height <= room.z + connectionTolerance &&
+                        otherRoom.x < room.x + room.width + connectionTolerance &&
+                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'south':
+                    if (otherRoom.z >= room.z + room.height - connectionTolerance &&
+                        otherRoom.z <= room.z + room.height + connectionTolerance &&
+                        otherRoom.x < room.x + room.width + connectionTolerance &&
+                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'east':
+                    if (otherRoom.x >= room.x + room.width - connectionTolerance &&
+                        otherRoom.x <= room.x + room.width + connectionTolerance &&
+                        otherRoom.z < room.z + room.height + connectionTolerance &&
+                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+                    
+                case 'west':
+                    if (otherRoom.x + otherRoom.width >= room.x - connectionTolerance &&
+                        otherRoom.x + otherRoom.width <= room.x + connectionTolerance &&
+                        otherRoom.z < room.z + room.height + connectionTolerance &&
+                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
+                        return true;
+                    }
+                    break;
+            }
+        }
+    } catch (error) {
+        console.error("Error checking for passages:", error);
+        return false; // Default to no passage if there's an error
     }
+    
+    return false;
+}
     
     // Find rooms connected to a corridor
     findConnectedRooms(corridor) {
