@@ -7,7 +7,7 @@ export class WallBuilder {
         this.theme = dungeon.theme;
         this.wallMeshes = [];
         this.wallColliders = [];
-        this.wallHeight = 2.5; // Reduced wall height to avoid camera issues
+        this.wallHeight = 3.0; // Increased wall height for better visibility
         this.wallThickness = 0.5; // Standard wall thickness
         
         // Keep track of built walls to avoid duplicates
@@ -122,39 +122,58 @@ export class WallBuilder {
         const floorHeight = room.floorHeight || 0;
         const wallY = floorHeight + this.wallHeight / 2;
         
-        // For each side of the room, check if there's a direct corridor connection
-        const sides = [
-            { name: 'north', x: room.x + room.width / 2, z: room.z, width: room.width, height: this.wallThickness },
-            { name: 'south', x: room.x + room.width / 2, z: room.z + room.height, width: room.width, height: this.wallThickness },
-            { name: 'east', x: room.x + room.width, z: room.z + room.height / 2, width: this.wallThickness, height: room.height },
-            { name: 'west', x: room.x, z: room.z + room.height / 2, width: this.wallThickness, height: room.height }
-        ];
+        // Build walls for each side of the room if no connection exists
+        this.buildRoomSideWall(room, 'north', wallMaterial, wallY);
+        this.buildRoomSideWall(room, 'south', wallMaterial, wallY);
+        this.buildRoomSideWall(room, 'east', wallMaterial, wallY);
+        this.buildRoomSideWall(room, 'west', wallMaterial, wallY);
+    }
+    
+    // Build a wall on a specific side of a room if no connection exists
+    buildRoomSideWall(room, side, wallMaterial, wallY) {
+        const hasConnection = this.hasDirectConnection(room, side);
         
-        sides.forEach(side => {
-            const hasConnection = this.hasDirectConnection(room, side.name);
+        if (!hasConnection) {
+            const wallId = `room-${side}-${room.x.toFixed(1)}-${room.z.toFixed(1)}-${room.width}-${room.height}`;
             
-            if (!hasConnection) {
-                const wallId = `room-${side.name}-${room.x}-${room.z}-${room.width}-${room.height}`;
+            if (!this.builtWallSegments.has(wallId)) {
+                let wallX, wallZ, wallWidth, wallDepth;
                 
-                if (!this.builtWallSegments.has(wallId)) {
-                    // Adjust wall position based on side
-                    let wallX = side.x;
-                    let wallZ = side.z;
-                    
-                    if (side.name === 'north') wallZ -= this.wallThickness / 2;
-                    if (side.name === 'south') wallZ -= this.wallThickness / 2;
-                    if (side.name === 'east') wallX -= this.wallThickness / 2;
-                    if (side.name === 'west') wallX += this.wallThickness / 2;
-                    
-                    this.buildWall(
-                        wallX, wallY, wallZ,
-                        side.width, this.wallHeight, side.height,
-                        wallMaterial, side.name === 'north' || side.name === 'south', wallId
-                    );
-                    this.builtWallSegments.set(wallId, true);
+                switch (side) {
+                    case 'north':
+                        wallX = room.x + room.width / 2;
+                        wallZ = room.z - this.wallThickness / 2;
+                        wallWidth = room.width;
+                        wallDepth = this.wallThickness;
+                        break;
+                    case 'south':
+                        wallX = room.x + room.width / 2;
+                        wallZ = room.z + room.height + this.wallThickness / 2;
+                        wallWidth = room.width;
+                        wallDepth = this.wallThickness;
+                        break;
+                    case 'east':
+                        wallX = room.x + room.width + this.wallThickness / 2;
+                        wallZ = room.z + room.height / 2;
+                        wallWidth = this.wallThickness;
+                        wallDepth = room.height;
+                        break;
+                    case 'west':
+                        wallX = room.x - this.wallThickness / 2;
+                        wallZ = room.z + room.height / 2;
+                        wallWidth = this.wallThickness;
+                        wallDepth = room.height;
+                        break;
                 }
+                
+                this.buildWall(
+                    wallX, wallY, wallZ,
+                    wallWidth, this.wallHeight, wallDepth,
+                    wallMaterial, side === 'north' || side === 'south', wallId
+                );
+                this.builtWallSegments.set(wallId, true);
             }
-        });
+        }
     }
     
     // Build walls for corridors with special logic
@@ -174,7 +193,7 @@ export class WallBuilder {
         if (isHorizontal) {
             // Horizontal corridor - build north and south walls
             // North wall
-            const northWallId = `corridor-north-${corridor.x}-${corridor.z}`;
+            const northWallId = `corridor-north-${corridor.x.toFixed(1)}-${corridor.z.toFixed(1)}`;
             if (!this.builtWallSegments.has(northWallId)) {
                 this.buildWall(
                     corridor.x + corridor.width / 2,
@@ -189,7 +208,7 @@ export class WallBuilder {
             }
             
             // South wall
-            const southWallId = `corridor-south-${corridor.x}-${corridor.z}`;
+            const southWallId = `corridor-south-${corridor.x.toFixed(1)}-${corridor.z.toFixed(1)}`;
             if (!this.builtWallSegments.has(southWallId)) {
                 this.buildWall(
                     corridor.x + corridor.width / 2,
@@ -205,7 +224,7 @@ export class WallBuilder {
         } else {
             // Vertical corridor - build east and west walls
             // East wall
-            const eastWallId = `corridor-east-${corridor.x}-${corridor.z}`;
+            const eastWallId = `corridor-east-${corridor.x.toFixed(1)}-${corridor.z.toFixed(1)}`;
             if (!this.builtWallSegments.has(eastWallId)) {
                 this.buildWall(
                     corridor.x + corridor.width + this.wallThickness / 2,
@@ -220,7 +239,7 @@ export class WallBuilder {
             }
             
             // West wall
-            const westWallId = `corridor-west-${corridor.x}-${corridor.z}`;
+            const westWallId = `corridor-west-${corridor.x.toFixed(1)}-${corridor.z.toFixed(1)}`;
             if (!this.builtWallSegments.has(westWallId)) {
                 this.buildWall(
                     corridor.x - this.wallThickness / 2,
@@ -238,96 +257,90 @@ export class WallBuilder {
     
     // Improved connection detection - check for direct corridor connections
     hasDirectConnection(room, direction) {
-        const connectionTolerance = 2; // How close corridors need to be to count as connected
+        const connectionTolerance = 3; // Increased tolerance for better connection detection
         
+        // Check connections to corridors
         for (const corridor of this.dungeon.corridors) {
             if (!corridor) continue;
             
-            // Check if corridor directly connects to this side of the room
-            switch (direction) {
-                case 'north':
-                    // Corridor should be above (north of) the room and overlap horizontally
-                    if (corridor.z + corridor.height >= room.z - connectionTolerance &&
-                        corridor.z + corridor.height <= room.z + connectionTolerance &&
-                        corridor.x < room.x + room.width + connectionTolerance &&
-                        corridor.x + corridor.width > room.x - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'south':
-                    // Corridor should be below (south of) the room and overlap horizontally
-                    if (corridor.z >= room.z + room.height - connectionTolerance &&
-                        corridor.z <= room.z + room.height + connectionTolerance &&
-                        corridor.x < room.x + room.width + connectionTolerance &&
-                        corridor.x + corridor.width > room.x - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'east':
-                    // Corridor should be to the right (east of) the room and overlap vertically
-                    if (corridor.x >= room.x + room.width - connectionTolerance &&
-                        corridor.x <= room.x + room.width + connectionTolerance &&
-                        corridor.z < room.z + room.height + connectionTolerance &&
-                        corridor.z + corridor.height > room.z - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'west':
-                    // Corridor should be to the left (west of) the room and overlap vertically
-                    if (corridor.x + corridor.width >= room.x - connectionTolerance &&
-                        corridor.x + corridor.width <= room.x + connectionTolerance &&
-                        corridor.z < room.z + room.height + connectionTolerance &&
-                        corridor.z + corridor.height > room.z - connectionTolerance) {
-                        return true;
-                    }
-                    break;
+            if (this.roomConnectsToCorridorOnSide(room, corridor, direction, connectionTolerance)) {
+                return true;
             }
         }
         
-        // Also check for connections to other rooms (for alcoves, etc.)
+        // Check connections to other rooms (for alcoves, etc.)
         for (const otherRoom of this.dungeon.rooms) {
             if (otherRoom === room || otherRoom.isCorridor) continue;
             
-            switch (direction) {
-                case 'north':
-                    if (otherRoom.z + otherRoom.height >= room.z - connectionTolerance &&
-                        otherRoom.z + otherRoom.height <= room.z + connectionTolerance &&
-                        otherRoom.x < room.x + room.width + connectionTolerance &&
-                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'south':
-                    if (otherRoom.z >= room.z + room.height - connectionTolerance &&
-                        otherRoom.z <= room.z + room.height + connectionTolerance &&
-                        otherRoom.x < room.x + room.width + connectionTolerance &&
-                        otherRoom.x + otherRoom.width > room.x - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'east':
-                    if (otherRoom.x >= room.x + room.width - connectionTolerance &&
-                        otherRoom.x <= room.x + room.width + connectionTolerance &&
-                        otherRoom.z < room.z + room.height + connectionTolerance &&
-                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
-                        return true;
-                    }
-                    break;
-                    
-                case 'west':
-                    if (otherRoom.x + otherRoom.width >= room.x - connectionTolerance &&
-                        otherRoom.x + otherRoom.width <= room.x + connectionTolerance &&
-                        otherRoom.z < room.z + room.height + connectionTolerance &&
-                        otherRoom.z + otherRoom.height > room.z - connectionTolerance) {
-                        return true;
-                    }
-                    break;
+            if (this.roomConnectsToRoomOnSide(room, otherRoom, direction, connectionTolerance)) {
+                return true;
             }
+        }
+        
+        return false;
+    }
+    
+    // Check if a room connects to a corridor on a specific side
+    roomConnectsToCorridorOnSide(room, corridor, direction, tolerance) {
+        switch (direction) {
+            case 'north':
+                // Corridor should be north of the room and overlap horizontally
+                return (corridor.z + corridor.height >= room.z - tolerance &&
+                        corridor.z <= room.z + tolerance &&
+                        corridor.x + corridor.width > room.x - tolerance &&
+                        corridor.x < room.x + room.width + tolerance);
+                
+            case 'south':
+                // Corridor should be south of the room and overlap horizontally
+                return (corridor.z >= room.z + room.height - tolerance &&
+                        corridor.z <= room.z + room.height + tolerance &&
+                        corridor.x + corridor.width > room.x - tolerance &&
+                        corridor.x < room.x + room.width + tolerance);
+                
+            case 'east':
+                // Corridor should be east of the room and overlap vertically
+                return (corridor.x >= room.x + room.width - tolerance &&
+                        corridor.x <= room.x + room.width + tolerance &&
+                        corridor.z + corridor.height > room.z - tolerance &&
+                        corridor.z < room.z + room.height + tolerance);
+                
+            case 'west':
+                // Corridor should be west of the room and overlap vertically
+                return (corridor.x + corridor.width >= room.x - tolerance &&
+                        corridor.x + corridor.width <= room.x + tolerance &&
+                        corridor.z + corridor.height > room.z - tolerance &&
+                        corridor.z < room.z + room.height + tolerance);
+        }
+        
+        return false;
+    }
+    
+    // Check if a room connects to another room on a specific side
+    roomConnectsToRoomOnSide(room, otherRoom, direction, tolerance) {
+        switch (direction) {
+            case 'north':
+                return (otherRoom.z + otherRoom.height >= room.z - tolerance &&
+                        otherRoom.z + otherRoom.height <= room.z + tolerance &&
+                        otherRoom.x + otherRoom.width > room.x - tolerance &&
+                        otherRoom.x < room.x + room.width + tolerance);
+                
+            case 'south':
+                return (otherRoom.z >= room.z + room.height - tolerance &&
+                        otherRoom.z <= room.z + room.height + tolerance &&
+                        otherRoom.x + otherRoom.width > room.x - tolerance &&
+                        otherRoom.x < room.x + room.width + tolerance);
+                
+            case 'east':
+                return (otherRoom.x >= room.x + room.width - tolerance &&
+                        otherRoom.x <= room.x + room.width + tolerance &&
+                        otherRoom.z + otherRoom.height > room.z - tolerance &&
+                        otherRoom.z < room.z + room.height + tolerance);
+                
+            case 'west':
+                return (otherRoom.x + otherRoom.width >= room.x - tolerance &&
+                        otherRoom.x + otherRoom.width <= room.x + tolerance &&
+                        otherRoom.z + otherRoom.height > room.z - tolerance &&
+                        otherRoom.z < room.z + room.height + tolerance);
         }
         
         return false;
