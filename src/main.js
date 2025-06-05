@@ -1,8 +1,8 @@
-// src/main.js - Updated with improved error handling and integration with DungeonLoader
+// src/main.js - Updated with first-person view support and improved error handling
 import { setupRenderer, resizeRenderer, getRenderer } from './engine/renderer.js';
 import { setupInput, getInput } from './engine/input.js';
 import { Game } from './game/game.js';
-import { initUI, showMessage } from './game/ui.js';
+import { initUI, showMessage, setFirstPersonMode, showHitMarker } from './game/ui.js';
 import { initMenu } from './game/pauseMenu.js';
 import { loadingScreen } from './game/loadingScreen.js';
 import { spawnChestsInDungeon, getSpawnedChests, clearSpawnedChests } from './entities/items/chestSpawner.js';
@@ -10,9 +10,9 @@ import { spawnChestsInDungeon, getSpawnedChests, clearSpawnedChests } from './en
 // Main game instance
 let game;
 
-// Initialize the game with improved error handling
+// Initialize the game with first-person support and improved error handling
 function init() {
-    console.log('Initializing Labyrinth Legacy...');
+    console.log('Initializing Labyrinth Legacy with First-Person View...');
     
     try {
         // Initialize loading screen first
@@ -38,9 +38,11 @@ function init() {
         
         loadingScreen.updateProgress(30);
         
-        // Initialize UI with three status bars
+        // Initialize UI with first-person support
         try {
             initUI();
+            // Set first-person mode from the start
+            setFirstPersonMode(true);
         } catch (uiError) {
             console.error("Error initializing UI:", uiError);
             showWarning("UI initialization failed. Game interface may not display correctly.");
@@ -74,6 +76,7 @@ function init() {
         
         // Expose necessary functions globally
         window.showMessage = showMessage;
+        window.showHitMarker = showHitMarker;
         window.spawnChestsInDungeon = spawnChestsInDungeon;
         window.getSpawnedChests = getSpawnedChests;
         window.clearSpawnedChests = clearSpawnedChests;
@@ -90,13 +93,42 @@ function init() {
             renderer.domElement.addEventListener('webglcontextlost', handleWebGLContextLost);
         }
         
+        // Add pointer lock change handler for first-person mode
+        document.addEventListener('pointerlockchange', handlePointerLockChange);
+        document.addEventListener('pointerlockerror', handlePointerLockError);
+        
+        // Show first-person instructions
+        setTimeout(() => {
+            if (window.showMessage) {
+                showMessage('Click to enable mouse look. Use WASD to move, mouse to look around.', 5000);
+            }
+        }, 2000);
+        
     } catch (error) {
         console.error("Critical initialization error:", error);
         showFatalError("A critical error occurred during game initialization: " + error.message);
     }
 }
 
-// Game loop function with improved error handling
+// Handle pointer lock changes for first-person view
+function handlePointerLockChange() {
+    const isLocked = document.pointerLockElement === document.getElementById('game-canvas');
+    
+    if (isLocked) {
+        console.log('Mouse locked - first-person controls active');
+        // Could show a subtle indicator that mouse look is active
+    } else {
+        console.log('Mouse unlocked - first-person controls inactive');
+    }
+}
+
+// Handle pointer lock errors
+function handlePointerLockError() {
+    console.error('Pointer lock failed');
+    showWarning('Mouse lock failed. Click the game area to enable first-person mouse look.');
+}
+
+// Game loop function with improved error handling for first-person
 function gameLoop(timestamp) {
     try {
         // Get current input state
@@ -116,6 +148,10 @@ function gameLoop(timestamp) {
             try {
                 game.update(timestamp, inputState);
                 game.render();
+                
+                // Update first-person specific features
+                updateFirstPersonFeatures(game, inputState);
+                
             } catch (gameError) {
                 console.error("Error during game update or render:", gameError);
                 // Show error message to user
@@ -131,6 +167,31 @@ function gameLoop(timestamp) {
         // Try to recover by restarting the loop
         showWarning('Critical error occurred. Attempting to recover...');
         setTimeout(() => requestAnimationFrame(gameLoop), 1000);
+    }
+}
+
+// Update first-person specific features
+function updateFirstPersonFeatures(game, inputState) {
+    try {
+        // Check for projectile hits and show hit markers
+        if (game.player && game.player.projectiles) {
+            // This would be called when a projectile hits an enemy
+            // The hit detection is already handled in player.js
+            
+            // Future: Add more first-person specific updates here
+            // - Weapon sway based on movement
+            // - Breathing effect on camera
+            // - Dynamic crosshair behavior
+        }
+        
+        // Handle ESC key to release pointer lock
+        if (inputState.justPressed.menu) {
+            // Menu is already handled in game.js, but we could add
+            // pointer lock release here if needed
+        }
+        
+    } catch (error) {
+        console.error("Error updating first-person features:", error);
     }
 }
 
@@ -219,6 +280,35 @@ window.addEventListener('error', function(event) {
     }
 });
 
+// Add keyboard shortcuts for first-person mode
+document.addEventListener('keydown', function(event) {
+    // F key to toggle flashlight (future feature)
+    if (event.code === 'KeyF' && game && game.player) {
+        // Future: Toggle player light
+        console.log('Flashlight toggle (future feature)');
+    }
+    
+    // V key to toggle view mode (if we want to support both first and third person)
+    if (event.code === 'KeyV' && game && game.player && game.player.toggleViewMode) {
+        game.player.toggleViewMode();
+        setFirstPersonMode(game.player.isFirstPerson);
+        showMessage(game.player.isFirstPerson ? 'First-Person View' : 'Third-Person View', 2000);
+    }
+    
+    // Tab key to toggle UI visibility (for immersive screenshots)
+    if (event.code === 'Tab') {
+        event.preventDefault();
+        const uiContainer = document.getElementById('ui-container');
+        const minimapContainer = document.getElementById('minimap-container');
+        
+        if (uiContainer && minimapContainer) {
+            const isHidden = uiContainer.style.display === 'none';
+            uiContainer.style.display = isHidden ? 'block' : 'none';
+            minimapContainer.style.display = isHidden ? 'block' : 'none';
+        }
+    }
+});
+
 // Helper function to format strings with variables
 window.formatString = function(str, vars) {
     return str.replace(/{(\w+)}/g, function(_, key) {
@@ -241,5 +331,30 @@ window.getItemTypeName = function(type) {
             return 'Scroll';
         default:
             return type;
+    }
+};
+
+// Add first-person specific utility functions
+window.toggleFirstPersonMode = function() {
+    if (game && game.player && game.player.toggleViewMode) {
+        game.player.toggleViewMode();
+        setFirstPersonMode(game.player.isFirstPerson);
+        return game.player.isFirstPerson;
+    }
+    return true; // Default to first-person
+};
+
+// Helper to request pointer lock manually
+window.requestMouseLock = function() {
+    const canvas = document.getElementById('game-canvas');
+    if (canvas && canvas.requestPointerLock) {
+        canvas.requestPointerLock();
+    }
+};
+
+// Helper to exit pointer lock
+window.exitMouseLock = function() {
+    if (document.exitPointerLock) {
+        document.exitPointerLock();
     }
 };
