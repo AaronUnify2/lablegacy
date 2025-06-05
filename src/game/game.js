@@ -1,4 +1,4 @@
-// src/game/game.js - Game with first-person camera system
+// src/game/game.js - Game with first-person camera system (FIXED)
 import * as THREE from 'three';
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
@@ -102,7 +102,7 @@ export class Game {
         this.player = new Player();
         this.player.init();
         
-        // Add compatibility for enemy system
+        // Add compatibility for enemy system - FIXED VERSION
         this.addPlayerCompatibilityLayer();
         
         addToScene(this.player.getObject());
@@ -149,15 +149,25 @@ export class Game {
         this.dungeonLoader.generateDungeon(floorNumber);
     }
     
-    // Add compatibility layer to handle differences between player and enemy systems
+    // FIXED: Add compatibility layer to handle differences between player and enemy systems
     addPlayerCompatibilityLayer() {
+        // Fix the isAttacking compatibility - it's a method, not a property
         if (typeof this.player.playerIsAttacking === 'undefined') {
             Object.defineProperty(this.player, 'playerIsAttacking', {
                 get: function() {
-                    return this.isAttacking;
+                    return this.isAttacking(); // FIXED: Call the method with parentheses
                 }
             });
         }
+        
+        // Also add a direct method alias for safety
+        if (typeof this.player.getIsAttacking === 'undefined') {
+            this.player.getIsAttacking = function() {
+                return this.isAttacking();
+            };
+        }
+        
+        console.log('Player compatibility layer added successfully');
     }
     
     // Apply patches to the enemy spawner
