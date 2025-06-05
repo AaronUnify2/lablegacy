@@ -1,4 +1,4 @@
-// src/engine/input.js - Input handling system with mobile controller support and menu button
+// src/engine/input.js - Input handling system with first-person mouse look
 
 // Input state object
 const inputState = {
@@ -13,19 +13,23 @@ const inputState = {
     chargeAttack: false,
     interact: false,
     dash: false,
-    jump: false,  // Add jump input
+    jump: false,
     
     // UI controls
     inventory: false,
     map: false,
-    menu: false,  // Changed from pause to menu
+    menu: false,
     
-    // Mouse data
+    // Mouse data for first-person look
     mouse: {
         x: 0,
         y: 0,
+        deltaX: 0,
+        deltaY: 0,
         leftButton: false,
-        rightButton: false
+        rightButton: false,
+        sensitivity: 0.002, // Mouse sensitivity for first-person look
+        locked: false
     },
     
     // For actions that should only trigger once per press
@@ -34,9 +38,9 @@ const inputState = {
         interact: false,
         inventory: false,
         map: false,
-        menu: false,  // Changed from pause to menu
+        menu: false,
         dash: false,
-        jump: false  // Add jump to justPressed tracking
+        jump: false
     },
     
     // Keep track of keys that were down in the previous frame
@@ -45,9 +49,9 @@ const inputState = {
         interact: false,
         inventory: false,
         map: false,
-        menu: false,  // Changed from pause to menu
+        menu: false,
         dash: false,
-        jump: false  // Add jump to previouslyPressed tracking
+        jump: false
     },
     
     // For analog input (gamepad or touch joystick)
@@ -68,7 +72,7 @@ let joystickElement;
 let joystickKnob;
 let actionButtons;
 let mobileControls;
-let menuButton; // Changed from pauseButton
+let menuButton;
 
 // Set up input event listeners
 export function setupInput() {
@@ -79,7 +83,7 @@ export function setupInput() {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
     
-    // Mouse events (for desktop)
+    // Mouse events (for desktop first-person)
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
@@ -87,12 +91,54 @@ export function setupInput() {
     // Prevent context menu on right click
     document.addEventListener('contextmenu', (e) => e.preventDefault());
     
+    // Pointer lock events for first-person view
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    document.addEventListener('pointerlockerror', handlePointerLockError);
+    
+    // Click to enable pointer lock (first-person mode)
+    document.addEventListener('click', requestPointerLock);
+    
     // If mobile, set up touch controls
     if (inputState.isMobile) {
         setupMobileControls();
     }
     
-    console.log('Input system initialized', inputState.isMobile ? 'with mobile controls' : 'with desktop controls');
+    console.log('Input system initialized for first-person view', inputState.isMobile ? 'with mobile controls' : 'with desktop controls');
+}
+
+// Request pointer lock for first-person mouse look
+function requestPointerLock() {
+    if (inputState.isMobile) return; // Skip on mobile
+    
+    const canvas = document.getElementById('game-canvas');
+    if (canvas && !inputState.mouse.locked) {
+        canvas.requestPointerLock = canvas.requestPointerLock || 
+                                   canvas.mozRequestPointerLock ||
+                                   canvas.webkitRequestPointerLock;
+        if (canvas.requestPointerLock) {
+            canvas.requestPointerLock();
+        }
+    }
+}
+
+// Handle pointer lock state changes
+function handlePointerLockChange() {
+    const canvas = document.getElementById('game-canvas');
+    if (document.pointerLockElement === canvas ||
+        document.mozPointerLockElement === canvas ||
+        document.webkitPointerLockElement === canvas) {
+        inputState.mouse.locked = true;
+        console.log('Pointer locked - first-person mode active');
+    } else {
+        inputState.mouse.locked = false;
+        console.log('Pointer unlocked - first-person mode inactive');
+    }
+}
+
+// Handle pointer lock errors
+function handlePointerLockError() {
+    console.error('Pointer lock failed');
+    inputState.mouse.locked = false;
 }
 
 // Detect if using a mobile device
@@ -114,7 +160,7 @@ function setupMobileControls() {
     mobileControls.style.width = '100%';
     mobileControls.style.height = '40%';
     mobileControls.style.zIndex = '1000';
-    mobileControls.style.pointerEvents = 'none'; // Allow clicks to pass through by default
+    mobileControls.style.pointerEvents = 'none';
     mobileControls.style.display = 'flex';
     mobileControls.style.alignItems = 'center';
     mobileControls.style.justifyContent = 'space-between';
@@ -134,6 +180,60 @@ function setupMobileControls() {
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: false });
+    
+    // Add touch look controls for mobile first-person
+    createTouchLookArea();
+}
+
+// Create touch look area for mobile first-person view
+function createTouchLookArea() {
+    const lookArea = document.createElement('div');
+    lookArea.id = 'touch-look-area';
+    lookArea.style.position = 'absolute';
+    lookArea.style.top = '0';
+    lookArea.style.left = '0';
+    lookArea.style.width = '100%';
+    lookArea.style.height = '60%'; // Upper 60% of screen for looking
+    lookArea.style.zIndex = '999';
+    lookArea.style.pointerEvents = 'auto';
+    lookArea.style.touchAction = 'none';
+    
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+    let isLooking = false;
+    
+    lookArea.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (e.touches.length === 1) {
+            isLooking = true;
+            lastTouchX = e.touches[0].clientX;
+            lastTouchY = e.touches[0].clientY;
+        }
+    });
+    
+    lookArea.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (isLooking && e.touches.length === 1) {
+            const touch = e.touches[0];
+            const deltaX = (touch.clientX - lastTouchX) * 0.005; // Sensitivity
+            const deltaY = (touch.clientY - lastTouchY) * 0.005;
+            
+            inputState.mouse.deltaX = deltaX;
+            inputState.mouse.deltaY = deltaY;
+            
+            lastTouchX = touch.clientX;
+            lastTouchY = touch.clientY;
+        }
+    });
+    
+    lookArea.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isLooking = false;
+        inputState.mouse.deltaX = 0;
+        inputState.mouse.deltaY = 0;
+    });
+    
+    document.body.appendChild(lookArea);
 }
 
 // Create joystick control
@@ -141,7 +241,7 @@ function createJoystick() {
     // Joystick container
     joystickElement = document.createElement('div');
     joystickElement.id = 'joystick';
-    joystickElement.style.position = 'relative'; // Changed from absolute to relative
+    joystickElement.style.position = 'relative';
     joystickElement.style.width = '120px';
     joystickElement.style.height = '120px';
     joystickElement.style.borderRadius = '50%';
@@ -169,9 +269,9 @@ function createJoystick() {
 // Create menu button in the middle
 function createMenuButton() {
     menuButton = document.createElement('div');
-    menuButton.id = 'menu-button';     // Updated ID from 'pause-button'
+    menuButton.id = 'menu-button';
     menuButton.className = 'control-button';
-    menuButton.dataset.action = 'menu'; // Changed from 'pause' to 'menu'
+    menuButton.dataset.action = 'menu';
     
     menuButton.style.width = '45px';
     menuButton.style.height = '45px';
@@ -217,15 +317,15 @@ function createActionButtons() {
     // Button container for right side
     const buttonContainer = document.createElement('div');
     buttonContainer.id = 'action-buttons';
-    buttonContainer.style.position = 'relative'; // Changed from absolute to relative
+    buttonContainer.style.position = 'relative';
     buttonContainer.style.display = 'grid';
     buttonContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
     buttonContainer.style.gridTemplateRows = 'repeat(3, 1fr)';
-    buttonContainer.style.gap = '7px'; // Reduced gap from 10px to 7px
+    buttonContainer.style.gap = '7px';
     buttonContainer.style.pointerEvents = 'auto';
-    buttonContainer.style.transform = 'scale(0.6)'; // Shrink by 40%
-    buttonContainer.style.transformOrigin = 'right center'; // Scale from right side
-    buttonContainer.style.marginRight = '40px'; // Add right margin to shift left
+    buttonContainer.style.transform = 'scale(0.6)';
+    buttonContainer.style.transformOrigin = 'right center';
+    buttonContainer.style.marginRight = '40px';
     mobileControls.appendChild(buttonContainer);
     
     // Button definitions: [id, label, color, row, col, action]
@@ -282,27 +382,20 @@ function handleTouchStart(event) {
         
         // Check if touch is on joystick
         if (target.id === 'joystick' || target.id === 'joystick-knob') {
-            // Save touch identifier for tracking this touch
             inputState.touchId = touch.identifier;
             updateJoystickPosition(touch);
         }
         
         // Check if touch is on menu button
         if (target.id === 'menu-button' || target.parentElement === menuButton) {
-            // Handle menu button press
             handleButtonPress('menu', true);
-            // Visual feedback
             menuButton.style.transform = 'scale(0.9)';
         }
         
         // Check if touch is on action button
         if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
             const action = target.dataset.action;
-            
-            // Highlight button
             target.style.transform = 'scale(0.9)';
-            
-            // Set input state
             handleButtonPress(action, true);
         }
     }
@@ -331,7 +424,6 @@ function handleTouchEnd(event) {
         
         // Check if joystick touch ended
         if (touch.identifier === inputState.touchId) {
-            // Reset joystick position and input state
             resetJoystick();
             inputState.touchId = null;
         }
@@ -341,20 +433,14 @@ function handleTouchEnd(event) {
         
         // Check for menu button
         if (target && (target.id === 'menu-button' || target.parentElement === menuButton)) {
-            // Reset button appearance
             menuButton.style.transform = 'scale(1)';
-            // Reset input state (but keep the "just pressed" state for one frame)
             handleButtonPress('menu', false);
         }
         
         // Check for other buttons
         if (target && target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
             const action = target.dataset.action;
-            
-            // Reset button appearance
             target.style.transform = 'scale(1)';
-            
-            // Reset input state
             handleButtonPress(action, false);
         }
     }
@@ -366,31 +452,25 @@ function updateJoystickPosition(touch) {
     const centerX = joystickRect.left + joystickRect.width / 2;
     const centerY = joystickRect.top + joystickRect.height / 2;
     
-    // Calculate distance from center
     let deltaX = touch.clientX - centerX;
     let deltaY = touch.clientY - centerY;
     
-    // Calculate distance from center
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    
-    // Limit to joystick radius
     const maxRadius = joystickRect.width / 2 - joystickKnob.offsetWidth / 2;
+    
     if (distance > maxRadius) {
         deltaX = deltaX * maxRadius / distance;
         deltaY = deltaY * maxRadius / distance;
     }
     
-    // Move joystick knob
     joystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
     
-    // Update input state with normalized values (-1 to 1)
     const normalizedX = deltaX / maxRadius;
     const normalizedY = deltaY / maxRadius;
     
     inputState.axes.leftStickX = normalizedX;
     inputState.axes.leftStickY = normalizedY;
     
-    // Convert joystick position to directional input
     if (Math.abs(normalizedX) > 0.5) {
         inputState.moveLeft = normalizedX < 0;
         inputState.moveRight = normalizedX > 0;
@@ -439,7 +519,7 @@ function handleButtonPress(action, isPressed) {
         case 'attack':
             inputState.attack = isPressed;
             break;
-        case 'chargeAttack': // This handles the staff attack
+        case 'chargeAttack':
             inputState.chargeAttack = isPressed;
             break;
         case 'dash':
@@ -454,7 +534,7 @@ function handleButtonPress(action, isPressed) {
         case 'inventory':
             inputState.inventory = isPressed;
             break;
-        case 'menu':  // Changed from 'pause' to 'menu'
+        case 'menu':
             inputState.menu = isPressed;
             break;
     }
@@ -464,7 +544,6 @@ function handleButtonPress(action, isPressed) {
 function handleKeyDown(event) {
     updateInputState(event.code, true);
     
-    // Prevent default actions for game control keys
     if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
         event.preventDefault();
     }
@@ -478,7 +557,6 @@ function handleKeyUp(event) {
 // Update input state based on key code (for desktop)
 function updateInputState(code, isPressed) {
     switch (code) {
-        // Movement
         case 'KeyW':
         case 'ArrowUp':
             inputState.moveForward = isPressed;
@@ -495,14 +573,12 @@ function updateInputState(code, isPressed) {
         case 'ArrowRight':
             inputState.moveRight = isPressed;
             break;
-            
-        // Actions
         case 'Space':
-            inputState.jump = isPressed;  // Change dash to jump
+            inputState.jump = isPressed;
             break;
         case 'ShiftLeft':
         case 'ShiftRight':
-            inputState.dash = isPressed;  // Move dash to Shift key
+            inputState.dash = isPressed;
             break;
         case 'KeyE':
             inputState.interact = isPressed;
@@ -514,15 +590,24 @@ function updateInputState(code, isPressed) {
             inputState.map = isPressed;
             break;
         case 'Escape':
-            inputState.menu = isPressed;  // Changed from pause to menu
+            inputState.menu = isPressed;
             break;
     }
 }
 
-// Handle mouse movement (for desktop)
+// Handle mouse movement for first-person look (desktop)
 function handleMouseMove(event) {
-    inputState.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    inputState.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    if (inputState.mouse.locked && !inputState.isMobile) {
+        // Use movementX/Y for pointer-locked first-person look
+        inputState.mouse.deltaX = event.movementX * inputState.mouse.sensitivity;
+        inputState.mouse.deltaY = event.movementY * inputState.mouse.sensitivity;
+    } else {
+        // Fallback for when pointer is not locked
+        inputState.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        inputState.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        inputState.mouse.deltaX = 0;
+        inputState.mouse.deltaY = 0;
+    }
 }
 
 // Handle mouse button down (for desktop)
@@ -555,44 +640,33 @@ function handleMouseUp(event) {
 
 // Update "just pressed" states for single-press actions
 function updateJustPressedStates() {
-    // List of keys to check for "just pressed" state
     const keysToCheck = ['attack', 'interact', 'inventory', 'map', 'menu', 'dash', 'jump'];
     
     keysToCheck.forEach(key => {
-        // A key is "just pressed" if it's currently down but wasn't in the previous frame
         inputState.justPressed[key] = inputState[key] && !inputState.previouslyPressed[key];
-        
-        // Update the previously pressed state for the next frame
         inputState.previouslyPressed[key] = inputState[key];
     });
 }
 
 // Get current input state (called each frame)
 export function getInput() {
-    // Update "just pressed" states before returning the input state
     updateJustPressedStates();
-    
-    // Return a copy of the input state to prevent external modifications
     return { ...inputState };
 }
 
-// Lock/unlock cursor for gameplay (called when entering/exiting game)
+// Lock/unlock cursor for gameplay
 export function setCursorLock(locked) {
-    if (inputState.isMobile) {
-        // No cursor lock needed for mobile
-        return;
-    }
+    if (inputState.isMobile) return;
     
     if (locked) {
-        document.body.requestPointerLock = document.body.requestPointerLock || 
-                                           document.body.mozRequestPointerLock ||
-                                           document.body.webkitRequestPointerLock;
-        document.body.requestPointerLock();
+        requestPointerLock();
     } else {
         document.exitPointerLock = document.exitPointerLock || 
                                    document.mozExitPointerLock ||
                                    document.webkitExitPointerLock;
-        document.exitPointerLock();
+        if (document.exitPointerLock) {
+            document.exitPointerLock();
+        }
     }
 }
 
@@ -603,41 +677,36 @@ export function toggleMobileControls(show) {
     }
 }
 
-// Reset all input states - used when needed to clear inputs
+// Reset all input states
 export function resetInputState() {
-    // Reset movement controls
     inputState.moveForward = false;
     inputState.moveBackward = false;
     inputState.moveLeft = false;
     inputState.moveRight = false;
     
-    // Reset action controls
     inputState.attack = false;
     inputState.chargeAttack = false;
     inputState.interact = false;
     inputState.dash = false;
     inputState.jump = false;
     
-    // Reset UI controls
     inputState.inventory = false;
     inputState.map = false;
-    inputState.menu = false;  // Changed from pause to menu
+    inputState.menu = false;
     
-    // Reset mouse data
     inputState.mouse.leftButton = false;
     inputState.mouse.rightButton = false;
+    inputState.mouse.deltaX = 0;
+    inputState.mouse.deltaY = 0;
     
-    // Reset "just pressed" states
     for (const key in inputState.justPressed) {
         inputState.justPressed[key] = false;
     }
     
-    // Reset "previously pressed" states
     for (const key in inputState.previouslyPressed) {
         inputState.previouslyPressed[key] = false;
     }
     
-    // Reset analog input values
     inputState.axes.leftStickX = 0;
     inputState.axes.leftStickY = 0;
     inputState.axes.rightStickX = 0;
@@ -646,5 +715,4 @@ export function resetInputState() {
     console.log("Input state has been reset");
 }
 
-// Make this function available globally for emergency resets
 window.resetInputState = resetInputState;
