@@ -1,4 +1,4 @@
-// src/game/game.js - Refactored with DungeonLoader for stable generation
+// src/game/game.js - Game with first-person camera system
 import * as THREE from 'three';
 
 import { getRenderer, render, addToScene, removeFromScene } from '../engine/renderer.js';
@@ -56,6 +56,13 @@ export class Game {
         // Menu visibility tracking
         this.isMenuVisible = false;
         
+        // First-person camera properties
+        this.cameraRotation = {
+            yaw: 0,   // Horizontal rotation (left/right)
+            pitch: 0  // Vertical rotation (up/down)
+        };
+        this.maxPitch = Math.PI / 3; // Limit vertical look (60 degrees up/down)
+        
         // Added reference to enemy systems
         this.enemySpawner = enemySpawner;
         this.projectileSystem = projectileSystem;
@@ -66,7 +73,7 @@ export class Game {
     
     // Initialize the game
     init() {
-        console.log('Initializing game...');
+        console.log('Initializing game with first-person view...');
         
         // Initialize loading screen
         loadingScreen.init();
@@ -116,10 +123,21 @@ export class Game {
         // Initialize dungeon loader
         this.dungeonLoader = new DungeonLoader(this);
         
+        // Show crosshair for first-person view
+        this.showCrosshair();
+        
         // Generate first dungeon floor with loading screen
         this.generateNewFloor(this.currentFloor);
         
-        console.log('Game initialized!');
+        console.log('Game initialized with first-person controls!');
+    }
+    
+    // Show crosshair for first-person view
+    showCrosshair() {
+        const crosshair = document.getElementById('crosshair');
+        if (crosshair) {
+            crosshair.style.display = 'block';
+        }
     }
     
     // Generate a new dungeon floor using the DungeonLoader
@@ -129,18 +147,14 @@ export class Game {
         
         // Use the dungeon loader to generate the floor
         this.dungeonLoader.generateDungeon(floorNumber);
-        
-        // Return immediately - the dungeon loader will handle the loading screen
-        // and state transitions asynchronously
     }
     
     // Add compatibility layer to handle differences between player and enemy systems
     addPlayerCompatibilityLayer() {
-        // Add properties the enemy system expects to find
         if (typeof this.player.playerIsAttacking === 'undefined') {
             Object.defineProperty(this.player, 'playerIsAttacking', {
                 get: function() {
-                    return this.isAttacking; // Return the property that player.js does have
+                    return this.isAttacking;
                 }
             });
         }
@@ -148,16 +162,11 @@ export class Game {
     
     // Apply patches to the enemy spawner
     patchEnemySpawner() {
-        // Override the spawning methods to include safety checks
-        
-        // First, save the original methods
         const originalSpawnInRoom = this.enemySpawner.spawnEnemiesInRoom;
         const originalSpawnInCardinalRoom = this.enemySpawner.spawnEnemiesInCardinalRoom;
         
-        // Override spawnEnemiesInRoom with a safer version
         this.enemySpawner.spawnEnemiesInRoom = function(room, count, availableEnemies, scene) {
             try {
-                // Determine the room type for enemy selection
                 let roomType = 'corridor';
                 if (room.isSpawnRoom) {
                     roomType = 'spawnRoom';
@@ -166,35 +175,29 @@ export class Game {
                 } else if (room.roomType === 'cardinal') {
                     roomType = 'cardinal';
                 } else if (!room.isCorridor) {
-                    roomType = 'radial'; // Default for other room types
+                    roomType = 'radial';
                 }
                 
-                // Get the appropriate enemy types for this room
-                // FIXED: Check if availableEnemies exists and has the room type
                 const enemyTypes = (availableEnemies && availableEnemies[roomType]) 
                     ? availableEnemies[roomType] 
                     : (availableEnemies && availableEnemies['radial']) 
                         ? availableEnemies['radial']
-                        : ['sphere']; // Default to sphere if no enemies available
+                        : ['sphere'];
                 
                 console.log(`Spawning in ${roomType} room, enemy types:`, enemyTypes);
                 
                 for (let i = 0; i < count; i++) {
-                    // Get random position in room (with margin from walls)
                     const margin = 2;
                     const x = room.x + margin + Math.random() * (room.width - margin * 2);
                     const z = room.z + margin + Math.random() * (room.height - margin * 2);
                     const y = room.floorHeight !== undefined ? room.floorHeight + 1 : 1;
                     
-                    // Pick random enemy type
                     const enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
                     
-                    // Create and spawn enemy
                     try {
                         this.spawnEnemy(enemyType, x, y, z, scene);
                     } catch (error) {
                         console.error(`Error spawning ${enemyType} in room:`, error);
-                        // Try spawning a sphere as fallback
                         if (enemyType !== 'sphere') {
                             try {
                                 console.log('Trying fallback sphere enemy');
@@ -210,44 +213,35 @@ export class Game {
             }
         };
         
-        // Override spawnEnemiesInCardinalRoom with a safer version
         this.enemySpawner.spawnEnemiesInCardinalRoom = function(room, count, availableEnemies, scene) {
             try {
-                // Get the appropriate enemy types for cardinal rooms
-                // FIXED: Check if availableEnemies exists and has the room type
                 const enemyTypes = (availableEnemies && availableEnemies['cardinal']) 
                     ? availableEnemies['cardinal'] 
                     : (availableEnemies && availableEnemies['radial']) 
                         ? availableEnemies['radial']
-                        : ['sphere']; // Default to sphere if no enemies available
+                        : ['sphere'];
                 
                 console.log('Enemy types for cardinal room:', enemyTypes);
                 
-                // Get center position
                 const centerX = room.x + room.width / 2;
                 const centerZ = room.z + room.height / 2;
                 const y = room.floorHeight !== undefined ? room.floorHeight + 1 : 1;
                 
                 for (let i = 0; i < count; i++) {
-                    // Pick random enemy type
                     const enemyType = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
                     
-                    // For multiple enemies, add slight offset from center
                     let x = centerX;
                     let z = centerZ;
                     
                     if (count > 1) {
-                        // Small random offset if more than one enemy
                         x += (Math.random() * 2 - 1) * (room.width / 6);
                         z += (Math.random() * 2 - 1) * (room.height / 6);
                     }
                     
-                    // Create and spawn enemy
                     try {
                         this.spawnEnemy(enemyType, x, y, z, scene);
                     } catch (error) {
                         console.error(`Error spawning ${enemyType} in cardinal room:`, error);
-                        // Try spawning a sphere as fallback
                         if (enemyType !== 'sphere') {
                             try {
                                 console.log('Trying fallback sphere enemy');
@@ -263,7 +257,6 @@ export class Game {
             }
         };
         
-        // Also patch the performSpawning method
         const originalPerformSpawning = this.enemySpawner.performSpawning;
         this.enemySpawner.performSpawning = function(dungeon, scene) {
             try {
@@ -274,62 +267,50 @@ export class Game {
                 
                 console.log('Beginning enemy spawning...');
                 
-                // Get all rooms
                 const rooms = dungeon.getRooms();
                 if (!rooms || !Array.isArray(rooms) || rooms.length === 0) {
                     console.error('No rooms available in dungeon');
                     return;
                 }
                 
-                // Separate rooms by type
                 const centerRoom = rooms.find(room => room.isSpawnRoom);
                 const radialRooms = rooms.filter(room => room.roomType === 'radial');
                 const cardinalRooms = rooms.filter(room => room.roomType === 'cardinal');
                 const corridors = dungeon.corridors || [];
                 
-                // Track which enemy types can spawn in which room types
                 const availableEnemies = {};
                 
-                // Ensure we have defaults for all room types
                 availableEnemies['spawnRoom'] = ['sphere'];
                 availableEnemies['radial'] = ['sphere'];
                 availableEnemies['cardinal'] = ['sphere'];
                 availableEnemies['corridor'] = ['sphere'];
                 
                 try {
-                    // Try to get specific enemies for each room type
                     for (const roomType of ['spawnRoom', 'radial', 'cardinal', 'corridor']) {
                         const enemiesForRoom = enemyRegistry.getEnemiesForSpawn(this.currentFloor, roomType);
                         
                         if (enemiesForRoom && enemiesForRoom.length > 0) {
                             availableEnemies[roomType] = enemiesForRoom;
                         } else {
-                            // Try to get general floor enemies
                             const floorEnemies = enemyRegistry.getEnemiesForFloor(this.currentFloor);
                             if (floorEnemies && floorEnemies.length > 0) {
                                 availableEnemies[roomType] = floorEnemies;
                             }
-                            // Otherwise, keep the defaults set above
                         }
                     }
                 } catch (error) {
                     console.error('Error getting available enemies:', error);
-                    // We'll use our defaults from above
                 }
                 
-                // Determine number of enemies based on floor
                 const baseEnemyCount = 10 + Math.floor(this.currentFloor / 2);
                 let remainingEnemies = baseEnemyCount;
                 
-                // Track which rooms already have enemies
                 const roomsWithEnemies = new Set();
                 
-                // 1. Spawn in cardinal rooms first (center position)
                 if (cardinalRooms.length > 0) {
                     cardinalRooms.forEach(room => {
-                        if (remainingEnemies <= 0 || Math.random() > 0.7) return; // 70% chance to spawn
+                        if (remainingEnemies <= 0 || Math.random() > 0.7) return;
                         
-                        // Spawn 1-2 enemies in center of cardinal rooms
                         const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * 2));
                         try {
                             this.spawnEnemiesInCardinalRoom(room, count, availableEnemies, scene);
@@ -341,12 +322,10 @@ export class Game {
                     });
                 }
                 
-                // 2. Spawn in radial rooms (random position)
                 if (radialRooms.length > 0) {
                     radialRooms.forEach(room => {
-                        if (remainingEnemies <= 0 || Math.random() > 0.6) return; // 60% chance to spawn
+                        if (remainingEnemies <= 0 || Math.random() > 0.6) return;
                         
-                        // Spawn 1-3 enemies in radial rooms
                         const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * (this.maxEnemiesPerRoom || 3)));
                         try {
                             this.spawnEnemiesInRoom(room, count, availableEnemies, scene);
@@ -358,9 +337,7 @@ export class Game {
                     });
                 }
                 
-                // 3. Maybe spawn in center room last (they'll be immediately active)
-                if (centerRoom && remainingEnemies > 0 && Math.random() > 0.7) { // 30% chance to spawn in center
-                    // Spawn 1-2 enemies in center room
+                if (centerRoom && remainingEnemies > 0 && Math.random() > 0.7) {
                     const count = Math.min(remainingEnemies, 1 + Math.floor(Math.random() * 2));
                     try {
                         this.spawnEnemiesInRoom(centerRoom, count, availableEnemies, scene);
@@ -378,7 +355,7 @@ export class Game {
         };
     }
     
-    // Update method
+    // Update method with first-person camera controls
     update(timestamp, inputState) {
         // Calculate delta time
         const deltaTime = (timestamp - this.lastTimestamp) / 1000;
@@ -389,7 +366,6 @@ export class Game {
         
         // Skip updates if we're in transitioning state
         if (this.state === GameState.TRANSITIONING) {
-            // Only render the scene, don't update gameplay
             return;
         }
         
@@ -398,12 +374,14 @@ export class Game {
             this.toggleMenu();
         }
         
-        // Update player - game always runs now
+        // Update first-person camera rotation based on mouse input
+        this.updateFirstPersonCamera(inputState);
+        
+        // Update player
         this.player.update(cappedDeltaTime, inputState, this.currentDungeon, this.scene);
         
         // Check for interactions with chests
         if (inputState.justPressed.interact) {
-            // Find a chest to interact with
             const interactableChest = this.currentDungeon.findInteractableChest(this.player.getPosition());
             if (interactableChest) {
                 this.player.interactWithChest(interactableChest);
@@ -429,13 +407,13 @@ export class Game {
             console.error('Error updating projectiles:', error);
         }
         
-        // Update camera to follow player
-        this.updateCamera(cappedDeltaTime);
+        // Update camera position to follow player in first-person
+        this.updateCameraPosition(cappedDeltaTime);
         
         // Update physics
         this.physics.update(cappedDeltaTime);
         
-        // Update all entities (merged with enemySpawner.enemies)
+        // Update all entities
         try {
             this.entities = [...this.enemySpawner.getEnemies()];
             for (const entity of this.entities) {
@@ -463,57 +441,59 @@ export class Game {
         
         // Check for floor progression
         if (this.currentDungeon.isKeyCollected() && this.currentDungeon.isPlayerAtExit(this.player.getPosition())) {
-            // Increment floor number
             this.currentFloor++;
-            
-            // Generate new floor using the stable DungeonLoader
             this.generateNewFloor(this.currentFloor);
         }
+    }
+    
+    // Update first-person camera rotation based on mouse input
+    updateFirstPersonCamera(inputState) {
+        // Only update if we have mouse delta values
+        if (inputState.mouse.deltaX !== 0 || inputState.mouse.deltaY !== 0) {
+            // Update yaw (horizontal rotation) - unlimited
+            this.cameraRotation.yaw -= inputState.mouse.deltaX;
+            
+            // Update pitch (vertical rotation) - limited
+            this.cameraRotation.pitch -= inputState.mouse.deltaY;
+            this.cameraRotation.pitch = Math.max(-this.maxPitch, Math.min(this.maxPitch, this.cameraRotation.pitch));
+            
+            // Apply rotation to camera
+            this.camera.rotation.order = 'YXZ'; // Ensure proper rotation order
+            this.camera.rotation.y = this.cameraRotation.yaw;
+            this.camera.rotation.x = this.cameraRotation.pitch;
+            
+            // Update player rotation to match camera yaw for movement direction
+            this.player.rotation = this.cameraRotation.yaw;
+            if (this.player.object) {
+                this.player.object.rotation.y = this.cameraRotation.yaw;
+            }
+        }
+    }
+    
+    // Update camera position to stay at player's eye level
+    updateCameraPosition(deltaTime) {
+        if (this.state === GameState.TRANSITIONING) return;
+        
+        const playerPosition = this.player.getPosition();
+        
+        // Position camera at player's eye level (first-person view)
+        const eyeHeight = 1.7; // Eye height above player's feet
+        
+        this.camera.position.set(
+            playerPosition.x,
+            playerPosition.y + eyeHeight,
+            playerPosition.z
+        );
+        
+        // The camera rotation is handled in updateFirstPersonCamera()
+        // So we don't need to call lookAt() here
     }
     
     // Toggle menu overlay without pausing the game
     toggleMenu() {
         this.isMenuVisible = toggleMenu();
-        
-        // The game continues to run - we just show/hide the menu
         console.log(this.isMenuVisible ? "Menu opened" : "Menu closed");
-        
-        // Return visibility state in case other code needs to know
         return this.isMenuVisible;
-    }
-    
-    // Update camera position to follow player
-    updateCamera(deltaTime) {
-        // Skip camera updates during transitions
-        if (this.state === GameState.TRANSITIONING) return;
-        
-        const playerPosition = this.player.getPosition();
-        const isPlayerInAir = this.player.isInAir();
-        
-        // Calculate target camera position
-        // Adjust camera height based on whether player is jumping
-        const cameraHeight = isPlayerInAir ? 
-            playerPosition.y + 9 : // Higher camera when jumping
-            playerPosition.y + 8;  // Normal camera height
-        
-        const targetPosition = new THREE.Vector3(
-            playerPosition.x,
-            cameraHeight,
-            playerPosition.z + 10 // Camera distance behind player
-        );
-        
-        // Smoothly move camera to target position
-        // Use faster lerp when player is jumping for more responsive camera
-        const lerpFactor = isPlayerInAir ? 8 * deltaTime : 5 * deltaTime;
-        this.camera.position.lerp(targetPosition, lerpFactor);
-        
-        // Look at player
-        this.camera.lookAt(playerPosition);
-    }
-    
-    // Update game over state
-    updateGameOver(inputState) {
-        // Game over logic will go here
     }
     
     // Render the current frame
