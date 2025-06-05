@@ -1,4 +1,4 @@
-// src/entities/player.js - Player character implementation with dual weapons
+// src/entities/player.js - Player character implementation with first-person support
 import * as THREE from 'three';
 
 export class Player {
@@ -45,6 +45,10 @@ export class Player {
         this.attackHitbox = null;
         this.invulnerabilityTime = 0;
         
+        // First-person view settings
+        this.isFirstPerson = true;
+        this.bodyVisible = false;  // Hide player body in first-person
+        
         // Weapons
         this.weapons = {
             sword: {
@@ -66,12 +70,12 @@ export class Player {
             }
         };
         
-        // Player light - ENHANCED properties
+        // Player light - positioned for first-person
         this.playerLight = null;
-        this.lightIntensity = 2.0;      // Increased from 1.5
-        this.lightRadius = 15;          // Increased from 12
-        this.lightColor = 0xf8e0a7;     // Slightly warmer white light
-        this.lightHeight = 2.0;         // Position light above player's head
+        this.lightIntensity = 2.0;      
+        this.lightRadius = 15;          
+        this.lightColor = 0xf8e0a7;     
+        this.lightHeight = 0.5;         // Lower light position for first-person
         
         // Ranged attack properties
         this.projectiles = [];
@@ -111,12 +115,17 @@ export class Player {
     
     // Initialize player's 3D model and physics
     init() {
-        // Create simple player mesh
+        // Create player mesh (invisible in first-person)
         const geometry = new THREE.BoxGeometry(0.8, 1.8, 0.8);
-        const material = new THREE.MeshLambertMaterial({ color: 0x00aaff });
+        const material = new THREE.MeshLambertMaterial({ 
+            color: 0x00aaff,
+            transparent: true,
+            opacity: this.bodyVisible ? 1.0 : 0.0  // Invisible in first-person
+        });
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
+        this.mesh.visible = this.bodyVisible;
         
         // Create player container to handle rotations better
         this.object = new THREE.Object3D();
@@ -137,11 +146,13 @@ export class Player {
             window.updatePauseMenuInventory(this.inventory);
             console.log("Player inventory synchronized with menu system");
         }
+        
+        console.log("Player initialized for first-person view");
     }
     
-    // Create visual representations of the player's weapons
+    // Create visual representations of the player's weapons (positioned for first-person)
     createWeaponModels() {
-        // Create sword model for right hand
+        // Create sword model for right side of screen
         const swordGeometry = new THREE.BoxGeometry(0.1, 0.8, 0.1);
         const handleGeometry = new THREE.BoxGeometry(0.15, 0.2, 0.15);
         const guardGeometry = new THREE.BoxGeometry(0.3, 0.1, 0.1);
@@ -165,13 +176,13 @@ export class Player {
         this.weapons.sword.mesh.add(handle);
         this.weapons.sword.mesh.add(guard);
         
-        // Position sword in player's right hand
-        this.weapons.sword.mesh.position.set(0.5, 0.3, 0.5);
-        this.weapons.sword.mesh.rotation.z = -Math.PI / 4;
+        // Position sword for first-person view (right side, slightly forward)
+        this.weapons.sword.mesh.position.set(1.2, -0.5, 0.8);
+        this.weapons.sword.mesh.rotation.set(-0.3, 0, -0.2);
         
         this.object.add(this.weapons.sword.mesh);
         
-        // Create staff model for left hand
+        // Create staff model for left side of screen
         const staffPoleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 1.2, 8);
         const staffTopGeometry = new THREE.SphereGeometry(0.1, 16, 16);
         
@@ -194,9 +205,9 @@ export class Player {
         this.weapons.staff.mesh.add(staffPole);
         this.weapons.staff.mesh.add(staffTop);
         
-        // Position staff in player's left hand
-        this.weapons.staff.mesh.position.set(-0.5, 0.3, 0.5);
-        this.weapons.staff.mesh.rotation.z = Math.PI / 10;
+        // Position staff for first-person view (left side, slightly forward)
+        this.weapons.staff.mesh.position.set(-1.2, -0.3, 0.6);
+        this.weapons.staff.mesh.rotation.set(-0.2, 0, 0.1);
         
         // Add a small light to the staff top
         const staffLight = new THREE.PointLight(0x4040ff, 0.5, 3);
@@ -224,7 +235,7 @@ export class Player {
         projectileLight.position.set(0, 0, 0);
         projectileMesh.add(projectileLight);
         
-        // ENHANCEMENT: Add a trail effect to projectiles
+        // Add a trail effect to projectiles
         const trailGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.3);
         const trailMaterial = new THREE.MeshBasicMaterial({
             color: 0x4040ff,
@@ -241,28 +252,20 @@ export class Player {
         const staffWorldPosition = new THREE.Vector3();
         this.weapons.staff.mesh.getWorldPosition(staffWorldPosition);
         
-        // Create direction vector - use player's movement direction
+        // Create direction vector for first-person - use camera/player rotation
         let direction = new THREE.Vector3();
         
-        // SOLUTION: Use the same logic that moves the player
-        // If the player is moving, use that direction
-        if (Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1) {
-            // The player's velocity already points in the correct direction
-            direction.copy(this.velocity).normalize();
-        } else {
-            // Player is standing still, use rotation
-            // The key insight: Player's rotation is based on atan2(velocity.x, velocity.z)
-            // This means rotation 0 corresponds to -Z, so:
-            const angleRadians = this.rotation;
-            direction.x = Math.sin(angleRadians);
-            direction.z = Math.cos(angleRadians);
-        }
+        // In first-person, use the player's facing direction (rotation)
+        const angleRadians = this.rotation;
+        direction.x = Math.sin(angleRadians);
+        direction.z = Math.cos(angleRadians);
+        direction.y = 0; // Keep projectiles horizontal for now
         
-        // Set initial position slightly in front of the staff
+        // Set initial position in front of the player at staff height
         const startPosition = new THREE.Vector3(
-            staffWorldPosition.x + direction.x * 0.7,
-            staffWorldPosition.y + 0.65, // Position at the staff top
-            staffWorldPosition.z + direction.z * 0.7
+            this.position.x + direction.x * 1.5,
+            this.position.y + 1.2, // Staff height in first-person
+            this.position.z + direction.z * 1.5
         );
         
         projectileMesh.position.copy(startPosition);
@@ -321,7 +324,7 @@ export class Player {
         }
     }
     
-    // FIXED: Check projectile collisions with enemies
+    // Check projectile collisions with enemies
     checkProjectileCollisions(enemies, scene) {
         let hitDetected = false;
         
@@ -389,7 +392,7 @@ export class Player {
         return hitDetected;
     }
     
-    // NEW METHOD: Create a hit effect when a projectile hits an enemy
+    // Create a hit effect when a projectile hits an enemy
     createHitEffect(position, scene) {
         // Skip if scene is not provided
         if (!scene) return;
@@ -552,10 +555,14 @@ export class Player {
         if (this.invulnerabilityTime > 0) {
             this.invulnerabilityTime -= deltaTime;
             
-            // Flash effect for invulnerability
-            this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+            // Flash effect for invulnerability (only affects visible body parts)
+            if (this.bodyVisible) {
+                this.mesh.visible = Math.floor(this.invulnerabilityTime * 10) % 2 === 0;
+            }
         } else {
-            this.mesh.visible = true;
+            if (this.bodyVisible) {
+                this.mesh.visible = true;
+            }
         }
         
         // Update 3D object position and rotation
@@ -564,7 +571,7 @@ export class Player {
         // Update collider
         this.updateCollider();
         
-        // Update player light
+        // Update player light for first-person view
         if (this.playerLight) {
             // Apply subtle flicker/breathing effect to light
             const flickerAmount = Math.sin(Date.now() * 0.002) * 0.1; // Subtle oscillation
@@ -587,12 +594,6 @@ export class Player {
             } else {
                 this.playerLight.color.setHex(this.lightColor);
             }
-        }
-        
-        // Debug logging of movement states (only when moving or paused/unpaused)
-        if (this.velocity.x !== 0 || this.velocity.z !== 0 || window.game?.state === 'paused') {
-            console.log(`Player state - vX: ${this.velocity.x.toFixed(2)}, vZ: ${this.velocity.z.toFixed(2)}, 
-                        jump: ${this.isJumping}, fall: ${this.isFalling}, dash: ${this.isDashing}`);
         }
     }
     
@@ -659,7 +660,8 @@ export class Player {
         this.position.x += this.velocity.x * deltaTime;
         this.position.z += this.velocity.z * deltaTime;
         
-        // Update rotation based on movement direction
+        // In first-person, rotation is handled by the camera system in game.js
+        // We still update the player's rotation for projectile direction
         if (this.velocity.x !== 0 || this.velocity.z !== 0) {
             const targetRotation = Math.atan2(this.velocity.x, this.velocity.z);
             
@@ -678,8 +680,6 @@ export class Player {
                 targetRotation,
                 this.rotationSpeed * deltaTime
             );
-            
-            this.object.rotation.y = this.rotation;
         }
     }
     
@@ -760,7 +760,7 @@ export class Player {
         }
     }
     
-    // Start a melee attack with the sword
+    // Start a melee attack with the sword (enhanced for first-person)
     startMeleeAttack() {
         this.isAttacking = true;
         this.attackTimer = this.attackCooldown;
@@ -769,8 +769,9 @@ export class Player {
         this.attackAnimationTime = 0;
         this.attackAnimationDuration = 0.3;
         
-        // Store original weapon rotation for animation
-        this.swordOrigRotation = this.weapons.sword.mesh.rotation.z;
+        // Store original weapon position for animation
+        this.swordOrigPosition = this.weapons.sword.mesh.position.clone();
+        this.swordOrigRotation = this.weapons.sword.mesh.rotation.clone();
     }
     
     // Fire a projectile from the staff
@@ -788,40 +789,54 @@ export class Player {
         this.animateStaffCast();
     }
     
-    // Animate staff casting
+    // Animate staff casting (enhanced for first-person)
     animateStaffCast() {
-        // Quick pulse animation for staff
+        // More dramatic animation for first-person view
         const staffTop = this.weapons.staff.mesh.children[1]; // The glowing orb at top of staff
         const originalScale = staffTop.scale.clone();
+        const originalPosition = this.weapons.staff.mesh.position.clone();
         
-        // Scale up quickly
-        staffTop.scale.set(1.5, 1.5, 1.5);
+        // Scale up and move forward quickly
+        staffTop.scale.set(1.8, 1.8, 1.8);
+        this.weapons.staff.mesh.position.z += 0.3;
         
-        // Then return to normal scale
+        // Then return to normal
         setTimeout(() => {
             staffTop.scale.copy(originalScale);
+            this.weapons.staff.mesh.position.copy(originalPosition);
         }, 150);
     }
     
-    // Update attack animation
+    // Update attack animation (enhanced for first-person)
     updateAttackAnimation(deltaTime) {
         this.attackAnimationTime += deltaTime;
         
-        // Simple attack animation - swing the sword
+        // More dramatic sword animation for first-person view
         const progress = this.attackAnimationTime / this.attackAnimationDuration;
         
-        if (progress < 0.5) {
-            // First half of animation - swing back
-            const swingBackAmount = Math.PI / 2;
-            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation + progress * 2 * swingBackAmount;
-        } else if (progress < 1) {
-            // Second half - swing forward
-            const swingForwardAmount = Math.PI;
-            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation + 
-                Math.PI / 2 - (progress - 0.5) * 2 * swingForwardAmount;
+        if (progress < 0.3) {
+            // First phase - pull back
+            const pullBackAmount = progress / 0.3;
+            this.weapons.sword.mesh.position.x = this.swordOrigPosition.x - pullBackAmount * 0.3;
+            this.weapons.sword.mesh.position.z = this.swordOrigPosition.z - pullBackAmount * 0.2;
+        } else if (progress < 0.7) {
+            // Second phase - swing forward
+            const swingAmount = (progress - 0.3) / 0.4;
+            this.weapons.sword.mesh.position.x = this.swordOrigPosition.x - 0.3 + swingAmount * 0.6;
+            this.weapons.sword.mesh.position.z = this.swordOrigPosition.z - 0.2 + swingAmount * 0.4;
+            this.weapons.sword.mesh.rotation.y = this.swordOrigRotation.y + swingAmount * Math.PI / 4;
         } else {
-            // End animation
-            this.weapons.sword.mesh.rotation.z = this.swordOrigRotation;
+            // Final phase - return to normal
+            const returnAmount = (progress - 0.7) / 0.3;
+            this.weapons.sword.mesh.position.x = this.swordOrigPosition.x + 0.3 - returnAmount * 0.3;
+            this.weapons.sword.mesh.position.z = this.swordOrigPosition.z + 0.2 - returnAmount * 0.2;
+            this.weapons.sword.mesh.rotation.y = this.swordOrigRotation.y + (1 - returnAmount) * Math.PI / 4;
+        }
+        
+        if (progress >= 1.0) {
+            // End animation - restore original position
+            this.weapons.sword.mesh.position.copy(this.swordOrigPosition);
+            this.weapons.sword.mesh.rotation.copy(this.swordOrigRotation);
             this.isAttacking = false;
         }
     }
@@ -855,7 +870,7 @@ export class Player {
         }
     }
     
-    // FIXED: Clean up all projectiles without removing player light
+    // Clean up all projectiles without removing player light
     cleanupProjectiles(scene) {
         for (const projectile of this.projectiles) {
             // Make sure to remove from scene
@@ -890,7 +905,7 @@ export class Player {
         console.log("Projectiles cleaned up successfully");
     }
     
-    // NEW METHOD: For cleaning up player light if needed
+    // Clean up player light if needed
     cleanupPlayerLight() {
         if (this.playerLight) {
             this.object.remove(this.playerLight);
@@ -904,13 +919,13 @@ export class Player {
         }
     }
     
-    // NEW METHOD: Recreate player light if needed
+    // Recreate player light for first-person view
     recreatePlayerLight() {
         // Only create a new light if it doesn't exist
         if (!this.playerLight) {
-            // Create player light
+            // Create player light positioned lower for first-person
             this.playerLight = new THREE.PointLight(this.lightColor, this.lightIntensity, this.lightRadius);
-            this.playerLight.position.set(0, this.lightHeight, 0); // Position light above player's head
+            this.playerLight.position.set(0, this.lightHeight, 0); // Lower position for first-person
             this.playerLight.castShadow = true;
 
             // Configure shadows for better quality
@@ -919,12 +934,12 @@ export class Player {
             this.playerLight.shadow.camera.near = 0.5;
             this.playerLight.shadow.camera.far = 15;
 
-            // Add a subtle ambient glow sphere around the player
-            const glowGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+            // Add a subtle ambient glow sphere around the player (smaller for first-person)
+            const glowGeometry = new THREE.SphereGeometry(0.15, 16, 16);
             const glowMaterial = new THREE.MeshBasicMaterial({
                 color: this.lightColor,
                 transparent: true,
-                opacity: 0.4
+                opacity: 0.3
             });
             this.glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
             this.glowMesh.position.set(0, this.lightHeight, 0);
@@ -933,7 +948,7 @@ export class Player {
             // Add light to player object
             this.object.add(this.playerLight);
             
-            console.log("Player light recreated successfully");
+            console.log("Player light created for first-person view");
         }
     }
     
@@ -967,6 +982,50 @@ export class Player {
         }
         
         this.playerLight.visible = enabled;
+    }
+    
+    // Toggle between first-person and third-person view
+    toggleViewMode() {
+        this.isFirstPerson = !this.isFirstPerson;
+        this.bodyVisible = !this.isFirstPerson;
+        
+        if (this.mesh) {
+            this.mesh.visible = this.bodyVisible;
+            this.mesh.material.opacity = this.bodyVisible ? 1.0 : 0.0;
+        }
+        
+        // Adjust weapon positions based on view mode
+        if (this.isFirstPerson) {
+            // Position weapons for first-person view
+            this.weapons.sword.mesh.position.set(1.2, -0.5, 0.8);
+            this.weapons.sword.mesh.rotation.set(-0.3, 0, -0.2);
+            
+            this.weapons.staff.mesh.position.set(-1.2, -0.3, 0.6);
+            this.weapons.staff.mesh.rotation.set(-0.2, 0, 0.1);
+            
+            // Lower light position
+            this.lightHeight = 0.5;
+        } else {
+            // Position weapons for third-person view
+            this.weapons.sword.mesh.position.set(0.5, 0.3, 0.5);
+            this.weapons.sword.mesh.rotation.set(0, 0, -Math.PI / 4);
+            
+            this.weapons.staff.mesh.position.set(-0.5, 0.3, 0.5);
+            this.weapons.staff.mesh.rotation.set(0, 0, Math.PI / 10);
+            
+            // Higher light position
+            this.lightHeight = 2.0;
+        }
+        
+        // Update light position
+        if (this.playerLight) {
+            this.playerLight.position.y = this.lightHeight;
+            if (this.glowMesh) {
+                this.glowMesh.position.y = this.lightHeight;
+            }
+        }
+        
+        console.log(`Switched to ${this.isFirstPerson ? 'first' : 'third'}-person view`);
     }
     
     // Set the ground level for the player
