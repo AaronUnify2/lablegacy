@@ -1,4 +1,4 @@
-// src/game/ui.js - Enhanced user interface with three status bars positioned at top-left
+// src/game/ui.js - Enhanced user interface for first-person view
 
 // Update UI elements with current game state
 export function updateUI(player, floorNumber) {
@@ -7,6 +7,7 @@ export function updateUI(player, floorNumber) {
     updateStaminaBar(player);
     updateWeaponInfo(player);
     updateFloorInfo(floorNumber);
+    updateCrosshair(player);
     updateMinimap();
 }
 
@@ -58,9 +59,16 @@ function updateManaBar(player) {
     const manaFill = document.getElementById('mana-fill');
     if (manaFill) {
         manaFill.style.width = `${manaPercentage}%`;
+        
+        // Change mana bar brightness based on availability
+        if (manaPercentage < 100) {
+            manaFill.style.opacity = '0.6';
+        } else {
+            manaFill.style.opacity = '1.0';
+        }
     }
     
-    // Update numerical value (for now showing 100/100 when full)
+    // Update numerical value (for now showing percentage when full)
     const manaValue = document.getElementById('mana-value');
     if (manaValue) {
         manaValue.textContent = `${Math.floor(manaPercentage)}/${100}`;
@@ -78,12 +86,56 @@ function updateStaminaBar(player) {
     const staminaFill = document.getElementById('stamina-fill');
     if (staminaFill) {
         staminaFill.style.width = `${staminaPercentage}%`;
+        
+        // Change stamina bar brightness based on availability
+        if (staminaPercentage < 100) {
+            staminaFill.style.opacity = '0.6';
+        } else {
+            staminaFill.style.opacity = '1.0';
+        }
     }
     
     // Update numerical value
     const staminaValue = document.getElementById('stamina-value');
     if (staminaValue) {
         staminaValue.textContent = `${Math.floor(staminaPercentage)}/${100}`;
+    }
+}
+
+// Update crosshair for first-person view
+function updateCrosshair(player) {
+    const crosshair = document.getElementById('crosshair');
+    if (!crosshair) return;
+    
+    // Make sure crosshair is visible in first-person mode
+    if (player.isFirstPerson) {
+        crosshair.style.display = 'block';
+        
+        // Add attacking effect
+        if (player.isAttacking()) {
+            crosshair.classList.add('attacking');
+            // Remove the class after animation
+            setTimeout(() => {
+                crosshair.classList.remove('attacking');
+            }, 300);
+        }
+        
+        // Change crosshair color based on what player is aiming at
+        // For now, just change color when staff is on cooldown
+        if (player.weapons && player.weapons.staff && player.weapons.staff.cooldownTimer > 0) {
+            crosshair.style.filter = 'hue-rotate(240deg)'; // Blue tint when staff on cooldown
+        } else {
+            crosshair.style.filter = 'none';
+        }
+        
+        // Add subtle movement effect when player is moving
+        if (player.velocity && (Math.abs(player.velocity.x) > 0.1 || Math.abs(player.velocity.z) > 0.1)) {
+            crosshair.style.transform = 'translate(-50%, -50%) scale(0.95)';
+        } else {
+            crosshair.style.transform = 'translate(-50%, -50%) scale(1.0)';
+        }
+    } else {
+        crosshair.style.display = 'none';
     }
 }
 
@@ -116,7 +168,7 @@ function updateMinimap() {
     // For now, this is just a placeholder
 }
 
-// Initialize the UI
+// Initialize the UI with first-person support
 export function initUI() {
     // Create/update UI container if needed
     let uiContainer = document.getElementById('ui-container');
@@ -187,6 +239,50 @@ export function initUI() {
         <div class="weapon-name">Sword & Staff</div>
     `;
     uiContainer.appendChild(weaponInfo);
+    
+    // Initialize crosshair for first-person view
+    initCrosshair();
+    
+    // Add first-person mode class to body for CSS targeting
+    document.body.classList.add('first-person-mode');
+}
+
+// Initialize crosshair element
+function initCrosshair() {
+    let crosshair = document.getElementById('crosshair');
+    
+    if (!crosshair) {
+        crosshair = document.createElement('div');
+        crosshair.id = 'crosshair';
+        document.body.appendChild(crosshair);
+    }
+    
+    // Make sure it's visible
+    crosshair.style.display = 'block';
+    
+    console.log('Crosshair initialized for first-person view');
+}
+
+// Show/hide crosshair based on view mode
+export function toggleCrosshair(visible) {
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) {
+        crosshair.style.display = visible ? 'block' : 'none';
+    }
+}
+
+// Add hit marker effect to crosshair
+export function showHitMarker() {
+    const crosshair = document.getElementById('crosshair');
+    if (crosshair) {
+        crosshair.classList.add('attacking');
+        crosshair.style.filter = 'hue-rotate(120deg) brightness(1.5)'; // Green flash
+        
+        setTimeout(() => {
+            crosshair.classList.remove('attacking');
+            crosshair.style.filter = 'none';
+        }, 200);
+    }
 }
 
 // Helper function to capitalize first letter
@@ -337,8 +433,88 @@ export function showInventory(player) {
     // For now, this is just a placeholder
 }
 
-// Add this function to create control hints
-export function createControlHints() {
-    // Function disabled to prevent control hints from showing
-    return;
+// Add first-person specific UI helpers
+export function setFirstPersonMode(enabled) {
+    const body = document.body;
+    
+    if (enabled) {
+        body.classList.add('first-person-mode');
+        toggleCrosshair(true);
+    } else {
+        body.classList.remove('first-person-mode');
+        toggleCrosshair(false);
+    }
 }
+
+// Update weapon status indicators for first-person
+export function updateWeaponStatus(player) {
+    // This could be expanded to show weapon readiness indicators
+    // near the crosshair or in the corners of the screen
+    
+    const swordReady = player.attackTimer <= 0;
+    const staffReady = player.weapons?.staff?.cooldownTimer <= 0;
+    
+    // Future: Add visual indicators for weapon readiness
+    // For now, this information is available through the mana/stamina bars
+}
+
+// Add damage indicator when player takes damage
+export function showDamageIndicator(damage) {
+    // Create a red flash overlay
+    const damageOverlay = document.createElement('div');
+    damageOverlay.style.position = 'absolute';
+    damageOverlay.style.top = '0';
+    damageOverlay.style.left = '0';
+    damageOverlay.style.width = '100%';
+    damageOverlay.style.height = '100%';
+    damageOverlay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+    damageOverlay.style.pointerEvents = 'none';
+    damageOverlay.style.zIndex = '150';
+    damageOverlay.style.transition = 'opacity 0.2s';
+    document.body.appendChild(damageOverlay);
+    
+    // Fade out the overlay
+    setTimeout(() => {
+        damageOverlay.style.opacity = '0';
+        setTimeout(() => {
+            if (damageOverlay.parentNode) {
+                document.body.removeChild(damageOverlay);
+            }
+        }, 200);
+    }, 100);
+    
+    // Also show damage number
+    showMessage(`-${damage} HP`, 1500);
+}
+
+// Add healing indicator when player heals
+export function showHealingIndicator(healing) {
+    // Create a green flash overlay
+    const healOverlay = document.createElement('div');
+    healOverlay.style.position = 'absolute';
+    healOverlay.style.top = '0';
+    healOverlay.style.left = '0';
+    healOverlay.style.width = '100%';
+    healOverlay.style.height = '100%';
+    healOverlay.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
+    healOverlay.style.pointerEvents = 'none';
+    healOverlay.style.zIndex = '150';
+    healOverlay.style.transition = 'opacity 0.2s';
+    document.body.appendChild(healOverlay);
+    
+    // Fade out the overlay
+    setTimeout(() => {
+        healOverlay.style.opacity = '0';
+        setTimeout(() => {
+            if (healOverlay.parentNode) {
+                document.body.removeChild(healOverlay);
+            }
+        }, 200);
+    }, 100);
+    
+    // Also show healing number
+    showMessage(`+${healing} HP`, 1500);
+}
+
+// Export the hit marker function globally
+window.showHitMarker = showHitMarker;
