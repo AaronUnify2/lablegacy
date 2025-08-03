@@ -124,10 +124,17 @@ function createDualJoystickUI() {
     // Clear existing content and rebuild
     mobileControls.innerHTML = '';
     mobileControls.style.display = 'flex';
+    mobileControls.style.alignItems = 'flex-end'; // Align joysticks at bottom
+    mobileControls.style.justifyContent = 'space-between';
     
     // Left joystick (movement)
     const leftJoystickContainer = document.createElement('div');
-    leftJoystickContainer.style.position = 'relative';
+    leftJoystickContainer.style.cssText = `
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    `;
     
     leftJoystickElement = document.createElement('div');
     leftJoystickElement.id = 'left-joystick';
@@ -183,6 +190,7 @@ function createDualJoystickUI() {
         user-select: none;
         pointer-events: auto;
         position: relative;
+        margin-bottom: 45px;
     `;
     menuButton.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
@@ -193,23 +201,68 @@ function createDualJoystickUI() {
     `;
     mobileControls.appendChild(menuButton);
     
-    // Right side container for camera joystick and action buttons
+    // Right side container for action buttons and camera joystick
     const rightContainer = document.createElement('div');
     rightContainer.style.cssText = `
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 20px;
+        gap: 15px;
         margin-right: 20px;
     `;
     
-    // Right joystick (camera)
+    // Action buttons in horizontal line
+    const actionButtonsContainer = document.createElement('div');
+    actionButtonsContainer.id = 'action-buttons';
+    actionButtonsContainer.style.cssText = `
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        pointer-events: auto;
+    `;
+    
+    const buttons = [
+        ['button-sword', 'attack', '⚔️', 'rgba(205, 133, 63, 0.8)'],
+        ['button-dash', 'dash', '💨', 'rgba(255, 150, 50, 0.8)'],
+        ['button-jump', 'jump', '⬆️', 'rgba(60, 179, 113, 0.8)'],
+        ['button-staff', 'chargeAttack', '🔮', 'rgba(186, 85, 211, 0.8)']
+    ];
+    
+    buttons.forEach(([id, action, emoji, color]) => {
+        const button = document.createElement('div');
+        button.id = id;
+        button.className = 'control-button';
+        button.dataset.action = action;
+        button.textContent = emoji;
+        button.style.cssText = `
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: ${color};
+            border: 2px solid ${color.replace('0.8', '1')};
+            box-shadow: 0 0 10px ${color};
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            user-select: none;
+            font-size: 14px;
+            transition: transform 0.1s ease;
+        `;
+        actionButtonsContainer.appendChild(button);
+    });
+    
+    rightContainer.appendChild(actionButtonsContainer);
+    
+    // Right joystick (camera) - same size as left
     rightJoystickElement = document.createElement('div');
     rightJoystickElement.id = 'right-joystick';
     rightJoystickElement.style.cssText = `
         position: relative;
-        width: 100px;
-        height: 100px;
+        width: 120px;
+        height: 120px;
         border-radius: 50%;
         border: 2px solid rgba(255, 140, 0, 0.8);
         background-color: rgba(255, 165, 0, 0.3);
@@ -224,8 +277,8 @@ function createDualJoystickUI() {
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         background-color: rgba(255, 140, 0, 0.8);
         pointer-events: none;
@@ -234,53 +287,6 @@ function createDualJoystickUI() {
     rightJoystickElement.appendChild(rightJoystickKnob);
     rightContainer.appendChild(rightJoystickElement);
     
-    // Action buttons
-    const actionButtonsContainer = document.createElement('div');
-    actionButtonsContainer.id = 'action-buttons';
-    actionButtonsContainer.style.cssText = `
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        gap: 6px;
-        pointer-events: auto;
-    `;
-    
-    const buttons = [
-        ['button-sword', 'attack', '⚔️', 'rgba(205, 133, 63, 0.8)', 1, 1],
-        ['button-staff', 'chargeAttack', '🔮', 'rgba(186, 85, 211, 0.8)', 1, 2],
-        ['button-jump', 'jump', '⬆️', 'rgba(60, 179, 113, 0.8)', 2, 1],
-        ['button-dash', 'dash', '💨', 'rgba(255, 150, 50, 0.8)', 2, 2]
-    ];
-    
-    buttons.forEach(([id, action, emoji, color, row, col]) => {
-        const button = document.createElement('div');
-        button.id = id;
-        button.className = 'control-button';
-        button.dataset.action = action;
-        button.textContent = emoji;
-        button.style.cssText = `
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background-color: ${color};
-            border: 2px solid ${color.replace('0.8', '1')};
-            box-shadow: 0 0 10px ${color};
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-weight: bold;
-            user-select: none;
-            font-size: 16px;
-            transition: transform 0.1s ease;
-            grid-row: ${row};
-            grid-column: ${col};
-        `;
-        actionButtonsContainer.appendChild(button);
-    });
-    
-    rightContainer.appendChild(actionButtonsContainer);
     mobileControls.appendChild(rightContainer);
 }
 
