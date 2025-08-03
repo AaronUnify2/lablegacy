@@ -3,38 +3,793 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Labyrinth Legacy - First Person</title>
-    <link rel="stylesheet" href="styles/main.css">
-    <link rel="stylesheet" href="styles/menu.css">
-    
-    <!-- Preload hint for better performance -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js" as="script">
-    
-    <!-- Meta tags for first-person game experience -->
-    <meta name="description" content="Labyrinth Legacy - An immersive first-person dungeon crawler">
-    <meta name="theme-color" content="#1a1a1a">
-    
-    <!-- Disable text selection and context menu for immersive gaming -->
+    <title>Labyrinth Legacy</title>
     <style>
         body {
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            -webkit-touch-callout: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        /* Ensure game canvas takes full priority */
-        #game-canvas {
-            cursor: crosshair;
-            outline: none;
-        }
-        
-        /* Hide scrollbars completely for immersive experience */
-        html, body {
-            overflow: hidden;
             margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+            cursor: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        #healthBar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #8B4513;
+            border-radius: 10px;
+        }
+
+        #healthFill {
+            height: 100%;
+            background: linear-gradient(90deg, #8B0000, #DC143C);
+            border-radius: 8px;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+
+        #staminaBar {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            width: 150px;
+            height: 15px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #4682B4;
+            border-radius: 8px;
+        }
+
+        #staminaFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4169E1, #87CEEB);
+            border-radius: 6px;
+            width: 100%;
+            transition: width 0.2s ease;
+        }
+
+        #manaBar {
+            position: absolute;
+            top: 75px;
+            left: 20px;
+            width: 150px;
+            height: 15px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #9370DB;
+            border-radius: 8px;
+        }
+
+        #manaFill {
+            height: 100%;
+            background: linear-gradient(90deg, #4B0082, #9370DB);
+            border-radius: 6px;
+            width: 100%;
+            transition: width 0.2s ease;
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        #crosshair::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        /* Mobile Controls Styles */
+        #mobile-controls {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 40%;
+            z-index: 1000;
+            pointer-events: none;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0;
+        }
+
+        #joystick {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 2px solid rgba(100, 149, 237, 0.8);
+            background-color: rgba(65, 105, 225, 0.3);
+            pointer-events: auto;
+            box-shadow: 0 0 15px rgba(100, 149, 237, 0.8);
+            margin-left: 20px;
+        }
+
+        #joystick-knob {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: rgba(65, 105, 225, 0.8);
+            pointer-events: none;
+        }
+
+        #menu-button {
+            width: 31px;
+            height: 31px;
+            border-radius: 50%;
+            background-color: rgba(240, 240, 240, 0.8);
+            border: 2px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            font-size: 11px;
+            user-select: none;
+            pointer-events: auto;
+            position: relative;
+        }
+
+        #action-buttons {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 6px;
+            pointer-events: auto;
+            margin-right: 20px;
+        }
+
+        .control-button {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            user-select: none;
+            font-size: 16px;
+            transition: transform 0.1s ease;
+        }
+
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: flex;
+            }
+            #instructions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <div id="healthBar">
+                <div id="healthFill"></div>
+            </div>
+            <div id="staminaBar">
+                <div id="staminaFill"></div>
+            </div>
+            <div id="manaBar">
+                <div id="manaFill"></div>
+            </div>
+            <div id="crosshair"></div>
+            <div id="instructions">
+                WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
+                <small>Mobile: Joystick to move, swipe to look, tap action buttons</small>
+            </div>
+        </div>
+        
+        <!-- Mobile Controls -->
+        <div id="mobile-controls">
+            <div id="joystick">
+                <div id="joystick-knob"></div>
+            </div>
+            
+            <div id="menu-button" class="control-button" data-action="menu">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+                </div>
+            </div>
+            
+            <div id="action-buttons">
+                <div id="button-sword" class="control-button" data-action="attack" 
+                     style="background-color: rgba(205, 133, 63, 0.8); border: 2px solid rgba(205, 133, 63, 1); 
+                     box-shadow: 0 0 10px rgba(205, 133, 63, 0.8); grid-row: 1; grid-column: 1;">⚔️</div>
+                
+                <div id="button-staff" class="control-button" data-action="chargeAttack" 
+                     style="background-color: rgba(186, 85, 211, 0.8); border: 2px solid rgba(186, 85, 211, 1); 
+                     box-shadow: 0 0 10px rgba(186, 85, 211, 0.8); grid-row: 1; grid-column: 2;">🔮</div>
+                
+                <div id="button-jump" class="control-button" data-action="jump" 
+                     style="background-color: rgba(60, 179, 113, 0.8); border: 2px solid rgba(60, 179, 113, 1); 
+                     box-shadow: 0 0 10px rgba(60, 179, 113, 0.8); grid-row: 2; grid-column: 1;">⬆️</div>
+                
+                <div id="button-dash" class="control-button" data-action="dash" 
+                     style="background-color: rgba(255, 150, 50, 0.8); border: 2px solid rgba(255, 150, 50, 1); 
+                     box-shadow: 0 0 10px rgba(255, 150, 50, 0.8); grid-row: 2; grid-column: 2;">💨</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRITICAL LOADING ORDER - GUARANTEED EXECUTION SEQUENCE -->
+    <!-- 1. Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- 2. Input System -->
+    <script src="src/core/input.js"></script>
+    
+    <!-- 3. Player System -->
+    <script src="src/systems/player.js"></script>
+    
+    <!-- 4. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
+    <script>
+        // Main Game Engine with proper initialization sequencing
+        class LabyrinthGame {
+            constructor() {
+                console.log('Initializing Labyrinth Game...');
+                
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.player = null;
+                
+                // Game state
+                this.gameState = 'loading'; // loading, playing, paused, menu
+                this.currentFloor = 1;
+                this.gameTime = 0;
+                
+                // Performance
+                this.clock = new THREE.Clock();
+                this.frameCount = 0;
+                
+                // Input handling
+                this.isPointerLocked = false;
+                
+                // Initialization phases
+                this.initializationPhases = [
+                    'scene',
+                    'renderer', 
+                    'camera',
+                    'lighting',
+                    'environment',
+                    'player',
+                    'ui',
+                    'complete'
+                ];
+                this.currentPhase = 0;
+                
+                this.init();
+            }
+            
+            async init() {
+                console.log('Starting game initialization sequence...');
+                
+                try {
+                    // Execute each initialization phase in sequence
+                    for (let i = 0; i < this.initializationPhases.length; i++) {
+                        const phase = this.initializationPhases[i];
+                        console.log(`Initializing phase: ${phase}`);
+                        
+                        await this.executePhase(phase);
+                        this.currentPhase = i;
+                        
+                        // Small delay to prevent blocking
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                    
+                    // All systems loaded - start game
+                    this.gameState = 'playing';
+                    console.log('Game initialization complete - starting game loop');
+                    this.gameLoop();
+                    
+                } catch (error) {
+                    console.error('Failed to initialize game:', error);
+                    this.gameState = 'error';
+                }
+            }
+            
+            async executePhase(phase) {
+                switch(phase) {
+                    case 'scene':
+                        this.setupScene();
+                        break;
+                    case 'renderer':
+                        this.setupRenderer();
+                        break;
+                    case 'camera':
+                        this.setupCamera();
+                        break;
+                    case 'lighting':
+                        this.setupLighting();
+                        break;
+                    case 'environment':
+                        this.setupEnvironment();
+                        break;
+                    case 'player':
+                        this.setupPlayer();
+                        break;
+                    case 'ui':
+                        this.setupUI();
+                        break;
+                    case 'complete':
+                        this.onInitializationComplete();
+                        break;
+                }
+            }
+            
+            setupScene() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+                this.scene.background = new THREE.Color(0x0f0f1f);
+            }
+            
+            setupRenderer() {
+                this.renderer = new THREE.WebGLRenderer({ 
+                    antialias: true,
+                    powerPreference: "high-performance"
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                
+                // Enhanced rendering settings for atmosphere
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.outputEncoding = THREE.sRGBEncoding;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 0.6;
+                
+                const gameContainer = document.getElementById('gameContainer');
+                if (gameContainer) {
+                    gameContainer.appendChild(this.renderer.domElement);
+                } else {
+                    console.error('gameContainer element not found!');
+                }
+                
+                // Set up pointer lock for desktop
+                if (!inputState.isMobile) {
+                    this.renderer.domElement.addEventListener('click', () => {
+                        this.requestPointerLock();
+                    });
+                    
+                    document.addEventListener('pointerlockchange', () => {
+                        this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
+                    });
+                }
+            }
+            
+            setupCamera() {
+                this.camera = new THREE.PerspectiveCamera(
+                    75, 
+                    window.innerWidth / window.innerHeight, 
+                    0.1, 
+                    1000
+                );
+                this.camera.position.set(0, 1.8, 0);
+                
+                // Window resize handler
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            setupLighting() {
+                // Atmospheric ambient lighting
+                const ambientLight = new THREE.AmbientLight(0x2c1810, 0.4);
+                this.scene.add(ambientLight);
+                
+                // Main directional light (simulating mysterious overhead lighting)
+                const directionalLight = new THREE.DirectionalLight(0x4a3728, 0.8);
+                directionalLight.position.set(10, 20, 5);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                directionalLight.shadow.camera.near = 0.5;
+                directionalLight.shadow.camera.far = 50;
+                directionalLight.shadow.camera.left = -25;
+                directionalLight.shadow.camera.right = 25;
+                directionalLight.shadow.camera.top = 25;
+                directionalLight.shadow.camera.bottom = -25;
+                this.scene.add(directionalLight);
+                
+                // Subtle rim lighting for atmosphere
+                const rimLight = new THREE.DirectionalLight(0x6b4e71, 0.3);
+                rimLight.position.set(-10, 5, -10);
+                this.scene.add(rimLight);
+                
+                // Point lights for mystical atmosphere
+                this.createAtmosphericLights();
+            }
+            
+            createAtmosphericLights() {
+                // Mystical floating lights
+                for(let i = 0; i < 8; i++) {
+                    const light = new THREE.PointLight(
+                        Math.random() > 0.5 ? 0x4a90e2 : 0x8e44ad, 
+                        0.5, 
+                        15
+                    );
+                    
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = 20 + Math.random() * 10;
+                    light.position.set(
+                        Math.cos(angle) * radius,
+                        2 + Math.random() * 3,
+                        Math.sin(angle) * radius
+                    );
+                    
+                    this.scene.add(light);
+                    
+                    // Add floating animation
+                    light.userData = {
+                        originalY: light.position.y,
+                        floatSpeed: 0.5 + Math.random() * 0.5,
+                        floatAmount: 0.5 + Math.random() * 0.3
+                    };
+                }
+            }
+            
+            setupEnvironment() {
+                // Create atmospheric test environment - FOUNDATION FIRST
+                this.createTestDungeon();
+                this.createParticleEffects();
+            }
+            
+            createTestDungeon() {
+                // Floor - MUST BE CREATED FIRST (entities will spawn on this)
+                const floorGeometry = new THREE.PlaneGeometry(50, 50);
+                const floorMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0x2c2c54,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.rotation.x = -Math.PI / 2;
+                floor.position.y = 0; // Ensure floor is at y=0
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+                
+                // Store floor reference for later use
+                this.floor = floor;
+                
+                console.log('Floor created at y=0 - safe for entity spawning');
+                
+                // NOW create walls and pillars
+                this.createDungeonStructures();
+                
+                // LAST: Add atmospheric props
+                this.createAtmosphericProps();
+            }
+            
+            createDungeonStructures() {
+                const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x3c3c54 });
+                
+                // Create some walls and pillars
+                for(let i = 0; i < 12; i++) {
+                    // Pillars - positioned ABOVE the floor
+                    const pillarGeometry = new THREE.CylinderGeometry(0.8, 1, 6, 8);
+                    const pillar = new THREE.Mesh(pillarGeometry, wallMaterial);
+                    
+                    const angle = (i / 12) * Math.PI * 2;
+                    const radius = 15;
+                    pillar.position.set(
+                        Math.cos(angle) * radius,
+                        3, // Above the floor
+                        Math.sin(angle) * radius
+                    );
+                    pillar.castShadow = true;
+                    pillar.receiveShadow = true;
+                    this.scene.add(pillar);
+                }
+                
+                // Perimeter walls - positioned ABOVE the floor
+                const wallGeometry = new THREE.BoxGeometry(1, 8, 8);
+                const positions = [
+                    [25, 4, 0], [-25, 4, 0], [0, 4, 25], [0, 4, -25]
+                ];
+                
+                positions.forEach(pos => {
+                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                    wall.position.set(...pos);
+                    wall.castShadow = true;
+                    wall.receiveShadow = true;
+                    this.scene.add(wall);
+                });
+            }
+            
+            createAtmosphericProps() {
+                // Ancient crystal formations (using billboard sprites mixed with geometry)
+                for(let i = 0; i < 6; i++) {
+                    const crystalGroup = new THREE.Group();
+                    
+                    // Base crystal geometry - positioned ABOVE the floor
+                    const crystalGeometry = new THREE.ConeGeometry(0.3, 2, 6);
+                    const crystalMaterial = new THREE.MeshPhongMaterial({ 
+                        color: 0x6c5ce7,
+                        transparent: true,
+                        opacity: 0.7,
+                        emissive: 0x2d1b69,
+                        emissiveIntensity: 0.2
+                    });
+                    
+                    const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
+                    crystal.position.y = 1; // Above the floor
+                    crystalGroup.add(crystal);
+                    
+                    // Glowing particle effect around crystal
+                    const glowGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+                    const glowMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xa29bfe,
+                        transparent: true,
+                        opacity: 0.6
+                    });
+                    
+                    for(let j = 0; j < 3; j++) {
+                        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                        glow.position.set(
+                            (Math.random() - 0.5) * 2,
+                            1 + Math.random() * 2, // Above the floor
+                            (Math.random() - 0.5) * 2
+                        );
+                        crystalGroup.add(glow);
+                        
+                        // Animation data
+                        glow.userData = {
+                            originalPos: glow.position.clone(),
+                            floatSpeed: 1 + Math.random(),
+                            radius: 0.5 + Math.random() * 0.5
+                        };
+                    }
+                    
+                    // Position crystal formation ON the floor
+                    const angle = (i / 6) * Math.PI * 2;
+                    const radius = 8 + Math.random() * 5;
+                    crystalGroup.position.set(
+                        Math.cos(angle) * radius,
+                        0, // On the floor level
+                        Math.sin(angle) * radius
+                    );
+                    
+                    this.scene.add(crystalGroup);
+                }
+            }
+            
+            createParticleEffects() {
+                // Floating dust particles for atmosphere
+                const particleCount = 200;
+                const particles = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+                
+                for(let i = 0; i < particleCount * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 100;     // x
+                    positions[i + 1] = Math.random() * 20;          // y (above floor)
+                    positions[i + 2] = (Math.random() - 0.5) * 100; // z
+                }
+                
+                particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const particleMaterial = new THREE.PointsMaterial({
+                    color: 0x8e8e93,
+                    size: 0.1,
+                    transparent: true,
+                    opacity: 0.6,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                this.particles = new THREE.Points(particles, particleMaterial);
+                this.scene.add(this.particles);
+            }
+            
+            setupPlayer() {
+                // CRITICAL: Only create player AFTER environment is ready
+                if (!this.scene || !this.camera) {
+                    throw new Error('Scene and camera must be initialized before player');
+                }
+                
+                console.log('Creating player - environment is ready');
+                this.player = new Player(this.scene, this.camera);
+            }
+            
+            setupUI() {
+                this.updateUI();
+            }
+            
+            onInitializationComplete() {
+                console.log('All systems initialized successfully');
+                
+                // Set up additional input handlers now that everything is ready
+                if (!inputState.isMobile) {
+                    document.addEventListener('keydown', (e) => {
+                        if (e.code === 'Escape' && this.isPointerLocked) {
+                            document.exitPointerLock();
+                        }
+                    });
+                }
+            }
+            
+            requestPointerLock() {
+                if (!inputState.isMobile) {
+                    this.renderer.domElement.requestPointerLock();
+                }
+            }
+            
+            update(deltaTime) {
+                // Only update if game is playing
+                if (this.gameState !== 'playing') return;
+                
+                this.gameTime += deltaTime;
+                this.frameCount++;
+                
+                // Get current input state
+                const input = getInput();
+                
+                // Update player (only if initialized)
+                if (this.player) {
+                    this.player.update(deltaTime, input);
+                }
+                
+                // Reset mouse delta
+                inputState.mouse.deltaX = 0;
+                inputState.mouse.deltaY = 0;
+                
+                // Update atmospheric effects
+                this.updateAtmosphericEffects(deltaTime);
+                
+                // Update UI
+                this.updateUI();
+            }
+            
+            updateAtmosphericEffects(deltaTime) {
+                // Animate floating lights
+                this.scene.traverse((child) => {
+                    if (child.isPointLight && child.userData.floatSpeed) {
+                        child.position.y = child.userData.originalY + 
+                            Math.sin(this.gameTime * child.userData.floatSpeed) * child.userData.floatAmount;
+                    }
+                    
+                    // Animate crystal glow particles
+                    if (child.userData.floatSpeed && child.userData.originalPos) {
+                        const time = this.gameTime * child.userData.floatSpeed;
+                        child.position.x = child.userData.originalPos.x + 
+                            Math.cos(time) * child.userData.radius;
+                        child.position.y = child.userData.originalPos.y + 
+                            Math.sin(time * 0.7) * 0.3;
+                        child.position.z = child.userData.originalPos.z + 
+                            Math.sin(time) * child.userData.radius;
+                    }
+                });
+                
+                // Animate dust particles
+                if (this.particles) {
+                    this.particles.rotation.y += deltaTime * 0.1;
+                }
+            }
+            
+            updateUI() {
+                if (!this.player) return;
+                
+                const healthPercent = (this.player.health / this.player.maxHealth) * 100;
+                const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
+                const manaPercent = (this.player.mana / this.player.maxMana) * 100;
+                
+                const healthFill = document.getElementById('healthFill');
+                const staminaFill = document.getElementById('staminaFill');
+                const manaFill = document.getElementById('manaFill');
+                
+                if (healthFill) healthFill.style.width = healthPercent + '%';
+                if (staminaFill) staminaFill.style.width = staminaPercent + '%';
+                if (manaFill) manaFill.style.width = manaPercent + '%';
+            }
+            
+            render() {
+                if (this.renderer && this.scene && this.camera) {
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
+            
+            gameLoop() {
+                const deltaTime = this.clock.getDelta();
+                
+                this.update(deltaTime);
+                this.render();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+
+        // Make LabyrinthGame available globally
+        window.LabyrinthGame = LabyrinthGame;
+    </script>
+    
+    <!-- 5. GUARANTEED FINAL INITIALIZATION -->
+    <script>
+        // Wait for DOM to be fully loaded before starting
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing game...');
+            
+            // Verify all dependencies are loaded
+            if (!window.THREE) {
+                console.error('Three.js not loaded!');
+                return;
+            }
+            
+            if (!window.setupInput) {
+                console.error('Input system not loaded!');
+                return;
+            }
+            
+            if (!window.Player) {
+                console.error('Player system not loaded!');
+                return;
+            }
+            
+            // Initialize input system first
+            setupInput();
+            
+            // Initialize game engine (this will create player, dungeon, etc.)
+            window.game = new LabyrinthGame();
+            
+            console.log('Game initialization complete');
+        });
+    </script>
+</body>
+</html>            margin: 0;
             padding: 0;
         }
     </style>
