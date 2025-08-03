@@ -60,13 +60,11 @@ const inputState = {
         rightStickY: 0
     },
     
-    // Mobile-specific - track multiple touches
+    // Mobile-specific - zone-based approach
     isMobile: false,
-    touchId: null,              // Joystick touch
-    cameraSwipeId: null,        // Camera swipe touch
-    lastCameraTouchX: null,
-    lastCameraTouchY: null,
-    activeTouches: new Map()    // Track all active touches
+    joystickTouch: null,        // Touch controlling joystick
+    cameraTouch: null,          // Touch controlling camera
+    buttonTouches: new Map()    // Touch controlling buttons
 };
 
 // Mobile controller elements
@@ -75,6 +73,11 @@ let joystickKnob;
 let actionButtons;
 let mobileControls;
 let menuButton;
+
+// Screen zones
+const SCREEN_ZONES = {
+    LEFT_BOUNDARY: 0.5  // Left 50% = movement zone, Right 50% = camera zone
+};
 
 // Set up input event listeners
 function setupInput() {
@@ -124,59 +127,91 @@ function setupMobileControls() {
     document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 }
 
+// Determine which zone a touch is in
+function getTouchZone(touch) {
+    const x = touch.clientX;
+    const y = touch.clientY;
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Check if touch is on specific UI elements first
+    const target = touch.target;
+    
+    if (target.id === 'joystick' || target.id === 'joystick-knob') {
+        return 'joystick';
+    }
+    
+    if (target.id === 'menu-button' || target.closest('#menu-button')) {
+        return 'menu';
+    }
+    
+    if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
+        return 'button';
+    }
+    
+    // Zone-based detection for general screen areas
+    if (x < screenWidth * SCREEN_ZONES.LEFT_BOUNDARY) {
+        return 'movement';  // Left side of screen
+    } else {
+        return 'camera';    // Right side of screen
+    }
+}
+
 // Touch event handlers
 function handleTouchStart(event) {
     event.preventDefault();
     
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
-        const target = touch.target;
         const touchId = touch.identifier;
+        const zone = getTouchZone(touch);
         
-        // Store this touch in our active touches map
-        inputState.activeTouches.set(touchId, {
-            startX: touch.clientX,
-            startY: touch.clientY,
-            currentX: touch.clientX,
-            currentY: touch.clientY,
-            target: target,
-            type: 'unknown'
-        });
+        console.log(`Touch ${touchId} started in ${zone} zone`);
         
-        // Check if touch is on joystick
-        if (target.id === 'joystick' || target.id === 'joystick-knob') {
-            inputState.touchId = touchId;
-            inputState.activeTouches.get(touchId).type = 'joystick';
-            updateJoystickPosition(touch);
-            console.log('Joystick touch started:', touchId);
-            continue;
-        }
-        
-        // Check if touch is on menu button
-        if (target.id === 'menu-button' || target.closest('#menu-button')) {
-            inputState.activeTouches.get(touchId).type = 'menu';
-            handleButtonPress('menu', true);
-            if (menuButton) menuButton.style.transform = 'scale(0.9)';
-            continue;
-        }
-        
-        // Check if touch is on action button
-        if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
-            const action = target.dataset.action;
-            inputState.activeTouches.get(touchId).type = 'button';
-            inputState.activeTouches.get(touchId).action = action;
-            target.style.transform = 'scale(0.9)';
-            handleButtonPress(action, true);
-            continue;
-        }
-        
-        // Any other touch becomes camera swipe (if we don't already have one)
-        if (!inputState.cameraSwipeId) {
-            inputState.cameraSwipeId = touchId;
-            inputState.lastCameraTouchX = touch.clientX;
-            inputState.lastCameraTouchY = touch.clientY;
-            inputState.activeTouches.get(touchId).type = 'camera';
-            console.log('Camera swipe started:', touchId);
+        switch (zone) {
+            case 'joystick':
+                if (!inputState.joystickTouch) {
+                    inputState.joystickTouch = {
+                        id: touchId,
+                        startX: touch.clientX,
+                        startY: touch.clientY
+                    };
+                    updateJoystickPosition(touch);
+                }
+                break;
+                
+            case 'camera':
+                if (!inputState.cameraTouch) {
+                    inputState.cameraTouch = {
+                        id: touchId,
+                        lastX: touch.clientX,
+                        lastY: touch.clientY
+                    };
+                    console.log('Camera control started');
+                }
+                break;
+                
+            case 'menu':
+                inputState.buttonTouches.set(touchId, { type: 'menu', target: touch.target });
+                handleButtonPress('menu', true);
+                if (menuButton) menuButton.style.transform = 'scale(0.9)';
+                break;
+                
+            case 'button':
+                const action = touch.target.dataset.action;
+                inputState.buttonTouches.set(touchId, { 
+                    type: 'button', 
+                    target: touch.target,
+                    action: action 
+                });
+                touch.target.style.transform = 'scale(0.9)';
+                handleButtonPress(action, true);
+                break;
+                
+            case 'movement':
+                // Ignore touches in movement zone that aren't on joystick
+                console.log('Touch in movement zone but not on joystick - ignoring');
+                break;
         }
     }
 }
@@ -188,30 +223,23 @@ function handleTouchMove(event) {
         const touch = event.changedTouches[i];
         const touchId = touch.identifier;
         
-        // Update our touch tracking
-        if (inputState.activeTouches.has(touchId)) {
-            const touchData = inputState.activeTouches.get(touchId);
-            touchData.currentX = touch.clientX;
-            touchData.currentY = touch.clientY;
-        }
-        
         // Handle joystick movement
-        if (touchId === inputState.touchId) {
+        if (inputState.joystickTouch && inputState.joystickTouch.id === touchId) {
             updateJoystickPosition(touch);
         }
         
-        // Handle camera swiping
-        if (touchId === inputState.cameraSwipeId) {
-            const deltaX = touch.clientX - inputState.lastCameraTouchX;
-            const deltaY = touch.clientY - inputState.lastCameraTouchY;
+        // Handle camera movement
+        if (inputState.cameraTouch && inputState.cameraTouch.id === touchId) {
+            const deltaX = touch.clientX - inputState.cameraTouch.lastX;
+            const deltaY = touch.clientY - inputState.cameraTouch.lastY;
             
-            // Apply camera movement (increased sensitivity)
+            // Apply camera movement
             inputState.mouse.deltaX = deltaX * 2.0;
             inputState.mouse.deltaY = deltaY * 2.0;
             
             // Update last positions
-            inputState.lastCameraTouchX = touch.clientX;
-            inputState.lastCameraTouchY = touch.clientY;
+            inputState.cameraTouch.lastX = touch.clientX;
+            inputState.cameraTouch.lastY = touch.clientY;
         }
     }
 }
@@ -223,38 +251,35 @@ function handleTouchEnd(event) {
         const touch = event.changedTouches[i];
         const touchId = touch.identifier;
         
-        // Get touch data before removing it
-        const touchData = inputState.activeTouches.get(touchId);
+        console.log(`Touch ${touchId} ended`);
         
         // Handle joystick touch end
-        if (touchId === inputState.touchId) {
+        if (inputState.joystickTouch && inputState.joystickTouch.id === touchId) {
             resetJoystick();
-            inputState.touchId = null;
-            console.log('Joystick touch ended:', touchId);
+            inputState.joystickTouch = null;
+            console.log('Joystick control ended');
         }
         
-        // Handle camera swipe touch end
-        if (touchId === inputState.cameraSwipeId) {
-            inputState.cameraSwipeId = null;
-            inputState.lastCameraTouchX = null;
-            inputState.lastCameraTouchY = null;
-            console.log('Camera swipe ended:', touchId);
+        // Handle camera touch end
+        if (inputState.cameraTouch && inputState.cameraTouch.id === touchId) {
+            inputState.cameraTouch = null;
+            console.log('Camera control ended');
         }
         
         // Handle button touch end
-        if (touchData && touchData.type === 'menu') {
-            if (menuButton) menuButton.style.transform = 'scale(1)';
-            handleButtonPress('menu', false);
+        if (inputState.buttonTouches.has(touchId)) {
+            const buttonData = inputState.buttonTouches.get(touchId);
+            
+            if (buttonData.type === 'menu') {
+                if (menuButton) menuButton.style.transform = 'scale(1)';
+                handleButtonPress('menu', false);
+            } else if (buttonData.type === 'button') {
+                buttonData.target.style.transform = 'scale(1)';
+                handleButtonPress(buttonData.action, false);
+            }
+            
+            inputState.buttonTouches.delete(touchId);
         }
-        
-        if (touchData && touchData.type === 'button') {
-            const target = document.getElementById(touchData.target.id);
-            if (target) target.style.transform = 'scale(1)';
-            handleButtonPress(touchData.action, false);
-        }
-        
-        // Remove from active touches
-        inputState.activeTouches.delete(touchId);
     }
 }
 
