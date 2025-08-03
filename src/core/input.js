@@ -1,4 +1,4 @@
-// Input handling system with mobile controller support
+// Input handling system with dual-joystick mobile controls
 
 // Input state object
 const inputState = {
@@ -52,7 +52,7 @@ const inputState = {
         jump: false
     },
     
-    // For analog input (gamepad or touch joystick)
+    // For analog input (dual joysticks)
     axes: {
         leftStickX: 0,
         leftStickY: 0,
@@ -60,24 +60,21 @@ const inputState = {
         rightStickY: 0
     },
     
-    // Mobile-specific - zone-based approach
+    // Mobile-specific
     isMobile: false,
-    joystickTouch: null,        // Touch controlling joystick
-    cameraTouch: null,          // Touch controlling camera
-    buttonTouches: new Map()    // Touch controlling buttons
+    leftJoystickTouch: null,
+    rightJoystickTouch: null,
+    buttonTouches: new Map()
 };
 
 // Mobile controller elements
-let joystickElement;
-let joystickKnob;
+let leftJoystickElement;
+let leftJoystickKnob;
+let rightJoystickElement;
+let rightJoystickKnob;
 let actionButtons;
 let mobileControls;
 let menuButton;
-
-// Screen zones
-const SCREEN_ZONES = {
-    LEFT_BOUNDARY: 0.5  // Left 50% = movement zone, Right 50% = camera zone
-};
 
 // Set up input event listeners
 function setupInput() {
@@ -104,21 +101,13 @@ function setupInput() {
         setupMobileControls();
     }
     
-    console.log('Input system initialized', inputState.isMobile ? 'with mobile controls' : 'with desktop controls');
+    console.log('Input system initialized', inputState.isMobile ? 'with mobile dual-joystick controls' : 'with desktop controls');
 }
 
 // Set up mobile controls
 function setupMobileControls() {
-    // Get mobile controls container
-    mobileControls = document.getElementById('mobile-controls');
-    joystickElement = document.getElementById('joystick');
-    joystickKnob = document.getElementById('joystick-knob');
-    menuButton = document.getElementById('menu-button');
-    
-    // Show mobile controls
-    if (mobileControls) {
-        mobileControls.style.display = 'flex';
-    }
+    // Create the dual joystick UI
+    createDualJoystickUI();
     
     // Add touch event listeners
     document.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -127,34 +116,172 @@ function setupMobileControls() {
     document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 }
 
-// Determine which zone a touch is in
-function getTouchZone(touch) {
-    const x = touch.clientX;
-    const y = touch.clientY;
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
+function createDualJoystickUI() {
+    // Get existing mobile controls
+    mobileControls = document.getElementById('mobile-controls');
+    if (!mobileControls) return;
     
-    // Check if touch is on specific UI elements first
-    const target = touch.target;
+    // Clear existing content and rebuild
+    mobileControls.innerHTML = '';
+    mobileControls.style.display = 'flex';
     
-    if (target.id === 'joystick' || target.id === 'joystick-knob') {
-        return 'joystick';
-    }
+    // Left joystick (movement)
+    const leftJoystickContainer = document.createElement('div');
+    leftJoystickContainer.style.position = 'relative';
     
-    if (target.id === 'menu-button' || target.closest('#menu-button')) {
-        return 'menu';
-    }
+    leftJoystickElement = document.createElement('div');
+    leftJoystickElement.id = 'left-joystick';
+    leftJoystickElement.style.cssText = `
+        position: relative;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 2px solid rgba(100, 149, 237, 0.8);
+        background-color: rgba(65, 105, 225, 0.3);
+        pointer-events: auto;
+        box-shadow: 0 0 15px rgba(100, 149, 237, 0.8);
+        margin-left: 20px;
+    `;
     
-    if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
-        return 'button';
-    }
+    leftJoystickKnob = document.createElement('div');
+    leftJoystickKnob.id = 'left-joystick-knob';
+    leftJoystickKnob.style.cssText = `
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: rgba(65, 105, 225, 0.8);
+        pointer-events: none;
+    `;
     
-    // Zone-based detection for general screen areas
-    if (x < screenWidth * SCREEN_ZONES.LEFT_BOUNDARY) {
-        return 'movement';  // Left side of screen
-    } else {
-        return 'camera';    // Right side of screen
-    }
+    leftJoystickElement.appendChild(leftJoystickKnob);
+    leftJoystickContainer.appendChild(leftJoystickElement);
+    mobileControls.appendChild(leftJoystickContainer);
+    
+    // Menu button (center)
+    menuButton = document.createElement('div');
+    menuButton.id = 'menu-button';
+    menuButton.className = 'control-button';
+    menuButton.dataset.action = 'menu';
+    menuButton.style.cssText = `
+        width: 31px;
+        height: 31px;
+        border-radius: 50%;
+        background-color: rgba(240, 240, 240, 0.8);
+        border: 2px solid rgba(255, 255, 255, 1);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color: #333;
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+        font-size: 11px;
+        user-select: none;
+        pointer-events: auto;
+        position: relative;
+    `;
+    menuButton.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+            <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+            <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+        </div>
+    `;
+    mobileControls.appendChild(menuButton);
+    
+    // Right side container for camera joystick and action buttons
+    const rightContainer = document.createElement('div');
+    rightContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        margin-right: 20px;
+    `;
+    
+    // Right joystick (camera)
+    rightJoystickElement = document.createElement('div');
+    rightJoystickElement.id = 'right-joystick';
+    rightJoystickElement.style.cssText = `
+        position: relative;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 140, 0, 0.8);
+        background-color: rgba(255, 165, 0, 0.3);
+        pointer-events: auto;
+        box-shadow: 0 0 15px rgba(255, 140, 0, 0.8);
+    `;
+    
+    rightJoystickKnob = document.createElement('div');
+    rightJoystickKnob.id = 'right-joystick-knob';
+    rightJoystickKnob.style.cssText = `
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: rgba(255, 140, 0, 0.8);
+        pointer-events: none;
+    `;
+    
+    rightJoystickElement.appendChild(rightJoystickKnob);
+    rightContainer.appendChild(rightJoystickElement);
+    
+    // Action buttons
+    const actionButtonsContainer = document.createElement('div');
+    actionButtonsContainer.id = 'action-buttons';
+    actionButtonsContainer.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 6px;
+        pointer-events: auto;
+    `;
+    
+    const buttons = [
+        ['button-sword', 'attack', '⚔️', 'rgba(205, 133, 63, 0.8)', 1, 1],
+        ['button-staff', 'chargeAttack', '🔮', 'rgba(186, 85, 211, 0.8)', 1, 2],
+        ['button-jump', 'jump', '⬆️', 'rgba(60, 179, 113, 0.8)', 2, 1],
+        ['button-dash', 'dash', '💨', 'rgba(255, 150, 50, 0.8)', 2, 2]
+    ];
+    
+    buttons.forEach(([id, action, emoji, color, row, col]) => {
+        const button = document.createElement('div');
+        button.id = id;
+        button.className = 'control-button';
+        button.dataset.action = action;
+        button.textContent = emoji;
+        button.style.cssText = `
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: ${color};
+            border: 2px solid ${color.replace('0.8', '1')};
+            box-shadow: 0 0 10px ${color};
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            user-select: none;
+            font-size: 16px;
+            transition: transform 0.1s ease;
+            grid-row: ${row};
+            grid-column: ${col};
+        `;
+        actionButtonsContainer.appendChild(button);
+    });
+    
+    rightContainer.appendChild(actionButtonsContainer);
+    mobileControls.appendChild(rightContainer);
 }
 
 // Touch event handlers
@@ -163,55 +290,46 @@ function handleTouchStart(event) {
     
     for (let i = 0; i < event.changedTouches.length; i++) {
         const touch = event.changedTouches[i];
+        const target = touch.target;
         const touchId = touch.identifier;
-        const zone = getTouchZone(touch);
         
-        console.log(`Touch ${touchId} started in ${zone} zone`);
+        // Left joystick (movement)
+        if (target.id === 'left-joystick' || target.id === 'left-joystick-knob') {
+            if (!inputState.leftJoystickTouch) {
+                inputState.leftJoystickTouch = touchId;
+                updateLeftJoystick(touch);
+            }
+            continue;
+        }
         
-        switch (zone) {
-            case 'joystick':
-                if (!inputState.joystickTouch) {
-                    inputState.joystickTouch = {
-                        id: touchId,
-                        startX: touch.clientX,
-                        startY: touch.clientY
-                    };
-                    updateJoystickPosition(touch);
-                }
-                break;
-                
-            case 'camera':
-                if (!inputState.cameraTouch) {
-                    inputState.cameraTouch = {
-                        id: touchId,
-                        lastX: touch.clientX,
-                        lastY: touch.clientY
-                    };
-                    console.log('Camera control started');
-                }
-                break;
-                
-            case 'menu':
-                inputState.buttonTouches.set(touchId, { type: 'menu', target: touch.target });
-                handleButtonPress('menu', true);
-                if (menuButton) menuButton.style.transform = 'scale(0.9)';
-                break;
-                
-            case 'button':
-                const action = touch.target.dataset.action;
-                inputState.buttonTouches.set(touchId, { 
-                    type: 'button', 
-                    target: touch.target,
-                    action: action 
-                });
-                touch.target.style.transform = 'scale(0.9)';
-                handleButtonPress(action, true);
-                break;
-                
-            case 'movement':
-                // Ignore touches in movement zone that aren't on joystick
-                console.log('Touch in movement zone but not on joystick - ignoring');
-                break;
+        // Right joystick (camera)
+        if (target.id === 'right-joystick' || target.id === 'right-joystick-knob') {
+            if (!inputState.rightJoystickTouch) {
+                inputState.rightJoystickTouch = touchId;
+                updateRightJoystick(touch);
+            }
+            continue;
+        }
+        
+        // Menu button
+        if (target.id === 'menu-button' || target.closest('#menu-button')) {
+            inputState.buttonTouches.set(touchId, { type: 'menu', target: target });
+            handleButtonPress('menu', true);
+            menuButton.style.transform = 'scale(0.9)';
+            continue;
+        }
+        
+        // Action buttons
+        if (target.classList && target.classList.contains('control-button') && target.id !== 'menu-button') {
+            const action = target.dataset.action;
+            inputState.buttonTouches.set(touchId, { 
+                type: 'button', 
+                target: target,
+                action: action 
+            });
+            target.style.transform = 'scale(0.9)';
+            handleButtonPress(action, true);
+            continue;
         }
     }
 }
@@ -223,23 +341,14 @@ function handleTouchMove(event) {
         const touch = event.changedTouches[i];
         const touchId = touch.identifier;
         
-        // Handle joystick movement
-        if (inputState.joystickTouch && inputState.joystickTouch.id === touchId) {
-            updateJoystickPosition(touch);
+        // Update left joystick
+        if (inputState.leftJoystickTouch === touchId) {
+            updateLeftJoystick(touch);
         }
         
-        // Handle camera movement
-        if (inputState.cameraTouch && inputState.cameraTouch.id === touchId) {
-            const deltaX = touch.clientX - inputState.cameraTouch.lastX;
-            const deltaY = touch.clientY - inputState.cameraTouch.lastY;
-            
-            // Apply camera movement
-            inputState.mouse.deltaX = deltaX * 2.0;
-            inputState.mouse.deltaY = deltaY * 2.0;
-            
-            // Update last positions
-            inputState.cameraTouch.lastX = touch.clientX;
-            inputState.cameraTouch.lastY = touch.clientY;
+        // Update right joystick
+        if (inputState.rightJoystickTouch === touchId) {
+            updateRightJoystick(touch);
         }
     }
 }
@@ -251,27 +360,24 @@ function handleTouchEnd(event) {
         const touch = event.changedTouches[i];
         const touchId = touch.identifier;
         
-        console.log(`Touch ${touchId} ended`);
-        
-        // Handle joystick touch end
-        if (inputState.joystickTouch && inputState.joystickTouch.id === touchId) {
-            resetJoystick();
-            inputState.joystickTouch = null;
-            console.log('Joystick control ended');
+        // Left joystick end
+        if (inputState.leftJoystickTouch === touchId) {
+            resetLeftJoystick();
+            inputState.leftJoystickTouch = null;
         }
         
-        // Handle camera touch end
-        if (inputState.cameraTouch && inputState.cameraTouch.id === touchId) {
-            inputState.cameraTouch = null;
-            console.log('Camera control ended');
+        // Right joystick end
+        if (inputState.rightJoystickTouch === touchId) {
+            resetRightJoystick();
+            inputState.rightJoystickTouch = null;
         }
         
-        // Handle button touch end
+        // Button end
         if (inputState.buttonTouches.has(touchId)) {
             const buttonData = inputState.buttonTouches.get(touchId);
             
             if (buttonData.type === 'menu') {
-                if (menuButton) menuButton.style.transform = 'scale(1)';
+                menuButton.style.transform = 'scale(1)';
                 handleButtonPress('menu', false);
             } else if (buttonData.type === 'button') {
                 buttonData.target.style.transform = 'scale(1)';
@@ -283,26 +389,26 @@ function handleTouchEnd(event) {
     }
 }
 
-// Joystick helpers
-function updateJoystickPosition(touch) {
-    if (!joystickElement || !joystickKnob) return;
+// Joystick update functions
+function updateLeftJoystick(touch) {
+    if (!leftJoystickElement || !leftJoystickKnob) return;
     
-    const joystickRect = joystickElement.getBoundingClientRect();
-    const centerX = joystickRect.left + joystickRect.width / 2;
-    const centerY = joystickRect.top + joystickRect.height / 2;
+    const rect = leftJoystickElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
     
     let deltaX = touch.clientX - centerX;
     let deltaY = touch.clientY - centerY;
     
     const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    const maxRadius = joystickRect.width / 2 - joystickKnob.offsetWidth / 2;
+    const maxRadius = rect.width / 2 - leftJoystickKnob.offsetWidth / 2;
     
     if (distance > maxRadius) {
         deltaX = deltaX * maxRadius / distance;
         deltaY = deltaY * maxRadius / distance;
     }
     
-    joystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    leftJoystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
     
     const normalizedX = deltaX / maxRadius;
     const normalizedY = deltaY / maxRadius;
@@ -310,16 +416,47 @@ function updateJoystickPosition(touch) {
     inputState.axes.leftStickX = normalizedX;
     inputState.axes.leftStickY = normalizedY;
     
-    // Convert joystick position to directional input
+    // Convert to movement input
     inputState.moveLeft = Math.abs(normalizedX) > 0.3 && normalizedX < 0;
     inputState.moveRight = Math.abs(normalizedX) > 0.3 && normalizedX > 0;
     inputState.moveForward = Math.abs(normalizedY) > 0.3 && normalizedY < 0;
     inputState.moveBackward = Math.abs(normalizedY) > 0.3 && normalizedY > 0;
 }
 
-function resetJoystick() {
-    if (joystickKnob) {
-        joystickKnob.style.transform = 'translate(-50%, -50%)';
+function updateRightJoystick(touch) {
+    if (!rightJoystickElement || !rightJoystickKnob) return;
+    
+    const rect = rightJoystickElement.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    let deltaX = touch.clientX - centerX;
+    let deltaY = touch.clientY - centerY;
+    
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const maxRadius = rect.width / 2 - rightJoystickKnob.offsetWidth / 2;
+    
+    if (distance > maxRadius) {
+        deltaX = deltaX * maxRadius / distance;
+        deltaY = deltaY * maxRadius / distance;
+    }
+    
+    rightJoystickKnob.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px))`;
+    
+    const normalizedX = deltaX / maxRadius;
+    const normalizedY = deltaY / maxRadius;
+    
+    inputState.axes.rightStickX = normalizedX;
+    inputState.axes.rightStickY = normalizedY;
+    
+    // Convert to camera input with sensitivity
+    inputState.mouse.deltaX = normalizedX * 3.0;
+    inputState.mouse.deltaY = normalizedY * 3.0;
+}
+
+function resetLeftJoystick() {
+    if (leftJoystickKnob) {
+        leftJoystickKnob.style.transform = 'translate(-50%, -50%)';
     }
     
     inputState.axes.leftStickX = 0;
@@ -328,6 +465,17 @@ function resetJoystick() {
     inputState.moveBackward = false;
     inputState.moveLeft = false;
     inputState.moveRight = false;
+}
+
+function resetRightJoystick() {
+    if (rightJoystickKnob) {
+        rightJoystickKnob.style.transform = 'translate(-50%, -50%)';
+    }
+    
+    inputState.axes.rightStickX = 0;
+    inputState.axes.rightStickY = 0;
+    inputState.mouse.deltaX = 0;
+    inputState.mouse.deltaY = 0;
 }
 
 function handleButtonPress(action, isPressed) {
@@ -356,7 +504,7 @@ function handleButtonPress(action, isPressed) {
     }
 }
 
-// Desktop input handlers
+// Desktop input handlers (unchanged)
 function handleKeyDown(event) {
     updateInputState(event.code, true);
     
