@@ -122,6 +122,18 @@ function setupMobileControls() {
     document.addEventListener('touchend', handleTouchEnd, { passive: false });
 }
 
+// Helper function to check if touch is on interactive elements
+function isTouchOnInteractiveElement(target) {
+    // Check if touch is specifically on joystick, buttons, or menu
+    return (
+        target.id === 'joystick' ||
+        target.id === 'joystick-knob' ||
+        target.id === 'menu-button' ||
+        target.closest('#menu-button') ||
+        (target.classList && target.classList.contains('control-button'))
+    );
+}
+
 // Touch event handlers
 function handleTouchStart(event) {
     event.preventDefault();
@@ -152,11 +164,13 @@ function handleTouchStart(event) {
             continue;
         }
         
-        // Check if touch is on mobile controls area - if not, use for camera
-        if (!target.closest('#mobile-controls') && !inputState.cameraSwipeId) {
+        // For any other touch (not on interactive elements), use for camera
+        // This allows swiping anywhere on screen for camera while using joystick
+        if (!inputState.cameraSwipeId) {
             inputState.cameraSwipeId = touch.identifier;
             inputState.lastCameraTouchX = touch.clientX;
             inputState.lastCameraTouchY = touch.clientY;
+            console.log('Camera swipe started');
         }
     }
 }
@@ -205,6 +219,7 @@ function handleTouchEnd(event) {
             inputState.cameraSwipeId = null;
             inputState.lastCameraTouchX = null;
             inputState.lastCameraTouchY = null;
+            console.log('Camera swipe ended');
         }
         
         // Handle button touch end
