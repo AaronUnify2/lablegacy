@@ -572,3 +572,47 @@ function handleMouseMove(event) {
 
 function handleMouseDown(event) {
     switch (event.button) {
+        case 0:
+            inputState.mouse.leftButton = true;
+            inputState.attack = true;
+            break;
+        case 2:
+            inputState.mouse.rightButton = true;
+            inputState.chargeAttack = true;
+            break;
+    }
+}
+
+function handleMouseUp(event) {
+    switch (event.button) {
+        case 0:
+            inputState.mouse.leftButton = false;
+            inputState.attack = false;
+            break;
+        case 2:
+            inputState.mouse.rightButton = false;
+            inputState.chargeAttack = false;
+            break;
+    }
+}
+
+// Update "just pressed" states for single-press actions
+function updateJustPressedStates() {
+    const keysToCheck = ['attack', 'interact', 'inventory', 'map', 'menu', 'dash', 'jump'];
+    
+    keysToCheck.forEach(key => {
+        inputState.justPressed[key] = inputState[key] && !inputState.previouslyPressed[key];
+        inputState.previouslyPressed[key] = inputState[key];
+    });
+}
+
+// Get current input state (called each frame)
+function getInput() {
+    updateJustPressedStates();
+    return { ...inputState };
+}
+
+// Make functions available globally
+window.setupInput = setupInput;
+window.getInput = getInput;
+window.inputState = inputState;
