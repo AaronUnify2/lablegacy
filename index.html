@@ -447,12 +447,12 @@
             }
             
             setupLighting() {
-                // Basic ambient lighting - dungeon system will enhance this
-                const ambientLight = new THREE.AmbientLight(0x2c1810, 0.3);
+                // Much brighter ambient lighting for testing
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
                 this.scene.add(ambientLight);
                 
-                // Main directional light for basic visibility
-                const directionalLight = new THREE.DirectionalLight(0x4a3728, 0.6);
+                // Brighter main directional light for testing
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
                 directionalLight.position.set(10, 20, 5);
                 directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
