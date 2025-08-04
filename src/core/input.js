@@ -124,10 +124,12 @@ function createDualJoystickUI() {
     // Clear existing content and rebuild
     mobileControls.innerHTML = '';
     mobileControls.style.display = 'flex';
-    mobileControls.style.alignItems = 'flex-end'; // Align joysticks at bottom
+    mobileControls.style.alignItems = 'flex-end';
     mobileControls.style.justifyContent = 'space-between';
+    mobileControls.style.bottom = '50px'; // Raise 50px from bottom
+    mobileControls.style.height = 'auto'; // Override the 40% height
     
-    // Left joystick (movement)
+    // Left joystick (movement) - 30% smaller (120px -> 84px)
     const leftJoystickContainer = document.createElement('div');
     leftJoystickContainer.style.cssText = `
         position: relative;
@@ -140,8 +142,8 @@ function createDualJoystickUI() {
     leftJoystickElement.id = 'left-joystick';
     leftJoystickElement.style.cssText = `
         position: relative;
-        width: 120px;
-        height: 120px;
+        width: 84px;
+        height: 84px;
         border-radius: 50%;
         border: 2px solid rgba(100, 149, 237, 0.8);
         background-color: rgba(65, 105, 225, 0.3);
@@ -157,8 +159,8 @@ function createDualJoystickUI() {
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: 60px;
-        height: 60px;
+        width: 42px;
+        height: 42px;
         border-radius: 50%;
         background-color: rgba(65, 105, 225, 0.8);
         pointer-events: none;
@@ -190,7 +192,7 @@ function createDualJoystickUI() {
         user-select: none;
         pointer-events: auto;
         position: relative;
-        margin-bottom: 45px;
+        margin-bottom: 30px;
     `;
     menuButton.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
@@ -256,13 +258,13 @@ function createDualJoystickUI() {
     
     rightContainer.appendChild(actionButtonsContainer);
     
-    // Right joystick (camera) - same size as left
+    // Right joystick (camera) - 30% smaller (120px -> 84px)
     rightJoystickElement = document.createElement('div');
     rightJoystickElement.id = 'right-joystick';
     rightJoystickElement.style.cssText = `
         position: relative;
-        width: 120px;
-        height: 120px;
+        width: 84px;
+        height: 84px;
         border-radius: 50%;
         border: 2px solid rgba(255, 140, 0, 0.8);
         background-color: rgba(255, 165, 0, 0.3);
@@ -277,8 +279,8 @@ function createDualJoystickUI() {
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: 60px;
-        height: 60px;
+        width: 42px;
+        height: 42px;
         border-radius: 50%;
         background-color: rgba(255, 140, 0, 0.8);
         pointer-events: none;
@@ -455,9 +457,9 @@ function updateRightJoystick(touch) {
     inputState.axes.rightStickX = normalizedX;
     inputState.axes.rightStickY = normalizedY;
     
-    // Convert to camera input with sensitivity
-    inputState.mouse.deltaX = normalizedX * 3.0;
-    inputState.mouse.deltaY = normalizedY * 3.0;
+    // Convert to camera input with sensitivity of 2.0
+    inputState.mouse.deltaX = normalizedX * 2.0;
+    inputState.mouse.deltaY = normalizedY * 2.0;
 }
 
 function resetLeftJoystick() {
@@ -510,7 +512,7 @@ function handleButtonPress(action, isPressed) {
     }
 }
 
-// Desktop input handlers (unchanged)
+// Desktop input handlers
 function handleKeyDown(event) {
     updateInputState(event.code, true);
     
@@ -570,47 +572,3 @@ function handleMouseMove(event) {
 
 function handleMouseDown(event) {
     switch (event.button) {
-        case 0:
-            inputState.mouse.leftButton = true;
-            inputState.attack = true;
-            break;
-        case 2:
-            inputState.mouse.rightButton = true;
-            inputState.chargeAttack = true;
-            break;
-    }
-}
-
-function handleMouseUp(event) {
-    switch (event.button) {
-        case 0:
-            inputState.mouse.leftButton = false;
-            inputState.attack = false;
-            break;
-        case 2:
-            inputState.mouse.rightButton = false;
-            inputState.chargeAttack = false;
-            break;
-    }
-}
-
-// Update "just pressed" states for single-press actions
-function updateJustPressedStates() {
-    const keysToCheck = ['attack', 'interact', 'inventory', 'map', 'menu', 'dash', 'jump'];
-    
-    keysToCheck.forEach(key => {
-        inputState.justPressed[key] = inputState[key] && !inputState.previouslyPressed[key];
-        inputState.previouslyPressed[key] = inputState[key];
-    });
-}
-
-// Get current input state (called each frame)
-function getInput() {
-    updateJustPressedStates();
-    return { ...inputState };
-}
-
-// Make functions available globally
-window.setupInput = setupInput;
-window.getInput = getInput;
-window.inputState = inputState;
