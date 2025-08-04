@@ -1035,6 +1035,73 @@ class DungeonSystem {
         });
     }
     
+    // Collision detection methods
+    isWalkable(worldX, worldZ) {
+        if (!this.currentDungeon || !this.currentDungeon.floorMap) return false;
+        
+        // Convert world coordinates to grid coordinates
+        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize);
+        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize);
+        
+        // Check bounds
+        if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
+            return false;
+        }
+        
+        // Return walkable status
+        return this.currentDungeon.floorMap[gridZ][gridX];
+    }
+    
+    checkCollision(position, radius = 0.8) {
+        if (!this.currentDungeon) return { collision: false };
+        
+        // Check multiple points around the player's position
+        const checkPoints = [
+            { x: position.x, z: position.z }, // Center
+            { x: position.x + radius, z: position.z }, // Right
+            { x: position.x - radius, z: position.z }, // Left  
+            { x: position.x, z: position.z + radius }, // Forward
+            { x: position.x, z: position.z - radius }, // Back
+            { x: position.x + radius * 0.7, z: position.z + radius * 0.7 }, // Diagonal corners
+            { x: position.x - radius * 0.7, z: position.z + radius * 0.7 },
+            { x: position.x + radius * 0.7, z: position.z - radius * 0.7 },
+            { x: position.x - radius * 0.7, z: position.z - radius * 0.7 }
+        ];
+        
+        for (let point of checkPoints) {
+            if (!this.isWalkable(point.x, point.z)) {
+                return { 
+                    collision: true, 
+                    collisionPoint: point,
+                    normal: this.getWallNormal(point.x, point.z)
+                };
+            }
+        }
+        
+        return { collision: false };
+    }
+    
+    getWallNormal(worldX, worldZ) {
+        // Calculate wall normal for sliding collision response
+        const directions = [
+            { x: 1, z: 0 },   // Right
+            { x: -1, z: 0 },  // Left
+            { x: 0, z: 1 },   // Forward  
+            { x: 0, z: -1 }   // Back
+        ];
+        
+        for (let dir of directions) {
+            const checkX = worldX + dir.x * this.gridSize;
+            const checkZ = worldZ + dir.z * this.gridSize;
+            
+            if (this.isWalkable(checkX, checkZ)) {
+                return new THREE.Vector3(-dir.x, 0, -dir.z); // Normal points away from wall
+            }
+        }
+        
+        return new THREE.Vector3(0, 0, 0); // Default normal
+    }
+    
     clearCurrentDungeon() {
         if (this.currentDungeonGroup) {
             this.scene.remove(this.currentDungeonGroup);
@@ -1252,6 +1319,9 @@ window.DungeonSystem = DungeonSystem;
                 
                 console.log('Creating player - scene is ready');
                 this.player = new Player(this.scene, this.camera);
+                
+                // Give player reference to dungeon system for collision detection
+                this.player.dungeonSystem = null; // Will be set after dungeon is created
             }
             
             setupDungeon() {
@@ -1262,6 +1332,9 @@ window.DungeonSystem = DungeonSystem;
                 
                 console.log('Creating dungeon system...');
                 this.dungeonSystem = new DungeonSystem(this.scene, this.player);
+                
+                // Connect player to dungeon system for collision detection
+                this.player.dungeonSystem = this.dungeonSystem;
                 
                 // Generate the first dungeon floor
                 console.log('Generating first dungeon floor...');
@@ -1447,4 +1520,4 @@ window.DungeonSystem = DungeonSystem;
         });
     </script>
 </body>
-</html>
+    </html>
