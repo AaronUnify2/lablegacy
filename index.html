@@ -211,6 +211,18 @@
                 display: none;
             }
         }
+
+        /* Floor indicator */
+        #floorIndicator {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            color: rgba(255,255,255,0.9);
+            font-size: 18px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
     </style>
 </head>
 <body>
@@ -226,9 +238,10 @@
                 <div id="manaFill"></div>
             </div>
             <div id="crosshair"></div>
+            <div id="floorIndicator">Floor 1</div>
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
-                <small>Mobile: Joystick to move, swipe to look, tap action buttons</small>
+                <small>Mobile: Joystick to move, right stick to look, tap action buttons</small>
             </div>
         </div>
         
@@ -275,11 +288,11 @@
     
     <!-- 3. Player System -->
     <script src="src/systems/player.js"></script>
-
-<!-- 4. Dungeon-->
-<script src="src/systems/dungeon.js"></script>
     
-    <!-- 4. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
+    <!-- 4. Dungeon System -->
+    <script src="src/systems/dungeon.js"></script>
+    
+    <!-- 5. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
     <script>
         // Main Game Engine with proper initialization sequencing
         class LabyrinthGame {
@@ -290,6 +303,7 @@
                 this.camera = null;
                 this.renderer = null;
                 this.player = null;
+                this.dungeonSystem = null;
                 
                 // Game state
                 this.gameState = 'loading'; // loading, playing, paused, menu
@@ -309,8 +323,8 @@
                     'renderer', 
                     'camera',
                     'lighting',
-                    'environment',
                     'player',
+                    'dungeon',
                     'ui',
                     'complete'
                 ];
@@ -360,11 +374,11 @@
                     case 'lighting':
                         this.setupLighting();
                         break;
-                    case 'environment':
-                        this.setupEnvironment();
-                        break;
                     case 'player':
                         this.setupPlayer();
+                        break;
+                    case 'dungeon':
+                        this.setupDungeon();
                         break;
                     case 'ui':
                         this.setupUI();
@@ -433,220 +447,53 @@
             }
             
             setupLighting() {
-                // Atmospheric ambient lighting
-                const ambientLight = new THREE.AmbientLight(0x2c1810, 0.4);
+                // Basic ambient lighting - dungeon system will enhance this
+                const ambientLight = new THREE.AmbientLight(0x2c1810, 0.3);
                 this.scene.add(ambientLight);
                 
-                // Main directional light (simulating mysterious overhead lighting)
-                const directionalLight = new THREE.DirectionalLight(0x4a3728, 0.8);
+                // Main directional light for basic visibility
+                const directionalLight = new THREE.DirectionalLight(0x4a3728, 0.6);
                 directionalLight.position.set(10, 20, 5);
                 directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
                 directionalLight.shadow.mapSize.height = 2048;
                 directionalLight.shadow.camera.near = 0.5;
-                directionalLight.shadow.camera.far = 50;
-                directionalLight.shadow.camera.left = -25;
-                directionalLight.shadow.camera.right = 25;
-                directionalLight.shadow.camera.top = 25;
-                directionalLight.shadow.camera.bottom = -25;
+                directionalLight.shadow.camera.far = 100;
+                directionalLight.shadow.camera.left = -50;
+                directionalLight.shadow.camera.right = 50;
+                directionalLight.shadow.camera.top = 50;
+                directionalLight.shadow.camera.bottom = -50;
                 this.scene.add(directionalLight);
-                
-                // Subtle rim lighting for atmosphere
-                const rimLight = new THREE.DirectionalLight(0x6b4e71, 0.3);
-                rimLight.position.set(-10, 5, -10);
-                this.scene.add(rimLight);
-                
-                // Point lights for mystical atmosphere
-                this.createAtmosphericLights();
-            }
-            
-            createAtmosphericLights() {
-                // Mystical floating lights
-                for(let i = 0; i < 8; i++) {
-                    const light = new THREE.PointLight(
-                        Math.random() > 0.5 ? 0x4a90e2 : 0x8e44ad, 
-                        0.5, 
-                        15
-                    );
-                    
-                    const angle = (i / 8) * Math.PI * 2;
-                    const radius = 20 + Math.random() * 10;
-                    light.position.set(
-                        Math.cos(angle) * radius,
-                        2 + Math.random() * 3,
-                        Math.sin(angle) * radius
-                    );
-                    
-                    this.scene.add(light);
-                    
-                    // Add floating animation
-                    light.userData = {
-                        originalY: light.position.y,
-                        floatSpeed: 0.5 + Math.random() * 0.5,
-                        floatAmount: 0.5 + Math.random() * 0.3
-                    };
-                }
-            }
-            
-            setupEnvironment() {
-                // Create atmospheric test environment - FOUNDATION FIRST
-                this.createTestDungeon();
-                this.createParticleEffects();
-            }
-            
-            createTestDungeon() {
-                // Floor - MUST BE CREATED FIRST (entities will spawn on this)
-                const floorGeometry = new THREE.PlaneGeometry(50, 50);
-                const floorMaterial = new THREE.MeshLambertMaterial({ 
-                    color: 0x2c2c54,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-                floor.rotation.x = -Math.PI / 2;
-                floor.position.y = 0; // Ensure floor is at y=0
-                floor.receiveShadow = true;
-                this.scene.add(floor);
-                
-                // Store floor reference for later use
-                this.floor = floor;
-                
-                console.log('Floor created at y=0 - safe for entity spawning');
-                
-                // NOW create walls and pillars
-                this.createDungeonStructures();
-                
-                // LAST: Add atmospheric props
-                this.createAtmosphericProps();
-            }
-            
-            createDungeonStructures() {
-                const wallMaterial = new THREE.MeshLambertMaterial({ color: 0x3c3c54 });
-                
-                // Create some walls and pillars
-                for(let i = 0; i < 12; i++) {
-                    // Pillars - positioned ABOVE the floor
-                    const pillarGeometry = new THREE.CylinderGeometry(0.8, 1, 6, 8);
-                    const pillar = new THREE.Mesh(pillarGeometry, wallMaterial);
-                    
-                    const angle = (i / 12) * Math.PI * 2;
-                    const radius = 15;
-                    pillar.position.set(
-                        Math.cos(angle) * radius,
-                        3, // Above the floor
-                        Math.sin(angle) * radius
-                    );
-                    pillar.castShadow = true;
-                    pillar.receiveShadow = true;
-                    this.scene.add(pillar);
-                }
-                
-                // Perimeter walls - positioned ABOVE the floor
-                const wallGeometry = new THREE.BoxGeometry(1, 8, 8);
-                const positions = [
-                    [25, 4, 0], [-25, 4, 0], [0, 4, 25], [0, 4, -25]
-                ];
-                
-                positions.forEach(pos => {
-                    const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                    wall.position.set(...pos);
-                    wall.castShadow = true;
-                    wall.receiveShadow = true;
-                    this.scene.add(wall);
-                });
-            }
-            
-            createAtmosphericProps() {
-                // Ancient crystal formations (using billboard sprites mixed with geometry)
-                for(let i = 0; i < 6; i++) {
-                    const crystalGroup = new THREE.Group();
-                    
-                    // Base crystal geometry - positioned ABOVE the floor
-                    const crystalGeometry = new THREE.ConeGeometry(0.3, 2, 6);
-                    const crystalMaterial = new THREE.MeshPhongMaterial({ 
-                        color: 0x6c5ce7,
-                        transparent: true,
-                        opacity: 0.7,
-                        emissive: 0x2d1b69,
-                        emissiveIntensity: 0.2
-                    });
-                    
-                    const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-                    crystal.position.y = 1; // Above the floor
-                    crystalGroup.add(crystal);
-                    
-                    // Glowing particle effect around crystal
-                    const glowGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-                    const glowMaterial = new THREE.MeshBasicMaterial({
-                        color: 0xa29bfe,
-                        transparent: true,
-                        opacity: 0.6
-                    });
-                    
-                    for(let j = 0; j < 3; j++) {
-                        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                        glow.position.set(
-                            (Math.random() - 0.5) * 2,
-                            1 + Math.random() * 2, // Above the floor
-                            (Math.random() - 0.5) * 2
-                        );
-                        crystalGroup.add(glow);
-                        
-                        // Animation data
-                        glow.userData = {
-                            originalPos: glow.position.clone(),
-                            floatSpeed: 1 + Math.random(),
-                            radius: 0.5 + Math.random() * 0.5
-                        };
-                    }
-                    
-                    // Position crystal formation ON the floor
-                    const angle = (i / 6) * Math.PI * 2;
-                    const radius = 8 + Math.random() * 5;
-                    crystalGroup.position.set(
-                        Math.cos(angle) * radius,
-                        0, // On the floor level
-                        Math.sin(angle) * radius
-                    );
-                    
-                    this.scene.add(crystalGroup);
-                }
-            }
-            
-            createParticleEffects() {
-                // Floating dust particles for atmosphere
-                const particleCount = 200;
-                const particles = new THREE.BufferGeometry();
-                const positions = new Float32Array(particleCount * 3);
-                
-                for(let i = 0; i < particleCount * 3; i += 3) {
-                    positions[i] = (Math.random() - 0.5) * 100;     // x
-                    positions[i + 1] = Math.random() * 20;          // y (above floor)
-                    positions[i + 2] = (Math.random() - 0.5) * 100; // z
-                }
-                
-                particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                
-                const particleMaterial = new THREE.PointsMaterial({
-                    color: 0x8e8e93,
-                    size: 0.1,
-                    transparent: true,
-                    opacity: 0.6,
-                    blending: THREE.AdditiveBlending
-                });
-                
-                this.particles = new THREE.Points(particles, particleMaterial);
-                this.scene.add(this.particles);
             }
             
             setupPlayer() {
-                // CRITICAL: Only create player AFTER environment is ready
+                // CRITICAL: Only create player AFTER scene is ready
                 if (!this.scene || !this.camera) {
                     throw new Error('Scene and camera must be initialized before player');
                 }
                 
-                console.log('Creating player - environment is ready');
+                console.log('Creating player - scene is ready');
                 this.player = new Player(this.scene, this.camera);
+            }
+            
+            setupDungeon() {
+                // Initialize dungeon system AFTER player is created
+                if (!this.player) {
+                    throw new Error('Player must be initialized before dungeon system');
+                }
+                
+                console.log('Creating dungeon system...');
+                this.dungeonSystem = new DungeonSystem(this.scene, this.player);
+                
+                // Generate the first dungeon floor
+                console.log('Generating first dungeon floor...');
+                this.dungeonSystem.generateDungeon(this.currentFloor);
+                
+                // Position player in center room
+                this.player.position.set(0, 1.8, 0);
+                this.player.camera.position.copy(this.player.position);
+                
+                console.log('Dungeon system initialized and first floor generated');
             }
             
             setupUI() {
@@ -664,6 +511,9 @@
                         }
                     });
                 }
+                
+                // Update floor indicator
+                this.updateFloorIndicator();
             }
             
             requestPointerLock() {
@@ -687,40 +537,52 @@
                     this.player.update(deltaTime, input);
                 }
                 
+                // Update dungeon system (animated elements, lighting, etc.)
+                if (this.dungeonSystem) {
+                    this.dungeonSystem.update(deltaTime);
+                }
+                
                 // Reset mouse delta
                 inputState.mouse.deltaX = 0;
                 inputState.mouse.deltaY = 0;
                 
-                // Update atmospheric effects
-                this.updateAtmosphericEffects(deltaTime);
-                
                 // Update UI
                 this.updateUI();
+                
+                // Check for floor progression (placeholder - will be replaced with key system)
+                this.checkFloorProgression(input);
             }
             
-            updateAtmosphericEffects(deltaTime) {
-                // Animate floating lights
-                this.scene.traverse((child) => {
-                    if (child.isPointLight && child.userData.floatSpeed) {
-                        child.position.y = child.userData.originalY + 
-                            Math.sin(this.gameTime * child.userData.floatSpeed) * child.userData.floatAmount;
-                    }
-                    
-                    // Animate crystal glow particles
-                    if (child.userData.floatSpeed && child.userData.originalPos) {
-                        const time = this.gameTime * child.userData.floatSpeed;
-                        child.position.x = child.userData.originalPos.x + 
-                            Math.cos(time) * child.userData.radius;
-                        child.position.y = child.userData.originalPos.y + 
-                            Math.sin(time * 0.7) * 0.3;
-                        child.position.z = child.userData.originalPos.z + 
-                            Math.sin(time) * child.userData.radius;
-                    }
-                });
+            checkFloorProgression(input) {
+                // Temporary: Press 'N' to go to next floor for testing
+                if (input.justPressed.interact && input.menu) { // E + Esc together for testing
+                    this.advanceToNextFloor();
+                }
+            }
+            
+            advanceToNextFloor() {
+                this.currentFloor++;
+                console.log(`Advancing to floor ${this.currentFloor}`);
                 
-                // Animate dust particles
-                if (this.particles) {
-                    this.particles.rotation.y += deltaTime * 0.1;
+                // Generate new dungeon floor
+                if (this.dungeonSystem) {
+                    this.dungeonSystem.generateDungeon(this.currentFloor);
+                }
+                
+                // Reset player position to center
+                this.player.position.set(0, 1.8, 0);
+                this.player.velocity.set(0, 0, 0);
+                this.player.camera.position.copy(this.player.position);
+                
+                // Update UI
+                this.updateFloorIndicator();
+            }
+            
+            updateFloorIndicator() {
+                const floorElement = document.getElementById('floorIndicator');
+                if (floorElement) {
+                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
+                    floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
                 }
             }
             
@@ -760,7 +622,7 @@
         window.LabyrinthGame = LabyrinthGame;
     </script>
     
-    <!-- 5. GUARANTEED FINAL INITIALIZATION -->
+    <!-- 6. GUARANTEED FINAL INITIALIZATION -->
     <script>
         // Wait for DOM to be fully loaded before starting
         document.addEventListener('DOMContentLoaded', function() {
@@ -779,6 +641,11 @@
             
             if (!window.Player) {
                 console.error('Player system not loaded!');
+                return;
+            }
+            
+            if (!window.DungeonSystem) {
+                console.error('Dungeon system not loaded!');
                 return;
             }
             
