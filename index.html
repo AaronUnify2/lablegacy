@@ -241,7 +241,8 @@
             <div id="floorIndicator">Floor 1</div>
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
-                <small>Mobile: Joystick to move, right stick to look, tap action buttons</small>
+                <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
+                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small>
             </div>
         </div>
         
@@ -748,32 +749,29 @@ class DungeonSystem {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // ATMOSPHERIC LIGHTING: Moderate brightness with theme colors
-        const themeColor = this.getThemeColor(theme);
+        // Super bright overhead light
+        const brightLight = new THREE.PointLight(0xffffff, 3.0, 50);
+        brightLight.position.set(worldX, this.ceilingHeight - 1, worldZ);
+        this.currentDungeonGroup.add(brightLight);
+        this.lightSources.push(brightLight);
         
-        // Main room light - atmospheric but visible
-        const mainLight = new THREE.PointLight(themeColor, 1.2, 40);
-        mainLight.position.set(worldX, this.ceilingHeight - 2, worldZ);
-        this.currentDungeonGroup.add(mainLight);
-        this.lightSources.push(mainLight);
-        
-        // Subtle corner accent lights
+        // Corner lights for even coverage
         const roomSize = room.size * this.gridSize;
         const cornerPositions = [
-            [worldX - roomSize/4, this.ceilingHeight/2, worldZ - roomSize/4],
-            [worldX + roomSize/4, this.ceilingHeight/2, worldZ - roomSize/4],
+            [worldX - roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
+            [worldX + roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
             [worldX - roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3],
             [worldX + roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3]
         ];
         
-        cornerPositions.forEach((pos, index) => {
-            const cornerLight = new THREE.PointLight(themeColor, 0.6, 20);
+        cornerPositions.forEach(pos => {
+            const cornerLight = new THREE.PointLight(0xffffff, 2.0, 30);
             cornerLight.position.set(...pos);
             this.currentDungeonGroup.add(cornerLight);
             this.lightSources.push(cornerLight);
         });
         
-        console.log(`Added atmospheric lighting to ${room.type} room at (${worldX}, ${worldZ})`);
+        console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ})`);
     }
     
     addCorridorLighting(roomA, roomB, theme) {
@@ -782,20 +780,18 @@ class DungeonSystem {
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
         const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        const themeColor = this.getThemeColor(theme);
-        
-        // Corridor lights with atmospheric theme colors
-        const cornerLight = new THREE.PointLight(themeColor, 0.8, 25);
-        cornerLight.position.set(endWorldX, 3, startWorldZ); // Corner position
+        // Light at corner of L-shaped corridor
+        const cornerLight = new THREE.PointLight(0xffffff, 2.5, 40);
+        cornerLight.position.set(endWorldX, 4, startWorldZ); // Corner position
         this.currentDungeonGroup.add(cornerLight);
         this.lightSources.push(cornerLight);
         
-        // Dimmer mid-corridor light
+        // Additional lights along corridor path
         const midWorldX = (startWorldX + endWorldX) / 2;
         const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
-        const midLight = new THREE.PointLight(themeColor, 0.5, 15);
-        midLight.position.set(midWorldX, 2.5, midWorldZ);
+        const midLight = new THREE.PointLight(0xffffff, 1.8, 25);
+        midLight.position.set(midWorldX, 3.5, midWorldZ);
         this.currentDungeonGroup.add(midLight);
         this.lightSources.push(midLight);
     }
@@ -1229,12 +1225,12 @@ window.DungeonSystem = DungeonSystem;
             }
             
             setupLighting() {
-                // Atmospheric ambient lighting - dark but visible
-                const ambientLight = new THREE.AmbientLight(0x2c1810, 0.5);
+                // Much brighter ambient lighting for testing
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
                 this.scene.add(ambientLight);
                 
-                // Atmospheric directional light - warm tone
-                const directionalLight = new THREE.DirectionalLight(0x4a3728, 0.7);
+                // Brighter main directional light for testing
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
                 directionalLight.position.set(10, 20, 5);
                 directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
@@ -1336,15 +1332,20 @@ window.DungeonSystem = DungeonSystem;
             }
             
             checkFloorProgression(input) {
-                // Temporary: Press 'N' to go to next floor for testing
-                if (input.justPressed.interact && input.menu) { // E + Esc together for testing
-                    this.advanceToNextFloor();
+                // Menu button: Skip 10 floors ahead for testing
+                if (input.justPressed.menu) {
+                    this.advanceFloors(10);
+                }
+                
+                // E + Esc together: Advance 1 floor for fine testing
+                if (input.justPressed.interact && input.menu) {
+                    this.advanceFloors(1);
                 }
             }
             
-            advanceToNextFloor() {
-                this.currentFloor++;
-                console.log(`Advancing to floor ${this.currentFloor}`);
+            advanceFloors(count) {
+                this.currentFloor += count;
+                console.log(`Advancing ${count} floors to floor ${this.currentFloor}`);
                 
                 // Generate new dungeon floor
                 if (this.dungeonSystem) {
@@ -1358,6 +1359,11 @@ window.DungeonSystem = DungeonSystem;
                 
                 // Update UI
                 this.updateFloorIndicator();
+            }
+            
+            advanceToNextFloor() {
+                // Keep this method for compatibility
+                this.advanceFloors(1);
             }
             
             updateFloorIndicator() {
