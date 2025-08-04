@@ -182,7 +182,7 @@ class Player {
         }
         
         // Basic boundary collision (keep player in test area)
-        const maxDistance = 23;
+        const maxDistance = 60;
         if (this.position.x > maxDistance) {
             this.position.x = maxDistance;
             this.velocity.x = 0;
