@@ -457,9 +457,9 @@ function updateRightJoystick(touch) {
     inputState.axes.rightStickX = normalizedX;
     inputState.axes.rightStickY = normalizedY;
     
-    // Convert to camera input with sensitivity of 8.0
-    inputState.mouse.deltaX = normalizedX * 8.0;
-    inputState.mouse.deltaY = normalizedY * 8.0;
+    // Convert to camera input with sensitivity of 10.0
+    inputState.mouse.deltaX = normalizedX * 10.0;
+    inputState.mouse.deltaY = normalizedY * 10.0;
 }
 
 function resetLeftJoystick() {
