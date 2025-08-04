@@ -241,7 +241,7 @@
             <div id="floorIndicator">Floor 1</div>
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
-                <small>Mobile: Joystick to move, right stick to look, tap action buttons</small>
+                <small>Mobile: Joystick to move, right stick to look, tap action buttons | Menu button: Next floor</small>
             </div>
         </div>
         
@@ -358,9 +358,41 @@ class DungeonSystem {
     }
     
     createStoneMaterials() {
-        const stoneFloor = new THREE.MeshLambertMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.9 });
-        const stoneWall = new THREE.MeshLambertMaterial({ color: 0x3a3a3a, transparent: true, opacity: 0.95 });
-        const stoneCeiling = new THREE.MeshLambertMaterial({ color: 0x2a2a2a, transparent: true, opacity: 0.8 });
+        // Create beautiful stained glass mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Create mosaic tile pattern
+        const tileSize = 32;
+        const colors = ['#8B4513', '#CD853F', '#DAA520', '#B8860B', '#D2691E', '#A0522D'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 4);
+            }
+        }
+        
+        const stoneFloorTexture = new THREE.CanvasTexture(canvas);
+        stoneFloorTexture.wrapS = THREE.RepeatWrapping;
+        stoneFloorTexture.wrapT = THREE.RepeatWrapping;
+        stoneFloorTexture.repeat.set(4, 4);
+        
+        const stoneFloor = new THREE.MeshLambertMaterial({ 
+            map: stoneFloorTexture,
+            transparent: true, 
+            opacity: 0.9 
+        });
+        
+        const stoneWall = new THREE.MeshLambertMaterial({ color: 0x6a6a6a, transparent: true, opacity: 0.95 });
+        const stoneCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.8 });
         
         this.materials.set('stone_floor', stoneFloor);
         this.materials.set('stone_wall', stoneWall);
@@ -368,9 +400,40 @@ class DungeonSystem {
     }
     
     createCrystalMaterials() {
-        const crystalFloor = new THREE.MeshPhongMaterial({ color: 0x4a4a6a, transparent: true, opacity: 0.9, shininess: 30 });
-        const crystalWall = new THREE.MeshPhongMaterial({ color: 0x5a5a7a, transparent: true, opacity: 0.95, shininess: 50 });
-        const crystalCeiling = new THREE.MeshPhongMaterial({ color: 0x3a3a5a, transparent: true, opacity: 0.8, shininess: 20 });
+        // Create crystal mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        const tileSize = 32;
+        const colors = ['#4169E1', '#6495ED', '#7B68EE', '#9370DB', '#8A2BE2', '#4B0082'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add crystal shine
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillRect(x, y, tileSize - 2, 6);
+            }
+        }
+        
+        const crystalFloorTexture = new THREE.CanvasTexture(canvas);
+        crystalFloorTexture.wrapS = THREE.RepeatWrapping;
+        crystalFloorTexture.wrapT = THREE.RepeatWrapping;
+        crystalFloorTexture.repeat.set(4, 4);
+        
+        const crystalFloor = new THREE.MeshPhongMaterial({ 
+            map: crystalFloorTexture,
+            transparent: true, 
+            opacity: 0.9, 
+            shininess: 30 
+        });
+        const crystalWall = new THREE.MeshPhongMaterial({ color: 0x7a7a9a, transparent: true, opacity: 0.95, shininess: 50 });
+        const crystalCeiling = new THREE.MeshPhongMaterial({ color: 0x5a5a7a, transparent: true, opacity: 0.8, shininess: 20 });
         
         this.materials.set('crystal_floor', crystalFloor);
         this.materials.set('crystal_wall', crystalWall);
@@ -378,9 +441,41 @@ class DungeonSystem {
     }
     
     createRuinsMaterials() {
-        const ruinsFloor = new THREE.MeshLambertMaterial({ color: 0x6a4a6a, transparent: true, opacity: 0.85 });
-        const ruinsWall = new THREE.MeshLambertMaterial({ color: 0x7a5a7a, transparent: true, opacity: 0.9 });
-        const ruinsCeiling = new THREE.MeshLambertMaterial({ color: 0x5a3a5a, transparent: true, opacity: 0.7 });
+        // Create ruined mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        const tileSize = 32;
+        const colors = ['#8B008B', '#DA70D6', '#BA55D3', '#9932CC', '#8A2BE2', '#6A5ACD'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                
+                // Some tiles are "broken" - irregular shapes
+                if (Math.random() > 0.3) {
+                    ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                } else {
+                    ctx.fillRect(x + 4, y + 4, tileSize - 10, tileSize - 10);
+                }
+                
+                // Add mystical glow
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
+            }
+        }
+        
+        const ruinsFloorTexture = new THREE.CanvasTexture(canvas);
+        ruinsFloorTexture.wrapS = THREE.RepeatWrapping;
+        ruinsFloorTexture.wrapT = THREE.RepeatWrapping;
+        ruinsFloorTexture.repeat.set(4, 4);
+        
+        const ruinsFloor = new THREE.MeshLambertMaterial({ map: ruinsFloorTexture, transparent: true, opacity: 0.85 });
+        const ruinsWall = new THREE.MeshLambertMaterial({ color: 0x9a7a9a, transparent: true, opacity: 0.9 });
+        const ruinsCeiling = new THREE.MeshLambertMaterial({ color: 0x7a5a7a, transparent: true, opacity: 0.7 });
         
         this.materials.set('ruins_floor', ruinsFloor);
         this.materials.set('ruins_wall', ruinsWall);
@@ -388,9 +483,35 @@ class DungeonSystem {
     }
     
     createCryptMaterials() {
-        const cryptFloor = new THREE.MeshLambertMaterial({ color: 0x3a3a2a, transparent: true, opacity: 0.9 });
-        const cryptWall = new THREE.MeshLambertMaterial({ color: 0x4a4a3a, transparent: true, opacity: 0.95 });
-        const cryptCeiling = new THREE.MeshLambertMaterial({ color: 0x2a2a1a, transparent: true, opacity: 0.6 });
+        // Create dark mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        const tileSize = 32;
+        const colors = ['#2F4F2F', '#556B2F', '#6B8E23', '#808000', '#9ACD32', '#32CD32'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add eerie glow
+                ctx.fillStyle = 'rgba(0,255,0,0.2)';
+                ctx.fillRect(x, y, tileSize - 2, 4);
+            }
+        }
+        
+        const cryptFloorTexture = new THREE.CanvasTexture(canvas);
+        cryptFloorTexture.wrapS = THREE.RepeatWrapping;
+        cryptFloorTexture.wrapT = THREE.RepeatWrapping;
+        cryptFloorTexture.repeat.set(4, 4);
+        
+        const cryptFloor = new THREE.MeshLambertMaterial({ map: cryptFloorTexture, transparent: true, opacity: 0.9 });
+        const cryptWall = new THREE.MeshLambertMaterial({ color: 0x6a6a5a, transparent: true, opacity: 0.95 });
+        const cryptCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a3a, transparent: true, opacity: 0.6 });
         
         this.materials.set('crypt_floor', cryptFloor);
         this.materials.set('crypt_wall', cryptWall);
@@ -398,9 +519,39 @@ class DungeonSystem {
     }
     
     createForestMaterials() {
-        const forestFloor = new THREE.MeshLambertMaterial({ color: 0x2a4a2a, transparent: true, opacity: 0.8 });
-        const forestWall = new THREE.MeshLambertMaterial({ color: 0x3a5a3a, transparent: true, opacity: 0.7 });
-        const forestCeiling = new THREE.MeshLambertMaterial({ color: 0x1a3a1a, transparent: true, opacity: 0.5 });
+        // Create natural mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        const tileSize = 32;
+        const colors = ['#228B22', '#32CD32', '#7CFC00', '#ADFF2F', '#9ACD32', '#6B8E23'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                
+                // Organic, leaf-like shapes
+                ctx.beginPath();
+                ctx.ellipse(x + tileSize/2, y + tileSize/2, tileSize/2 - 2, tileSize/3 - 1, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add natural highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
+            }
+        }
+        
+        const forestFloorTexture = new THREE.CanvasTexture(canvas);
+        forestFloorTexture.wrapS = THREE.RepeatWrapping;
+        forestFloorTexture.wrapT = THREE.RepeatWrapping;
+        forestFloorTexture.repeat.set(4, 4);
+        
+        const forestFloor = new THREE.MeshLambertMaterial({ map: forestFloorTexture, transparent: true, opacity: 0.8 });
+        const forestWall = new THREE.MeshLambertMaterial({ color: 0x5a7a5a, transparent: true, opacity: 0.7 });
+        const forestCeiling = new THREE.MeshLambertMaterial({ color: 0x3a5a3a, transparent: true, opacity: 0.5 });
         
         this.materials.set('forest_floor', forestFloor);
         this.materials.set('forest_wall', forestWall);
@@ -1331,15 +1482,15 @@ window.DungeonSystem = DungeonSystem;
             }
             
             checkFloorProgression(input) {
-                // Temporary: Press 'N' to go to next floor for testing
-                if (input.justPressed.interact && input.menu) { // E + Esc together for testing
+                // Mobile testing: Press menu button to advance floors
+                if (input.justPressed.menu) {
                     this.advanceToNextFloor();
                 }
             }
             
             advanceToNextFloor() {
                 this.currentFloor++;
-                console.log(`Advancing to floor ${this.currentFloor}`);
+                console.log(`Advancing to floor ${this.currentFloor} (Menu button pressed)`);
                 
                 // Generate new dungeon floor
                 if (this.dungeonSystem) {
