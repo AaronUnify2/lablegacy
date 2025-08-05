@@ -181,7 +181,7 @@ class Player {
             this.isGrounded = false;
         }
         
-        // Basic boundary collision (keep player in test area)
+        /* Basic boundary collision (keep player in test area)
         const maxDistance = 23;
         if (this.position.x > maxDistance) {
             this.position.x = maxDistance;
@@ -200,7 +200,7 @@ class Player {
             this.velocity.z = 0;
         }
     }
-    
+    */
     updateRegeneration(deltaTime) {
         // Stamina regeneration
         if (this.stamina < this.maxStamina && !this.isDashing) {
