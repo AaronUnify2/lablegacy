@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Labyrinth Legacy</title>
+    <title>Labyrinth Legacy - Multi-Level</title>
     <style>
         body {
             margin: 0;
@@ -212,7 +212,7 @@
             }
         }
 
-        /* Floor indicator */
+        /* Floor and level indicators */
         #floorIndicator {
             position: absolute;
             top: 100px;
@@ -222,6 +222,28 @@
             font-weight: bold;
             pointer-events: none;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        #levelIndicator {
+            position: absolute;
+            top: 125px;
+            left: 20px;
+            color: rgba(255,255,0,0.9);
+            font-size: 16px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
+        #debugInfo {
+            position: absolute;
+            top: 150px;
+            left: 20px;
+            color: rgba(0,255,255,0.8);
+            font-size: 12px;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            line-height: 1.4;
         }
     </style>
 </head>
@@ -239,10 +261,17 @@
             </div>
             <div id="crosshair"></div>
             <div id="floorIndicator">Floor 1</div>
+            <div id="levelIndicator">Level: TOP</div>
+            <div id="debugInfo">
+                Position: (0, 0, 0)<br>
+                Room: None<br>
+                Grounded: Yes
+            </div>
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
-                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small>
+                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, E = Interact/Open holes</small><br>
+                <small>Multi-Level: Fall through holes to progress deeper! Center room hole is always open.</small>
             </div>
         </div>
         
@@ -290,15 +319,15 @@
     <!-- 3. Player System -->
     <script src="src/systems/player.js"></script>
     
-    <!-- 4. Dungeon System - LOAD FROM EXTERNAL FILE -->
+    <!-- 4. Dungeon System -->
     <script src="src/systems/dungeon.js"></script>
     
     <!-- 5. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
     <script>
-        // Main Game Engine with proper initialization sequencing
+        // Multi-Level Labyrinth Game Engine
         class LabyrinthGame {
             constructor() {
-                console.log('Initializing Labyrinth Game...');
+                console.log('Initializing Multi-Level Labyrinth Game...');
                 
                 this.scene = null;
                 this.camera = null;
@@ -335,7 +364,7 @@
             }
             
             async init() {
-                console.log('Starting game initialization sequence...');
+                console.log('Starting multi-level game initialization sequence...');
                 
                 try {
                     // Execute each initialization phase in sequence
@@ -352,11 +381,11 @@
                     
                     // All systems loaded - start game
                     this.gameState = 'playing';
-                    console.log('Game initialization complete - starting game loop');
+                    console.log('Multi-level game initialization complete - starting game loop');
                     this.gameLoop();
                     
                 } catch (error) {
-                    console.error('Failed to initialize game:', error);
+                    console.error('Failed to initialize multi-level game:', error);
                     this.gameState = 'error';
                 }
             }
@@ -392,7 +421,7 @@
             
             setupScene() {
                 this.scene = new THREE.Scene();
-                this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+                this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.015);
                 this.scene.background = new THREE.Color(0x0f0f1f);
             }
             
@@ -448,22 +477,22 @@
             }
             
             setupLighting() {
-                // Much brighter ambient lighting for testing
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                // Much brighter ambient lighting for multi-level visibility
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
                 this.scene.add(ambientLight);
                 
-                // Brighter main directional light for testing
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-                directionalLight.position.set(10, 20, 5);
+                // Brighter main directional light
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.3);
+                directionalLight.position.set(10, 30, 5);
                 directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
                 directionalLight.shadow.mapSize.height = 2048;
                 directionalLight.shadow.camera.near = 0.5;
-                directionalLight.shadow.camera.far = 100;
-                directionalLight.shadow.camera.left = -50;
-                directionalLight.shadow.camera.right = 50;
-                directionalLight.shadow.camera.top = 50;
-                directionalLight.shadow.camera.bottom = -50;
+                directionalLight.shadow.camera.far = 150;
+                directionalLight.shadow.camera.left = -75;
+                directionalLight.shadow.camera.right = 75;
+                directionalLight.shadow.camera.top = 75;
+                directionalLight.shadow.camera.bottom = -75;
                 this.scene.add(directionalLight);
             }
             
@@ -473,7 +502,7 @@
                     throw new Error('Scene and camera must be initialized before player');
                 }
                 
-                console.log('Creating player - scene is ready');
+                console.log('Creating multi-level player - scene is ready');
                 this.player = new Player(this.scene, this.camera);
             }
             
@@ -483,18 +512,22 @@
                     throw new Error('Player must be initialized before dungeon system');
                 }
                 
-                console.log('Creating dungeon system...');
+                console.log('Creating multi-level dungeon system...');
                 this.dungeonSystem = new DungeonSystem(this.scene, this.player);
                 
-                // Generate the first dungeon floor
-                console.log('Generating first dungeon floor...');
+                // CRITICAL: Connect player to dungeon system for collision detection
+                this.player.setDungeonSystem(this.dungeonSystem);
+                
+                // Generate the first multi-level dungeon
+                console.log('Generating first multi-level dungeon...');
                 this.dungeonSystem.generateDungeon(this.currentFloor);
                 
-                // Position player in center room
+                // Position player on TOP level at center
                 this.player.position.set(0, 1.8, 0);
+                this.player.currentLevel = 'TOP';
                 this.player.camera.position.copy(this.player.position);
                 
-                console.log('Dungeon system initialized and first floor generated');
+                console.log('Multi-level dungeon system initialized and first floor generated');
             }
             
             setupUI() {
@@ -502,7 +535,7 @@
             }
             
             onInitializationComplete() {
-                console.log('All systems initialized successfully');
+                console.log('All multi-level systems initialized successfully');
                 
                 // Set up additional input handlers now that everything is ready
                 if (!inputState.isMobile) {
@@ -513,8 +546,9 @@
                     });
                 }
                 
-                // Update floor indicator
+                // Update UI indicators
                 this.updateFloorIndicator();
+                this.updateLevelIndicator();
             }
             
             requestPointerLock() {
@@ -549,6 +583,8 @@
                 
                 // Update UI
                 this.updateUI();
+                this.updateLevelIndicator();
+                this.updateDebugInfo();
                 
                 // Check for floor progression (placeholder - will be replaced with key system)
                 this.checkFloorProgression(input);
@@ -570,22 +606,24 @@
                 this.currentFloor += count;
                 console.log(`Advancing ${count} floors to floor ${this.currentFloor}`);
                 
-                // Generate new dungeon floor
+                // Generate new multi-level dungeon floor
                 if (this.dungeonSystem) {
                     this.dungeonSystem.generateDungeon(this.currentFloor);
                 }
                 
-                // Reset player position to center
+                // Reset player position to center of TOP level
                 this.player.position.set(0, 1.8, 0);
+                this.player.currentLevel = 'TOP';
                 this.player.velocity.set(0, 0, 0);
                 this.player.camera.position.copy(this.player.position);
                 
                 // Update UI
                 this.updateFloorIndicator();
+                this.updateLevelIndicator();
             }
             
             advanceToNextFloor() {
-                // Keep this method for compatibility
+                // Keep this method for compatibility with level transitions
                 this.advanceFloors(1);
             }
             
@@ -594,6 +632,34 @@
                 if (floorElement) {
                     const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
                     floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
+                }
+            }
+            
+            updateLevelIndicator() {
+                const levelElement = document.getElementById('levelIndicator');
+                if (levelElement && this.player) {
+                    const level = this.player.getCurrentLevel();
+                    const levelNames = {
+                        'TOP': 'Surface Level',
+                        'MID': 'Underground',
+                        'BASEMENT': 'Deep Basement'
+                    };
+                    levelElement.textContent = `Level: ${levelNames[level] || level}`;
+                }
+            }
+            
+            updateDebugInfo() {
+                const debugElement = document.getElementById('debugInfo');
+                if (debugElement && this.player && this.dungeonSystem) {
+                    const pos = this.player.position;
+                    const currentRoom = this.dungeonSystem.getRoomAt(pos);
+                    
+                    debugElement.innerHTML = `
+                        Position: (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})<br>
+                        Room: ${currentRoom ? currentRoom.id : 'None'}<br>
+                        Grounded: ${this.player.isGrounded ? 'Yes' : 'No'}<br>
+                        Falling: ${this.player.isFalling ? 'Yes' : 'No'}
+                    `;
                 }
             }
             
@@ -637,7 +703,7 @@
     <script>
         // Wait for DOM to be fully loaded before starting
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing game...');
+            console.log('DOM loaded, initializing multi-level game...');
             
             // Verify all dependencies are loaded
             if (!window.THREE) {
@@ -663,10 +729,10 @@
             // Initialize input system first
             setupInput();
             
-            // Initialize game engine (this will create player, dungeon, etc.)
+            // Initialize multi-level game engine
             window.game = new LabyrinthGame();
             
-            console.log('Game initialization complete');
+            console.log('Multi-level game initialization complete');
         });
     </script>
 </body>
