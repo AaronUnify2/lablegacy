@@ -1,8 +1,8 @@
-// Player Character System
+// Multi-Level Player Character System
 
 class Player {
     constructor(scene, camera) {
-        console.log('Initializing Player...');
+        console.log('Initializing Multi-Level Player...');
         
         this.scene = scene;
         this.camera = camera;
@@ -25,6 +25,10 @@ class Player {
         this.isDashing = false;
         this.dashCooldown = 0;
         
+        // Multi-level tracking
+        this.currentLevel = 'TOP';
+        this.dungeonSystem = null; // Will be set by game engine
+        
         // Look controls
         this.pitch = 0;
         this.yaw = 0;
@@ -43,12 +47,24 @@ class Player {
         this.dashStaminaCost = 30;
         this.jumpStaminaCost = 20;
         
+        // Interaction
+        this.interactionRange = 3;
+        
+        // Level transition
+        this.isFalling = false;
+        this.fallTarget = null;
+        
         this.init();
     }
     
     init() {
         this.camera.position.copy(this.position);
-        console.log('Player initialized');
+        console.log('Multi-Level Player initialized');
+    }
+    
+    setDungeonSystem(dungeonSystem) {
+        this.dungeonSystem = dungeonSystem;
+        console.log('Player connected to dungeon system');
     }
     
     update(deltaTime, input) {
@@ -57,6 +73,8 @@ class Player {
         this.updateRegeneration(deltaTime);
         this.updateCamera();
         this.updateCooldowns(deltaTime);
+        this.checkInteractions(input);
+        this.checkLevelTransitions();
     }
     
     handleInput(input, deltaTime) {
@@ -101,7 +119,7 @@ class Player {
         }
         
         // Dashing
-        if (input.justPressed.dash && this.dashCooldown <= 0 && this.stamina >= this.dashStaminaCost) {
+        if (input.justPressed.dash && this.dashCooldown <= 0 && this.stamina >= this.dashStaminaCost && this.isGrounded) {
             this.isDashing = true;
             this.dashCooldown = 1.0; // 1 second cooldown
             this.stamina -= this.dashStaminaCost;
@@ -133,10 +151,6 @@ class Player {
         }
         
         // Handle other actions
-        if (input.justPressed.interact) {
-            console.log("Interact pressed!");
-        }
-        
         if (input.justPressed.attack) {
             console.log("Sword attack!");
         }
@@ -159,8 +173,11 @@ class Player {
             }
         }
         
+        // Store previous position for collision rollback
+        const previousPosition = this.position.clone();
+        
         // Apply gravity
-        if (!this.isGrounded) {
+        if (!this.isGrounded && !this.isFalling) {
             this.velocity.y += this.gravity * deltaTime;
         }
         
@@ -172,17 +189,49 @@ class Player {
         // Update position
         this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
         
-        // Ground collision (simple)
-        if (this.position.y <= this.groundY) {
-            this.position.y = this.groundY;
-            this.velocity.y = 0;
-            this.isGrounded = true;
+        // Collision detection with dungeon
+        if (this.dungeonSystem) {
+            const collisionResult = this.dungeonSystem.checkCollision(this.position, this.velocity);
+            
+            if (collisionResult.collision) {
+                // Push player away from walls
+                this.position.copy(collisionResult.correctedPosition);
+            }
+            
+            // Handle ground collision
+            if (collisionResult.groundY !== null) {
+                if (this.position.y <= collisionResult.groundY) {
+                    this.position.y = collisionResult.groundY;
+                    this.velocity.y = 0;
+                    this.isGrounded = true;
+                    this.isFalling = false;
+                    
+                    // Update current level
+                    if (collisionResult.level !== this.currentLevel) {
+                        this.currentLevel = collisionResult.level;
+                        console.log(`Player moved to level: ${this.currentLevel}`);
+                    }
+                } else {
+                    this.isGrounded = false;
+                }
+            } else {
+                // No floor detected - might be falling through a hole
+                this.isGrounded = false;
+            }
         } else {
-            this.isGrounded = false;
+            // Fallback ground collision (for when dungeon system isn't available)
+            if (this.position.y <= this.groundY) {
+                this.position.y = this.groundY;
+                this.velocity.y = 0;
+                this.isGrounded = true;
+                this.isFalling = false;
+            } else {
+                this.isGrounded = false;
+            }
         }
         
-        /* Basic boundary collision (keep player in test area)
-        const maxDistance = 23;
+        // Basic boundary collision (keep player in test area during development)
+        const maxDistance = 60; // Larger boundary for multi-level dungeon
         if (this.position.x > maxDistance) {
             this.position.x = maxDistance;
             this.velocity.x = 0;
@@ -199,7 +248,61 @@ class Player {
             this.position.z = -maxDistance;
             this.velocity.z = 0;
         }
-      */  
+    }
+    
+    checkInteractions(input) {
+        if (input.justPressed.interact && this.dungeonSystem) {
+            const currentRoom = this.dungeonSystem.getRoomAt(this.position);
+            
+            if (currentRoom) {
+                console.log(`Player interacting in room: ${currentRoom.id} on level: ${currentRoom.level || this.currentLevel}`);
+                
+                // Try to open holes in current room
+                if (this.dungeonSystem.openLevelHole(currentRoom.id)) {
+                    console.log(`Opened hole in room ${currentRoom.id}!`);
+                } else {
+                    console.log(`No holes to open in room ${currentRoom.id}`);
+                }
+            }
+        }
+    }
+    
+    checkLevelTransitions() {
+        if (!this.dungeonSystem) return;
+        
+        const transition = this.dungeonSystem.checkLevelTransitions(this.position);
+        
+        if (transition) {
+            if (transition.type === 'hole') {
+                // Fall through hole to next level
+                console.log(`Falling to level: ${transition.targetLevel}`);
+                this.isFalling = true;
+                this.fallTarget = transition.targetY;
+                this.currentLevel = transition.targetLevel;
+                
+                // Add downward velocity for dramatic fall
+                this.velocity.y = -15;
+                
+            } else if (transition.type === 'exit') {
+                // Reached final exit
+                console.log('Player reached final exit!');
+                if (transition.nextFloor && window.game) {
+                    window.game.advanceToNextFloor();
+                }
+            }
+        }
+        
+        // Handle falling transition
+        if (this.isFalling && this.fallTarget !== null) {
+            if (this.position.y <= this.fallTarget) {
+                this.position.y = this.fallTarget;
+                this.velocity.y = 0;
+                this.isGrounded = true;
+                this.isFalling = false;
+                this.fallTarget = null;
+                console.log(`Landed on level: ${this.currentLevel}`);
+            }
+        }
     }
     
     updateRegeneration(deltaTime) {
@@ -247,6 +350,47 @@ class Player {
             return true;
         }
         return false;
+    }
+    
+    // Multi-level specific methods
+    getCurrentLevel() {
+        return this.currentLevel;
+    }
+    
+    teleportToLevel(levelName, position = null) {
+        if (!this.dungeonSystem || !this.dungeonSystem.levels[levelName]) {
+            console.warn(`Invalid level: ${levelName}`);
+            return false;
+        }
+        
+        this.currentLevel = levelName;
+        const levelY = this.dungeonSystem.levels[levelName].y;
+        
+        if (position) {
+            this.position.copy(position);
+            this.position.y = levelY + 1.8;
+        } else {
+            // Teleport to center of level
+            this.position.set(0, levelY + 1.8, 0);
+        }
+        
+        this.velocity.set(0, 0, 0);
+        this.isGrounded = true;
+        this.isFalling = false;
+        
+        console.log(`Player teleported to level ${levelName} at Y=${levelY}`);
+        return true;
+    }
+    
+    isPlayerInRoom(roomId) {
+        if (!this.dungeonSystem) return false;
+        
+        const currentRoom = this.dungeonSystem.getRoomAt(this.position);
+        return currentRoom && currentRoom.id === roomId;
+    }
+    
+    getDistanceToPoint(point) {
+        return this.position.distanceTo(point);
     }
 }
 
