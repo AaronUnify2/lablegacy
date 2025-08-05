@@ -223,6 +223,102 @@
             pointer-events: none;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
+
+        /* Compass */
+        #compass {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            pointer-events: none;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        #compass-face {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+
+        .compass-direction {
+            position: absolute;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: bold;
+            font-size: 16px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        #compass-n {
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff6b6b;
+        }
+
+        #compass-s {
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        #compass-e {
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #compass-w {
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        #compass-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 45px;
+            background: linear-gradient(180deg, #ff6b6b 0%, #ff6b6b 60%, #ffffff 60%, #ffffff 100%);
+            transform-origin: bottom center;
+            transform: translate(-50%, -100%);
+            border-radius: 1px;
+            box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+        }
+
+        #compass-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            background: #ffffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+        }
+
+        @media (max-width: 768px) {
+            #compass {
+                width: 100px;
+                height: 100px;
+                top: 15px;
+                right: 15px;
+            }
+            
+            .compass-direction {
+                font-size: 14px;
+            }
+            
+            #compass-needle {
+                height: 38px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -239,11 +335,24 @@
             </div>
             <div id="crosshair"></div>
             <div id="floorIndicator">Floor 1</div>
+            
+            <!-- Compass -->
+            <div id="compass">
+                <div id="compass-face">
+                    <div id="compass-n" class="compass-direction">N</div>
+                    <div id="compass-s" class="compass-direction">S</div>
+                    <div id="compass-e" class="compass-direction">E</div>
+                    <div id="compass-w" class="compass-direction">W</div>
+                    <div id="compass-needle"></div>
+                    <div id="compass-center"></div>
+                </div>
+            </div>
+            
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
                 <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small><br>
-                <small>Walls, floors, and ceilings are now solid!</small>
+                <small>Walls, floors, and ceilings are now solid! Check the compass (top-right) for direction.</small>
             </div>
         </div>
         
@@ -613,6 +722,23 @@
                 if (healthFill) healthFill.style.width = healthPercent + '%';
                 if (staminaFill) staminaFill.style.width = staminaPercent + '%';
                 if (manaFill) manaFill.style.width = manaPercent + '%';
+                
+                // Update compass
+                this.updateCompass();
+            }
+            
+            updateCompass() {
+                if (!this.player) return;
+                
+                const compassNeedle = document.getElementById('compass-needle');
+                if (compassNeedle) {
+                    // Convert player yaw to degrees and adjust for compass orientation
+                    // Player yaw of 0 = facing negative Z (which is North in our coordinate system)
+                    const yawDegrees = (this.player.yaw * 180 / Math.PI);
+                    
+                    // Rotate the needle - yaw of 0 should point North (up)
+                    compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
+                }
             }
             
             render() {
