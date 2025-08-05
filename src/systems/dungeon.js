@@ -14,9 +14,6 @@ class DungeonSystem {
         this.rooms = new Map(); // roomId -> room data
         this.connections = new Map(); // connectionId -> hallway data
         
-        // Collision geometry for wall detection
-        this.wallBoxes = []; // Array of bounding boxes for collision detection
-        
         // Room types and layout
         this.roomTypes = {
             CENTER: 'center',
@@ -54,73 +51,6 @@ class DungeonSystem {
         this.setupMaterials();
         this.setupBillboardSystem();
         console.log('Dungeon System initialized');
-    }
-    
-    // Collision detection method for the player
-    checkCollision(position, radius) {
-        for (let i = 0; i < this.wallBoxes.length; i++) {
-            const wall = this.wallBoxes[i];
-            
-            // Check if the player sphere intersects with the wall box
-            const closestPoint = {
-                x: Math.max(wall.min.x, Math.min(position.x, wall.max.x)),
-                y: Math.max(wall.min.y, Math.min(position.y, wall.max.y)),
-                z: Math.max(wall.min.z, Math.min(position.z, wall.max.z))
-            };
-            
-            const distance = Math.sqrt(
-                (position.x - closestPoint.x) ** 2 +
-                (position.y - closestPoint.y) ** 2 +
-                (position.z - closestPoint.z) ** 2
-            );
-            
-            if (distance < radius) {
-                // Calculate collision normal
-                const normal = new THREE.Vector3(
-                    position.x - closestPoint.x,
-                    position.y - closestPoint.y,
-                    position.z - closestPoint.z
-                ).normalize();
-                
-                return {
-                    collision: true,
-                    normal: normal,
-                    distance: distance,
-                    wall: wall
-                };
-            }
-        }
-        
-        return { collision: false };
-    }
-    
-    // Add a wall box for collision detection
-    addWallBox(position, size) {
-        const halfSize = {
-            x: size.x / 2,
-            y: size.y / 2,
-            z: size.z / 2
-        };
-        
-        const wallBox = {
-            min: {
-                x: position.x - halfSize.x,
-                y: position.y - halfSize.y,
-                z: position.z - halfSize.z
-            },
-            max: {
-                x: position.x + halfSize.x,
-                y: position.y + halfSize.y,
-                z: position.z + halfSize.z
-            }
-        };
-        
-        this.wallBoxes.push(wallBox);
-    }
-    
-    // Clear all wall collision boxes
-    clearWallBoxes() {
-        this.wallBoxes = [];
     }
     
     setupMaterials() {
@@ -362,7 +292,7 @@ class DungeonSystem {
             connections: new Map(this.connections)
         };
         
-        console.log(`Dungeon floor ${floorNumber} generated successfully with ${this.wallBoxes.length} collision walls`);
+        console.log(`Dungeon floor ${floorNumber} generated successfully`);
         return this.currentDungeon;
     }
     
@@ -519,12 +449,6 @@ class DungeonSystem {
                 wallMesh.castShadow = true;
                 wallMesh.receiveShadow = true;
                 roomGroup.add(wallMesh);
-                
-                // Add collision box for solid wall
-                this.addWallBox(
-                    { x: wall.pos[0], y: wall.pos[1], z: wall.pos[2] },
-                    { x: wall.size[0], y: wall.size[1], z: wall.size[2] }
-                );
             } else {
                 // Create wall with doorway gap
                 this.createWallWithDoorway(roomGroup, wall, wallMaterial);
@@ -602,47 +526,26 @@ class DungeonSystem {
             // Left segment
             const leftGeometry = new THREE.BoxGeometry(leftWidth, height, thickness);
             const leftMesh = new THREE.Mesh(leftGeometry, material);
-            const leftX = x - width/2 + leftWidth/2;
-            leftMesh.position.set(leftX, y, z);
+            leftMesh.position.set(x - width/2 + leftWidth/2, y, z);
             leftMesh.castShadow = true;
             leftMesh.receiveShadow = true;
             roomGroup.add(leftMesh);
             
-            // Add collision for left segment
-            this.addWallBox(
-                { x: leftX, y: y, z: z },
-                { x: leftWidth, y: height, z: thickness }
-            );
-            
             // Right segment
             const rightGeometry = new THREE.BoxGeometry(rightWidth, height, thickness);
             const rightMesh = new THREE.Mesh(rightGeometry, material);
-            const rightX = x + width/2 - rightWidth/2;
-            rightMesh.position.set(rightX, y, z);
+            rightMesh.position.set(x + width/2 - rightWidth/2, y, z);
             rightMesh.castShadow = true;
             rightMesh.receiveShadow = true;
             roomGroup.add(rightMesh);
             
-            // Add collision for right segment
-            this.addWallBox(
-                { x: rightX, y: y, z: z },
-                { x: rightWidth, y: height, z: thickness }
-            );
-            
             // Top segment over doorway
             const topGeometry = new THREE.BoxGeometry(doorwayWidth, height - doorwayHeight, thickness);
             const topMesh = new THREE.Mesh(topGeometry, material);
-            const topY = y + doorwayHeight/2;
-            topMesh.position.set(x, topY, z);
+            topMesh.position.set(x, y + doorwayHeight/2, z);
             topMesh.castShadow = true;
             topMesh.receiveShadow = true;
             roomGroup.add(topMesh);
-            
-            // Add collision for top segment
-            this.addWallBox(
-                { x: x, y: topY, z: z },
-                { x: doorwayWidth, y: height - doorwayHeight, z: thickness }
-            );
             
         } else {
             // Vertical wall - create front and back segments
@@ -652,47 +555,26 @@ class DungeonSystem {
             // Front segment
             const frontGeometry = new THREE.BoxGeometry(thickness, height, frontDepth);
             const frontMesh = new THREE.Mesh(frontGeometry, material);
-            const frontZ = z - width/2 + frontDepth/2;
-            frontMesh.position.set(x, y, frontZ);
+            frontMesh.position.set(x, y, z - width/2 + frontDepth/2);
             frontMesh.castShadow = true;
             frontMesh.receiveShadow = true;
             roomGroup.add(frontMesh);
             
-            // Add collision for front segment
-            this.addWallBox(
-                { x: x, y: y, z: frontZ },
-                { x: thickness, y: height, z: frontDepth }
-            );
-            
             // Back segment
             const backGeometry = new THREE.BoxGeometry(thickness, height, backDepth);
             const backMesh = new THREE.Mesh(backGeometry, material);
-            const backZ = z + width/2 - backDepth/2;
-            backMesh.position.set(x, y, backZ);
+            backMesh.position.set(x, y, z + width/2 - backDepth/2);
             backMesh.castShadow = true;
             backMesh.receiveShadow = true;
             roomGroup.add(backMesh);
             
-            // Add collision for back segment
-            this.addWallBox(
-                { x: x, y: y, z: backZ },
-                { x: thickness, y: height, z: backDepth }
-            );
-            
             // Top segment over doorway
             const topGeometry = new THREE.BoxGeometry(thickness, height - doorwayHeight, doorwayWidth);
             const topMesh = new THREE.Mesh(topGeometry, material);
-            const topY = y + doorwayHeight/2;
-            topMesh.position.set(x, topY, z);
+            topMesh.position.set(x, y + doorwayHeight/2, z);
             topMesh.castShadow = true;
             topMesh.receiveShadow = true;
             roomGroup.add(topMesh);
-            
-            // Add collision for top segment
-            this.addWallBox(
-                { x: x, y: topY, z: z },
-                { x: thickness, y: height - doorwayHeight, z: doorwayWidth }
-            );
         }
     }
     
@@ -804,12 +686,6 @@ class DungeonSystem {
         wall1.receiveShadow = true;
         group.add(wall1);
         
-        // Add collision for wall 1
-        this.addWallBox(
-            { x: wall1Pos[0], y: wall1Pos[1], z: wall1Pos[2] },
-            { x: length, y: height, z: wallThickness }
-        );
-        
         // Wall 2
         const wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
         wall2.position.set(...wall2Pos);
@@ -817,12 +693,6 @@ class DungeonSystem {
         wall2.castShadow = true;
         wall2.receiveShadow = true;
         group.add(wall2);
-        
-        // Add collision for wall 2
-        this.addWallBox(
-            { x: wall2Pos[0], y: wall2Pos[1], z: wall2Pos[2] },
-            { x: length, y: height, z: wallThickness }
-        );
     }
     
     addCenterRoomFeatures(roomGroup, roomData, theme) {
@@ -1283,9 +1153,6 @@ class DungeonSystem {
         this.connections.clear();
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
-        
-        // Clear collision data
-        this.clearWallBoxes();
         
         console.log('Previous dungeon cleared');
     }
