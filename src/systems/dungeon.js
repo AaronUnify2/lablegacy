@@ -109,14 +109,24 @@ class DungeonSystem {
         stoneFloorTexture.wrapT = THREE.RepeatWrapping;
         stoneFloorTexture.repeat.set(4, 4);
         
+        // Make materials fully opaque and visible
         const stoneFloor = new THREE.MeshLambertMaterial({ 
             map: stoneFloorTexture,
-            transparent: true, 
-            opacity: 0.9 
+            transparent: false, 
+            opacity: 1.0 
         });
         
-        const stoneWall = new THREE.MeshLambertMaterial({ color: 0x6a6a6a, transparent: true, opacity: 0.95 });
-        const stoneCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.8 });
+        const stoneWall = new THREE.MeshLambertMaterial({ 
+            color: 0x8a8a8a, 
+            transparent: false, 
+            opacity: 1.0 
+        });
+        
+        const stoneCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x6a6a6a, 
+            transparent: false, 
+            opacity: 1.0 
+        });
         
         this.materials.set('stone_floor', stoneFloor);
         this.materials.set('stone_wall', stoneWall);
@@ -316,6 +326,11 @@ class DungeonSystem {
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
         
+        // Clear collision arrays
+        this.collisionBoxes.length = 0;
+        this.floorColliders.length = 0;
+        this.ceilingColliders.length = 0;
+        
         const theme = this.getCurrentTheme();
         console.log(`Using theme: ${theme}`);
         
@@ -361,6 +376,7 @@ class DungeonSystem {
         this.player.currentLevel = 'TOP';
         
         console.log(`Multi-level dungeon floor ${floorNumber} generated successfully`);
+        console.log(`Total collision boxes: Walls=${this.collisionBoxes.length}, Floors=${this.floorColliders.length}, Ceilings=${this.ceilingColliders.length}`);
         return this.currentDungeon;
     }
     
@@ -543,6 +559,12 @@ class DungeonSystem {
     generateSolidFloor(levelGroup, floorMap, theme, levelY, levelName) {
         const floorMaterial = this.materials.get(`${theme}_floor`);
         
+        // Make floor material more visible
+        if (floorMaterial) {
+            floorMaterial.transparent = false;
+            floorMaterial.opacity = 1.0;
+        }
+        
         // Find connected floor regions and create efficient meshes
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
@@ -551,16 +573,17 @@ class DungeonSystem {
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
-                    const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    // Use BoxGeometry for better visibility and collision
+                    const floorGeometry = new THREE.BoxGeometry(this.gridSize, 0.2, this.gridSize);
                     const floorSegment = new THREE.Mesh(floorGeometry, floorMaterial);
-                    floorSegment.rotation.x = -Math.PI / 2;
-                    floorSegment.position.set(worldX, levelY, worldZ);
+                    floorSegment.position.set(worldX, levelY - 0.1, worldZ);
                     floorSegment.receiveShadow = true;
+                    floorSegment.castShadow = true;
                     
-                    // Add collision box for floor
+                    // Add collision box for floor - make it slightly larger for better detection
                     const floorCollider = new THREE.Box3().setFromCenterAndSize(
-                        new THREE.Vector3(worldX, levelY - 0.1, worldZ),
-                        new THREE.Vector3(this.gridSize, 0.2, this.gridSize)
+                        new THREE.Vector3(worldX, levelY, worldZ),
+                        new THREE.Vector3(this.gridSize + 0.1, 0.4, this.gridSize + 0.1)
                     );
                     floorCollider.userData = { 
                         type: 'floor', 
@@ -574,12 +597,18 @@ class DungeonSystem {
             }
         }
         
-        console.log(`Generated solid floor geometry for ${levelName} with collision`);
+        console.log(`Generated solid floor geometry for ${levelName} with ${this.floorColliders.length} collision boxes`);
     }
     
     generateSolidWalls(levelGroup, floorMap, theme, levelY, levelName) {
         const wallMaterial = this.materials.get(`${theme}_wall`);
         const wallHeight = this.ceilingHeight;
+        
+        // Make wall material more visible
+        if (wallMaterial) {
+            wallMaterial.transparent = false;
+            wallMaterial.opacity = 1.0;
+        }
         
         // March around perimeter of walkable areas to create walls
         for (let z = 0; z < this.gridDepth; z++) {
@@ -587,10 +616,10 @@ class DungeonSystem {
                 if (floorMap[z][x]) {
                     // Check all 4 directions for wall placement
                     const directions = [
-                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0 }, // North wall
-                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0 },  // South wall  
-                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: Math.PI/2 }, // East wall
-                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: Math.PI/2 } // West wall
+                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0, sizeX: this.gridSize, sizeZ: 0.5 }, // North wall
+                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0, sizeX: this.gridSize, sizeZ: 0.5 },  // South wall  
+                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: 0, sizeX: 0.5, sizeZ: this.gridSize }, // East wall
+                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: 0, sizeX: 0.5, sizeZ: this.gridSize } // West wall
                     ];
                     
                     directions.forEach(dir => {
@@ -602,15 +631,17 @@ class DungeonSystem {
                             const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
                             const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
                             
-                            const wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
+                            const wallGeometry = new THREE.BoxGeometry(dir.sizeX, wallHeight, dir.sizeZ);
                             const wall = new THREE.Mesh(wallGeometry, wallMaterial);
                             wall.position.set(worldX, levelY + wallHeight/2, worldZ);
-                            wall.rotation.y = dir.rotY;
                             wall.castShadow = true;
                             wall.receiveShadow = true;
                             
-                            // Add collision box for wall
-                            const wallCollider = new THREE.Box3().setFromObject(wall);
+                            // Add larger collision box for wall to prevent gaps
+                            const wallCollider = new THREE.Box3().setFromCenterAndSize(
+                                new THREE.Vector3(worldX, levelY + wallHeight/2, worldZ),
+                                new THREE.Vector3(dir.sizeX + 0.1, wallHeight + 0.1, dir.sizeZ + 0.1)
+                            );
                             wallCollider.userData = { 
                                 type: 'wall', 
                                 level: levelName 
@@ -624,11 +655,17 @@ class DungeonSystem {
             }
         }
         
-        console.log(`Generated solid wall geometry for ${levelName} with collision`);
+        console.log(`Generated solid wall geometry for ${levelName} with ${this.collisionBoxes.length} collision boxes`);
     }
     
     generateSolidCeiling(levelGroup, floorMap, theme, levelY, levelName) {
         const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
+        
+        // Make ceiling material more visible
+        if (ceilingMaterial) {
+            ceilingMaterial.transparent = false;
+            ceilingMaterial.opacity = 1.0;
+        }
         
         // Create ceiling segments over walkable areas
         for (let z = 0; z < this.gridDepth; z++) {
@@ -637,16 +674,16 @@ class DungeonSystem {
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
-                    const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    const ceilingGeometry = new THREE.BoxGeometry(this.gridSize, 0.2, this.gridSize);
                     const ceilingSegment = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-                    ceilingSegment.rotation.x = Math.PI / 2;
-                    ceilingSegment.position.set(worldX, levelY + this.ceilingHeight, worldZ);
+                    ceilingSegment.position.set(worldX, levelY + this.ceilingHeight + 0.1, worldZ);
                     ceilingSegment.receiveShadow = true;
+                    ceilingSegment.castShadow = true;
                     
                     // Add collision box for ceiling
                     const ceilingCollider = new THREE.Box3().setFromCenterAndSize(
-                        new THREE.Vector3(worldX, levelY + this.ceilingHeight + 0.1, worldZ),
-                        new THREE.Vector3(this.gridSize, 0.2, this.gridSize)
+                        new THREE.Vector3(worldX, levelY + this.ceilingHeight, worldZ),
+                        new THREE.Vector3(this.gridSize + 0.1, 0.4, this.gridSize + 0.1)
                     );
                     ceilingCollider.userData = { 
                         type: 'ceiling', 
@@ -771,7 +808,7 @@ class DungeonSystem {
     checkCollision(position, velocity) {
         const playerBox = new THREE.Box3().setFromCenterAndSize(
             position,
-            new THREE.Vector3(0.8, 1.8, 0.8) // Player collision box
+            new THREE.Vector3(0.6, 1.6, 0.6) // Smaller player collision box
         );
         
         const result = {
@@ -785,27 +822,35 @@ class DungeonSystem {
         for (const wallBox of this.collisionBoxes) {
             if (playerBox.intersectsBox(wallBox)) {
                 result.collision = true;
-                // Simple push-back collision response
-                const center = wallBox.getCenter(new THREE.Vector3());
-                const direction = position.clone().sub(center).normalize();
-                result.correctedPosition.add(direction.multiplyScalar(0.5));
+                // Better collision response - push away from wall center
+                const wallCenter = wallBox.getCenter(new THREE.Vector3());
+                const direction = position.clone().sub(wallCenter);
+                direction.y = 0; // Only push horizontally
+                direction.normalize();
+                result.correctedPosition.copy(position.clone().add(direction.multiplyScalar(0.8)));
+                break; // Only handle one collision at a time
             }
         }
         
-        // Check floor collisions (find ground level)
+        // Check floor collisions (find ground level) - much improved detection
         let closestFloorY = -1000;
         let playerLevel = this.currentLevel;
         
         for (const floorBox of this.floorColliders) {
             const floorCenter = floorBox.getCenter(new THREE.Vector3());
-            const distance = Math.sqrt(
+            const horizontalDistance = Math.sqrt(
                 Math.pow(position.x - floorCenter.x, 2) + 
                 Math.pow(position.z - floorCenter.z, 2)
             );
             
-            if (distance < this.gridSize && floorCenter.y > closestFloorY && position.y > floorCenter.y - 2) {
-                closestFloorY = floorCenter.y + 1.8; // Player height above floor
-                playerLevel = floorBox.userData.level;
+            // Player is over this floor tile
+            if (horizontalDistance < this.gridSize * 0.8) {
+                const floorY = floorBox.userData.y;
+                // Check if this floor is below the player and higher than previous floors
+                if (position.y >= floorY - 0.5 && floorY > closestFloorY) {
+                    closestFloorY = floorY + 1.8; // Player height above floor
+                    playerLevel = floorBox.userData.level;
+                }
             }
         }
         
@@ -816,14 +861,16 @@ class DungeonSystem {
         
         // Check ceiling collisions
         for (const ceilingBox of this.ceilingColliders) {
-            if (position.y + 1.8 > ceilingBox.userData.y && 
-                Math.sqrt(
-                    Math.pow(position.x - ceilingBox.getCenter(new THREE.Vector3()).x, 2) + 
-                    Math.pow(position.z - ceilingBox.getCenter(new THREE.Vector3()).z, 2)
-                ) < this.gridSize) {
-                
-                if (velocity.y > 0) {
-                    result.correctedPosition.y = ceilingBox.userData.y - 1.8;
+            const ceilingCenter = ceilingBox.getCenter(new THREE.Vector3());
+            const horizontalDistance = Math.sqrt(
+                Math.pow(position.x - ceilingCenter.x, 2) + 
+                Math.pow(position.z - ceilingCenter.z, 2)
+            );
+            
+            if (horizontalDistance < this.gridSize * 0.8) {
+                const ceilingY = ceilingBox.userData.y;
+                if (position.y + 1.8 > ceilingY && velocity.y > 0) {
+                    result.correctedPosition.y = ceilingY - 1.8;
                     velocity.y = 0;
                 }
             }
