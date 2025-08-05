@@ -1,9 +1,9 @@
-// Dungeon Generation System - src/systems/dungeon.js
-// Grid-based procedural dungeon generation with no overlaps
+// Multi-Level Dungeon Generation System - src/systems/dungeon.js
+// Grid-based procedural dungeon generation with multiple vertical levels
 
 class DungeonSystem {
     constructor(scene, player) {
-        console.log('Initializing Unified Dungeon System...');
+        console.log('Initializing Multi-Level Dungeon System...');
         
         this.scene = scene;
         this.player = player;
@@ -11,6 +11,14 @@ class DungeonSystem {
         // Current dungeon state
         this.currentFloor = 1;
         this.currentDungeon = null;
+        
+        // Multi-level configuration
+        this.levels = {
+            TOP: { y: 0, name: 'top' },
+            MID: { y: -12, name: 'mid' }, 
+            BASEMENT: { y: -24, name: 'basement' }
+        };
+        this.currentLevel = 'TOP';
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
@@ -47,13 +55,22 @@ class DungeonSystem {
         // Room height
         this.ceilingHeight = 8;
         
+        // Collision detection
+        this.collisionBoxes = [];
+        this.floorColliders = [];
+        this.ceilingColliders = [];
+        
+        // Level transitions
+        this.levelHoles = new Map(); // Track holes between levels
+        this.transitionTriggers = new Map();
+        
         this.init();
     }
     
     init() {
         this.setupMaterials();
         this.setupBillboardSystem();
-        console.log('Unified Dungeon System initialized');
+        console.log('Multi-Level Dungeon System initialized');
     }
     
     setupMaterials() {
@@ -294,7 +311,7 @@ class DungeonSystem {
     }
     
     generateDungeon(floorNumber) {
-        console.log(`Generating unified dungeon for floor ${floorNumber}...`);
+        console.log(`Generating multi-level dungeon for floor ${floorNumber}...`);
         
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
@@ -302,28 +319,48 @@ class DungeonSystem {
         const theme = this.getCurrentTheme();
         console.log(`Using theme: ${theme}`);
         
-        // Phase 1: Plan room layout
-        const roomLayout = this.planRoomLayout();
-        
-        // Phase 2: Create unified floor map
-        const floorMap = this.createFloorMap(roomLayout);
-        
-        // Phase 3: Generate unified geometry
-        this.generateUnifiedGeometry(floorMap, theme);
-        
-        // Phase 4: Add lighting and atmosphere
-        this.addDungeonLighting(roomLayout, theme);
-        this.addAtmosphericElements(roomLayout, theme);
-        
-        // Store dungeon data
-        this.currentDungeon = {
+        // Generate all three levels
+        const dungeonData = {
             floor: floorNumber,
             theme: theme,
-            roomLayout: roomLayout,
-            floorMap: floorMap
+            levels: {}
         };
         
-        console.log(`Unified dungeon floor ${floorNumber} generated successfully`);
+        // Generate each level
+        Object.entries(this.levels).forEach(([levelName, levelData]) => {
+            console.log(`Generating ${levelName} level at Y=${levelData.y}`);
+            
+            // Phase 1: Plan room layout for this level
+            const roomLayout = this.planRoomLayout();
+            
+            // Phase 2: Create unified floor map for this level
+            const floorMap = this.createFloorMap(roomLayout);
+            
+            // Phase 3: Generate unified geometry for this level
+            this.generateLevelGeometry(floorMap, theme, levelData.y, levelName);
+            
+            // Phase 4: Add lighting and atmosphere for this level
+            this.addLevelLighting(roomLayout, theme, levelData.y);
+            this.addLevelAtmosphere(roomLayout, theme, levelData.y);
+            
+            dungeonData.levels[levelName] = {
+                roomLayout: roomLayout,
+                floorMap: floorMap,
+                y: levelData.y
+            };
+        });
+        
+        // Phase 5: Create holes and transitions between levels
+        this.createLevelTransitions(dungeonData);
+        
+        // Store dungeon data
+        this.currentDungeon = dungeonData;
+        
+        // Set player to top level initially
+        this.currentLevel = 'TOP';
+        this.player.currentLevel = 'TOP';
+        
+        console.log(`Multi-level dungeon floor ${floorNumber} generated successfully`);
         return this.currentDungeon;
     }
     
@@ -477,28 +514,34 @@ class DungeonSystem {
         return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
     }
     
-    generateUnifiedGeometry(floorMap, theme) {
-        console.log('Generating unified geometry...');
+    generateLevelGeometry(floorMap, theme, levelY, levelName) {
+        console.log(`Generating geometry for ${levelName} level at Y=${levelY}`);
         
-        const dungeonGroup = new THREE.Group();
-        dungeonGroup.name = 'unified_dungeon';
+        const levelGroup = new THREE.Group();
+        levelGroup.name = `level_${levelName.toLowerCase()}`;
         
-        // Generate unified floor
-        this.generateUnifiedFloor(dungeonGroup, floorMap, theme);
+        // Generate unified floor with collision
+        this.generateSolidFloor(levelGroup, floorMap, theme, levelY, levelName);
         
-        // Generate walls around walkable areas
-        this.generateWallsFromMap(dungeonGroup, floorMap, theme);
+        // Generate walls around walkable areas with collision
+        this.generateSolidWalls(levelGroup, floorMap, theme, levelY, levelName);
         
-        // Generate unified ceiling
-        this.generateUnifiedCeiling(dungeonGroup, floorMap, theme);
+        // Generate unified ceiling with collision
+        this.generateSolidCeiling(levelGroup, floorMap, theme, levelY, levelName);
         
-        this.scene.add(dungeonGroup);
-        this.currentDungeonGroup = dungeonGroup;
+        this.scene.add(levelGroup);
+        
+        // Store reference
+        if (!this.currentDungeonGroup) {
+            this.currentDungeonGroup = new THREE.Group();
+            this.currentDungeonGroup.name = 'multi_level_dungeon';
+            this.scene.add(this.currentDungeonGroup);
+        }
+        this.currentDungeonGroup.add(levelGroup);
     }
     
-    generateUnifiedFloor(dungeonGroup, floorMap, theme) {
+    generateSolidFloor(levelGroup, floorMap, theme, levelY, levelName) {
         const floorMaterial = this.materials.get(`${theme}_floor`);
-        const floorSegments = [];
         
         // Find connected floor regions and create efficient meshes
         for (let z = 0; z < this.gridDepth; z++) {
@@ -511,18 +554,30 @@ class DungeonSystem {
                     const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
                     const floorSegment = new THREE.Mesh(floorGeometry, floorMaterial);
                     floorSegment.rotation.x = -Math.PI / 2;
-                    floorSegment.position.set(worldX, 0, worldZ);
+                    floorSegment.position.set(worldX, levelY, worldZ);
                     floorSegment.receiveShadow = true;
                     
-                    dungeonGroup.add(floorSegment);
+                    // Add collision box for floor
+                    const floorCollider = new THREE.Box3().setFromCenterAndSize(
+                        new THREE.Vector3(worldX, levelY - 0.1, worldZ),
+                        new THREE.Vector3(this.gridSize, 0.2, this.gridSize)
+                    );
+                    floorCollider.userData = { 
+                        type: 'floor', 
+                        level: levelName,
+                        y: levelY 
+                    };
+                    this.floorColliders.push(floorCollider);
+                    
+                    levelGroup.add(floorSegment);
                 }
             }
         }
         
-        console.log('Generated unified floor geometry');
+        console.log(`Generated solid floor geometry for ${levelName} with collision`);
     }
     
-    generateWallsFromMap(dungeonGroup, floorMap, theme) {
+    generateSolidWalls(levelGroup, floorMap, theme, levelY, levelName) {
         const wallMaterial = this.materials.get(`${theme}_wall`);
         const wallHeight = this.ceilingHeight;
         
@@ -549,22 +604,30 @@ class DungeonSystem {
                             
                             const wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
                             const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                            wall.position.set(worldX, wallHeight/2, worldZ);
+                            wall.position.set(worldX, levelY + wallHeight/2, worldZ);
                             wall.rotation.y = dir.rotY;
                             wall.castShadow = true;
                             wall.receiveShadow = true;
                             
-                            dungeonGroup.add(wall);
+                            // Add collision box for wall
+                            const wallCollider = new THREE.Box3().setFromObject(wall);
+                            wallCollider.userData = { 
+                                type: 'wall', 
+                                level: levelName 
+                            };
+                            this.collisionBoxes.push(wallCollider);
+                            
+                            levelGroup.add(wall);
                         }
                     });
                 }
             }
         }
         
-        console.log('Generated unified wall geometry');
+        console.log(`Generated solid wall geometry for ${levelName} with collision`);
     }
     
-    generateUnifiedCeiling(dungeonGroup, floorMap, theme) {
+    generateSolidCeiling(levelGroup, floorMap, theme, levelY, levelName) {
         const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
         
         // Create ceiling segments over walkable areas
@@ -577,48 +640,271 @@ class DungeonSystem {
                     const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
                     const ceilingSegment = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
                     ceilingSegment.rotation.x = Math.PI / 2;
-                    ceilingSegment.position.set(worldX, this.ceilingHeight, worldZ);
+                    ceilingSegment.position.set(worldX, levelY + this.ceilingHeight, worldZ);
                     ceilingSegment.receiveShadow = true;
                     
-                    dungeonGroup.add(ceilingSegment);
+                    // Add collision box for ceiling
+                    const ceilingCollider = new THREE.Box3().setFromCenterAndSize(
+                        new THREE.Vector3(worldX, levelY + this.ceilingHeight + 0.1, worldZ),
+                        new THREE.Vector3(this.gridSize, 0.2, this.gridSize)
+                    );
+                    ceilingCollider.userData = { 
+                        type: 'ceiling', 
+                        level: levelName,
+                        y: levelY + this.ceilingHeight 
+                    };
+                    this.ceilingColliders.push(ceilingCollider);
+                    
+                    levelGroup.add(ceilingSegment);
                 }
             }
         }
         
-        console.log('Generated unified ceiling geometry');
+        console.log(`Generated solid ceiling geometry for ${levelName} with collision`);
     }
     
-    addDungeonLighting(roomLayout, theme) {
-        console.log('Adding dungeon lighting...');
+    createLevelTransitions(dungeonData) {
+        console.log('Creating level transitions...');
+        
+        // Create hole from TOP to MID in orbital_north room
+        this.createLevelHole('TOP', 'MID', 'orbital_north', dungeonData);
+        
+        // Create hole from MID to BASEMENT in center room
+        this.createLevelHole('MID', 'BASEMENT', 'center', dungeonData);
+        
+        // Create final exit in BASEMENT orbital_south room
+        this.createFinalExit('BASEMENT', 'orbital_south', dungeonData);
+    }
+    
+    createLevelHole(fromLevel, toLevel, roomId, dungeonData) {
+        const fromLevelData = dungeonData.levels[fromLevel];
+        const toLevelData = dungeonData.levels[toLevel];
+        
+        const room = fromLevelData.roomLayout.rooms[roomId];
+        if (!room) {
+            console.warn(`Room ${roomId} not found for hole creation`);
+            return;
+        }
+        
+        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
+        const fromY = fromLevelData.y;
+        const toY = toLevelData.y;
+        
+        // Remove floor section to create hole
+        const holeSize = 4; // 4x4 unit hole
+        
+        // Create hole marker (visible dark circle)
+        const holeGeometry = new THREE.CylinderGeometry(holeSize/2, holeSize/2, 0.2, 16);
+        const holeMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x000000, 
+            transparent: true, 
+            opacity: 0.8 
+        });
+        const holeMarker = new THREE.Mesh(holeGeometry, holeMaterial);
+        holeMarker.position.set(worldX, fromY + 0.1, worldZ);
+        
+        // Store hole data
+        const holeData = {
+            id: `${fromLevel}_to_${toLevel}_${roomId}`,
+            fromLevel: fromLevel,
+            toLevel: toLevel,
+            position: new THREE.Vector3(worldX, fromY, worldZ),
+            targetY: toY + 1.8, // Player height above floor
+            isOpen: roomId === 'center', // Center room hole is always open for testing
+            triggerCondition: 'interact', // For now, opens on interact
+            room: roomId
+        };
+        
+        this.levelHoles.set(holeData.id, holeData);
+        this.currentDungeonGroup.add(holeMarker);
+        
+        console.log(`Created level hole from ${fromLevel} to ${toLevel} in room ${roomId} (open: ${holeData.isOpen})`);
+    }
+    
+    createFinalExit(level, roomId, dungeonData) {
+        const levelData = dungeonData.levels[level];
+        const room = levelData.roomLayout.rooms[roomId];
+        
+        if (!room) {
+            console.warn(`Room ${roomId} not found for exit creation`);
+            return;
+        }
+        
+        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
+        const levelY = levelData.y;
+        
+        // Create glowing exit portal
+        const exitGeometry = new THREE.CylinderGeometry(2, 2, 0.5, 12);
+        const exitMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            transparent: true,
+            opacity: 0.7,
+            emissive: 0x004400,
+            emissiveIntensity: 0.5
+        });
+        
+        const exitPortal = new THREE.Mesh(exitGeometry, exitMaterial);
+        exitPortal.position.set(worldX, levelY + 0.25, worldZ);
+        
+        // Add exit light
+        const exitLight = new THREE.PointLight(0x00ff00, 2.0, 15);
+        exitLight.position.set(worldX, levelY + 3, worldZ);
+        
+        this.currentDungeonGroup.add(exitPortal);
+        this.currentDungeonGroup.add(exitLight);
+        this.lightSources.push(exitLight);
+        
+        // Store exit data
+        this.levelHoles.set('final_exit', {
+            id: 'final_exit',
+            position: new THREE.Vector3(worldX, levelY, worldZ),
+            type: 'exit',
+            room: roomId
+        });
+        
+        console.log(`Created final exit in ${level} room ${roomId}`);
+    }
+    
+    // Collision detection methods
+    checkCollision(position, velocity) {
+        const playerBox = new THREE.Box3().setFromCenterAndSize(
+            position,
+            new THREE.Vector3(0.8, 1.8, 0.8) // Player collision box
+        );
+        
+        const result = {
+            collision: false,
+            correctedPosition: position.clone(),
+            groundY: null,
+            level: this.currentLevel
+        };
+        
+        // Check wall collisions
+        for (const wallBox of this.collisionBoxes) {
+            if (playerBox.intersectsBox(wallBox)) {
+                result.collision = true;
+                // Simple push-back collision response
+                const center = wallBox.getCenter(new THREE.Vector3());
+                const direction = position.clone().sub(center).normalize();
+                result.correctedPosition.add(direction.multiplyScalar(0.5));
+            }
+        }
+        
+        // Check floor collisions (find ground level)
+        let closestFloorY = -1000;
+        let playerLevel = this.currentLevel;
+        
+        for (const floorBox of this.floorColliders) {
+            const floorCenter = floorBox.getCenter(new THREE.Vector3());
+            const distance = Math.sqrt(
+                Math.pow(position.x - floorCenter.x, 2) + 
+                Math.pow(position.z - floorCenter.z, 2)
+            );
+            
+            if (distance < this.gridSize && floorCenter.y > closestFloorY && position.y > floorCenter.y - 2) {
+                closestFloorY = floorCenter.y + 1.8; // Player height above floor
+                playerLevel = floorBox.userData.level;
+            }
+        }
+        
+        if (closestFloorY > -1000) {
+            result.groundY = closestFloorY;
+            result.level = playerLevel;
+        }
+        
+        // Check ceiling collisions
+        for (const ceilingBox of this.ceilingColliders) {
+            if (position.y + 1.8 > ceilingBox.userData.y && 
+                Math.sqrt(
+                    Math.pow(position.x - ceilingBox.getCenter(new THREE.Vector3()).x, 2) + 
+                    Math.pow(position.z - ceilingBox.getCenter(new THREE.Vector3()).z, 2)
+                ) < this.gridSize) {
+                
+                if (velocity.y > 0) {
+                    result.correctedPosition.y = ceilingBox.userData.y - 1.8;
+                    velocity.y = 0;
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    checkLevelTransitions(playerPosition) {
+        for (const [holeId, holeData] of this.levelHoles.entries()) {
+            if (holeData.type === 'exit') {
+                // Check final exit
+                const distance = playerPosition.distanceTo(holeData.position);
+                if (distance < 3) {
+                    console.log('Player reached final exit!');
+                    // Trigger next floor generation
+                    return { type: 'exit', nextFloor: true };
+                }
+            } else if (holeData.isOpen) {
+                // Check level holes that are open
+                const distance = Math.sqrt(
+                    Math.pow(playerPosition.x - holeData.position.x, 2) + 
+                    Math.pow(playerPosition.z - holeData.position.z, 2)
+                );
+                
+                if (distance < 2.5 && playerPosition.y > holeData.position.y - 1) {
+                    console.log(`Player falling through hole: ${holeId}`);
+                    return { 
+                        type: 'hole', 
+                        targetY: holeData.targetY,
+                        targetLevel: holeData.toLevel 
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    openLevelHole(roomId) {
+        for (const [holeId, holeData] of this.levelHoles.entries()) {
+            if (holeData.room === roomId && !holeData.isOpen) {
+                holeData.isOpen = true;
+                console.log(`Opened level hole in room ${roomId}`);
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    addLevelLighting(roomLayout, theme, levelY) {
+        console.log(`Adding lighting for level at Y=${levelY}...`);
         
         // Add bright test lighting to each room
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomLighting(room, theme);
+            this.addRoomLighting(room, theme, levelY);
         });
         
         // Add corridor lighting
         roomLayout.connections.forEach(connection => {
-            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to], theme);
+            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to], theme, levelY);
         });
     }
     
-    addRoomLighting(room, theme) {
+    addRoomLighting(room, theme, levelY) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         
         // Super bright overhead light
         const brightLight = new THREE.PointLight(0xffffff, 3.0, 50);
-        brightLight.position.set(worldX, this.ceilingHeight - 1, worldZ);
+        brightLight.position.set(worldX, levelY + this.ceilingHeight - 1, worldZ);
         this.currentDungeonGroup.add(brightLight);
         this.lightSources.push(brightLight);
         
         // Corner lights for even coverage
         const roomSize = room.size * this.gridSize;
         const cornerPositions = [
-            [worldX - roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
-            [worldX + roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
-            [worldX - roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3],
-            [worldX + roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3]
+            [worldX - roomSize/3, levelY + this.ceilingHeight/2, worldZ - roomSize/3],
+            [worldX + roomSize/3, levelY + this.ceilingHeight/2, worldZ - roomSize/3],
+            [worldX - roomSize/3, levelY + this.ceilingHeight/2, worldZ + roomSize/3],
+            [worldX + roomSize/3, levelY + this.ceilingHeight/2, worldZ + roomSize/3]
         ];
         
         cornerPositions.forEach(pos => {
@@ -628,10 +914,10 @@ class DungeonSystem {
             this.lightSources.push(cornerLight);
         });
         
-        console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ})`);
+        console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ}) level Y=${levelY}`);
     }
     
-    addCorridorLighting(roomA, roomB, theme) {
+    addCorridorLighting(roomA, roomB, theme, levelY) {
         const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
         const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
@@ -639,7 +925,7 @@ class DungeonSystem {
         
         // Light at corner of L-shaped corridor
         const cornerLight = new THREE.PointLight(0xffffff, 2.5, 40);
-        cornerLight.position.set(endWorldX, 4, startWorldZ); // Corner position
+        cornerLight.position.set(endWorldX, levelY + 4, startWorldZ); // Corner position
         this.currentDungeonGroup.add(cornerLight);
         this.lightSources.push(cornerLight);
         
@@ -648,20 +934,20 @@ class DungeonSystem {
         const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
         const midLight = new THREE.PointLight(0xffffff, 1.8, 25);
-        midLight.position.set(midWorldX, 3.5, midWorldZ);
+        midLight.position.set(midWorldX, levelY + 3.5, midWorldZ);
         this.currentDungeonGroup.add(midLight);
         this.lightSources.push(midLight);
     }
     
-    addAtmosphericElements(roomLayout, theme) {
-        console.log('Adding atmospheric elements...');
+    addLevelAtmosphere(roomLayout, theme, levelY) {
+        console.log(`Adding atmospheric elements for level at Y=${levelY}...`);
         
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomAtmosphere(room, theme);
+            this.addRoomAtmosphere(room, theme, levelY);
         });
     }
     
-    addRoomAtmosphere(room, theme) {
+    addRoomAtmosphere(room, theme, levelY) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
@@ -669,27 +955,27 @@ class DungeonSystem {
         // Add theme-specific atmospheric elements
         switch (theme) {
             case 'stone':
-                this.addStoneAtmosphere(worldX, worldZ, roomSize, room.type);
+                this.addStoneAtmosphere(worldX, worldZ, roomSize, room.type, levelY);
                 break;
             case 'crystal':
-                this.addCrystalAtmosphere(worldX, worldZ, roomSize, room.type);
+                this.addCrystalAtmosphere(worldX, worldZ, roomSize, room.type, levelY);
                 break;
             case 'ruins':
-                this.addRuinsAtmosphere(worldX, worldZ, roomSize, room.type);
+                this.addRuinsAtmosphere(worldX, worldZ, roomSize, room.type, levelY);
                 break;
             case 'crypt':
-                this.addCryptAtmosphere(worldX, worldZ, roomSize, room.type);
+                this.addCryptAtmosphere(worldX, worldZ, roomSize, room.type, levelY);
                 break;
             case 'forest':
-                this.addForestAtmosphere(worldX, worldZ, roomSize, room.type);
+                this.addForestAtmosphere(worldX, worldZ, roomSize, room.type, levelY);
                 break;
         }
         
         // Add floating orbs to all rooms
-        this.addFloatingOrbs(worldX, worldZ, roomSize, theme);
+        this.addFloatingOrbs(worldX, worldZ, roomSize, theme, levelY);
     }
     
-    addStoneAtmosphere(worldX, worldZ, roomSize, roomType) {
+    addStoneAtmosphere(worldX, worldZ, roomSize, roomType, levelY) {
         // Stone pillars
         for (let i = 0; i < 4; i++) {
             const angle = (i / 4) * Math.PI * 2;
@@ -701,20 +987,20 @@ class DungeonSystem {
             const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
             const pillarMaterial = this.materials.get('stone_wall');
             const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-            pillar.position.set(pillarX, 2, pillarZ);
+            pillar.position.set(pillarX, levelY + 2, pillarZ);
             pillar.castShadow = true;
             pillar.receiveShadow = true;
             this.currentDungeonGroup.add(pillar);
             
             // Torch light on pillar
             const torchLight = new THREE.PointLight(0xff6644, 0.8, 8);
-            torchLight.position.set(pillarX, 3.5, pillarZ);
+            torchLight.position.set(pillarX, levelY + 3.5, pillarZ);
             this.currentDungeonGroup.add(torchLight);
             this.lightSources.push(torchLight);
         }
     }
     
-    addCrystalAtmosphere(worldX, worldZ, roomSize, roomType) {
+    addCrystalAtmosphere(worldX, worldZ, roomSize, roomType, levelY) {
         // Crystal formations
         for (let i = 0; i < 6; i++) {
             const crystalX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
@@ -730,19 +1016,19 @@ class DungeonSystem {
             });
             
             const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-            crystal.position.set(crystalX, 1.25, crystalZ);
+            crystal.position.set(crystalX, levelY + 1.25, crystalZ);
             crystal.rotation.y = Math.random() * Math.PI * 2;
             this.currentDungeonGroup.add(crystal);
             
             // Crystal glow
             const crystalLight = new THREE.PointLight(0x8a6ae7, 0.6, 6);
-            crystalLight.position.set(crystalX, 2, crystalZ);
+            crystalLight.position.set(crystalX, levelY + 2, crystalZ);
             this.currentDungeonGroup.add(crystalLight);
             this.lightSources.push(crystalLight);
         }
     }
     
-    addRuinsAtmosphere(worldX, worldZ, roomSize, roomType) {
+    addRuinsAtmosphere(worldX, worldZ, roomSize, roomType, levelY) {
         // Runed stones
         for (let i = 0; i < 4; i++) {
             const runeX = worldX + (Math.random() - 0.5) * roomSize * 0.6;
@@ -756,19 +1042,19 @@ class DungeonSystem {
             });
             
             const runeStone = new THREE.Mesh(runeGeometry, runeMaterial);
-            runeStone.position.set(runeX, 1, runeZ);
+            runeStone.position.set(runeX, levelY + 1, runeZ);
             runeStone.rotation.y = Math.random() * Math.PI * 2;
             this.currentDungeonGroup.add(runeStone);
             
             // Rune glow
             const runeLight = new THREE.PointLight(0xaa6aaa, 0.4, 5);
-            runeLight.position.set(runeX, 1.5, runeZ);
+            runeLight.position.set(runeX, levelY + 1.5, runeZ);
             this.currentDungeonGroup.add(runeLight);
             this.lightSources.push(runeLight);
         }
     }
     
-    addCryptAtmosphere(worldX, worldZ, roomSize, roomType) {
+    addCryptAtmosphere(worldX, worldZ, roomSize, roomType, levelY) {
         // Ancient braziers
         for (let i = 0; i < 3; i++) {
             const angle = (i / 3) * Math.PI * 2;
@@ -781,18 +1067,18 @@ class DungeonSystem {
             const brazierGeometry = new THREE.CylinderGeometry(0.5, 0.3, 1.5, 8);
             const brazierMaterial = this.materials.get('crypt_wall');
             const brazier = new THREE.Mesh(brazierGeometry, brazierMaterial);
-            brazier.position.set(brazierX, 0.75, brazierZ);
+            brazier.position.set(brazierX, levelY + 0.75, brazierZ);
             this.currentDungeonGroup.add(brazier);
             
             // Green flame light
             const brazierLight = new THREE.PointLight(0x44aa44, 0.8, 8);
-            brazierLight.position.set(brazierX, 2.5, brazierZ);
+            brazierLight.position.set(brazierX, levelY + 2.5, brazierZ);
             this.currentDungeonGroup.add(brazierLight);
             this.lightSources.push(brazierLight);
         }
     }
     
-    addForestAtmosphere(worldX, worldZ, roomSize, roomType) {
+    addForestAtmosphere(worldX, worldZ, roomSize, roomType, levelY) {
         // Glowing mushroom clusters
         for (let i = 0; i < 8; i++) {
             const mushroomX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
@@ -808,19 +1094,19 @@ class DungeonSystem {
             });
             
             const mushroom = new THREE.Mesh(mushroomGeometry, mushroomMaterial);
-            mushroom.position.set(mushroomX, 0.3, mushroomZ);
+            mushroom.position.set(mushroomX, levelY + 0.3, mushroomZ);
             mushroom.scale.set(1 + Math.random() * 0.5, 1, 1 + Math.random() * 0.5);
             this.currentDungeonGroup.add(mushroom);
             
             // Mushroom glow
             const mushroomLight = new THREE.PointLight(0x6aaa6a, 0.5, 4);
-            mushroomLight.position.set(mushroomX, 1, mushroomZ);
+            mushroomLight.position.set(mushroomX, levelY + 1, mushroomZ);
             this.currentDungeonGroup.add(mushroomLight);
             this.lightSources.push(mushroomLight);
         }
     }
     
-    addFloatingOrbs(worldX, worldZ, roomSize, theme) {
+    addFloatingOrbs(worldX, worldZ, roomSize, theme, levelY) {
         const numOrbs = 2 + Math.floor(Math.random() * 3);
         const themeColor = this.getThemeColor(theme);
         
@@ -837,7 +1123,7 @@ class DungeonSystem {
             const orb = new THREE.Mesh(orbGeometry, orbMaterial);
             orb.position.set(
                 worldX + (Math.random() - 0.5) * roomSize * 0.6,
-                4 + Math.random() * 2,
+                levelY + 4 + Math.random() * 2,
                 worldZ + (Math.random() - 0.5) * roomSize * 0.6
             );
             
@@ -899,8 +1185,12 @@ class DungeonSystem {
         
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
+        this.collisionBoxes.length = 0;
+        this.floorColliders.length = 0;
+        this.ceilingColliders.length = 0;
+        this.levelHoles.clear();
         
-        console.log('Previous dungeon cleared');
+        console.log('Previous multi-level dungeon cleared');
     }
     
     getRoomAt(position) {
@@ -910,12 +1200,23 @@ class DungeonSystem {
         const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
         const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
         
+        // Determine which level based on Y position
+        let targetLevel = 'TOP';
+        for (const [levelName, levelData] of Object.entries(this.levels)) {
+            if (Math.abs(position.y - levelData.y) < Math.abs(position.y - this.levels[targetLevel].y)) {
+                targetLevel = levelName;
+            }
+        }
+        
+        const levelData = this.currentDungeon.levels[targetLevel];
+        if (!levelData) return null;
+        
         // Find which room contains this grid position
-        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
+        for (const room of Object.values(levelData.roomLayout.rooms)) {
             const halfSize = Math.floor(room.size / 2);
             if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
                 gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
-                return room;
+                return { ...room, level: targetLevel };
             }
         }
         
