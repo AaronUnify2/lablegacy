@@ -1,4 +1,4 @@
-// Player Character System with Wall Collision Detection
+// Player Character System
 
 class Player {
     constructor(scene, camera) {
@@ -36,10 +36,6 @@ class Player {
         this.groundY = 1.8;
         this.friction = 0.85;
         this.airFriction = 0.98;
-        
-        // Collision detection
-        this.collisionRadius = 0.8; // Player collision radius
-        this.dungeonSystem = null; // Will be set by game engine
         
         // Regeneration
         this.staminaRegenRate = 50; // per second
@@ -145,16 +141,8 @@ class Player {
             console.log("Sword attack!");
         }
         
-        if (input.attack) {
-            console.log("Sword attack held!");
-        }
-        
         if (input.justPressed.chargeAttack) {
             console.log("Staff attack!");
-        }
-        
-        if (input.chargeAttack) {
-            console.log("Staff attack charging!");
         }
         
         if (input.justPressed.menu) {
@@ -181,56 +169,10 @@ class Player {
         this.velocity.x *= Math.pow(frictionFactor, deltaTime * 60);
         this.velocity.z *= Math.pow(frictionFactor, deltaTime * 60);
         
-        // Calculate new position
-        const newPosition = this.position.clone();
-        newPosition.add(this.velocity.clone().multiplyScalar(deltaTime));
+        // Update position
+        this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
         
-        // Check collision with dungeon walls if dungeon system is available
-        if (this.dungeonSystem && this.dungeonSystem.checkCollision) {
-            const collisionResult = this.dungeonSystem.checkCollision(newPosition, this.collisionRadius);
-            
-            if (collisionResult.collision) {
-                // Try sliding along walls
-                const slidePosition = this.calculateSlidePosition(newPosition, collisionResult.normal, deltaTime);
-                const slideCollision = this.dungeonSystem.checkCollision(slidePosition, this.collisionRadius);
-                
-                if (!slideCollision.collision) {
-                    // Sliding works, use slide position
-                    this.position.x = slidePosition.x;
-                    this.position.z = slidePosition.z;
-                    this.position.y = newPosition.y; // Keep Y movement for jumping/falling
-                } else {
-                    // Can't slide, stop movement in collision direction
-                    if (Math.abs(collisionResult.normal.x) > 0.5) {
-                        this.velocity.x = 0;
-                    }
-                    if (Math.abs(collisionResult.normal.z) > 0.5) {
-                        this.velocity.z = 0;
-                    }
-                    // Keep Y movement
-                    this.position.y = newPosition.y;
-                }
-            } else {
-                // No collision, move normally
-                this.position.copy(newPosition);
-            }
-        } else {
-            // No dungeon system or collision method, move freely with basic bounds
-            this.position.copy(newPosition);
-            
-            // Basic boundary collision (keep player in reasonable area)
-            const maxDistance = 100;
-            if (Math.abs(this.position.x) > maxDistance) {
-                this.position.x = Math.sign(this.position.x) * maxDistance;
-                this.velocity.x = 0;
-            }
-            if (Math.abs(this.position.z) > maxDistance) {
-                this.position.z = Math.sign(this.position.z) * maxDistance;
-                this.velocity.z = 0;
-            }
-        }
-        
-        // Ground collision
+        // Ground collision (simple)
         if (this.position.y <= this.groundY) {
             this.position.y = this.groundY;
             this.velocity.y = 0;
@@ -238,22 +180,25 @@ class Player {
         } else {
             this.isGrounded = false;
         }
-    }
-    
-    calculateSlidePosition(position, normal, deltaTime) {
-        // Calculate position for sliding along walls
-        const slideDirection = new THREE.Vector3();
-        slideDirection.copy(this.velocity);
-        slideDirection.y = 0; // Only slide horizontally
         
-        // Remove component of velocity in direction of wall normal
-        const velocityDotNormal = slideDirection.dot(normal);
-        slideDirection.addScaledVector(normal, -velocityDotNormal);
-        
-        const slidePosition = this.position.clone();
-        slidePosition.add(slideDirection.multiplyScalar(deltaTime));
-        
-        return slidePosition;
+        // Basic boundary collision (keep player in test area)
+        const maxDistance = 23;
+        if (this.position.x > maxDistance) {
+            this.position.x = maxDistance;
+            this.velocity.x = 0;
+        }
+        if (this.position.x < -maxDistance) {
+            this.position.x = -maxDistance;
+            this.velocity.x = 0;
+        }
+        if (this.position.z > maxDistance) {
+            this.position.z = maxDistance;
+            this.velocity.z = 0;
+        }
+        if (this.position.z < -maxDistance) {
+            this.position.z = -maxDistance;
+            this.velocity.z = 0;
+        }
     }
     
     updateRegeneration(deltaTime) {
