@@ -1,9 +1,9 @@
 // Dungeon Generation System - src/systems/dungeon.js
-// Comprehensive procedural dungeon generation with atmospheric lighting and billboard sprites
+// Grid-based procedural dungeon generation with no overlaps
 
 class DungeonSystem {
     constructor(scene, player) {
-        console.log('Initializing Dungeon System...');
+        console.log('Initializing Unified Dungeon System...');
         
         this.scene = scene;
         this.player = player;
@@ -11,17 +11,25 @@ class DungeonSystem {
         // Current dungeon state
         this.currentFloor = 1;
         this.currentDungeon = null;
-        this.rooms = new Map(); // roomId -> room data
-        this.connections = new Map(); // connectionId -> hallway data
         
-        // Room types and layout
-        this.roomTypes = {
-            CENTER: 'center',
-            ORBITAL: 'orbital', 
-            CARDINAL: 'cardinal'
+        // Grid-based floor planning
+        this.gridSize = 2; // 2 units per grid cell
+        this.dungeonWidth = 120; // Total dungeon width in units
+        this.dungeonDepth = 120; // Total dungeon depth in units
+        this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        
+        // Room templates
+        this.roomTemplates = {
+            CENTER: { size: 13, type: 'center' },    // 26x26 units
+            ORBITAL: { size: 10, type: 'orbital' },  // 20x20 units  
+            CARDINAL: { size: 15, type: 'cardinal' } // 30x30 units
         };
         
-        // Theme progression based on floor depth
+        // Corridor width in grid cells
+        this.corridorWidth = 2; // 4 units wide
+        
+        // Theme progression
         this.themes = {
             STONE: { floors: [1, 10], name: 'stone' },
             CRYSTAL: { floors: [11, 20], name: 'crystal' },
@@ -30,18 +38,13 @@ class DungeonSystem {
             FOREST: { floors: [41, 50], name: 'forest' }
         };
         
-        // Texture management
+        // Materials and lighting
         this.textureLoader = new THREE.TextureLoader();
         this.materials = new Map();
+        this.lightSources = [];
         this.billboardSprites = [];
         
-        // Lighting system
-        this.lightSources = [];
-        this.ambientLightLevel = 0.1;
-        
-        // Room generation parameters
-        this.roomSize = 20; // Base room size
-        this.hallwayWidth = 4;
+        // Room height
         this.ceilingHeight = 8;
         
         this.init();
@@ -50,11 +53,10 @@ class DungeonSystem {
     init() {
         this.setupMaterials();
         this.setupBillboardSystem();
-        console.log('Dungeon System initialized');
+        console.log('Unified Dungeon System initialized');
     }
     
     setupMaterials() {
-        // Create materials for different themes and surfaces
         this.createStoneMaterials();
         this.createCrystalMaterials();
         this.createRuinsMaterials();
@@ -63,24 +65,41 @@ class DungeonSystem {
     }
     
     createStoneMaterials() {
-        // Stone dungeon materials (floors 1-10)
-        const stoneFloor = new THREE.MeshLambertMaterial({
-            color: 0x4a4a4a,
-            transparent: true,
-            opacity: 0.9
+        // Create beautiful stained glass mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        // Create mosaic tile pattern
+        const tileSize = 32;
+        const colors = ['#8B4513', '#CD853F', '#DAA520', '#B8860B', '#D2691E', '#A0522D'];
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 4);
+            }
+        }
+        
+        const stoneFloorTexture = new THREE.CanvasTexture(canvas);
+        stoneFloorTexture.wrapS = THREE.RepeatWrapping;
+        stoneFloorTexture.wrapT = THREE.RepeatWrapping;
+        stoneFloorTexture.repeat.set(4, 4);
+        
+        const stoneFloor = new THREE.MeshLambertMaterial({ 
+            map: stoneFloorTexture,
+            transparent: true, 
+            opacity: 0.9 
         });
         
-        const stoneWall = new THREE.MeshLambertMaterial({
-            color: 0x3a3a3a,
-            transparent: true,
-            opacity: 0.95
-        });
-        
-        const stoneCeiling = new THREE.MeshLambertMaterial({
-            color: 0x2a2a2a,
-            transparent: true,
-            opacity: 0.8
-        });
+        const stoneWall = new THREE.MeshLambertMaterial({ color: 0x6a6a6a, transparent: true, opacity: 0.95 });
+        const stoneCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.8 });
         
         this.materials.set('stone_floor', stoneFloor);
         this.materials.set('stone_wall', stoneWall);
@@ -88,27 +107,40 @@ class DungeonSystem {
     }
     
     createCrystalMaterials() {
-        // Crystal cave materials (floors 11-20)
-        const crystalFloor = new THREE.MeshPhongMaterial({
-            color: 0x4a4a6a,
-            transparent: true,
-            opacity: 0.9,
-            shininess: 30
-        });
+        // Create crystal mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
         
-        const crystalWall = new THREE.MeshPhongMaterial({
-            color: 0x5a5a7a,
-            transparent: true,
-            opacity: 0.95,
-            shininess: 50
-        });
+        const tileSize = 32;
+        const colors = ['#4169E1', '#6495ED', '#7B68EE', '#9370DB', '#8A2BE2', '#4B0082'];
         
-        const crystalCeiling = new THREE.MeshPhongMaterial({
-            color: 0x3a3a5a,
-            transparent: true,
-            opacity: 0.8,
-            shininess: 20
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add crystal shine
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.fillRect(x, y, tileSize - 2, 6);
+            }
+        }
+        
+        const crystalFloorTexture = new THREE.CanvasTexture(canvas);
+        crystalFloorTexture.wrapS = THREE.RepeatWrapping;
+        crystalFloorTexture.wrapT = THREE.RepeatWrapping;
+        crystalFloorTexture.repeat.set(4, 4);
+        
+        const crystalFloor = new THREE.MeshPhongMaterial({ 
+            map: crystalFloorTexture,
+            transparent: true, 
+            opacity: 0.9, 
+            shininess: 30 
         });
+        const crystalWall = new THREE.MeshPhongMaterial({ color: 0x7a7a9a, transparent: true, opacity: 0.95, shininess: 50 });
+        const crystalCeiling = new THREE.MeshPhongMaterial({ color: 0x5a5a7a, transparent: true, opacity: 0.8, shininess: 20 });
         
         this.materials.set('crystal_floor', crystalFloor);
         this.materials.set('crystal_wall', crystalWall);
@@ -116,24 +148,41 @@ class DungeonSystem {
     }
     
     createRuinsMaterials() {
-        // Crystal ruins materials (floors 21-30)
-        const ruinsFloor = new THREE.MeshLambertMaterial({
-            color: 0x6a4a6a,
-            transparent: true,
-            opacity: 0.85
-        });
+        // Create ruined mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
         
-        const ruinsWall = new THREE.MeshLambertMaterial({
-            color: 0x7a5a7a,
-            transparent: true,
-            opacity: 0.9
-        });
+        const tileSize = 32;
+        const colors = ['#8B008B', '#DA70D6', '#BA55D3', '#9932CC', '#8A2BE2', '#6A5ACD'];
         
-        const ruinsCeiling = new THREE.MeshLambertMaterial({
-            color: 0x5a3a5a,
-            transparent: true,
-            opacity: 0.7
-        });
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                
+                // Some tiles are "broken" - irregular shapes
+                if (Math.random() > 0.3) {
+                    ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                } else {
+                    ctx.fillRect(x + 4, y + 4, tileSize - 10, tileSize - 10);
+                }
+                
+                // Add mystical glow
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
+            }
+        }
+        
+        const ruinsFloorTexture = new THREE.CanvasTexture(canvas);
+        ruinsFloorTexture.wrapS = THREE.RepeatWrapping;
+        ruinsFloorTexture.wrapT = THREE.RepeatWrapping;
+        ruinsFloorTexture.repeat.set(4, 4);
+        
+        const ruinsFloor = new THREE.MeshLambertMaterial({ map: ruinsFloorTexture, transparent: true, opacity: 0.85 });
+        const ruinsWall = new THREE.MeshLambertMaterial({ color: 0x9a7a9a, transparent: true, opacity: 0.9 });
+        const ruinsCeiling = new THREE.MeshLambertMaterial({ color: 0x7a5a7a, transparent: true, opacity: 0.7 });
         
         this.materials.set('ruins_floor', ruinsFloor);
         this.materials.set('ruins_wall', ruinsWall);
@@ -141,24 +190,35 @@ class DungeonSystem {
     }
     
     createCryptMaterials() {
-        // Crypt materials (floors 31-40) 
-        const cryptFloor = new THREE.MeshLambertMaterial({
-            color: 0x3a3a2a,
-            transparent: true,
-            opacity: 0.9
-        });
+        // Create dark mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
         
-        const cryptWall = new THREE.MeshLambertMaterial({
-            color: 0x4a4a3a,
-            transparent: true,
-            opacity: 0.95
-        });
+        const tileSize = 32;
+        const colors = ['#2F4F2F', '#556B2F', '#6B8E23', '#808000', '#9ACD32', '#32CD32'];
         
-        const cryptCeiling = new THREE.MeshLambertMaterial({
-            color: 0x2a2a1a,
-            transparent: true,
-            opacity: 0.6
-        });
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add eerie glow
+                ctx.fillStyle = 'rgba(0,255,0,0.2)';
+                ctx.fillRect(x, y, tileSize - 2, 4);
+            }
+        }
+        
+        const cryptFloorTexture = new THREE.CanvasTexture(canvas);
+        cryptFloorTexture.wrapS = THREE.RepeatWrapping;
+        cryptFloorTexture.wrapT = THREE.RepeatWrapping;
+        cryptFloorTexture.repeat.set(4, 4);
+        
+        const cryptFloor = new THREE.MeshLambertMaterial({ map: cryptFloorTexture, transparent: true, opacity: 0.9 });
+        const cryptWall = new THREE.MeshLambertMaterial({ color: 0x6a6a5a, transparent: true, opacity: 0.95 });
+        const cryptCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a3a, transparent: true, opacity: 0.6 });
         
         this.materials.set('crypt_floor', cryptFloor);
         this.materials.set('crypt_wall', cryptWall);
@@ -166,24 +226,39 @@ class DungeonSystem {
     }
     
     createForestMaterials() {
-        // Psychic forest materials (floors 41-50)
-        const forestFloor = new THREE.MeshLambertMaterial({
-            color: 0x2a4a2a,
-            transparent: true,
-            opacity: 0.8
-        });
+        // Create natural mosaic floor pattern
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
         
-        const forestWall = new THREE.MeshLambertMaterial({
-            color: 0x3a5a3a,
-            transparent: true,
-            opacity: 0.7
-        });
+        const tileSize = 32;
+        const colors = ['#228B22', '#32CD32', '#7CFC00', '#ADFF2F', '#9ACD32', '#6B8E23'];
         
-        const forestCeiling = new THREE.MeshLambertMaterial({
-            color: 0x1a3a1a,
-            transparent: true,
-            opacity: 0.5
-        });
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                
+                // Organic, leaf-like shapes
+                ctx.beginPath();
+                ctx.ellipse(x + tileSize/2, y + tileSize/2, tileSize/2 - 2, tileSize/3 - 1, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Add natural highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
+            }
+        }
+        
+        const forestFloorTexture = new THREE.CanvasTexture(canvas);
+        forestFloorTexture.wrapS = THREE.RepeatWrapping;
+        forestFloorTexture.wrapT = THREE.RepeatWrapping;
+        forestFloorTexture.repeat.set(4, 4);
+        
+        const forestFloor = new THREE.MeshLambertMaterial({ map: forestFloorTexture, transparent: true, opacity: 0.8 });
+        const forestWall = new THREE.MeshLambertMaterial({ color: 0x5a7a5a, transparent: true, opacity: 0.7 });
+        const forestCeiling = new THREE.MeshLambertMaterial({ color: 0x3a5a3a, transparent: true, opacity: 0.5 });
         
         this.materials.set('forest_floor', forestFloor);
         this.materials.set('forest_wall', forestWall);
@@ -191,76 +266,35 @@ class DungeonSystem {
     }
     
     setupBillboardSystem() {
-        // Create billboard sprite system for atmospheric elements
         this.billboardGeometry = new THREE.PlaneGeometry(1, 1);
         this.createBillboardMaterials();
     }
     
     createBillboardMaterials() {
-        // Create materials for different billboard sprites
+        const mushroomMaterial = new THREE.MeshBasicMaterial({ color: 0x4a8a4a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+        const crystalSpriteMaterial = new THREE.MeshBasicMaterial({ color: 0x6a4aaa, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+        const orbMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaa4a, transparent: true, opacity: 0.7, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+        const runeMaterial = new THREE.MeshBasicMaterial({ color: 0x8a6a8a, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+        const treeMaterial = new THREE.MeshBasicMaterial({ color: 0x4a6a8a, transparent: true, opacity: 0.6, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
         
-        // Glowing mushroom sprites
-        const mushroomMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4a8a4a,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
         this.materials.set('mushroom_billboard', mushroomMaterial);
-        
-        // Crystal formation sprites
-        const crystalSpriteMaterial = new THREE.MeshBasicMaterial({
-            color: 0x6a4aaa,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
         this.materials.set('crystal_billboard', crystalSpriteMaterial);
-        
-        // Floating orb sprites
-        const orbMaterial = new THREE.MeshBasicMaterial({
-            color: 0xaaaa4a,
-            transparent: true,
-            opacity: 0.7,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
         this.materials.set('orb_billboard', orbMaterial);
-        
-        // Rune stone sprites
-        const runeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x8a6a8a,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
         this.materials.set('rune_billboard', runeMaterial);
-        
-        // Psychic tree sprites
-        const treeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4a6a8a,
-            transparent: true,
-            opacity: 0.6,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
         this.materials.set('tree_billboard', treeMaterial);
     }
     
     getCurrentTheme() {
-        // Determine theme based on current floor
         for (const [themeName, themeData] of Object.entries(this.themes)) {
             if (this.currentFloor >= themeData.floors[0] && this.currentFloor <= themeData.floors[1]) {
                 return themeData.name;
             }
         }
-        return 'forest'; // Default to final theme for higher floors
+        return 'forest';
     }
     
     generateDungeon(floorNumber) {
-        console.log(`Generating dungeon for floor ${floorNumber}...`);
+        console.log(`Generating unified dungeon for floor ${floorNumber}...`);
         
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
@@ -268,638 +302,424 @@ class DungeonSystem {
         const theme = this.getCurrentTheme();
         console.log(`Using theme: ${theme}`);
         
-        // Generate room layout
-        const dungeonLayout = this.generateRoomLayout();
+        // Phase 1: Plan room layout
+        const roomLayout = this.planRoomLayout();
         
-        // Create physical rooms
-        this.createRooms(dungeonLayout, theme);
+        // Phase 2: Create unified floor map
+        const floorMap = this.createFloorMap(roomLayout);
         
-        // Create hallway connections
-        this.createHallways(dungeonLayout, theme);
+        // Phase 3: Generate unified geometry
+        this.generateUnifiedGeometry(floorMap, theme);
         
-        // Add atmospheric lighting
-        this.setupDungeonLighting(theme);
+        // Phase 4: Add lighting and atmosphere
+        this.addDungeonLighting(roomLayout, theme);
+        this.addAtmosphericElements(roomLayout, theme);
         
-        // Place decorative elements
-        this.placeAtmosphericElements(theme);
-        
-        // Store dungeon reference
+        // Store dungeon data
         this.currentDungeon = {
             floor: floorNumber,
             theme: theme,
-            layout: dungeonLayout,
-            rooms: new Map(this.rooms),
-            connections: new Map(this.connections)
+            roomLayout: roomLayout,
+            floorMap: floorMap
         };
         
-        console.log(`Dungeon floor ${floorNumber} generated successfully`);
+        console.log(`Unified dungeon floor ${floorNumber} generated successfully`);
         return this.currentDungeon;
     }
     
-    generateRoomLayout() {
-        // Create the center-orbital-cardinal room structure
+    planRoomLayout() {
+        console.log('Planning room layout...');
+        
         const layout = {
-            center: { id: 'center', type: this.roomTypes.CENTER, position: { x: 0, z: 0 } },
-            orbitals: {},
-            cardinals: {}
+            rooms: {},
+            connections: []
         };
         
-        // Create 4 orbital rooms (N, S, E, W)
-        const orbitalPositions = [
-            { dir: 'north', x: 0, z: -30 },
-            { dir: 'south', x: 0, z: 30 },
-            { dir: 'east', x: 30, z: 0 },
-            { dir: 'west', x: -30, z: 0 }
+        // Center room at origin
+        layout.rooms.center = {
+            id: 'center',
+            type: 'center',
+            gridX: Math.floor(this.gridWidth / 2),
+            gridZ: Math.floor(this.gridDepth / 2),
+            size: this.roomTemplates.CENTER.size
+        };
+        
+        // Four orbital rooms in cardinal directions
+        const orbitalDistance = 25; // Grid cells from center
+        const orbitals = [
+            { id: 'orbital_north', dir: 'north', offsetX: 0, offsetZ: -orbitalDistance },
+            { id: 'orbital_south', dir: 'south', offsetX: 0, offsetZ: orbitalDistance },
+            { id: 'orbital_east', dir: 'east', offsetX: orbitalDistance, offsetZ: 0 },
+            { id: 'orbital_west', dir: 'west', offsetX: -orbitalDistance, offsetZ: 0 }
         ];
         
-        orbitalPositions.forEach(pos => {
-            layout.orbitals[pos.dir] = {
-                id: `orbital_${pos.dir}`,
-                type: this.roomTypes.ORBITAL,
-                position: { x: pos.x, z: pos.z },
-                direction: pos.dir
+        orbitals.forEach(orbital => {
+            layout.rooms[orbital.id] = {
+                id: orbital.id,
+                type: 'orbital',
+                direction: orbital.dir,
+                gridX: layout.rooms.center.gridX + orbital.offsetX,
+                gridZ: layout.rooms.center.gridZ + orbital.offsetZ,
+                size: this.roomTemplates.ORBITAL.size
             };
+            
+            // Connect to center
+            layout.connections.push({
+                from: 'center',
+                to: orbital.id,
+                type: 'center_to_orbital'
+            });
         });
         
-        // Generate cardinal rooms (chance-based, connected to orbitals)
-        const cardinalChance = Math.min(0.3 + (this.currentFloor * 0.02), 0.8); // Increases with floor
+        // Cardinal rooms (chance-based)
+        const cardinalChance = Math.min(0.3 + (this.currentFloor * 0.02), 0.8);
+        const cardinalDistance = 25; // Additional distance from orbital
         
-        Object.entries(layout.orbitals).forEach(([dir, orbital]) => {
+        orbitals.forEach(orbital => {
             if (Math.random() < cardinalChance) {
-                const cardinalPos = this.getCardinalPosition(orbital.position, dir);
-                layout.cardinals[dir] = {
-                    id: `cardinal_${dir}`,
-                    type: this.roomTypes.CARDINAL,
-                    position: cardinalPos,
-                    direction: dir,
-                    connectedTo: orbital.id
+                const cardinalId = `cardinal_${orbital.dir}`;
+                
+                layout.rooms[cardinalId] = {
+                    id: cardinalId,
+                    type: 'cardinal',
+                    direction: orbital.dir,
+                    gridX: layout.rooms.center.gridX + orbital.offsetX + (orbital.offsetX > 0 ? cardinalDistance : orbital.offsetX < 0 ? -cardinalDistance : 0),
+                    gridZ: layout.rooms.center.gridZ + orbital.offsetZ + (orbital.offsetZ > 0 ? cardinalDistance : orbital.offsetZ < 0 ? -cardinalDistance : 0),
+                    size: this.roomTemplates.CARDINAL.size
                 };
+                
+                // Connect to orbital
+                layout.connections.push({
+                    from: orbital.id,
+                    to: cardinalId,
+                    type: 'orbital_to_cardinal'
+                });
             }
         });
         
+        console.log(`Planned ${Object.keys(layout.rooms).length} rooms with ${layout.connections.length} connections`);
         return layout;
     }
     
-    getCardinalPosition(orbitalPos, direction) {
-        // Position cardinal rooms further out from orbitals
-        const distance = 50;
-        const positions = {
-            north: { x: orbitalPos.x, z: orbitalPos.z - distance },
-            south: { x: orbitalPos.x, z: orbitalPos.z + distance },
-            east: { x: orbitalPos.x + distance, z: orbitalPos.z },
-            west: { x: orbitalPos.x - distance, z: orbitalPos.z }
-        };
-        return positions[direction];
-    }
-    
-    createRooms(layout, theme) {
-        // Create center room
-        this.createRoom(layout.center, theme, true);
+    createFloorMap(roomLayout) {
+        console.log('Creating unified floor map...');
         
-        // Create orbital rooms
-        Object.values(layout.orbitals).forEach(room => {
-            this.createRoom(room, theme, false);
+        // Initialize grid (false = wall/solid, true = walkable)
+        const floorMap = Array(this.gridDepth).fill().map(() => Array(this.gridWidth).fill(false));
+        
+        // Phase 1: Carve out room areas
+        Object.values(roomLayout.rooms).forEach(room => {
+            this.carveRoomArea(floorMap, room);
         });
         
-        // Create cardinal rooms
-        Object.values(layout.cardinals).forEach(room => {
-            this.createRoom(room, theme, false);
+        // Phase 2: Carve corridor paths
+        roomLayout.connections.forEach(connection => {
+            this.carveCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
+        
+        console.log('Floor map created with carved rooms and corridors');
+        return floorMap;
     }
     
-    createRoom(roomData, theme, isCenter = false) {
-        const roomGroup = new THREE.Group();
-        roomGroup.name = roomData.id;
+    carveRoomArea(floorMap, room) {
+        const halfSize = Math.floor(room.size / 2);
         
-        // Room dimensions based on type
-        let roomWidth = this.roomSize;
-        let roomDepth = this.roomSize;
-        let roomHeight = this.ceilingHeight;
-        
-        if (roomData.type === this.roomTypes.CARDINAL) {
-            // Cardinal rooms are larger
-            roomWidth *= 1.5;
-            roomDepth *= 1.5;
-            roomHeight *= 1.2;
-        } else if (isCenter) {
-            // Center room is slightly larger
-            roomWidth *= 1.3;
-            roomDepth *= 1.3;
+        for (let z = room.gridZ - halfSize; z <= room.gridZ + halfSize; z++) {
+            for (let x = room.gridX - halfSize; x <= room.gridX + halfSize; x++) {
+                if (this.isValidGridPos(x, z)) {
+                    floorMap[z][x] = true; // Mark as walkable
+                }
+            }
         }
         
-        // Create floor
-        const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
+        console.log(`Carved ${room.type} room at grid (${room.gridX}, ${room.gridZ}) size ${room.size}`);
+    }
+    
+    carveCorridorPath(floorMap, roomA, roomB) {
+        // Use L-shaped corridors: go horizontal first, then vertical
+        const startX = roomA.gridX;
+        const startZ = roomA.gridZ;
+        const endX = roomB.gridX;
+        const endZ = roomB.gridZ;
+        
+        const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
+        
+        // Horizontal segment
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        
+        for (let x = minX; x <= maxX; x++) {
+            for (let zOffset = -corridorHalfWidth; zOffset <= corridorHalfWidth; zOffset++) {
+                const z = startZ + zOffset;
+                if (this.isValidGridPos(x, z)) {
+                    floorMap[z][x] = true;
+                }
+            }
+        }
+        
+        // Vertical segment
+        const minZ = Math.min(startZ, endZ);
+        const maxZ = Math.max(startZ, endZ);
+        
+        for (let z = minZ; z <= maxZ; z++) {
+            for (let xOffset = -corridorHalfWidth; xOffset <= corridorHalfWidth; xOffset++) {
+                const x = endX + xOffset;
+                if (this.isValidGridPos(x, z)) {
+                    floorMap[z][x] = true;
+                }
+            }
+        }
+        
+        console.log(`Carved L-shaped corridor from (${startX},${startZ}) to (${endX},${endZ})`);
+    }
+    
+    isValidGridPos(x, z) {
+        return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
+    }
+    
+    generateUnifiedGeometry(floorMap, theme) {
+        console.log('Generating unified geometry...');
+        
+        const dungeonGroup = new THREE.Group();
+        dungeonGroup.name = 'unified_dungeon';
+        
+        // Generate unified floor
+        this.generateUnifiedFloor(dungeonGroup, floorMap, theme);
+        
+        // Generate walls around walkable areas
+        this.generateWallsFromMap(dungeonGroup, floorMap, theme);
+        
+        // Generate unified ceiling
+        this.generateUnifiedCeiling(dungeonGroup, floorMap, theme);
+        
+        this.scene.add(dungeonGroup);
+        this.currentDungeonGroup = dungeonGroup;
+    }
+    
+    generateUnifiedFloor(dungeonGroup, floorMap, theme) {
         const floorMaterial = this.materials.get(`${theme}_floor`);
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.set(roomData.position.x, 0, roomData.position.z);
-        floor.receiveShadow = true;
-        roomGroup.add(floor);
+        const floorSegments = [];
         
-        // Create walls
-        this.createRoomWalls(roomGroup, roomData, theme, roomWidth, roomDepth, roomHeight);
-        
-        // Create ceiling
-        const ceilingGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
-        const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
-        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(roomData.position.x, roomHeight, roomData.position.z);
-        ceiling.receiveShadow = true;
-        roomGroup.add(ceiling);
-        
-        // Add room-specific features
-        if (isCenter) {
-            this.addCenterRoomFeatures(roomGroup, roomData, theme);
-        } else if (roomData.type === this.roomTypes.CARDINAL) {
-            this.addCardinalRoomFeatures(roomGroup, roomData, theme);
-        } else {
-            this.addOrbitalRoomFeatures(roomGroup, roomData, theme);
+        // Find connected floor regions and create efficient meshes
+        for (let z = 0; z < this.gridDepth; z++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                if (floorMap[z][x]) {
+                    // Create floor segment
+                    const worldX = (x - this.gridWidth/2) * this.gridSize;
+                    const worldZ = (z - this.gridDepth/2) * this.gridSize;
+                    
+                    const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    const floorSegment = new THREE.Mesh(floorGeometry, floorMaterial);
+                    floorSegment.rotation.x = -Math.PI / 2;
+                    floorSegment.position.set(worldX, 0, worldZ);
+                    floorSegment.receiveShadow = true;
+                    
+                    dungeonGroup.add(floorSegment);
+                }
+            }
         }
         
-        this.scene.add(roomGroup);
-        this.rooms.set(roomData.id, {
-            ...roomData,
-            group: roomGroup,
-            dimensions: { width: roomWidth, depth: roomDepth, height: roomHeight }
+        console.log('Generated unified floor geometry');
+    }
+    
+    generateWallsFromMap(dungeonGroup, floorMap, theme) {
+        const wallMaterial = this.materials.get(`${theme}_wall`);
+        const wallHeight = this.ceilingHeight;
+        
+        // March around perimeter of walkable areas to create walls
+        for (let z = 0; z < this.gridDepth; z++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                if (floorMap[z][x]) {
+                    // Check all 4 directions for wall placement
+                    const directions = [
+                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0 }, // North wall
+                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0 },  // South wall  
+                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: Math.PI/2 }, // East wall
+                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: Math.PI/2 } // West wall
+                    ];
+                    
+                    directions.forEach(dir => {
+                        const neighborX = x + dir.dx;
+                        const neighborZ = z + dir.dz;
+                        
+                        // Place wall if neighbor is solid or out of bounds
+                        if (!this.isValidGridPos(neighborX, neighborZ) || !floorMap[neighborZ][neighborX]) {
+                            const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
+                            const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
+                            
+                            const wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
+                            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                            wall.position.set(worldX, wallHeight/2, worldZ);
+                            wall.rotation.y = dir.rotY;
+                            wall.castShadow = true;
+                            wall.receiveShadow = true;
+                            
+                            dungeonGroup.add(wall);
+                        }
+                    });
+                }
+            }
+        }
+        
+        console.log('Generated unified wall geometry');
+    }
+    
+    generateUnifiedCeiling(dungeonGroup, floorMap, theme) {
+        const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
+        
+        // Create ceiling segments over walkable areas
+        for (let z = 0; z < this.gridDepth; z++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                if (floorMap[z][x]) {
+                    const worldX = (x - this.gridWidth/2) * this.gridSize;
+                    const worldZ = (z - this.gridDepth/2) * this.gridSize;
+                    
+                    const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    const ceilingSegment = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+                    ceilingSegment.rotation.x = Math.PI / 2;
+                    ceilingSegment.position.set(worldX, this.ceilingHeight, worldZ);
+                    ceilingSegment.receiveShadow = true;
+                    
+                    dungeonGroup.add(ceilingSegment);
+                }
+            }
+        }
+        
+        console.log('Generated unified ceiling geometry');
+    }
+    
+    addDungeonLighting(roomLayout, theme) {
+        console.log('Adding dungeon lighting...');
+        
+        // Add bright test lighting to each room
+        Object.values(roomLayout.rooms).forEach(room => {
+            this.addRoomLighting(room, theme);
+        });
+        
+        // Add corridor lighting
+        roomLayout.connections.forEach(connection => {
+            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to], theme);
         });
     }
     
-    createRoomWalls(roomGroup, roomData, theme, width, depth, height) {
-        const wallMaterial = this.materials.get(`${theme}_wall`);
-        const wallThickness = 0.5;
+    addRoomLighting(room, theme) {
+        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Create 4 walls with doorway gaps
-        const walls = [
-            { pos: [roomData.position.x, height/2, roomData.position.z - depth/2], size: [width, height, wallThickness], dir: 'north' },
-            { pos: [roomData.position.x, height/2, roomData.position.z + depth/2], size: [width, height, wallThickness], dir: 'south' },
-            { pos: [roomData.position.x + width/2, height/2, roomData.position.z], size: [wallThickness, height, depth], dir: 'east' },
-            { pos: [roomData.position.x - width/2, height/2, roomData.position.z], size: [wallThickness, height, depth], dir: 'west' }
+        // Super bright overhead light
+        const brightLight = new THREE.PointLight(0xffffff, 3.0, 50);
+        brightLight.position.set(worldX, this.ceilingHeight - 1, worldZ);
+        this.currentDungeonGroup.add(brightLight);
+        this.lightSources.push(brightLight);
+        
+        // Corner lights for even coverage
+        const roomSize = room.size * this.gridSize;
+        const cornerPositions = [
+            [worldX - roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
+            [worldX + roomSize/3, this.ceilingHeight/2, worldZ - roomSize/3],
+            [worldX - roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3],
+            [worldX + roomSize/3, this.ceilingHeight/2, worldZ + roomSize/3]
         ];
         
-        walls.forEach(wall => {
-            // Check if this wall should have a doorway
-            const hasDoorway = this.shouldHaveDoorway(roomData, wall.dir);
-            
-            if (!hasDoorway) {
-                // Create solid wall
-                const wallGeometry = new THREE.BoxGeometry(...wall.size);
-                const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
-                wallMesh.position.set(...wall.pos);
-                wallMesh.castShadow = true;
-                wallMesh.receiveShadow = true;
-                roomGroup.add(wallMesh);
-            } else {
-                // Create wall with doorway gap
-                this.createWallWithDoorway(roomGroup, wall, wallMaterial);
-            }
-        });
-    }
-    
-    shouldHaveDoorway(roomData, direction) {
-        // Center room connects to all orbitals
-        if (roomData.type === this.roomTypes.CENTER) {
-            return true;
-        }
-        
-        // Orbital rooms connect to center
-        if (roomData.type === this.roomTypes.ORBITAL) {
-            // Connect to center
-            if ((direction === 'north' && roomData.direction === 'south') ||
-                (direction === 'south' && roomData.direction === 'north') ||
-                (direction === 'east' && roomData.direction === 'west') ||
-                (direction === 'west' && roomData.direction === 'east')) {
-                return true;
-            }
-            
-            // Also check for cardinal room connections
-            return this.hasCardinalConnection(roomData.id, direction);
-        }
-        
-        // Cardinal rooms connect to their orbital
-        if (roomData.type === this.roomTypes.CARDINAL) {
-            return this.shouldCardinalConnectDirection(roomData, direction);
-        }
-        
-        return false;
-    }
-    
-    hasCardinalConnection(orbitalId, direction) {
-        // Check if there's a cardinal room that connects in this direction
-        for (const [_, cardinal] of Object.entries(this.currentDungeon?.layout?.cardinals || {})) {
-            if (cardinal.connectedTo === orbitalId) {
-                return this.getOppositeDirection(cardinal.direction) === direction;
-            }
-        }
-        return false;
-    }
-    
-    shouldCardinalConnectDirection(cardinalData, direction) {
-        const oppositeOfCardinal = this.getOppositeDirection(cardinalData.direction);
-        return direction === oppositeOfCardinal;
-    }
-    
-    getOppositeDirection(direction) {
-        const opposites = {
-            north: 'south',
-            south: 'north',
-            east: 'west',
-            west: 'east'
-        };
-        return opposites[direction];
-    }
-    
-    createWallWithDoorway(roomGroup, wall, material) {
-        // Create wall segments around doorway
-        const doorwayWidth = 6;
-        const doorwayHeight = 4;
-        
-        // Calculate wall segments
-        const [x, y, z] = wall.pos;
-        const [width, height, thickness] = wall.size;
-        
-        if (wall.dir === 'north' || wall.dir === 'south') {
-            // Horizontal wall - create left and right segments
-            const leftWidth = (width - doorwayWidth) / 2;
-            const rightWidth = leftWidth;
-            
-            // Left segment
-            const leftGeometry = new THREE.BoxGeometry(leftWidth, height, thickness);
-            const leftMesh = new THREE.Mesh(leftGeometry, material);
-            leftMesh.position.set(x - width/2 + leftWidth/2, y, z);
-            leftMesh.castShadow = true;
-            leftMesh.receiveShadow = true;
-            roomGroup.add(leftMesh);
-            
-            // Right segment
-            const rightGeometry = new THREE.BoxGeometry(rightWidth, height, thickness);
-            const rightMesh = new THREE.Mesh(rightGeometry, material);
-            rightMesh.position.set(x + width/2 - rightWidth/2, y, z);
-            rightMesh.castShadow = true;
-            rightMesh.receiveShadow = true;
-            roomGroup.add(rightMesh);
-            
-            // Top segment over doorway
-            const topGeometry = new THREE.BoxGeometry(doorwayWidth, height - doorwayHeight, thickness);
-            const topMesh = new THREE.Mesh(topGeometry, material);
-            topMesh.position.set(x, y + doorwayHeight/2, z);
-            topMesh.castShadow = true;
-            topMesh.receiveShadow = true;
-            roomGroup.add(topMesh);
-            
-        } else {
-            // Vertical wall - create front and back segments
-            const frontDepth = (width - doorwayWidth) / 2;
-            const backDepth = frontDepth;
-            
-            // Front segment
-            const frontGeometry = new THREE.BoxGeometry(thickness, height, frontDepth);
-            const frontMesh = new THREE.Mesh(frontGeometry, material);
-            frontMesh.position.set(x, y, z - width/2 + frontDepth/2);
-            frontMesh.castShadow = true;
-            frontMesh.receiveShadow = true;
-            roomGroup.add(frontMesh);
-            
-            // Back segment
-            const backGeometry = new THREE.BoxGeometry(thickness, height, backDepth);
-            const backMesh = new THREE.Mesh(backGeometry, material);
-            backMesh.position.set(x, y, z + width/2 - backDepth/2);
-            backMesh.castShadow = true;
-            backMesh.receiveShadow = true;
-            roomGroup.add(backMesh);
-            
-            // Top segment over doorway
-            const topGeometry = new THREE.BoxGeometry(thickness, height - doorwayHeight, doorwayWidth);
-            const topMesh = new THREE.Mesh(topGeometry, material);
-            topMesh.position.set(x, y + doorwayHeight/2, z);
-            topMesh.castShadow = true;
-            topMesh.receiveShadow = true;
-            roomGroup.add(topMesh);
-        }
-    }
-    
-    createHallways(layout, theme) {
-        // Create hallways connecting center to orbitals
-        Object.values(layout.orbitals).forEach(orbital => {
-            this.createHallway(layout.center, orbital, theme);
+        cornerPositions.forEach(pos => {
+            const cornerLight = new THREE.PointLight(0xffffff, 2.0, 30);
+            cornerLight.position.set(...pos);
+            this.currentDungeonGroup.add(cornerLight);
+            this.lightSources.push(cornerLight);
         });
         
-        // Create hallways connecting orbitals to cardinals
-        Object.values(layout.cardinals).forEach(cardinal => {
-            const connectedOrbital = layout.orbitals[cardinal.direction];
-            if (connectedOrbital) {
-                this.createHallway(connectedOrbital, cardinal, theme);
-            }
-        });
+        console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ})`);
     }
     
-    createHallway(roomA, roomB, theme) {
-        const hallwayGroup = new THREE.Group();
-        const connectionId = `${roomA.id}_to_${roomB.id}`;
-        hallwayGroup.name = connectionId;
+    addCorridorLighting(roomA, roomB, theme) {
+        const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
+        const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
+        const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
+        const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Calculate hallway path
-        const start = roomA.position;
-        const end = roomB.position;
-        const distance = Math.sqrt((end.x - start.x) ** 2 + (end.z - start.z) ** 2);
-        const midX = (start.x + end.x) / 2;
-        const midZ = (start.z + end.z) / 2;
+        // Light at corner of L-shaped corridor
+        const cornerLight = new THREE.PointLight(0xffffff, 2.5, 40);
+        cornerLight.position.set(endWorldX, 4, startWorldZ); // Corner position
+        this.currentDungeonGroup.add(cornerLight);
+        this.lightSources.push(cornerLight);
         
-        // Create hallway geometry
-        const hallwayWidth = this.hallwayWidth;
-        const hallwayHeight = this.ceilingHeight * 0.8;
+        // Additional lights along corridor path
+        const midWorldX = (startWorldX + endWorldX) / 2;
+        const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
-        // Determine if hallway is horizontal or vertical
-        const isHorizontal = Math.abs(end.x - start.x) > Math.abs(end.z - start.z);
-        
-        let hallwayLength, hallwayRotation;
-        if (isHorizontal) {
-            hallwayLength = Math.abs(end.x - start.x);
-            hallwayRotation = 0;
-        } else {
-            hallwayLength = Math.abs(end.z - start.z);
-            hallwayRotation = Math.PI / 2;
-        }
-        
-        // Create hallway floor
-        const floorGeometry = new THREE.PlaneGeometry(hallwayLength, hallwayWidth);
-        const floorMaterial = this.materials.get(`${theme}_floor`);
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.rotation.z = hallwayRotation;
-        floor.position.set(midX, 0.01, midZ); // Slightly above room floors
-        floor.receiveShadow = true;
-        hallwayGroup.add(floor);
-        
-        // Create hallway walls
-        this.createHallwayWalls(hallwayGroup, midX, midZ, hallwayLength, hallwayWidth, hallwayHeight, hallwayRotation, theme);
-        
-        // Create hallway ceiling
-        const ceilingGeometry = new THREE.PlaneGeometry(hallwayLength, hallwayWidth);
-        const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
-        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.rotation.z = hallwayRotation;
-        ceiling.position.set(midX, hallwayHeight, midZ);
-        ceiling.receiveShadow = true;
-        hallwayGroup.add(ceiling);
-        
-        // Add hallway lighting
-        this.addHallwayLighting(hallwayGroup, midX, midZ, hallwayLength, theme);
-        
-        this.scene.add(hallwayGroup);
-        this.connections.set(connectionId, {
-            id: connectionId,
-            roomA: roomA.id,
-            roomB: roomB.id,
-            group: hallwayGroup,
-            path: { start, end, midX, midZ, distance }
-        });
+        const midLight = new THREE.PointLight(0xffffff, 1.8, 25);
+        midLight.position.set(midWorldX, 3.5, midWorldZ);
+        this.currentDungeonGroup.add(midLight);
+        this.lightSources.push(midLight);
     }
     
-    createHallwayWalls(group, centerX, centerZ, length, width, height, rotation, theme) {
-        const wallMaterial = this.materials.get(`${theme}_wall`);
-        const wallThickness = 0.3;
+    addAtmosphericElements(roomLayout, theme) {
+        console.log('Adding atmospheric elements...');
         
-        // Create two parallel walls
-        const wallGeometry = new THREE.BoxGeometry(length, height, wallThickness);
-        
-        // Calculate wall positions based on rotation
-        const offset = width / 2;
-        let wall1Pos, wall2Pos;
-        
-        if (rotation === 0) {
-            // Horizontal hallway
-            wall1Pos = [centerX, height/2, centerZ + offset];
-            wall2Pos = [centerX, height/2, centerZ - offset];
-        } else {
-            // Vertical hallway
-            wall1Pos = [centerX + offset, height/2, centerZ];
-            wall2Pos = [centerX - offset, height/2, centerZ];
-        }
-        
-        // Wall 1
-        const wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
-        wall1.position.set(...wall1Pos);
-        wall1.rotation.y = rotation;
-        wall1.castShadow = true;
-        wall1.receiveShadow = true;
-        group.add(wall1);
-        
-        // Wall 2
-        const wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
-        wall2.position.set(...wall2Pos);
-        wall2.rotation.y = rotation;
-        wall2.castShadow = true;
-        wall2.receiveShadow = true;
-        group.add(wall2);
-    }
-    
-    addCenterRoomFeatures(roomGroup, roomData, theme) {
-        // Add entrance portal (glowing exit back to hub)
-        this.createEntrancePortal(roomGroup, roomData);
-        
-        // Add central light source
-        this.addCentralLight(roomGroup, roomData, theme);
-        
-        // Add atmospheric elements specific to center
-        this.addCenterAtmosphere(roomGroup, roomData, theme);
-    }
-    
-    addOrbitalRoomFeatures(roomGroup, roomData, theme) {
-        // Add key pedestals for progression
-        this.createKeyPedestal(roomGroup, roomData, theme);
-        
-        // Add orbital-specific atmosphere
-        this.addOrbitalAtmosphere(roomGroup, roomData, theme);
-    }
-    
-    addCardinalRoomFeatures(roomGroup, roomData, theme) {
-        // Add mini-boss arena features
-        this.createBossArenaFeatures(roomGroup, roomData, theme);
-        
-        // Add cardinal-specific atmosphere
-        this.addCardinalAtmosphere(roomGroup, roomData, theme);
-    }
-    
-    createEntrancePortal(roomGroup, roomData) {
-        // Create glowing portal back to hub
-        const portalGeometry = new THREE.RingGeometry(1, 2, 16);
-        const portalMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4a8aff,
-            transparent: true,
-            opacity: 0.6,
-            side: THREE.DoubleSide,
-            blending: THREE.AdditiveBlending
-        });
-        
-        const portal = new THREE.Mesh(portalGeometry, portalMaterial);
-        portal.position.set(roomData.position.x, 1, roomData.position.z);
-        portal.rotation.x = -Math.PI / 2;
-        roomGroup.add(portal);
-        
-        // Add portal light
-        const portalLight = new THREE.PointLight(0x4a8aff, 1, 8);
-        portalLight.position.set(roomData.position.x, 2, roomData.position.z);
-        roomGroup.add(portalLight);
-        this.lightSources.push(portalLight);
-    }
-    
-    createKeyPedestal(roomGroup, roomData, theme) {
-        // Create pedestal for key (visual placeholder)
-        const pedestalGeometry = new THREE.CylinderGeometry(0.8, 1, 1.5, 8);
-        const pedestalMaterial = this.materials.get(`${theme}_wall`);
-        const pedestal = new THREE.Mesh(pedestalGeometry, pedestalMaterial);
-        pedestal.position.set(roomData.position.x, 0.75, roomData.position.z + 5);
-        pedestal.castShadow = true;
-        pedestal.receiveShadow = true;
-        roomGroup.add(pedestal);
-        
-        // Add pedestal light
-        const pedestalLight = new THREE.PointLight(0xffaa44, 0.8, 6);
-        pedestalLight.position.set(roomData.position.x, 3, roomData.position.z + 5);
-        roomGroup.add(pedestalLight);
-        this.lightSources.push(pedestalLight);
-    }
-    
-    createBossArenaFeatures(roomGroup, roomData, theme) {
-        // Create raised platform for boss encounters
-        const platformGeometry = new THREE.CylinderGeometry(8, 8, 0.3, 16);
-        const platformMaterial = this.materials.get(`${theme}_floor`);
-        const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-        platform.position.set(roomData.position.x, 0.15, roomData.position.z);
-        platform.castShadow = true;
-        platform.receiveShadow = true;
-        roomGroup.add(platform);
-        
-        // Add dramatic lighting around platform
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const radius = 10;
-            const lightColor = this.getThemeColor(theme);
-            
-            const arenaLight = new THREE.PointLight(lightColor, 0.6, 12);
-            arenaLight.position.set(
-                roomData.position.x + Math.cos(angle) * radius,
-                4,
-                roomData.position.z + Math.sin(angle) * radius
-            );
-            roomGroup.add(arenaLight);
-            this.lightSources.push(arenaLight);
-        }
-    }
-    
-    setupDungeonLighting(theme) {
-        // Set ambient lighting based on theme
-        this.scene.traverse((child) => {
-            if (child.isAmbientLight) {
-                child.intensity = this.getAmbientLightLevel(theme);
-                child.color.setHex(this.getAmbientColor(theme));
-            }
-        });
-    }
-    
-    addHallwayLighting(hallwayGroup, centerX, centerZ, length, theme) {
-        // Add lights spilling from connected rooms
-        const lightColor = this.getThemeColor(theme);
-        const numLights = Math.max(2, Math.floor(length / 10));
-        
-        for (let i = 0; i < numLights; i++) {
-            const progress = (i + 1) / (numLights + 1);
-            const lightX = centerX;
-            const lightZ = centerZ;
-            
-            const hallwayLight = new THREE.PointLight(lightColor, 0.4, 8);
-            hallwayLight.position.set(lightX, 3, lightZ);
-            hallwayGroup.add(hallwayLight);
-            this.lightSources.push(hallwayLight);
-        }
-    }
-    
-    addCentralLight(roomGroup, roomData, theme) {
-        // Add main light source for center room
-        const lightColor = this.getThemeColor(theme);
-        const centerLight = new THREE.PointLight(lightColor, 1.2, 15);
-        centerLight.position.set(roomData.position.x, 6, roomData.position.z);
-        roomGroup.add(centerLight);
-        this.lightSources.push(centerLight);
-    }
-    
-    placeAtmosphericElements(theme) {
-        // Place billboard sprites and decorative elements throughout the dungeon
-        this.rooms.forEach(room => {
+        Object.values(roomLayout.rooms).forEach(room => {
             this.addRoomAtmosphere(room, theme);
         });
     }
     
     addRoomAtmosphere(room, theme) {
-        const numElements = 3 + Math.floor(Math.random() * 4); // 3-6 elements per room
+        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
+        const roomSize = room.size * this.gridSize;
         
-        for (let i = 0; i < numElements; i++) {
-            this.placeBillboardSprite(room, theme);
-        }
-        
-        // Add floating orbs
-        this.addFloatingOrbs(room, theme);
-    }
-    
-    addCenterAtmosphere(roomGroup, roomData, theme) {
-        this.addThemeSpecificElements(roomGroup, roomData, theme, 'center');
-    }
-    
-    addOrbitalAtmosphere(roomGroup, roomData, theme) {
-        this.addThemeSpecificElements(roomGroup, roomData, theme, 'orbital');
-    }
-    
-    addCardinalAtmosphere(roomGroup, roomData, theme) {
-        this.addThemeSpecificElements(roomGroup, roomData, theme, 'cardinal');
-    }
-    
-    addThemeSpecificElements(roomGroup, roomData, theme, roomType) {
+        // Add theme-specific atmospheric elements
         switch (theme) {
             case 'stone':
-                this.addStoneElements(roomGroup, roomData, roomType);
+                this.addStoneAtmosphere(worldX, worldZ, roomSize, room.type);
                 break;
             case 'crystal':
-                this.addCrystalElements(roomGroup, roomData, roomType);
+                this.addCrystalAtmosphere(worldX, worldZ, roomSize, room.type);
                 break;
             case 'ruins':
-                this.addRuinsElements(roomGroup, roomData, roomType);
+                this.addRuinsAtmosphere(worldX, worldZ, roomSize, room.type);
                 break;
             case 'crypt':
-                this.addCryptElements(roomGroup, roomData, roomType);
+                this.addCryptAtmosphere(worldX, worldZ, roomSize, room.type);
                 break;
             case 'forest':
-                this.addForestElements(roomGroup, roomData, roomType);
+                this.addForestAtmosphere(worldX, worldZ, roomSize, room.type);
                 break;
         }
+        
+        // Add floating orbs to all rooms
+        this.addFloatingOrbs(worldX, worldZ, roomSize, theme);
     }
     
-    addStoneElements(roomGroup, roomData, roomType) {
-        // Add stone-specific atmosphere: torches, stone formations
+    addStoneAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Stone pillars
         for (let i = 0; i < 4; i++) {
-            const angle = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
-            const radius = 6 + Math.random() * 4;
+            const angle = (i / 4) * Math.PI * 2;
+            const radius = roomSize * 0.3;
             
-            // Torch light
-            const torchLight = new THREE.PointLight(0xff6644, 0.8, 6);
-            torchLight.position.set(
-                roomData.position.x + Math.cos(angle) * radius,
-                2.5,
-                roomData.position.z + Math.sin(angle) * radius
-            );
-            roomGroup.add(torchLight);
+            const pillarX = worldX + Math.cos(angle) * radius;
+            const pillarZ = worldZ + Math.sin(angle) * radius;
+            
+            const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
+            const pillarMaterial = this.materials.get('stone_wall');
+            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+            pillar.position.set(pillarX, 2, pillarZ);
+            pillar.castShadow = true;
+            pillar.receiveShadow = true;
+            this.currentDungeonGroup.add(pillar);
+            
+            // Torch light on pillar
+            const torchLight = new THREE.PointLight(0xff6644, 0.8, 8);
+            torchLight.position.set(pillarX, 3.5, pillarZ);
+            this.currentDungeonGroup.add(torchLight);
             this.lightSources.push(torchLight);
         }
     }
     
-    addCrystalElements(roomGroup, roomData, roomType) {
-        // Add crystal formations with glow
+    addCrystalAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Crystal formations
         for (let i = 0; i < 6; i++) {
-            const x = roomData.position.x + (Math.random() - 0.5) * 15;
-            const z = roomData.position.z + (Math.random() - 0.5) * 15;
+            const crystalX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
+            const crystalZ = worldZ + (Math.random() - 0.5) * roomSize * 0.8;
             
-            // Crystal formation
             const crystalGeometry = new THREE.ConeGeometry(0.4, 2.5, 6);
             const crystalMaterial = new THREE.MeshPhongMaterial({
                 color: 0x6c5ce7,
@@ -910,70 +730,74 @@ class DungeonSystem {
             });
             
             const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-            crystal.position.set(x, 1.25, z);
+            crystal.position.set(crystalX, 1.25, crystalZ);
             crystal.rotation.y = Math.random() * Math.PI * 2;
-            roomGroup.add(crystal);
+            this.currentDungeonGroup.add(crystal);
             
-            // Crystal glow light
-            const crystalLight = new THREE.PointLight(0x8a6ae7, 0.6, 5);
-            crystalLight.position.set(x, 2, z);
-            roomGroup.add(crystalLight);
+            // Crystal glow
+            const crystalLight = new THREE.PointLight(0x8a6ae7, 0.6, 6);
+            crystalLight.position.set(crystalX, 2, crystalZ);
+            this.currentDungeonGroup.add(crystalLight);
             this.lightSources.push(crystalLight);
         }
     }
     
-    addRuinsElements(roomGroup, roomData, roomType) {
-        // Add ruined crystal formations and mystical runes
+    addRuinsAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Runed stones
         for (let i = 0; i < 4; i++) {
-            const x = roomData.position.x + (Math.random() - 0.5) * 12;
-            const z = roomData.position.z + (Math.random() - 0.5) * 12;
+            const runeX = worldX + (Math.random() - 0.5) * roomSize * 0.6;
+            const runeZ = worldZ + (Math.random() - 0.5) * roomSize * 0.6;
             
-            // Runed stone
-            const runeStoneGeometry = new THREE.BoxGeometry(1, 2, 0.3);
-            const runeStoneMaterial = new THREE.MeshLambertMaterial({
+            const runeGeometry = new THREE.BoxGeometry(1, 2, 0.3);
+            const runeMaterial = new THREE.MeshLambertMaterial({
                 color: 0x7a5a7a,
                 emissive: 0x3a1a3a,
                 emissiveIntensity: 0.2
             });
             
-            const runeStone = new THREE.Mesh(runeStoneGeometry, runeStoneMaterial);
-            runeStone.position.set(x, 1, z);
+            const runeStone = new THREE.Mesh(runeGeometry, runeMaterial);
+            runeStone.position.set(runeX, 1, runeZ);
             runeStone.rotation.y = Math.random() * Math.PI * 2;
-            roomGroup.add(runeStone);
+            this.currentDungeonGroup.add(runeStone);
             
             // Rune glow
-            const runeLight = new THREE.PointLight(0xaa6aaa, 0.4, 4);
-            runeLight.position.set(x, 1.5, z);
-            roomGroup.add(runeLight);
+            const runeLight = new THREE.PointLight(0xaa6aaa, 0.4, 5);
+            runeLight.position.set(runeX, 1.5, runeZ);
+            this.currentDungeonGroup.add(runeLight);
             this.lightSources.push(runeLight);
         }
     }
     
-    addCryptElements(roomGroup, roomData, roomType) {
-        // Add cryptic atmosphere: ancient braziers, bone piles
+    addCryptAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Ancient braziers
         for (let i = 0; i < 3; i++) {
-            const angle = (i / 3) * Math.PI * 2 + Math.random() * 1;
-            const radius = 8 + Math.random() * 3;
+            const angle = (i / 3) * Math.PI * 2;
+            const radius = roomSize * 0.4;
             
-            // Brazier light (green flame)
-            const brazierLight = new THREE.PointLight(0x44aa44, 0.7, 7);
-            brazierLight.position.set(
-                roomData.position.x + Math.cos(angle) * radius,
-                3,
-                roomData.position.z + Math.sin(angle) * radius
-            );
-            roomGroup.add(brazierLight);
+            const brazierX = worldX + Math.cos(angle) * radius;
+            const brazierZ = worldZ + Math.sin(angle) * radius;
+            
+            // Brazier stand
+            const brazierGeometry = new THREE.CylinderGeometry(0.5, 0.3, 1.5, 8);
+            const brazierMaterial = this.materials.get('crypt_wall');
+            const brazier = new THREE.Mesh(brazierGeometry, brazierMaterial);
+            brazier.position.set(brazierX, 0.75, brazierZ);
+            this.currentDungeonGroup.add(brazier);
+            
+            // Green flame light
+            const brazierLight = new THREE.PointLight(0x44aa44, 0.8, 8);
+            brazierLight.position.set(brazierX, 2.5, brazierZ);
+            this.currentDungeonGroup.add(brazierLight);
             this.lightSources.push(brazierLight);
         }
     }
     
-    addForestElements(roomGroup, roomData, roomType) {
-        // Add psychic forest atmosphere: glowing mushrooms, spectral trees
+    addForestAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Glowing mushroom clusters
         for (let i = 0; i < 8; i++) {
-            const x = roomData.position.x + (Math.random() - 0.5) * 16;
-            const z = roomData.position.z + (Math.random() - 0.5) * 16;
+            const mushroomX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
+            const mushroomZ = worldZ + (Math.random() - 0.5) * roomSize * 0.8;
             
-            // Glowing mushroom cluster
             const mushroomGeometry = new THREE.SphereGeometry(0.3, 8, 6);
             const mushroomMaterial = new THREE.MeshBasicMaterial({
                 color: 0x4a8a4a,
@@ -984,61 +808,37 @@ class DungeonSystem {
             });
             
             const mushroom = new THREE.Mesh(mushroomGeometry, mushroomMaterial);
-            mushroom.position.set(x, 0.3, z);
+            mushroom.position.set(mushroomX, 0.3, mushroomZ);
             mushroom.scale.set(1 + Math.random() * 0.5, 1, 1 + Math.random() * 0.5);
-            roomGroup.add(mushroom);
+            this.currentDungeonGroup.add(mushroom);
             
             // Mushroom glow
-            const mushroomLight = new THREE.PointLight(0x6aaa6a, 0.5, 3);
-            mushroomLight.position.set(x, 1, z);
-            roomGroup.add(mushroomLight);
+            const mushroomLight = new THREE.PointLight(0x6aaa6a, 0.5, 4);
+            mushroomLight.position.set(mushroomX, 1, mushroomZ);
+            this.currentDungeonGroup.add(mushroomLight);
             this.lightSources.push(mushroomLight);
         }
     }
     
-    placeBillboardSprite(room, theme) {
-        const spriteType = this.getBillboardType(theme);
-        const material = this.materials.get(`${spriteType}_billboard`);
-        
-        if (!material) return;
-        
-        const sprite = new THREE.Mesh(this.billboardGeometry.clone(), material);
-        
-        // Random position within room bounds
-        const roomSize = room.dimensions.width * 0.8; // Stay within room bounds
-        sprite.position.set(
-            room.position.x + (Math.random() - 0.5) * roomSize,
-            1 + Math.random() * 3,
-            room.position.z + (Math.random() - 0.5) * roomSize
-        );
-        
-        // Random scale
-        const scale = 0.5 + Math.random() * 1.5;
-        sprite.scale.set(scale, scale, 1);
-        
-        // Add to room group
-        room.group.add(sprite);
-        this.billboardSprites.push(sprite);
-    }
-    
-    addFloatingOrbs(room, theme) {
+    addFloatingOrbs(worldX, worldZ, roomSize, theme) {
         const numOrbs = 2 + Math.floor(Math.random() * 3);
+        const themeColor = this.getThemeColor(theme);
         
         for (let i = 0; i < numOrbs; i++) {
             const orbGeometry = new THREE.SphereGeometry(0.15, 12, 8);
             const orbMaterial = new THREE.MeshBasicMaterial({
-                color: this.getThemeColor(theme),
+                color: themeColor,
                 transparent: true,
                 opacity: 0.8,
-                emissive: this.getThemeColor(theme),
+                emissive: themeColor,
                 emissiveIntensity: 0.5
             });
             
             const orb = new THREE.Mesh(orbGeometry, orbMaterial);
             orb.position.set(
-                room.position.x + (Math.random() - 0.5) * 10,
+                worldX + (Math.random() - 0.5) * roomSize * 0.6,
                 4 + Math.random() * 2,
-                room.position.z + (Math.random() - 0.5) * 10
+                worldZ + (Math.random() - 0.5) * roomSize * 0.6
             );
             
             // Add floating animation
@@ -1048,27 +848,14 @@ class DungeonSystem {
                 floatAmount: 0.3 + Math.random() * 0.4
             };
             
-            room.group.add(orb);
+            this.currentDungeonGroup.add(orb);
             
-            // Add orb light
-            const orbLight = new THREE.PointLight(this.getThemeColor(theme), 0.3, 4);
+            // Orb light
+            const orbLight = new THREE.PointLight(themeColor, 0.3, 5);
             orbLight.position.copy(orb.position);
-            room.group.add(orbLight);
+            this.currentDungeonGroup.add(orbLight);
             this.lightSources.push(orbLight);
         }
-    }
-    
-    getBillboardType(theme) {
-        const types = {
-            stone: ['rune', 'orb'],
-            crystal: ['crystal', 'orb'],
-            ruins: ['rune', 'crystal'],
-            crypt: ['rune', 'orb'],
-            forest: ['mushroom', 'tree', 'orb']
-        };
-        
-        const availableTypes = types[theme] || ['orb'];
-        return availableTypes[Math.floor(Math.random() * availableTypes.length)];
     }
     
     getThemeColor(theme) {
@@ -1082,45 +869,18 @@ class DungeonSystem {
         return colors[theme] || 0xffffff;
     }
     
-    getAmbientLightLevel(theme) {
-        const levels = {
-            stone: 0.2,
-            crystal: 0.25,
-            ruins: 0.15,
-            crypt: 0.1,
-            forest: 0.3
-        };
-        return levels[theme] || 0.2;
-    }
-    
-    getAmbientColor(theme) {
-        const colors = {
-            stone: 0x4a4a3a,
-            crystal: 0x4a4a6a,
-            ruins: 0x5a4a5a,
-            crypt: 0x3a4a3a,
-            forest: 0x4a5a4a
-        };
-        return colors[theme] || 0x404040;
-    }
-    
     update(deltaTime) {
-        // Update floating orbs and other animated elements
-        this.scene.traverse((child) => {
-            if (child.userData.floatSpeed && child.userData.originalY !== undefined) {
-                child.position.y = child.userData.originalY + 
-                    Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
-            }
-        });
-        
-        // Update billboard sprites to face camera
-        if (this.player && this.player.camera) {
-            this.billboardSprites.forEach(sprite => {
-                sprite.lookAt(this.player.camera.position);
+        // Update floating orbs and animated elements
+        if (this.currentDungeonGroup) {
+            this.currentDungeonGroup.traverse((child) => {
+                if (child.userData.floatSpeed && child.userData.originalY !== undefined) {
+                    child.position.y = child.userData.originalY + 
+                        Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
+                }
             });
         }
         
-        // Animate light intensities for atmospheric effect
+        // Animate light intensities
         this.lightSources.forEach(light => {
             if (light.userData.originalIntensity === undefined) {
                 light.userData.originalIntensity = light.intensity;
@@ -1133,24 +893,10 @@ class DungeonSystem {
     }
     
     clearCurrentDungeon() {
-        // Remove current dungeon from scene
-        if (this.currentDungeon) {
-            this.rooms.forEach(room => {
-                if (room.group) {
-                    this.scene.remove(room.group);
-                }
-            });
-            
-            this.connections.forEach(connection => {
-                if (connection.group) {
-                    this.scene.remove(connection.group);
-                }
-            });
+        if (this.currentDungeonGroup) {
+            this.scene.remove(this.currentDungeonGroup);
         }
         
-        // Clear data structures
-        this.rooms.clear();
-        this.connections.clear();
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
         
@@ -1158,33 +904,22 @@ class DungeonSystem {
     }
     
     getRoomAt(position) {
-        // Find which room the player is currently in
-        for (const [roomId, room] of this.rooms) {
-            const distance = Math.sqrt(
-                (position.x - room.position.x) ** 2 + 
-                (position.z - room.position.z) ** 2
-            );
-            
-            if (distance < room.dimensions.width / 2) {
+        if (!this.currentDungeon) return null;
+        
+        // Convert world position to grid position
+        const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
+        const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
+        
+        // Find which room contains this grid position
+        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
+            const halfSize = Math.floor(room.size / 2);
+            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
+                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
                 return room;
             }
         }
+        
         return null;
-    }
-    
-    getConnectedRooms(roomId) {
-        // Get all rooms connected to the given room
-        const connected = [];
-        
-        this.connections.forEach(connection => {
-            if (connection.roomA === roomId) {
-                connected.push(this.rooms.get(connection.roomB));
-            } else if (connection.roomB === roomId) {
-                connected.push(this.rooms.get(connection.roomA));
-            }
-        });
-        
-        return connected.filter(room => room !== undefined);
     }
 }
 
