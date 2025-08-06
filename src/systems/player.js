@@ -38,7 +38,7 @@ class Player {
         this.airFriction = 0.98;
         
         // Collision
-        this.radius = 0.4; // Player collision radius
+        this.radius = 0.5; // Increased collision radius slightly for better wall detection
         this.height = 1.8; // Player height
         this.dungeonSystem = null; // Will be set by game engine
         
@@ -226,20 +226,26 @@ class Player {
     isPositionValid(position) {
         if (!this.dungeonSystem) return true;
         
-        // Check multiple points around the player's circular collision shape
+        // Check more points around the player's circular collision shape
+        // Including more detailed edge checking for better wall detection
         const checkPoints = [
             // Center
             { x: position.x, z: position.z },
-            // Four cardinal directions
-            { x: position.x + this.radius, z: position.z },
-            { x: position.x - this.radius, z: position.z },
-            { x: position.x, z: position.z + this.radius },
-            { x: position.x, z: position.z - this.radius },
+            // Four cardinal directions (full radius)
+            { x: position.x + this.radius, z: position.z },     // East
+            { x: position.x - this.radius, z: position.z },     // West
+            { x: position.x, z: position.z + this.radius },     // South
+            { x: position.x, z: position.z - this.radius },     // North
             // Four diagonal directions
-            { x: position.x + this.radius * 0.7, z: position.z + this.radius * 0.7 },
-            { x: position.x - this.radius * 0.7, z: position.z + this.radius * 0.7 },
-            { x: position.x + this.radius * 0.7, z: position.z - this.radius * 0.7 },
-            { x: position.x - this.radius * 0.7, z: position.z - this.radius * 0.7 }
+            { x: position.x + this.radius * 0.7, z: position.z + this.radius * 0.7 },   // SE
+            { x: position.x - this.radius * 0.7, z: position.z + this.radius * 0.7 },   // SW
+            { x: position.x + this.radius * 0.7, z: position.z - this.radius * 0.7 },   // NE
+            { x: position.x - this.radius * 0.7, z: position.z - this.radius * 0.7 },   // NW
+            // Additional intermediate points for better coverage
+            { x: position.x + this.radius * 0.9, z: position.z },     // East edge
+            { x: position.x - this.radius * 0.9, z: position.z },     // West edge  
+            { x: position.x, z: position.z + this.radius * 0.9 },     // South edge
+            { x: position.x, z: position.z - this.radius * 0.9 },     // North edge
         ];
         
         // All check points must be in walkable areas
