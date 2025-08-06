@@ -868,57 +868,61 @@ class DungeonSystem {
         
         // Create billboard sprite for the mask
         const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
+        canvas.width = 256;
+        canvas.height = 256;
         const ctx = canvas.getContext('2d');
         
-        // Test if canvas is working
-        console.log('Creating canvas for', direction, 'portal. Canvas:', canvas, 'Context:', ctx);
-        
         // Draw creepy mask on canvas
-        const success = this.drawCreepyMask(ctx, canvas.width, canvas.height, isUnlocked);
+        this.drawCreepyMask(ctx, canvas.width, canvas.height, isUnlocked);
         
-        let material;
+        // DEBUG: Add a simple test pattern to see if canvas is working
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.5)'; // Magenta border for testing
+        ctx.fillRect(0, 0, 10, canvas.height); // Left border
+        ctx.fillRect(canvas.width - 10, 0, 10, canvas.height); // Right border
+        ctx.fillRect(0, 0, canvas.width, 10); // Top border
+        ctx.fillRect(0, canvas.height - 10, canvas.width, 10); // Bottom border
         
-        if (success && ctx) {
-            // Create texture from canvas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.generateMipmaps = false;
-            texture.wrapS = THREE.ClampToEdgeWrapping;
-            texture.wrapT = THREE.ClampToEdgeWrapping;
-            texture.flipY = false;
-            
-            // Create billboard material
-            material = new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide,
-                depthWrite: false
-            });
-            
-            console.log('Created texture material for', direction);
-        } else {
-            // Fallback: simple colored material
-            console.log('Canvas failed, using fallback material for', direction);
-            const color = isUnlocked ? 0x00ff00 : 0xff0000;
-            material = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
-        }
+        console.log('Canvas created:', canvas.width, 'x', canvas.height);
         
-        // Create billboard geometry - larger size
-        const geometry = new THREE.PlaneGeometry(4, 4);
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.generateMipmaps = false;
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.flipY = false; // Important for canvas textures
+        
+        console.log('Texture created from canvas');
+        
+        // Create billboard material with debugging
+        const material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            alphaTest: 0.01, // Lower threshold
+            side: THREE.DoubleSide, // Show both sides for testing
+            // Add a base color for debugging
+            color: 0xffffff
+        });
+        
+        console.log('Material created with texture');
+        
+        // Create billboard geometry - larger size for testing
+        const geometry = new THREE.PlaneGeometry(6, 6); // Made bigger
         const billboard = new THREE.Mesh(geometry, material);
         
-        // Make it always face the camera (billboard effect)
-        billboard.userData.isBillboard = true;
+        // Make it always face the camera (billboard effect) - DISABLED for testing
+        // billboard.userData.isBillboard = true;
         
         portalGroup.add(billboard);
         
-        // Add simple particle effects around the portal
+        // Add a simple colored cube for reference
+        const testCube = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshBasicMaterial({ color: isUnlocked ? 0x00ff00 : 0xff0000 })
+        );
+        testCube.position.set(0, 2, 0);
+        portalGroup.add(testCube);
+        
+        // Add particle effects around the portal
         this.addPortalParticleEffects(portalGroup, isUnlocked);
         
         // Add portal data
@@ -931,110 +935,206 @@ class DungeonSystem {
             pulseAmount: 0.1,
             canvas: canvas,
             ctx: ctx,
-            texture: success ? material.map : null,
-            material: material,
-            isCanvasMode: success && ctx
+            texture: texture
         };
+        
+        console.log(`Created billboard portal for ${direction}, unlocked: ${isUnlocked}`);
         
         return portalGroup;
     }
     
     drawCreepyMask(ctx, width, height, isUnlocked) {
-        try {
-            console.log('Drawing mask, isUnlocked:', isUnlocked, 'canvas size:', width, 'x', height);
-            
-            // Clear canvas with a test color first
-            ctx.fillStyle = '#ff00ff'; // Bright magenta for testing
-            ctx.fillRect(0, 0, width, height);
-            
-            // Clear canvas properly
-            ctx.clearRect(0, 0, width, height);
-            
-            const centerX = width / 2;
-            const centerY = height / 2;
-            
-            // Simple approach first - draw a basic creepy face
-            // Main mask shape (oval) - solid color
-            ctx.fillStyle = isUnlocked ? '#2d4a2d' : '#4a2d2d';
-            ctx.beginPath();
-            ctx.ellipse(centerX, centerY, width * 0.3, height * 0.35, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Add border
-            ctx.strokeStyle = '#1a1a1a';
-            ctx.lineWidth = 4;
-            ctx.stroke();
-            
-            // Draw eye sockets (black)
-            ctx.fillStyle = '#000000';
-            // Left eye socket
-            ctx.beginPath();
-            ctx.ellipse(centerX - 40, centerY - 30, 25, 30, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Right eye socket
-            ctx.beginPath();
-            ctx.ellipse(centerX + 40, centerY - 30, 20, 25, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw glowing eyes
-            const eyeColor = isUnlocked ? '#00ff00' : '#ff0000';
-            ctx.fillStyle = eyeColor;
-            ctx.shadowColor = eyeColor;
-            ctx.shadowBlur = 20;
-            
-            // Left eye glow
-            ctx.beginPath();
-            ctx.arc(centerX - 40, centerY - 30, 12, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Right eye glow
-            ctx.beginPath();
-            ctx.arc(centerX + 40, centerY - 30, 10, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Reset shadow
-            ctx.shadowBlur = 0;
-            
-            // Draw mouth
-            ctx.fillStyle = '#000000';
-            ctx.beginPath();
-            ctx.ellipse(centerX, centerY + 40, 30, 15, 0, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Add some simple cracks
-            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(centerX - 60, centerY - 60);
-            ctx.lineTo(centerX - 30, centerY - 40);
-            ctx.stroke();
-            
-            ctx.beginPath();
-            ctx.moveTo(centerX + 30, centerY + 20);
-            ctx.lineTo(centerX + 60, centerY + 40);
-            ctx.stroke();
-            
-            // Add runes around the edge
-            ctx.fillStyle = isUnlocked ? '#44aa44' : '#aa4444';
-            ctx.font = 'bold 24px serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            const runes = ['☠', '⚡', '✦', '◆', '▲', '●'];
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const runeRadius = Math.min(width, height) * 0.42;
-                const x = centerX + Math.cos(angle) * runeRadius;
-                const y = centerY + Math.sin(angle) * runeRadius;
-                ctx.fillText(runes[i], x, y);
-            }
-            
-            console.log('Mask drawing completed successfully');
-            return true;
-            
-        } catch (error) {
-            console.error('Error drawing mask:', error);
-            return false;
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height);
+        
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        // Create main mask gradient (weathered stone look)
+        const maskGradient = ctx.createRadialGradient(
+            centerX * 0.7, centerY * 0.6, 0,
+            centerX, centerY, width * 0.6
+        );
+        maskGradient.addColorStop(0, '#8B7355');
+        maskGradient.addColorStop(0.5, '#6B5B47');
+        maskGradient.addColorStop(1, '#4A3F35');
+        
+        // Draw main mask shape (oval)
+        ctx.fillStyle = maskGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, width * 0.32, height * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add weathering overlay
+        ctx.fillStyle = 'rgba(92, 74, 58, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, centerY, width * 0.32, height * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add dark stains and weathering marks
+        ctx.fillStyle = 'rgba(42, 31, 26, 0.6)';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 30, centerY - 40, 15, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(42, 31, 26, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(centerX + 30, centerY + 40, 20, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(58, 37, 32, 0.5)';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 55, centerY + 20, 8, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw cracks for weathered look
+        ctx.strokeStyle = 'rgba(26, 20, 16, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        
+        // Main crack
+        ctx.beginPath();
+        ctx.moveTo(centerX - 40, centerY - 50);
+        ctx.quadraticCurveTo(centerX - 35, centerY - 40, centerX - 30, centerY - 30);
+        ctx.quadraticCurveTo(centerX - 25, centerY - 20, centerX - 20, centerY - 10);
+        ctx.stroke();
+        
+        // Side crack
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX + 40, centerY - 70);
+        ctx.quadraticCurveTo(centerX + 35, centerY - 55, centerX + 30, centerY - 40);
+        ctx.stroke();
+        
+        // Small crack
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 70, centerY);
+        ctx.quadraticCurveTo(centerX - 60, centerY + 5, centerX - 50, centerY + 10);
+        ctx.stroke();
+        
+        // Draw asymmetrical eye holes (black base)
+        // Left eye (larger, more irregular)
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 25, centerY - 25, 18, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Right eye (smaller, more menacing)
+        ctx.beginPath();
+        ctx.ellipse(centerX + 25, centerY - 25, 15, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add depth to eye sockets with shadow gradients
+        const shadowGradient = ctx.createRadialGradient(centerX - 25, centerY - 25, 0, centerX - 25, centerY - 25, 20);
+        shadowGradient.addColorStop(0, 'rgba(0,0,0,0.8)');
+        shadowGradient.addColorStop(1, 'rgba(0,0,0,0.3)');
+        
+        ctx.fillStyle = shadowGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX - 25, centerY - 25, 16, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        const shadowGradient2 = ctx.createRadialGradient(centerX + 25, centerY - 25, 0, centerX + 25, centerY - 25, 18);
+        shadowGradient2.addColorStop(0, 'rgba(0,0,0,0.8)');
+        shadowGradient2.addColorStop(1, 'rgba(0,0,0,0.3)');
+        
+        ctx.fillStyle = shadowGradient2;
+        ctx.beginPath();
+        ctx.ellipse(centerX + 25, centerY - 25, 13, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw glowing eyes (color changes based on unlock status)
+        const eyeColor = isUnlocked ? '#00ff00' : '#ff0000';
+        const glowColor = isUnlocked ? '#44ff44' : '#ff4444';
+        
+        ctx.fillStyle = eyeColor;
+        ctx.shadowColor = glowColor;
+        ctx.shadowBlur = 15;
+        
+        // Left eye glow
+        ctx.beginPath();
+        ctx.arc(centerX - 25, centerY - 25, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Right eye glow
+        ctx.beginPath();
+        ctx.arc(centerX + 25, centerY - 25, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Reset shadow
+        ctx.shadowBlur = 0;
+        
+        // Draw unsettling grin mouth (transformed from smile)
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.moveTo(centerX - 30, centerY + 30);
+        ctx.quadraticCurveTo(centerX, centerY + 55, centerX + 30, centerY + 30);
+        ctx.quadraticCurveTo(centerX + 25, centerY + 45, centerX, centerY + 50);
+        ctx.quadraticCurveTo(centerX - 25, centerY + 45, centerX - 30, centerY + 30);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add internal mouth shadow
+        const mouthGradient = ctx.createRadialGradient(centerX, centerY + 40, 0, centerX, centerY + 40, 25);
+        mouthGradient.addColorStop(0, 'rgba(0,0,0,0.8)');
+        mouthGradient.addColorStop(1, 'rgba(0,0,0,0.3)');
+        
+        ctx.fillStyle = mouthGradient;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 28, centerY + 32);
+        ctx.quadraticCurveTo(centerX, centerY + 52, centerX + 28, centerY + 32);
+        ctx.quadraticCurveTo(centerX + 23, centerY + 42, centerX, centerY + 47);
+        ctx.quadraticCurveTo(centerX - 23, centerY + 42, centerX - 28, centerY + 32);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add teeth for extra creepiness
+        ctx.fillStyle = 'rgba(139, 115, 85, 0.8)';
+        const teeth = [
+            { x: centerX - 15, y: centerY + 38, w: 3, h: 8 },
+            { x: centerX - 8, y: centerY + 40, w: 3, h: 6 },
+            { x: centerX + 5, y: centerY + 40, w: 3, h: 6 },
+            { x: centerX + 12, y: centerY + 38, w: 3, h: 8 }
+        ];
+        
+        teeth.forEach(tooth => {
+            ctx.fillRect(tooth.x, tooth.y, tooth.w, tooth.h);
+        });
+        
+        // Add small wear marks and details
+        ctx.fillStyle = 'rgba(58, 37, 32, 0.6)';
+        ctx.beginPath();
+        ctx.arc(centerX - 45, centerY - 15, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(58, 37, 32, 0.7)';
+        ctx.beginPath();
+        ctx.arc(centerX + 45, centerY + 10, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'rgba(58, 37, 32, 0.5)';
+        ctx.beginPath();
+        ctx.arc(centerX - 10, centerY - 75, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add subtle highlight for dimension
+        ctx.fillStyle = 'rgba(166, 139, 112, 0.2)';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 15, centerY - 30, 25, 30, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add ancient runes around the edge (color changes with state)
+        ctx.fillStyle = isUnlocked ? '#44aa44' : '#aa4444';
+        ctx.font = 'bold 18px serif';
+        ctx.textAlign = 'center';
+        const runes = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ'];
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const runeRadius = Math.min(width, height) * 0.4;
+            const x = centerX + Math.cos(angle) * runeRadius;
+            const y = centerY + Math.sin(angle) * runeRadius;
+            ctx.fillText(runes[i], x, y);
         }
     }
     
@@ -1548,10 +1648,10 @@ class DungeonSystem {
                     this.updatePortalParticles(child, deltaTime);
                 }
                 
-                // Make billboards face camera
-                if (child.userData.isBillboard && window.game && window.game.camera) {
-                    child.lookAt(window.game.camera.position);
-                }
+                // DISABLED: Make billboards face camera (for testing)
+                // if (child.userData.isBillboard && window.game && window.game.camera) {
+                //     child.lookAt(window.game.camera.position);
+                // }
             });
         }
         
