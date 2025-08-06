@@ -226,31 +226,39 @@ class Player {
     isPositionValid(position) {
         if (!this.dungeonSystem) return true;
         
+        // Use a more conservative collision approach with additional boundary checks
+        const checkRadius = this.radius * 1.1; // Slightly larger than actual radius
+        
         // Check more points around the player's circular collision shape
-        // Including more detailed edge checking for better wall detection
         const checkPoints = [
             // Center
             { x: position.x, z: position.z },
-            // Four cardinal directions (full radius)
-            { x: position.x + this.radius, z: position.z },     // East
-            { x: position.x - this.radius, z: position.z },     // West
-            { x: position.x, z: position.z + this.radius },     // South
-            { x: position.x, z: position.z - this.radius },     // North
+            // Four cardinal directions (full radius + margin)
+            { x: position.x + checkRadius, z: position.z },     // East
+            { x: position.x - checkRadius, z: position.z },     // West
+            { x: position.x, z: position.z + checkRadius },     // South
+            { x: position.x, z: position.z - checkRadius },     // North
             // Four diagonal directions
-            { x: position.x + this.radius * 0.7, z: position.z + this.radius * 0.7 },   // SE
-            { x: position.x - this.radius * 0.7, z: position.z + this.radius * 0.7 },   // SW
-            { x: position.x + this.radius * 0.7, z: position.z - this.radius * 0.7 },   // NE
-            { x: position.x - this.radius * 0.7, z: position.z - this.radius * 0.7 },   // NW
-            // Additional intermediate points for better coverage
-            { x: position.x + this.radius * 0.9, z: position.z },     // East edge
-            { x: position.x - this.radius * 0.9, z: position.z },     // West edge  
-            { x: position.x, z: position.z + this.radius * 0.9 },     // South edge
-            { x: position.x, z: position.z - this.radius * 0.9 },     // North edge
+            { x: position.x + checkRadius * 0.7, z: position.z + checkRadius * 0.7 },   // SE
+            { x: position.x - checkRadius * 0.7, z: position.z + checkRadius * 0.7 },   // SW
+            { x: position.x + checkRadius * 0.7, z: position.z - checkRadius * 0.7 },   // NE
+            { x: position.x - checkRadius * 0.7, z: position.z - checkRadius * 0.7 },   // NW
+            // Extra edge points for problematic directions (South and West)
+            { x: position.x - checkRadius * 0.9, z: position.z },     // West edge
+            { x: position.x, z: position.z + checkRadius * 0.9 },     // South edge
+            { x: position.x - checkRadius * 0.8, z: position.z + checkRadius * 0.8 },   // SW additional
+            // Additional fine-grained points for South/West problem areas
+            { x: position.x - checkRadius * 0.95, z: position.z + checkRadius * 0.3 },
+            { x: position.x - checkRadius * 0.95, z: position.z - checkRadius * 0.3 },
+            { x: position.x - checkRadius * 0.3, z: position.z + checkRadius * 0.95 },
+            { x: position.x + checkRadius * 0.3, z: position.z + checkRadius * 0.95 },
         ];
         
         // All check points must be in walkable areas
         for (const point of checkPoints) {
-            if (!this.dungeonSystem.isPositionWalkable(point.x, point.z)) {
+            // Use both methods for extra safety
+            if (!this.dungeonSystem.isPositionWalkable(point.x, point.z) || 
+                this.dungeonSystem.isPositionSolid(point.x, point.z)) {
                 return false;
             }
         }
