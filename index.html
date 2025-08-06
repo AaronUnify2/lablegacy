@@ -224,6 +224,18 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
 
+        /* Room Progression Indicator */
+        #progressionIndicator {
+            position: absolute;
+            top: 130px;
+            left: 20px;
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+        }
+
         /* Compass */
         #compass {
             position: absolute;
@@ -318,6 +330,12 @@
             #compass-needle {
                 height: 38px;
             }
+            
+            #progressionIndicator {
+                font-size: 12px;
+                top: 120px;
+                left: 15px;
+            }
         }
     </style>
 </head>
@@ -336,6 +354,17 @@
             <div id="crosshair"></div>
             <div id="floorIndicator">Floor 1</div>
             
+            <!-- Room Progression Indicator -->
+            <div id="progressionIndicator">
+                <div>Room Progress:</div>
+                <div style="margin-top: 5px;">
+                    <span id="progress-north" style="color: #00ff00;">⬆️ North: OPEN</span><br>
+                    <span id="progress-east" style="color: #ff6666;">➡️ East: LOCKED</span><br>
+                    <span id="progress-west" style="color: #ff6666;">⬅️ West: LOCKED</span><br>
+                    <span id="progress-south" style="color: #ff6666;">⬇️ South: LOCKED</span>
+                </div>
+            </div>
+            
             <!-- Compass -->
             <div id="compass">
                 <div id="compass-face">
@@ -351,8 +380,9 @@
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
-                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small><br>
-                <small>Walls, floors, and ceilings are now solid! Check the compass (top-right) for direction.</small>
+                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, ⚔️ = Defeat Enemies (Progress)</small><br>
+                <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
+                <small>Creepy mask portals block paths - defeat enemies to unlock new areas!</small>
             </div>
         </div>
         
@@ -405,10 +435,10 @@
     
     <!-- 5. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
     <script>
-        // Main Game Engine with proper collision integration
+        // Main Game Engine with progressive portal system
         class LabyrinthGame {
             constructor() {
-                console.log('Initializing Labyrinth Game with collision detection...');
+                console.log('Initializing Labyrinth Game with progressive portal system...');
                 
                 this.scene = null;
                 this.camera = null;
@@ -605,7 +635,7 @@
                 this.player.position.set(0, 1.8, 0);
                 this.player.camera.position.copy(this.player.position);
                 
-                console.log('Dungeon system initialized with collision detection and first floor generated');
+                console.log('Dungeon system initialized with progressive portals and first floor generated');
             }
             
             setupUI() {
@@ -613,7 +643,7 @@
             }
             
             onInitializationComplete() {
-                console.log('All systems initialized successfully with collision detection');
+                console.log('All systems initialized successfully with progressive portal system');
                 
                 // Set up additional input handlers now that everything is ready
                 if (!inputState.isMobile) {
@@ -675,6 +705,13 @@
                 if (input.justPressed.interact && input.menu) {
                     this.advanceFloors(1);
                 }
+                
+                // Sword button or I key: Progress through rooms (simulate defeating enemies)
+                if (input.justPressed.attack || input.justPressed.inventory) {
+                    if (this.dungeonSystem) {
+                        this.dungeonSystem.togglePortals();
+                    }
+                }
             }
             
             advanceFloors(count) {
@@ -725,6 +762,40 @@
                 
                 // Update compass
                 this.updateCompass();
+                
+                // Update progression indicator
+                this.updateProgressionIndicator();
+            }
+            
+            updateProgressionIndicator() {
+                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
+                
+                const progression = this.dungeonSystem.roomProgression;
+                const directions = ['north', 'east', 'west', 'south'];
+                
+                directions.forEach(dir => {
+                    const element = document.getElementById(`progress-${dir}`);
+                    if (element) {
+                        const room = progression[dir];
+                        let status = '';
+                        let color = '';
+                        
+                        if (room.enemiesDefeated) {
+                            status = 'COMPLETED ✓';
+                            color = '#00ff00';
+                        } else if (room.unlocked) {
+                            status = 'OPEN - Fight!';
+                            color = '#ffff00';
+                        } else {
+                            status = 'LOCKED';
+                            color = '#ff6666';
+                        }
+                        
+                        const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
+                        element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
+                        element.style.color = color;
+                    }
+                });
             }
             
             updateCompass() {
@@ -765,7 +836,7 @@
     <script>
         // Wait for DOM to be fully loaded before starting
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing game with collision detection...');
+            console.log('DOM loaded, initializing game with progressive portal system...');
             
             // Verify all dependencies are loaded
             if (!window.THREE) {
@@ -791,10 +862,10 @@
             // Initialize input system first
             setupInput();
             
-            // Initialize game engine (this will create player, dungeon, etc. with collision)
+            // Initialize game engine (this will create player, dungeon, etc. with progressive portals)
             window.game = new LabyrinthGame();
             
-            console.log('Game initialization complete with solid walls, floors, and ceilings');
+            console.log('Game initialization complete with progressive portal system');
         });
     </script>
 </body>
