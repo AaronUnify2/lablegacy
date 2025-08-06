@@ -866,37 +866,9 @@ class DungeonSystem {
     createBillboardPortal(direction, theme, isUnlocked) {
         const portalGroup = new THREE.Group();
         
-        // Create billboard sprite for the mask
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw creepy mask on canvas
-        this.drawCreepyMask(ctx, canvas.width, canvas.height, isUnlocked);
-        
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.generateMipmaps = false;
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        
-        // Create billboard material
-        const material = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: true,
-            alphaTest: 0.1,
-            side: THREE.DoubleSide
-        });
-        
-        // Create billboard geometry - larger size
-        const geometry = new THREE.PlaneGeometry(4, 4);
-        const billboard = new THREE.Mesh(geometry, material);
-        
-        // Make it always face the camera (billboard effect)
-        billboard.userData.isBillboard = true;
-        
-        portalGroup.add(billboard);
+        // Create simple geometric mask instead of canvas texture
+        const mask = this.createGeometricMask(isUnlocked);
+        portalGroup.add(mask);
         
         // Add particle effects around the portal
         this.addPortalParticleEffects(portalGroup, isUnlocked);
@@ -908,208 +880,117 @@ class DungeonSystem {
             isBlocking: !isUnlocked,
             originalY: this.floorHeight + 3,
             pulseSpeed: 0.5 + Math.random() * 0.5,
-            pulseAmount: 0.1, // Much smaller pulse
-            canvas: canvas,
-            ctx: ctx,
-            texture: texture
+            pulseAmount: 0.1,
+            maskMesh: mask // Store reference to the mask for color changes
         };
+        
+        console.log(`Created geometric portal for ${direction}, unlocked: ${isUnlocked}`);
         
         return portalGroup;
     }
     
-    drawCreepyMask(ctx, width, height, isUnlocked) {
-        // Clear canvas
-        ctx.clearRect(0, 0, width, height);
+    createGeometricMask(isUnlocked) {
+        const maskGroup = new THREE.Group();
         
-        const centerX = width / 2;
-        const centerY = height / 2;
+        // Main mask face (oval)
+        const faceGeometry = new THREE.SphereGeometry(2, 16, 12);
+        faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
         
-        // Create main mask gradient (weathered stone look)
-        const maskGradient = ctx.createRadialGradient(
-            centerX * 0.7, centerY * 0.6, 0,
-            centerX, centerY, width * 0.6
-        );
-        maskGradient.addColorStop(0, '#8B7355');
-        maskGradient.addColorStop(0.5, '#6B5B47');
-        maskGradient.addColorStop(1, '#4A3F35');
-        
-        // Draw main mask shape (oval)
-        ctx.fillStyle = maskGradient;
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, width * 0.32, height * 0.35, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add weathering overlay
-        ctx.fillStyle = 'rgba(92, 74, 58, 0.3)';
-        ctx.beginPath();
-        ctx.ellipse(centerX, centerY, width * 0.32, height * 0.35, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add dark stains and weathering marks
-        ctx.fillStyle = 'rgba(42, 31, 26, 0.6)';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 30, centerY - 40, 15, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = 'rgba(42, 31, 26, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(centerX + 30, centerY + 40, 20, 12, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = 'rgba(58, 37, 32, 0.5)';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 55, centerY + 20, 8, 15, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw cracks for weathered look
-        ctx.strokeStyle = 'rgba(26, 20, 16, 0.7)';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        
-        // Main crack
-        ctx.beginPath();
-        ctx.moveTo(centerX - 40, centerY - 50);
-        ctx.quadraticCurveTo(centerX - 35, centerY - 40, centerX - 30, centerY - 30);
-        ctx.quadraticCurveTo(centerX - 25, centerY - 20, centerX - 20, centerY - 10);
-        ctx.stroke();
-        
-        // Side crack
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(centerX + 40, centerY - 70);
-        ctx.quadraticCurveTo(centerX + 35, centerY - 55, centerX + 30, centerY - 40);
-        ctx.stroke();
-        
-        // Small crack
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(centerX - 70, centerY);
-        ctx.quadraticCurveTo(centerX - 60, centerY + 5, centerX - 50, centerY + 10);
-        ctx.stroke();
-        
-        // Draw asymmetrical eye holes (black base)
-        // Left eye (larger, more irregular)
-        ctx.fillStyle = '#000000';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 25, centerY - 25, 18, 20, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Right eye (smaller, more menacing)
-        ctx.beginPath();
-        ctx.ellipse(centerX + 25, centerY - 25, 15, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Add depth to eye sockets with shadow gradients
-        const shadowGradient = ctx.createRadialGradient(centerX - 25, centerY - 25, 0, centerX - 25, centerY - 25, 20);
-        shadowGradient.addColorStop(0, 'rgba(0,0,0,0.8)');
-        shadowGradient.addColorStop(1, 'rgba(0,0,0,0.3)');
-        
-        ctx.fillStyle = shadowGradient;
-        ctx.beginPath();
-        ctx.ellipse(centerX - 25, centerY - 25, 16, 18, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        const shadowGradient2 = ctx.createRadialGradient(centerX + 25, centerY - 25, 0, centerX + 25, centerY - 25, 18);
-        shadowGradient2.addColorStop(0, 'rgba(0,0,0,0.8)');
-        shadowGradient2.addColorStop(1, 'rgba(0,0,0,0.3)');
-        
-        ctx.fillStyle = shadowGradient2;
-        ctx.beginPath();
-        ctx.ellipse(centerX + 25, centerY - 25, 13, 16, 0, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw glowing eyes (color changes based on unlock status)
-        const eyeColor = isUnlocked ? '#00ff00' : '#ff0000';
-        const glowColor = isUnlocked ? '#44ff44' : '#ff4444';
-        
-        ctx.fillStyle = eyeColor;
-        ctx.shadowColor = glowColor;
-        ctx.shadowBlur = 15;
-        
-        // Left eye glow
-        ctx.beginPath();
-        ctx.arc(centerX - 25, centerY - 25, 8, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Right eye glow
-        ctx.beginPath();
-        ctx.arc(centerX + 25, centerY - 25, 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Reset shadow
-        ctx.shadowBlur = 0;
-        
-        // Draw unsettling grin mouth (transformed from smile)
-        ctx.fillStyle = '#000000';
-        ctx.beginPath();
-        ctx.moveTo(centerX - 30, centerY + 30);
-        ctx.quadraticCurveTo(centerX, centerY + 55, centerX + 30, centerY + 30);
-        ctx.quadraticCurveTo(centerX + 25, centerY + 45, centerX, centerY + 50);
-        ctx.quadraticCurveTo(centerX - 25, centerY + 45, centerX - 30, centerY + 30);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add internal mouth shadow
-        const mouthGradient = ctx.createRadialGradient(centerX, centerY + 40, 0, centerX, centerY + 40, 25);
-        mouthGradient.addColorStop(0, 'rgba(0,0,0,0.8)');
-        mouthGradient.addColorStop(1, 'rgba(0,0,0,0.3)');
-        
-        ctx.fillStyle = mouthGradient;
-        ctx.beginPath();
-        ctx.moveTo(centerX - 28, centerY + 32);
-        ctx.quadraticCurveTo(centerX, centerY + 52, centerX + 28, centerY + 32);
-        ctx.quadraticCurveTo(centerX + 23, centerY + 42, centerX, centerY + 47);
-        ctx.quadraticCurveTo(centerX - 23, centerY + 42, centerX - 28, centerY + 32);
-        ctx.closePath();
-        ctx.fill();
-        
-        // Add teeth for extra creepiness
-        ctx.fillStyle = 'rgba(139, 115, 85, 0.8)';
-        const teeth = [
-            { x: centerX - 15, y: centerY + 38, w: 3, h: 8 },
-            { x: centerX - 8, y: centerY + 40, w: 3, h: 6 },
-            { x: centerX + 5, y: centerY + 40, w: 3, h: 6 },
-            { x: centerX + 12, y: centerY + 38, w: 3, h: 8 }
-        ];
-        
-        teeth.forEach(tooth => {
-            ctx.fillRect(tooth.x, tooth.y, tooth.w, tooth.h);
+        const faceColor = isUnlocked ? 0x2a4a2a : 0x4a2a2a;
+        const faceMaterial = new THREE.MeshLambertMaterial({ 
+            color: faceColor,
+            transparent: true,
+            opacity: 0.9
         });
         
-        // Add small wear marks and details
-        ctx.fillStyle = 'rgba(58, 37, 32, 0.6)';
-        ctx.beginPath();
-        ctx.arc(centerX - 45, centerY - 15, 3, 0, Math.PI * 2);
-        ctx.fill();
+        const face = new THREE.Mesh(faceGeometry, faceMaterial);
+        maskGroup.add(face);
         
-        ctx.fillStyle = 'rgba(58, 37, 32, 0.7)';
-        ctx.beginPath();
-        ctx.arc(centerX + 45, centerY + 10, 2, 0, Math.PI * 2);
-        ctx.fill();
+        // Eye sockets (black holes)
+        const eyeGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
         
-        ctx.fillStyle = 'rgba(58, 37, 32, 0.5)';
-        ctx.beginPath();
-        ctx.arc(centerX - 10, centerY - 75, 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        // Left eye socket
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.6, 0.3, 0.2);
+        leftEye.scale.set(1, 1.3, 0.8);
+        maskGroup.add(leftEye);
         
-        // Add subtle highlight for dimension
-        ctx.fillStyle = 'rgba(166, 139, 112, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 15, centerY - 30, 25, 30, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // Right eye socket  
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.6, 0.3, 0.2);
+        rightEye.scale.set(0.8, 1.1, 0.8);
+        maskGroup.add(rightEye);
         
-        // Add ancient runes around the edge (color changes with state)
-        ctx.fillStyle = isUnlocked ? '#44aa44' : '#aa4444';
-        ctx.font = 'bold 18px serif';
-        ctx.textAlign = 'center';
-        const runes = ['ᚠ', 'ᚢ', 'ᚦ', 'ᚨ', 'ᚱ', 'ᚲ'];
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const runeRadius = Math.min(width, height) * 0.4;
-            const x = centerX + Math.cos(angle) * runeRadius;
-            const y = centerY + Math.sin(angle) * runeRadius;
-            ctx.fillText(runes[i], x, y);
+        // Glowing eyes
+        const eyeColor = isUnlocked ? 0x00ff00 : 0xff0000;
+        const eyeGlowGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+        const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
+            color: eyeColor,
+            transparent: true,
+            opacity: 0.9,
+            emissive: eyeColor,
+            emissiveIntensity: 0.8
+        });
+        
+        // Left glowing eye
+        const leftGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
+        leftGlow.position.set(-0.6, 0.3, 0.25);
+        maskGroup.add(leftGlow);
+        
+        // Right glowing eye
+        const rightGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
+        rightGlow.position.set(0.6, 0.3, 0.25);
+        rightGlow.scale.set(0.8, 0.8, 0.8);
+        maskGroup.add(rightGlow);
+        
+        // Mouth (dark opening)
+        const mouthGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+        mouthGeometry.scale(1, 0.5, 0.8);
+        const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, -0.5, 0.15);
+        maskGroup.add(mouth);
+        
+        // Add some teeth
+        const toothGeometry = new THREE.BoxGeometry(0.05, 0.2, 0.05);
+        const toothMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFACD });
+        
+        for (let i = 0; i < 4; i++) {
+            const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
+            tooth.position.set(-0.15 + i * 0.1, -0.4, 0.2);
+            maskGroup.add(tooth);
         }
+        
+        // Add cracks/weathering marks
+        const crackGeometry = new THREE.BoxGeometry(0.02, 0.8, 0.02);
+        const crackMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x2a1a1a,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const crack1 = new THREE.Mesh(crackGeometry, crackMaterial);
+        crack1.position.set(-0.8, 0, 0.25);
+        crack1.rotation.z = Math.PI / 6;
+        maskGroup.add(crack1);
+        
+        const crack2 = new THREE.Mesh(crackGeometry, crackMaterial);
+        crack2.position.set(0.7, -0.3, 0.25);
+        crack2.rotation.z = -Math.PI / 4;
+        crack2.scale.set(1, 0.6, 1);
+        maskGroup.add(crack2);
+        
+        // Store references for color changes
+        maskGroup.userData = {
+            face: face,
+            leftGlow: leftGlow,
+            rightGlow: rightGlow,
+            isUnlocked: isUnlocked
+        };
+        
+        return maskGroup;
     }
     
     addPortalParticleEffects(portalGroup, isUnlocked) {
@@ -1378,15 +1259,27 @@ class DungeonSystem {
             if (child.userData.direction === direction) {
                 child.userData.isBlocking = !shouldOpen;
                 
-                // Redraw the mask with new state
-                if (child.userData.canvas && child.userData.ctx && child.userData.texture) {
-                    this.drawCreepyMask(child.userData.ctx, child.userData.canvas.width, child.userData.canvas.height, shouldOpen);
-                    child.userData.texture.needsUpdate = true;
+                // Update geometric mask colors
+                if (child.userData.maskMesh && child.userData.maskMesh.userData) {
+                    const maskData = child.userData.maskMesh.userData;
+                    
+                    // Update face color
+                    const newFaceColor = shouldOpen ? 0x2a4a2a : 0x4a2a2a;
+                    maskData.face.material.color.setHex(newFaceColor);
+                    
+                    // Update eye glow colors
+                    const newEyeColor = shouldOpen ? 0x00ff00 : 0xff0000;
+                    maskData.leftGlow.material.color.setHex(newEyeColor);
+                    maskData.leftGlow.material.emissive.setHex(newEyeColor);
+                    maskData.rightGlow.material.color.setHex(newEyeColor);
+                    maskData.rightGlow.material.emissive.setHex(newEyeColor);
+                    
+                    maskData.isUnlocked = shouldOpen;
                 }
                 
                 // Update particle colors
                 child.traverse((subChild) => {
-                    if (subChild.material && subChild.material.color) {
+                    if (subChild.material && subChild.material.color && subChild.userData.swirSpeed !== undefined) {
                         const newColor = shouldOpen ? 0x44ff44 : 0xff4444;
                         subChild.material.color.setHex(newColor);
                         if (subChild.material.emissive) {
@@ -1410,7 +1303,7 @@ class DungeonSystem {
             const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
             const roomSize = centerRoom.size * this.gridSize;
             
-            // Create and add exit portal billboard
+            // Create and add exit portal using geometric approach
             const exitPortal = this.createBillboardPortal('exit', this.getCurrentTheme(), true);
             exitPortal.position.set(centerWorldX, this.floorHeight + 3, centerWorldZ + roomSize * 0.3);
             exitPortal.name = 'exit_portal';
@@ -1419,7 +1312,7 @@ class DungeonSystem {
             exitPortal.userData.direction = 'exit';
             
             this.currentDungeonGroup.add(exitPortal);
-            console.log('Exit portal billboard added and opened!');
+            console.log('Exit portal added and opened with geometric design!');
         }
     }
     
@@ -1612,7 +1505,7 @@ class DungeonSystem {
                         Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
                 }
                 
-                // Update billboard portal animations
+                // Update geometric portal animations
                 if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
                     this.updateBillboardPortalAnimations(child, deltaTime);
                 }
@@ -1620,11 +1513,6 @@ class DungeonSystem {
                 // Update portal particles
                 if (child.userData.swirSpeed !== undefined) {
                     this.updatePortalParticles(child, deltaTime);
-                }
-                
-                // Make billboards face camera
-                if (child.userData.isBillboard && window.game && window.game.camera) {
-                    child.lookAt(window.game.camera.position);
                 }
             });
         }
@@ -1644,9 +1532,13 @@ class DungeonSystem {
     updateBillboardPortalAnimations(portalGroup, deltaTime) {
         const time = Date.now() * 0.001;
         
-        // Gentle breathing/pulsing animation - much smaller
+        // Gentle breathing/pulsing animation
         const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
-        portalGroup.scale.setScalar(pulseScale);
+        
+        // Apply pulse to the mask mesh specifically
+        if (portalGroup.userData.maskMesh) {
+            portalGroup.userData.maskMesh.scale.setScalar(pulseScale);
+        }
         
         // Very subtle floating motion - keep it within bounds
         const originalY = portalGroup.userData.originalY;
@@ -1659,6 +1551,19 @@ class DungeonSystem {
                 this.updatePortalParticles(child, deltaTime);
             }
         });
+        
+        // Subtle eye glow pulsing
+        if (portalGroup.userData.maskMesh && portalGroup.userData.maskMesh.userData) {
+            const maskData = portalGroup.userData.maskMesh.userData;
+            const glowIntensity = 0.5 + Math.sin(time * 3) * 0.3;
+            
+            if (maskData.leftGlow && maskData.leftGlow.material) {
+                maskData.leftGlow.material.emissiveIntensity = glowIntensity;
+            }
+            if (maskData.rightGlow && maskData.rightGlow.material) {
+                maskData.rightGlow.material.emissiveIntensity = glowIntensity;
+            }
+        }
     }
     
     updatePortalParticles(particle, deltaTime) {
