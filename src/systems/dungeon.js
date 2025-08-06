@@ -1,4 +1,4 @@
-// Dungeon Generation System with Collision Detection
+// Dungeon Generation System with Collision Detection and Progressive Portal System
 // Grid-based procedural dungeon generation with solid walls, floors, and ceilings
 
 class DungeonSystem {
@@ -11,6 +11,17 @@ class DungeonSystem {
         // Current dungeon state
         this.currentFloor = 1;
         this.currentDungeon = null;
+        
+        // Progressive unlock system
+        this.roomProgression = {
+            center: { unlocked: true, enemiesDefeated: false },
+            north: { unlocked: true, enemiesDefeated: false },    // Always unlocked first
+            east: { unlocked: false, enemiesDefeated: false },
+            west: { unlocked: false, enemiesDefeated: false },
+            south: { unlocked: false, enemiesDefeated: false }
+        };
+        this.progressionOrder = ['north', 'east', 'west', 'south'];
+        this.currentProgressionIndex = 0;
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
@@ -61,7 +72,56 @@ class DungeonSystem {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with collision detection');
+        console.log('Unified Dungeon System initialized with progressive portal system');
+    }
+    
+    // Progressive Unlock System
+    resetProgression() {
+        this.roomProgression = {
+            center: { unlocked: true, enemiesDefeated: false },
+            north: { unlocked: true, enemiesDefeated: false },
+            east: { unlocked: false, enemiesDefeated: false },
+            west: { unlocked: false, enemiesDefeated: false },
+            south: { unlocked: false, enemiesDefeated: false }
+        };
+        this.currentProgressionIndex = 0;
+        console.log('Room progression reset - only center and north rooms accessible');
+    }
+    
+    defeatEnemiesInRoom(roomDirection) {
+        if (this.roomProgression[roomDirection]) {
+            this.roomProgression[roomDirection].enemiesDefeated = true;
+            console.log(`Enemies defeated in ${roomDirection} room`);
+            
+            // Check if this unlocks the next room
+            this.checkProgressionUnlock();
+        }
+    }
+    
+    checkProgressionUnlock() {
+        const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+        
+        if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
+            // Unlock next room in sequence
+            this.currentProgressionIndex++;
+            
+            if (this.currentProgressionIndex < this.progressionOrder.length) {
+                const nextRoom = this.progressionOrder[this.currentProgressionIndex];
+                this.roomProgression[nextRoom].unlocked = true;
+                this.updateRoomPortals(nextRoom, false); // Open entrance to next room
+                console.log(`${nextRoom} room unlocked!`);
+            } else {
+                // All orbital rooms completed - open exit portal
+                this.openExitPortal();
+                console.log('All rooms completed - exit portal opened!');
+            }
+        }
+    }
+    
+    // For testing - cycles through the progression
+    testProgressionAdvance() {
+        const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+        this.defeatEnemiesInRoom(currentRoom);
     }
     
     // Collision Detection Methods
@@ -69,7 +129,6 @@ class DungeonSystem {
         if (!this.currentFloorMap) return true;
         
         // Convert world coordinates to grid coordinates with symmetric rounding
-        // This fixes the asymmetric behavior between positive/negative coordinates
         const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
         const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
         
@@ -100,8 +159,6 @@ class DungeonSystem {
     }
     
     getFloorHeight(worldX, worldZ) {
-        // For now, all floors are at the same height
-        // In the future, this could vary for multi-level dungeons
         return this.floorHeight;
     }
     
@@ -371,6 +428,9 @@ class DungeonSystem {
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
         
+        // Reset progression for new floor
+        this.resetProgression();
+        
         const theme = this.getCurrentTheme();
         console.log(`Using theme: ${theme}`);
         
@@ -390,6 +450,9 @@ class DungeonSystem {
         this.addDungeonLighting(roomLayout, theme);
         this.addAtmosphericElements(roomLayout, theme);
         
+        // Phase 5: Add progressive portal system
+        this.addProgressivePortals(roomLayout, theme);
+        
         // Store dungeon data
         this.currentDungeon = {
             floor: floorNumber,
@@ -398,7 +461,7 @@ class DungeonSystem {
             floorMap: floorMap
         };
         
-        console.log(`Unified dungeon floor ${floorNumber} generated successfully with collision detection`);
+        console.log(`Unified dungeon floor ${floorNumber} generated with progressive portal system`);
         return this.currentDungeon;
     }
     
@@ -741,6 +804,11 @@ class DungeonSystem {
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
+        // Add entry/exit portals to center room
+        if (room.type === 'center') {
+            this.addCenterRoomPortals(worldX, worldZ, roomSize, theme);
+        }
+        
         // Add theme-specific atmospheric elements
         switch (theme) {
             case 'stone':
@@ -762,6 +830,326 @@ class DungeonSystem {
         
         // Add floating orbs to all rooms
         this.addFloatingOrbs(worldX, worldZ, roomSize, theme);
+    }
+    
+    addProgressivePortals(roomLayout, theme) {
+        console.log('Adding progressive portal system...');
+        
+        // Find center room position
+        const centerRoom = roomLayout.rooms.center;
+        const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
+        const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
+        const roomSize = centerRoom.size * this.gridSize;
+        
+        // Calculate portal positions for each direction (closer to center room edges)
+        const portalDistance = roomSize * 0.45; // Distance from center
+        const portalPositions = {
+            east: { x: centerWorldX + portalDistance, z: centerWorldZ, rotation: Math.PI/2 },
+            west: { x: centerWorldX - portalDistance, z: centerWorldZ, rotation: -Math.PI/2 },
+            south: { x: centerWorldX, z: centerWorldZ + portalDistance, rotation: Math.PI }
+        };
+        
+        // Add room entrance portals (initially blocked except north)
+        Object.entries(portalPositions).forEach(([direction, pos]) => {
+            const isUnlocked = this.roomProgression[direction].unlocked;
+            const portal = this.createRoomEntrancePortal(direction, theme, isUnlocked);
+            portal.position.set(pos.x, this.floorHeight + 2, pos.z);
+            portal.rotation.y = pos.rotation;
+            portal.name = `${direction}_room_portal`;
+            this.currentDungeonGroup.add(portal);
+            
+            console.log(`Added ${direction} room portal at (${pos.x}, ${pos.z}) - ${isUnlocked ? 'UNLOCKED' : 'LOCKED'}`);
+        });
+    }
+    
+    addCenterRoomPortals(worldX, worldZ, roomSize, theme) {
+        console.log('Adding entry/exit portals to center room...');
+        
+        // Entry portal (where player spawns from) - North side
+        const entryPortal = this.createPortalMask('entry', theme);
+        entryPortal.position.set(worldX, this.floorHeight + 2, worldZ - roomSize * 0.4);
+        entryPortal.rotation.y = 0; // Facing south (towards room center)
+        entryPortal.name = 'entry_portal';
+        this.currentDungeonGroup.add(entryPortal);
+        
+        // Exit portal (leads to next floor) - This is not added here, it's created in addProgressivePortals
+        // and managed by the progression system
+        
+        console.log('Entry portal added to center room');
+    }
+    
+    createPortalMask(portalType, theme) {
+        const maskGroup = new THREE.Group();
+        
+        // Main mask face - inspired by the creepy reference images
+        const faceGeometry = new THREE.SphereGeometry(1.2, 16, 12);
+        // Flatten it to be more mask-like
+        faceGeometry.scale(1, 0.8, 0.4);
+        
+        let faceColor, eyeColor, runeColor;
+        
+        if (portalType === 'entry') {
+            faceColor = 0x8B4513;
+            eyeColor = 0xff4444;
+            runeColor = 0xff6644;
+        } else if (portalType === 'exit') {
+            faceColor = 0x2F5F2F;
+            eyeColor = 0x44ff44;
+            runeColor = 0x44ff66;
+        } else {
+            // Room entrance portals - darker, more menacing
+            faceColor = 0x654321;
+            eyeColor = 0xff6666;
+            runeColor = 0xff8866;
+        }
+        
+        const faceMaterial = new THREE.MeshPhongMaterial({
+            color: faceColor,
+            transparent: true,
+            opacity: 0.95,
+            shininess: 10,
+            emissive: faceColor,
+            emissiveIntensity: 0.1
+        });
+        
+        const face = new THREE.Mesh(faceGeometry, faceMaterial);
+        maskGroup.add(face);
+        
+        // Eye holes - large, menacing, and dark
+        const eyeGeometry = new THREE.SphereGeometry(0.25, 12, 8);
+        const eyeMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 1.0
+        });
+        
+        // Left eye
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.4, 0.2, 0.3);
+        leftEye.scale.set(1.2, 1.5, 0.8); // Make eyes more oval and deep
+        maskGroup.add(leftEye);
+        
+        // Right eye
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.4, 0.2, 0.3);
+        rightEye.scale.set(1.2, 1.5, 0.8);
+        maskGroup.add(rightEye);
+        
+        // Creepy glowing eyes inside the holes
+        const glowEyeGeometry = new THREE.SphereGeometry(0.08, 8, 6);
+        const glowEyeMaterial = new THREE.MeshBasicMaterial({
+            color: eyeColor,
+            transparent: true,
+            opacity: 0.9,
+            emissive: eyeColor,
+            emissiveIntensity: 1.0
+        });
+        
+        const leftGlow = new THREE.Mesh(glowEyeGeometry, glowEyeMaterial);
+        leftGlow.position.set(-0.4, 0.2, 0.35);
+        maskGroup.add(leftGlow);
+        
+        const rightGlow = new THREE.Mesh(glowEyeGeometry, glowEyeMaterial);
+        rightGlow.position.set(0.4, 0.2, 0.35);
+        maskGroup.add(rightGlow);
+        
+        // Mouth - gaping and unsettling
+        const mouthGeometry = new THREE.CylinderGeometry(0.15, 0.25, 0.3, 8);
+        const mouthMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000,
+            transparent: true,
+            opacity: 1.0
+        });
+        
+        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+        mouth.position.set(0, -0.3, 0.2);
+        mouth.rotation.x = Math.PI / 2;
+        maskGroup.add(mouth);
+        
+        // Add some teeth for extra creepiness
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const toothGeometry = new THREE.ConeGeometry(0.03, 0.15, 4);
+            const toothMaterial = new THREE.MeshPhongMaterial({
+                color: 0xFFFACD,
+                shininess: 30
+            });
+            
+            const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
+            tooth.position.set(
+                Math.cos(angle) * 0.12,
+                -0.25,
+                0.25 + Math.sin(angle) * 0.12
+            );
+            tooth.rotation.x = Math.PI;
+            maskGroup.add(tooth);
+        }
+        
+        // Ancient rune markings on forehead
+        const runeGeometry = new THREE.RingGeometry(0.2, 0.3, 8);
+        const runeMaterial = new THREE.MeshBasicMaterial({
+            color: runeColor,
+            transparent: true,
+            opacity: 0.7,
+            emissive: runeColor,
+            emissiveIntensity: 0.8,
+            side: THREE.DoubleSide
+        });
+        
+        const rune = new THREE.Mesh(runeGeometry, runeMaterial);
+        rune.position.set(0, 0.6, 0.4);
+        maskGroup.add(rune);
+        
+        // Portal frame/archway around the mask
+        const frameGeometry = new THREE.TorusGeometry(2, 0.3, 8, 16);
+        const frameMaterial = new THREE.MeshPhongMaterial({
+            color: 0x444444,
+            transparent: true,
+            opacity: 0.8,
+            emissive: 0x222222,
+            emissiveIntensity: 0.2
+        });
+        
+        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+        frame.rotation.x = Math.PI / 2;
+        frame.position.set(0, 0, -0.2);
+        maskGroup.add(frame);
+        
+        // Mystical particle effects around the portal
+        const particleCount = 20;
+        const particleGeometry = new THREE.SphereGeometry(0.02, 4, 4);
+        const particleMaterial = new THREE.MeshBasicMaterial({
+            color: runeColor,
+            transparent: true,
+            opacity: 0.8,
+            emissive: runeColor,
+            emissiveIntensity: 1.0
+        });
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            const angle = (i / particleCount) * Math.PI * 2;
+            const radius = 2.5 + Math.random() * 0.5;
+            
+            particle.position.set(
+                Math.cos(angle) * radius,
+                -1 + Math.random() * 2,
+                Math.sin(angle) * radius * 0.3
+            );
+            
+            // Add swirling animation data
+            particle.userData = {
+                originalAngle: angle,
+                radius: radius,
+                swirSpeed: 0.3 + Math.random() * 0.4,
+                bobSpeed: 0.5 + Math.random() * 1.0,
+                bobAmount: 0.2 + Math.random() * 0.3
+            };
+            
+            maskGroup.add(particle);
+        }
+        
+        // Add eerie lighting
+        const portalLight = new THREE.PointLight(eyeColor, 1.5, 8);
+        portalLight.position.set(0, 0, 1);
+        maskGroup.add(portalLight);
+        this.lightSources.push(portalLight);
+        
+        // Add breathing/pulsing animation
+        maskGroup.userData = {
+            portalType: portalType,
+            originalScale: maskGroup.scale.clone(),
+            pulseSpeed: 0.8 + Math.random() * 0.4,
+            pulseAmount: 0.05 + Math.random() * 0.03,
+            isBlocking: true // Will be set to false when conditions are met
+        };
+        
+        return maskGroup;
+    }
+    
+    createRoomEntrancePortal(direction, theme, isUnlocked) {
+        const portal = this.createPortalMask('room_entrance', theme);
+        
+        // Set initial state based on unlock status
+        portal.userData.portalType = `room_entrance_${direction}`;
+        portal.userData.direction = direction;
+        portal.userData.isBlocking = !isUnlocked;
+        
+        if (isUnlocked) {
+            // Make unlocked portals more transparent and less threatening
+            portal.traverse((child) => {
+                if (child.material && child.material.opacity !== undefined) {
+                    child.material.opacity *= 0.3; // Much more transparent when unlocked
+                }
+                if (child.material && child.material.emissive) {
+                    child.material.emissive.setHex(0x00ff00); // Green = unlocked
+                    child.material.emissiveIntensity = 0.3;
+                }
+            });
+        }
+        
+        return portal;
+    }
+    
+    updateRoomPortals(direction, shouldOpen) {
+        if (!this.currentDungeonGroup) return;
+        
+        this.currentDungeonGroup.traverse((child) => {
+            if (child.userData.direction === direction) {
+                child.userData.isBlocking = !shouldOpen;
+                
+                // Visual update
+                child.traverse((subChild) => {
+                    if (subChild.material && subChild.material.emissive) {
+                        if (shouldOpen) {
+                            subChild.material.emissive.setHex(0x00ff00); // Green = open
+                            subChild.material.emissiveIntensity = 0.3;
+                            if (subChild.material.opacity !== undefined) {
+                                subChild.material.opacity *= 0.3; // More transparent
+                            }
+                        } else {
+                            subChild.material.emissive.setHex(0xff6666); // Red = blocked
+                            subChild.material.emissiveIntensity = 0.8;
+                            if (subChild.material.opacity !== undefined) {
+                                subChild.material.opacity = 0.95; // Solid
+                            }
+                        }
+                    }
+                });
+                
+                console.log(`${direction} room portal ${shouldOpen ? 'opened' : 'closed'}`);
+            }
+        });
+    }
+    
+    openExitPortal() {
+        console.log('All rooms completed - adding exit portal!');
+        
+        // Find center room
+        if (this.currentDungeon && this.currentDungeon.roomLayout.rooms.center) {
+            const centerRoom = this.currentDungeon.roomLayout.rooms.center;
+            const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
+            const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
+            const roomSize = centerRoom.size * this.gridSize;
+            
+            // Create and add exit portal
+            const exitPortal = this.createPortalMask('exit', this.getCurrentTheme());
+            exitPortal.position.set(centerWorldX, this.floorHeight + 2, centerWorldZ + roomSize * 0.4);
+            exitPortal.rotation.y = Math.PI; // Facing north (towards room center)
+            exitPortal.name = 'exit_portal';
+            exitPortal.userData.isBlocking = false; // Exit is immediately usable
+            
+            // Make exit portal obviously different - brighter green
+            exitPortal.traverse((child) => {
+                if (child.material && child.material.emissive) {
+                    child.material.emissive.setHex(0x00ff00);
+                    child.material.emissiveIntensity = 1.0;
+                }
+            });
+            
+            this.currentDungeonGroup.add(exitPortal);
+            console.log('Exit portal added and opened!');
+        }
     }
     
     addStoneAtmosphere(worldX, worldZ, roomSize, roomType) {
@@ -952,6 +1340,16 @@ class DungeonSystem {
                     child.position.y = child.userData.originalY + 
                         Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
                 }
+                
+                // Update portal mask animations
+                if (child.userData.portalType) {
+                    this.updatePortalAnimations(child, deltaTime);
+                }
+                
+                // Update portal particles
+                if (child.userData.swirSpeed !== undefined) {
+                    this.updatePortalParticles(child, deltaTime);
+                }
             });
         }
         
@@ -967,6 +1365,61 @@ class DungeonSystem {
         });
     }
     
+    updatePortalAnimations(portalMask, deltaTime) {
+        const time = Date.now() * 0.001;
+        
+        // Breathing/pulsing animation
+        let pulseScale = 1 + Math.sin(time * portalMask.userData.pulseSpeed) * portalMask.userData.pulseAmount;
+        
+        // Opening animation - portal shrinks and becomes more transparent
+        if (portalMask.userData.isOpening) {
+            const openTime = (Date.now() - portalMask.userData.openTime) * 0.001;
+            const openProgress = Math.min(openTime / 2.0, 1.0); // 2 second opening animation
+            
+            // Shrink the mask
+            pulseScale *= (1.0 - openProgress * 0.7); // Shrink to 30% of original size
+            
+            // Make it more transparent
+            portalMask.traverse((child) => {
+                if (child.material && child.material.opacity !== undefined) {
+                    child.material.opacity = 0.95 * (1.0 - openProgress * 0.8);
+                }
+            });
+            
+            // Add spinning effect when opening
+            portalMask.rotation.y += deltaTime * openProgress * 3;
+        }
+        
+        portalMask.scale.setScalar(pulseScale);
+        
+        // Subtle floating motion
+        const originalY = portalMask.position.y;
+        portalMask.position.y = originalY + Math.sin(time * 0.7) * 0.1;
+        
+        // Eye glow intensity variation
+        portalMask.traverse((child) => {
+            if (child.material && child.material.emissiveIntensity !== undefined) {
+                const baseIntensity = portalMask.userData.isBlocking ? 1.0 : 1.5; // Brighter when open
+                child.material.emissiveIntensity = baseIntensity + Math.sin(time * 2.5) * 0.3;
+            }
+        });
+    }
+    
+    updatePortalParticles(particle, deltaTime) {
+        const time = Date.now() * 0.001;
+        
+        // Swirling motion around portal
+        particle.userData.originalAngle += particle.userData.swirSpeed * deltaTime;
+        const angle = particle.userData.originalAngle;
+        const radius = particle.userData.radius;
+        
+        particle.position.x = Math.cos(angle) * radius;
+        particle.position.z = Math.sin(angle) * radius * 0.3;
+        
+        // Bobbing motion
+        particle.position.y += Math.sin(time * particle.userData.bobSpeed) * particle.userData.bobAmount * deltaTime;
+    }
+    
     clearCurrentDungeon() {
         if (this.currentDungeonGroup) {
             this.scene.remove(this.currentDungeonGroup);
@@ -977,6 +1430,12 @@ class DungeonSystem {
         this.currentFloorMap = null;
         
         console.log('Previous dungeon cleared');
+    }
+    
+    // Portal Management Methods (for testing - will be replaced by enemy system)
+    togglePortals() {
+        // Test the progression system
+        this.testProgressionAdvance();
     }
     
     getRoomAt(position) {
