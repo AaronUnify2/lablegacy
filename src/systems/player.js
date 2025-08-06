@@ -286,34 +286,56 @@ class Player {
         this.dungeonSystem.currentDungeonGroup.traverse((child) => {
             if (child.userData.portalType && child.userData.isBlocking) {
                 const portalPos = child.position;
-                const distance = position.distanceTo(portalPos);
                 
-                // Check if player is too close to a blocking portal
-                if (distance < 2.5) { // Portal blocking radius
-                    blocked = true;
-                    blockingPortalType = child.userData.portalType;
+                // Check multiple points around the player to prevent slipping past
+                const checkPoints = [
+                    // Center position
+                    position,
+                    // Cardinal directions around player
+                    new THREE.Vector3(position.x + 1, position.y, position.z),     // East
+                    new THREE.Vector3(position.x - 1, position.y, position.z),     // West  
+                    new THREE.Vector3(position.x, position.y, position.z + 1),     // South
+                    new THREE.Vector3(position.x, position.y, position.z - 1),     // North
+                    // Diagonal directions
+                    new THREE.Vector3(position.x + 0.7, position.y, position.z + 0.7),   // SE
+                    new THREE.Vector3(position.x - 0.7, position.y, position.z + 0.7),   // SW
+                    new THREE.Vector3(position.x + 0.7, position.y, position.z - 0.7),   // NE
+                    new THREE.Vector3(position.x - 0.7, position.y, position.z - 0.7),   // NW
+                ];
+                
+                // Check if ANY point is too close to portal
+                for (const checkPoint of checkPoints) {
+                    const distance = checkPoint.distanceTo(portalPos);
                     
-                    // Show appropriate message when player approaches blocked portal
-                    if (distance < 3.0 && !this.lastPortalMessage) {
-                        let message = "";
+                    if (distance < 5.0) { // Large blocking radius
+                        blocked = true;
+                        blockingPortalType = child.userData.portalType;
                         
-                        if (blockingPortalType === 'entry') {
-                            message = "The ancient mask blocks your retreat...";
-                        } else if (blockingPortalType === 'exit') {
-                            message = "The exit remains sealed until all enemies are defeated...";
-                        } else if (blockingPortalType.includes('room_entrance')) {
-                            const direction = child.userData.direction;
-                            if (direction === 'north') {
-                                message = "The path north is open...";
-                            } else {
-                                message = `Defeat enemies in previous rooms to unlock the ${direction} path...`;
+                        // Show appropriate message when player approaches blocked portal
+                        if (distance < 6.0 && !this.lastPortalMessage) {
+                            let message = "";
+                            
+                            if (blockingPortalType === 'entry') {
+                                message = "The ancient mask blocks your retreat...";
+                            } else if (blockingPortalType === 'exit') {
+                                message = "The exit remains sealed until all enemies are defeated...";
+                            } else if (blockingPortalType.includes('room_entrance')) {
+                                const direction = child.userData.direction;
+                                if (direction === 'north') {
+                                    message = "The path north is open...";
+                                } else {
+                                    message = `Defeat enemies in previous rooms to unlock the ${direction} path...`;
+                                }
                             }
+                            
+                            console.log(message);
+                            this.lastPortalMessage = Date.now();
                         }
-                        
-                        console.log(message);
-                        this.lastPortalMessage = Date.now();
+                        break; // Exit loop if blocked
                     }
                 }
+                
+                if (blocked) return; // Exit traverse if blocked
             }
         });
         
