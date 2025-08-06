@@ -875,52 +875,28 @@ class DungeonSystem {
         // Draw creepy mask on canvas
         this.drawCreepyMask(ctx, canvas.width, canvas.height, isUnlocked);
         
-        // DEBUG: Add a simple test pattern to see if canvas is working
-        ctx.fillStyle = 'rgba(255, 0, 255, 0.5)'; // Magenta border for testing
-        ctx.fillRect(0, 0, 10, canvas.height); // Left border
-        ctx.fillRect(canvas.width - 10, 0, 10, canvas.height); // Right border
-        ctx.fillRect(0, 0, canvas.width, 10); // Top border
-        ctx.fillRect(0, canvas.height - 10, canvas.width, 10); // Bottom border
-        
-        console.log('Canvas created:', canvas.width, 'x', canvas.height);
-        
         // Create texture from canvas
         const texture = new THREE.CanvasTexture(canvas);
         texture.generateMipmaps = false;
         texture.wrapS = THREE.ClampToEdgeWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.flipY = false; // Important for canvas textures
         
-        console.log('Texture created from canvas');
-        
-        // Create billboard material with debugging
+        // Create billboard material
         const material = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
-            alphaTest: 0.01, // Lower threshold
-            side: THREE.DoubleSide, // Show both sides for testing
-            // Add a base color for debugging
-            color: 0xffffff
+            alphaTest: 0.1,
+            side: THREE.DoubleSide
         });
         
-        console.log('Material created with texture');
-        
-        // Create billboard geometry - larger size for testing
-        const geometry = new THREE.PlaneGeometry(6, 6); // Made bigger
+        // Create billboard geometry - larger size
+        const geometry = new THREE.PlaneGeometry(4, 4);
         const billboard = new THREE.Mesh(geometry, material);
         
-        // Make it always face the camera (billboard effect) - DISABLED for testing
-        // billboard.userData.isBillboard = true;
+        // Make it always face the camera (billboard effect)
+        billboard.userData.isBillboard = true;
         
         portalGroup.add(billboard);
-        
-        // Add a simple colored cube for reference
-        const testCube = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 1, 1),
-            new THREE.MeshBasicMaterial({ color: isUnlocked ? 0x00ff00 : 0xff0000 })
-        );
-        testCube.position.set(0, 2, 0);
-        portalGroup.add(testCube);
         
         // Add particle effects around the portal
         this.addPortalParticleEffects(portalGroup, isUnlocked);
@@ -932,13 +908,11 @@ class DungeonSystem {
             isBlocking: !isUnlocked,
             originalY: this.floorHeight + 3,
             pulseSpeed: 0.5 + Math.random() * 0.5,
-            pulseAmount: 0.1,
+            pulseAmount: 0.1, // Much smaller pulse
             canvas: canvas,
             ctx: ctx,
             texture: texture
         };
-        
-        console.log(`Created billboard portal for ${direction}, unlocked: ${isUnlocked}`);
         
         return portalGroup;
     }
@@ -1648,10 +1622,10 @@ class DungeonSystem {
                     this.updatePortalParticles(child, deltaTime);
                 }
                 
-                // DISABLED: Make billboards face camera (for testing)
-                // if (child.userData.isBillboard && window.game && window.game.camera) {
-                //     child.lookAt(window.game.camera.position);
-                // }
+                // Make billboards face camera
+                if (child.userData.isBillboard && window.game && window.game.camera) {
+                    child.lookAt(window.game.camera.position);
+                }
             });
         }
         
