@@ -42,6 +42,9 @@ class Player {
         this.height = 1.8; // Player height
         this.dungeonSystem = null; // Will be set by game engine
         
+        // Portal interaction
+        this.lastPortalMessage = null;
+        
         // Regeneration
         this.staminaRegenRate = 50; // per second
         this.manaRegenRate = 30;    // per second
@@ -226,6 +229,11 @@ class Player {
     isPositionValid(position) {
         if (!this.dungeonSystem) return true;
         
+        // Check portal blocking first
+        if (this.isBlockedByPortal(position)) {
+            return false;
+        }
+        
         // Use a more conservative collision approach with additional boundary checks
         const checkRadius = this.radius * 1.1; // Slightly larger than actual radius
         
@@ -264,6 +272,57 @@ class Player {
         }
         
         return true;
+    }
+    
+    isBlockedByPortal(position) {
+        if (!this.dungeonSystem || !this.dungeonSystem.currentDungeonGroup) {
+            return false;
+        }
+        
+        let blocked = false;
+        let blockingPortalType = null;
+        
+        // Find portal masks in the scene
+        this.dungeonSystem.currentDungeonGroup.traverse((child) => {
+            if (child.userData.portalType && child.userData.isBlocking) {
+                const portalPos = child.position;
+                const distance = position.distanceTo(portalPos);
+                
+                // Check if player is too close to a blocking portal
+                if (distance < 2.5) { // Portal blocking radius
+                    blocked = true;
+                    blockingPortalType = child.userData.portalType;
+                    
+                    // Show appropriate message when player approaches blocked portal
+                    if (distance < 3.0 && !this.lastPortalMessage) {
+                        let message = "";
+                        
+                        if (blockingPortalType === 'entry') {
+                            message = "The ancient mask blocks your retreat...";
+                        } else if (blockingPortalType === 'exit') {
+                            message = "The exit remains sealed until all enemies are defeated...";
+                        } else if (blockingPortalType.includes('room_entrance')) {
+                            const direction = child.userData.direction;
+                            if (direction === 'north') {
+                                message = "The path north is open...";
+                            } else {
+                                message = `Defeat enemies in previous rooms to unlock the ${direction} path...`;
+                            }
+                        }
+                        
+                        console.log(message);
+                        this.lastPortalMessage = Date.now();
+                    }
+                }
+            }
+        });
+        
+        // Reset message timer
+        if (Date.now() - (this.lastPortalMessage || 0) > 3000) {
+            this.lastPortalMessage = null;
+        }
+        
+        return blocked;
     }
     
     handleVerticalCollision() {
