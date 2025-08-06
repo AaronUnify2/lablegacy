@@ -918,18 +918,25 @@ class DungeonSystem {
         const faceGeometry = new THREE.SphereGeometry(3, 16, 12); // Increased from 2 to 3
         faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
         
-        // Use a neutral dark color for the mask face
-        const faceColor = 0x3a3a3a; // Dark gray
+        // Use a neutral dark color for the mask face with slight emissive glow
+        const faceColor = 0x4a4a4a; // Slightly lighter gray for better visibility
         const faceOpacity = isUnlocked ? 0.2 : 0.95; // Transparent when unlocked, solid when locked
         
         const faceMaterial = new THREE.MeshLambertMaterial({ 
             color: faceColor,
             transparent: true,
-            opacity: faceOpacity
+            opacity: faceOpacity,
+            emissive: faceColor,
+            emissiveIntensity: 0.2 // Slight self-illumination so it's always visible
         });
         
         const face = new THREE.Mesh(faceGeometry, faceMaterial);
         maskGroup.add(face);
+        
+        // Add front-facing light to illuminate the mask
+        const maskLight = new THREE.PointLight(0xffffff, 1.0, 8);
+        maskLight.position.set(0, 0, 4); // Position in front of the mask
+        maskGroup.add(maskLight);
         
         // Eye sockets (black holes) - MADE LARGER
         const eyeGeometry = new THREE.SphereGeometry(0.45, 8, 8); // Increased from 0.3 to 0.45
@@ -952,16 +959,17 @@ class DungeonSystem {
         rightEye.scale.set(0.8, 1.1, 0.8);
         maskGroup.add(rightEye);
         
-        // Glowing eyes - with opacity-based intensity
+        // Glowing eyes - with opacity-based intensity - BRIGHTER
         const eyeColor = 0xaaaaff; // Neutral blue-white glow
         const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 8, 8); // Increased from 0.15 to 0.25
-        const eyeGlowOpacity = isUnlocked ? 0.15 : 1.0;
+        const eyeGlowOpacity = isUnlocked ? 0.3 : 1.0; // More visible when unlocked
         const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
             color: eyeColor,
             transparent: true,
             opacity: eyeGlowOpacity,
             emissive: eyeColor,
-            emissiveIntensity: isUnlocked ? 0.2 : 1.2
+            emissiveIntensity: isUnlocked ? 0.5 : 1.5, // Brighter overall
+            blending: THREE.AdditiveBlending // Makes the glow more prominent
         });
         
         // Left glowing eye
@@ -989,13 +997,15 @@ class DungeonSystem {
         mouth.position.set(0, -0.75, 0.2); // Adjusted for larger scale
         maskGroup.add(mouth);
         
-        // Add some teeth - MADE LARGER
+        // Add some teeth - MADE LARGER AND BRIGHTER
         const toothGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08); // Increased size
-        const toothOpacity = isUnlocked ? 0.2 : 0.9;
+        const toothOpacity = isUnlocked ? 0.3 : 0.95; // More visible
         const toothMaterial = new THREE.MeshLambertMaterial({ 
             color: 0xFFFACD,
             transparent: true,
-            opacity: toothOpacity
+            opacity: toothOpacity,
+            emissive: 0xFFFACD,
+            emissiveIntensity: 0.1 // Slight glow for visibility
         });
         
         for (let i = 0; i < 4; i++) {
@@ -1104,10 +1114,11 @@ class DungeonSystem {
                     const maskData = child.userData.maskMesh.userData;
                     
                     try {
-                        // Update face opacity
+                        // Update face opacity and emissive
                         const newOpacity = shouldOpen ? 0.2 : 0.95;
                         if (maskData.face && maskData.face.material) {
                             maskData.face.material.opacity = newOpacity;
+                            maskData.face.material.emissiveIntensity = 0.2; // Keep slight glow
                         }
                         
                         // Update eye socket opacity
@@ -1120,8 +1131,8 @@ class DungeonSystem {
                         }
                         
                         // Update eye glow opacity and intensity
-                        const glowOpacity = shouldOpen ? 0.15 : 1.0;
-                        const glowIntensity = shouldOpen ? 0.2 : 1.2;
+                        const glowOpacity = shouldOpen ? 0.3 : 1.0; // More visible when unlocked
+                        const glowIntensity = shouldOpen ? 0.5 : 1.5; // Brighter overall
                         if (maskData.leftGlow && maskData.leftGlow.material) {
                             maskData.leftGlow.material.opacity = glowOpacity;
                             maskData.leftGlow.material.emissiveIntensity = glowIntensity;
@@ -1138,11 +1149,12 @@ class DungeonSystem {
                         }
                         
                         // Update teeth opacity
-                        const toothOpacity = shouldOpen ? 0.2 : 0.9;
+                        const toothOpacity = shouldOpen ? 0.3 : 0.95; // More visible
                         if (maskData.teeth && maskData.teeth.length > 0) {
                             maskData.teeth.forEach(tooth => {
                                 if (tooth.material) {
                                     tooth.material.opacity = toothOpacity;
+                                    tooth.material.emissiveIntensity = 0.1; // Keep slight glow
                                 }
                             });
                         }
