@@ -57,7 +57,6 @@ class DungeonSystem {
         // Materials and lighting
         this.textureLoader = new THREE.TextureLoader();
         this.materials = new Map();
-        this.maskMaterials = new Map(); // Enhanced mask materials
         this.lightSources = [];
         this.billboardSprites = [];
         
@@ -66,7 +65,6 @@ class DungeonSystem {
     
     init() {
         this.setupMaterials();
-        this.setupEnhancedMaskMaterials();
         this.setupBillboardSystem();
         
         // Connect player to this dungeon system for collision detection
@@ -74,397 +72,7 @@ class DungeonSystem {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with enhanced stone/porcelain masks');
-    }
-    
-    setupEnhancedMaskMaterials() {
-        console.log('Creating enhanced stone and porcelain mask materials...');
-        
-        // Create stone mask texture
-        const stoneMaskTexture = this.createStoneMaskTexture();
-        const stoneMaskNormal = this.createStoneNormalMap();
-        
-        const stoneMaskMaterial = new THREE.MeshStandardMaterial({
-            map: stoneMaskTexture,
-            normalMap: stoneMaskNormal,
-            normalScale: new THREE.Vector2(1.5, 1.5),
-            color: 0x8a7a6a,
-            roughness: 0.8,
-            metalness: 0.1,
-            emissive: 0x2a1a1a,
-            emissiveIntensity: 0.1,
-            transparent: true,
-            opacity: 0.95
-        });
-        
-        // Create porcelain mask texture  
-        const porcelainMaskTexture = this.createPorcelainMaskTexture();
-        const porcelainMaskNormal = this.createPorcelainNormalMap();
-        
-        const porcelainMaskMaterial = new THREE.MeshStandardMaterial({
-            map: porcelainMaskTexture,
-            normalMap: porcelainMaskNormal,
-            normalScale: new THREE.Vector2(0.8, 0.8),
-            color: 0xf5f5dc,
-            roughness: 0.3,
-            metalness: 0.0,
-            emissive: 0x1a1a2a,
-            emissiveIntensity: 0.05,
-            transparent: true,
-            opacity: 0.92
-        });
-        
-        // Weathered stone variation
-        const weatheredStoneTexture = this.createWeatheredStoneTexture();
-        const weatheredStoneNormal = this.createWeatheredStoneNormalMap();
-        
-        const weatheredStoneMaterial = new THREE.MeshStandardMaterial({
-            map: weatheredStoneTexture,
-            normalMap: weatheredStoneNormal,
-            normalScale: new THREE.Vector2(2.0, 2.0),
-            color: 0x6a5a4a,
-            roughness: 0.9,
-            metalness: 0.05,
-            emissive: 0x3a2a1a,
-            emissiveIntensity: 0.15,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        // Store enhanced materials
-        this.maskMaterials.set('stone_locked', stoneMaskMaterial);
-        this.maskMaterials.set('stone_unlocked', stoneMaskMaterial.clone());
-        this.maskMaterials.set('porcelain_locked', porcelainMaskMaterial);
-        this.maskMaterials.set('porcelain_unlocked', porcelainMaskMaterial.clone());
-        this.maskMaterials.set('weathered_locked', weatheredStoneMaterial);
-        this.maskMaterials.set('weathered_unlocked', weatheredStoneMaterial.clone());
-        
-        // Adjust unlocked versions to be slightly different
-        this.maskMaterials.get('stone_unlocked').emissive.setHex(0x1a3a1a);
-        this.maskMaterials.get('porcelain_unlocked').emissive.setHex(0x1a2a1a);
-        this.maskMaterials.get('weathered_unlocked').emissive.setHex(0x2a3a1a);
-        
-        console.log('Enhanced mask materials created');
-    }
-    
-    createStoneMaskTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Base stone color with variations
-        const baseColors = ['#8a7a6a', '#7a6a5a', '#9a8a7a', '#6a5a4a', '#aa9a8a'];
-        
-        // Fill with base color gradient
-        const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 300);
-        gradient.addColorStop(0, '#9a8a7a');
-        gradient.addColorStop(0.6, '#8a7a6a');
-        gradient.addColorStop(1, '#6a5a4a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Add stone grain texture
-        for (let i = 0; i < 2000; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const size = Math.random() * 3 + 1;
-            const opacity = Math.random() * 0.6 + 0.2;
-            
-            ctx.fillStyle = `rgba(${70 + Math.random() * 60}, ${60 + Math.random() * 50}, ${50 + Math.random() * 40}, ${opacity})`;
-            ctx.fillRect(x, y, size, size);
-        }
-        
-        // Add weathering stains
-        for (let i = 0; i < 150; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 25 + 5;
-            
-            const stainGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            stainGradient.addColorStop(0, 'rgba(50, 40, 30, 0.4)');
-            stainGradient.addColorStop(1, 'rgba(50, 40, 30, 0)');
-            
-            ctx.fillStyle = stainGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // Add cracks
-        ctx.strokeStyle = 'rgba(40, 30, 20, 0.8)';
-        ctx.lineWidth = 2;
-        for (let i = 0; i < 20; i++) {
-            ctx.beginPath();
-            ctx.moveTo(Math.random() * 512, Math.random() * 512);
-            
-            const steps = 5 + Math.random() * 10;
-            for (let j = 0; j < steps; j++) {
-                const currentX = Math.random() * 512;
-                const currentY = Math.random() * 512;
-                ctx.lineTo(currentX, currentY);
-            }
-            ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
-    }
-    
-    createStoneNormalMap() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Fill with neutral normal color
-        ctx.fillStyle = '#8080ff';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Add bumps and depressions for stone texture
-        for (let i = 0; i < 800; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 8 + 2;
-            const intensity = Math.random() * 0.8 + 0.2;
-            
-            const normalGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            
-            if (Math.random() > 0.5) {
-                // Bump
-                normalGradient.addColorStop(0, `rgba(${128 + intensity * 60}, ${128 + intensity * 60}, ${255}, 1)`);
-                normalGradient.addColorStop(1, `rgba(128, 128, 255, 1)`);
-            } else {
-                // Depression
-                normalGradient.addColorStop(0, `rgba(${128 - intensity * 60}, ${128 - intensity * 60}, ${200}, 1)`);
-                normalGradient.addColorStop(1, `rgba(128, 128, 255, 1)`);
-            }
-            
-            ctx.fillStyle = normalGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
-    }
-    
-    createPorcelainMaskTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Base porcelain color - creamy white
-        const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 300);
-        gradient.addColorStop(0, '#faf8f5');
-        gradient.addColorStop(0.7, '#f5f3f0');
-        gradient.addColorStop(1, '#e8e6e3');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Add subtle porcelain imperfections
-        for (let i = 0; i < 500; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const size = Math.random() * 2 + 0.5;
-            const opacity = Math.random() * 0.3 + 0.1;
-            
-            ctx.fillStyle = `rgba(${220 + Math.random() * 20}, ${215 + Math.random() * 20}, ${210 + Math.random() * 20}, ${opacity})`;
-            ctx.fillRect(x, y, size, size);
-        }
-        
-        // Add age stains (subtle yellowing)
-        for (let i = 0; i < 80; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 30 + 8;
-            
-            const stainGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            stainGradient.addColorStop(0, 'rgba(240, 230, 200, 0.3)');
-            stainGradient.addColorStop(1, 'rgba(240, 230, 200, 0)');
-            
-            ctx.fillStyle = stainGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // Add hairline cracks in porcelain
-        ctx.strokeStyle = 'rgba(180, 170, 160, 0.6)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 15; i++) {
-            ctx.beginPath();
-            ctx.moveTo(Math.random() * 512, Math.random() * 512);
-            
-            const steps = 3 + Math.random() * 8;
-            for (let j = 0; j < steps; j++) {
-                const currentX = Math.random() * 512;
-                const currentY = Math.random() * 512;
-                ctx.lineTo(currentX, currentY);
-            }
-            ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
-    }
-    
-    createPorcelainNormalMap() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Fill with neutral normal color
-        ctx.fillStyle = '#8080ff';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Add subtle surface variations for porcelain
-        for (let i = 0; i < 400; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 6 + 1;
-            const intensity = Math.random() * 0.4 + 0.1;
-            
-            const normalGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            normalGradient.addColorStop(0, `rgba(${128 + intensity * 30}, ${128 + intensity * 30}, ${255}, 1)`);
-            normalGradient.addColorStop(1, `rgba(128, 128, 255, 1)`);
-            
-            ctx.fillStyle = normalGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
-    }
-    
-    createWeatheredStoneTexture() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Base weathered stone - darker, more worn
-        const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 350);
-        gradient.addColorStop(0, '#6a5a4a');
-        gradient.addColorStop(0.5, '#5a4a3a');
-        gradient.addColorStop(1, '#4a3a2a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Heavy weathering texture
-        for (let i = 0; i < 3000; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const size = Math.random() * 4 + 1;
-            const opacity = Math.random() * 0.8 + 0.3;
-            
-            ctx.fillStyle = `rgba(${40 + Math.random() * 80}, ${30 + Math.random() * 60}, ${20 + Math.random() * 50}, ${opacity})`;
-            ctx.fillRect(x, y, size, size);
-        }
-        
-        // Moss and lichen stains
-        for (let i = 0; i < 200; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 35 + 10;
-            
-            const mossGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            mossGradient.addColorStop(0, 'rgba(60, 80, 40, 0.5)');
-            mossGradient.addColorStop(0.6, 'rgba(40, 60, 30, 0.3)');
-            mossGradient.addColorStop(1, 'rgba(40, 60, 30, 0)');
-            
-            ctx.fillStyle = mossGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // Deep cracks and erosion
-        ctx.strokeStyle = 'rgba(20, 15, 10, 0.9)';
-        ctx.lineWidth = 3;
-        for (let i = 0; i < 30; i++) {
-            ctx.beginPath();
-            ctx.moveTo(Math.random() * 512, Math.random() * 512);
-            
-            const steps = 8 + Math.random() * 15;
-            for (let j = 0; j < steps; j++) {
-                const currentX = Math.random() * 512;
-                const currentY = Math.random() * 512;
-                ctx.lineTo(currentX, currentY);
-            }
-            ctx.stroke();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
-    }
-    
-    createWeatheredStoneNormalMap() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        // Fill with neutral normal color
-        ctx.fillStyle = '#8080ff';
-        ctx.fillRect(0, 0, 512, 512);
-        
-        // Add deep weathering bumps and crevices
-        for (let i = 0; i < 1200; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const radius = Math.random() * 10 + 2;
-            const intensity = Math.random() * 1.0 + 0.3;
-            
-            const normalGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-            
-            if (Math.random() > 0.3) {
-                // Deep depression (weathering)
-                normalGradient.addColorStop(0, `rgba(${128 - intensity * 80}, ${128 - intensity * 80}, ${180}, 1)`);
-                normalGradient.addColorStop(1, `rgba(128, 128, 255, 1)`);
-            } else {
-                // Raised area
-                normalGradient.addColorStop(0, `rgba(${128 + intensity * 50}, ${128 + intensity * 50}, ${255}, 1)`);
-                normalGradient.addColorStop(1, `rgba(128, 128, 255, 1)`);
-            }
-            
-            ctx.fillStyle = normalGradient;
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.flipY = false;
-        
-        return texture;
+        console.log('Unified Dungeon System initialized with progressive portal system');
     }
     
     // Progressive Unlock System
@@ -864,7 +472,7 @@ class DungeonSystem {
         this.addDungeonLighting(roomLayout, theme);
         this.addAtmosphericElements(roomLayout, theme);
         
-        // Phase 5: Add progressive portal system with enhanced masks
+        // Phase 5: Add progressive portal system
         this.addProgressivePortals(roomLayout, theme);
         
         // Store dungeon data
@@ -875,7 +483,7 @@ class DungeonSystem {
             floorMap: floorMap
         };
         
-        console.log(`Unified dungeon floor ${floorNumber} generated with enhanced stone/porcelain portal masks`);
+        console.log(`Unified dungeon floor ${floorNumber} generated with progressive portal system`);
         return this.currentDungeon;
     }
     
@@ -1247,7 +855,7 @@ class DungeonSystem {
     }
     
     addProgressivePortals(roomLayout, theme) {
-        console.log('Adding progressive portal system with enhanced stone/porcelain masks...');
+        console.log('Adding progressive porcelain portal system...');
         
         // Find center room position
         const centerRoom = roomLayout.rooms.center;
@@ -1268,20 +876,20 @@ class DungeonSystem {
         // Add room entrance portals (initially blocked except north)
         Object.entries(portalPositions).forEach(([direction, pos]) => {
             const isUnlocked = this.roomProgression[direction].unlocked;
-            const portal = this.createEnhancedBillboardPortal(direction, theme, isUnlocked);
+            const portal = this.createBillboardPortal(direction, theme, isUnlocked);
             portal.position.set(pos.x, this.floorHeight + 3, pos.z); // Higher up, in the hallway
             portal.name = `${direction}_room_portal`;
             this.currentDungeonGroup.add(portal);
             
-            console.log(`Added enhanced ${direction} room portal at (${pos.x}, ${pos.z}) - ${isUnlocked ? 'UNLOCKED' : 'LOCKED'}`);
+            console.log(`Added ${direction} room portal at (${pos.x}, ${pos.z}) - ${isUnlocked ? 'UNLOCKED' : 'LOCKED'}`);
         });
     }
     
-    createEnhancedBillboardPortal(direction, theme, isUnlocked) {
+    createBillboardPortal(direction, theme, isUnlocked) {
         const portalGroup = new THREE.Group();
         
-        // Create enhanced stone/porcelain mask instead of simple geometric one
-        const mask = this.createEnhancedGeometricMask(theme, isUnlocked);
+        // Create porcelain geometric mask
+        const mask = this.createGeometricMask(isUnlocked);
         portalGroup.add(mask);
         
         // Add particle effects around the portal
@@ -1295,45 +903,42 @@ class DungeonSystem {
             originalY: this.floorHeight + 3,
             pulseSpeed: 0.5 + Math.random() * 0.5,
             pulseAmount: 0.1,
-            maskMesh: mask // Store reference to the mask for color changes
+            maskMesh: mask // Store reference to the mask for opacity changes
         };
         
-        console.log(`Created enhanced ${theme} mask portal for ${direction}, unlocked: ${isUnlocked}`);
+        console.log(`Created porcelain portal for ${direction}, unlocked: ${isUnlocked}`);
         
         return portalGroup;
     }
     
-    createEnhancedGeometricMask(theme, isUnlocked) {
+    createGeometricMask(isUnlocked) {
         const maskGroup = new THREE.Group();
         
-        // Determine mask material based on theme and floor number
-        let maskMaterial;
-        const materialKey = isUnlocked ? 'unlocked' : 'locked';
+        // Porcelain/stone color palette
+        const porcelainColor = 0xF5F5DC; // Beige/ivory
+        const stoneColor = 0xE6E6E6;     // Light gray
+        const darkStone = 0x8B7D6B;     // Darker stone for details
         
-        if (this.currentFloor <= 10) {
-            // Stone theme floors - use weathered stone for more character
-            maskMaterial = this.maskMaterials.get(`weathered_${materialKey}`);
-        } else if (this.currentFloor <= 30) {
-            // Crystal/Ruins themes - use porcelain for elegance
-            maskMaterial = this.maskMaterials.get(`porcelain_${materialKey}`);
-        } else {
-            // Higher floors - use regular stone
-            maskMaterial = this.maskMaterials.get(`stone_${materialKey}`);
-        }
-        
-        // Main mask face (oval) - ENHANCED WITH REALISTIC MATERIALS
-        const faceGeometry = new THREE.SphereGeometry(3, 32, 24); // Higher detail
+        // Main mask face (oval) - porcelain material
+        const faceGeometry = new THREE.SphereGeometry(3, 16, 12);
         faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
         
-        const face = new THREE.Mesh(faceGeometry, maskMaterial);
+        const faceMaterial = new THREE.MeshLambertMaterial({ 
+            color: porcelainColor,
+            transparent: true,
+            opacity: isUnlocked ? 0.4 : 1.0, // Opacity-based unlock state
+            shininess: 20
+        });
+        
+        const face = new THREE.Mesh(faceGeometry, faceMaterial);
         maskGroup.add(face);
         
-        // Eye sockets (black holes) - ENHANCED
-        const eyeGeometry = new THREE.SphereGeometry(0.45, 16, 12); // Higher detail
+        // Eye sockets (dark holes)
+        const eyeGeometry = new THREE.SphereGeometry(0.45, 8, 8);
         const eyeMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x000000,
             transparent: true,
-            opacity: 0.95
+            opacity: isUnlocked ? 0.4 : 1.0
         });
         
         // Left eye socket
@@ -1348,17 +953,14 @@ class DungeonSystem {
         rightEye.scale.set(0.8, 1.1, 0.8);
         maskGroup.add(rightEye);
         
-        // Glowing eyes - ENHANCED WITH BETTER MATERIALS
-        const eyeColor = isUnlocked ? 0x00ff00 : 0xff0000;
-        const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 16, 12);
-        const eyeGlowMaterial = new THREE.MeshStandardMaterial({ 
-            color: eyeColor,
+        // Subtle eye glow - amber/orange for ancient stone feel
+        const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+        const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xFFB347, // Warm amber
             transparent: true,
-            opacity: 1.0,
-            emissive: eyeColor,
-            emissiveIntensity: 2.0, // Brighter glow
-            roughness: 0.1,
-            metalness: 0.1
+            opacity: isUnlocked ? 0.2 : 0.6,
+            emissive: 0xFFB347,
+            emissiveIntensity: isUnlocked ? 0.3 : 0.8
         });
         
         // Left glowing eye
@@ -1372,27 +974,25 @@ class DungeonSystem {
         rightGlow.scale.set(0.8, 0.8, 0.8);
         maskGroup.add(rightGlow);
         
-        // Mouth (dark opening) - ENHANCED
-        const mouthGeometry = new THREE.SphereGeometry(0.6, 16, 12);
+        // Mouth (dark opening)
+        const mouthGeometry = new THREE.SphereGeometry(0.6, 8, 8);
         mouthGeometry.scale(1, 0.5, 0.8);
         const mouthMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x000000,
             transparent: true,
-            opacity: 0.9
+            opacity: isUnlocked ? 0.4 : 1.0
         });
         
         const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
         mouth.position.set(0, -0.75, 0.2);
         maskGroup.add(mouth);
         
-        // Enhanced teeth with better materials
+        // Stone teeth
         const toothGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08);
-        const toothMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0xFFFACD,
-            roughness: 0.3,
-            metalness: 0.1,
+        const toothMaterial = new THREE.MeshLambertMaterial({ 
+            color: stoneColor,
             transparent: true,
-            opacity: 0.9
+            opacity: isUnlocked ? 0.4 : 1.0
         });
         
         for (let i = 0; i < 4; i++) {
@@ -1401,14 +1001,12 @@ class DungeonSystem {
             maskGroup.add(tooth);
         }
         
-        // Enhanced cracks/weathering marks using mask material
+        // Stone cracks/weathering marks
         const crackGeometry = new THREE.BoxGeometry(0.03, 1.2, 0.03);
-        const crackMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x2a1a1a,
+        const crackMaterial = new THREE.MeshBasicMaterial({ 
+            color: darkStone,
             transparent: true,
-            opacity: 0.8,
-            roughness: 0.9,
-            metalness: 0.0
+            opacity: isUnlocked ? 0.3 : 0.7
         });
         
         const crack1 = new THREE.Mesh(crackGeometry, crackMaterial);
@@ -1422,83 +1020,34 @@ class DungeonSystem {
         crack2.scale.set(1, 0.6, 1);
         maskGroup.add(crack2);
         
-        // Add additional weathering details for stone masks
-        if (maskMaterial === this.maskMaterials.get('weathered_locked') || 
-            maskMaterial === this.maskMaterials.get('weathered_unlocked')) {
-            this.addWeatheringDetails(maskGroup);
-        }
-        
-        // Store references for color changes
+        // Store references for opacity changes
         maskGroup.userData = {
             face: face,
+            leftEye: leftEye,
+            rightEye: rightEye,
             leftGlow: leftGlow,
             rightGlow: rightGlow,
-            isUnlocked: isUnlocked,
-            theme: theme
+            mouth: mouth,
+            teeth: [tooth], // Store last tooth as example
+            cracks: [crack1, crack2],
+            isUnlocked: isUnlocked
         };
         
         return maskGroup;
     }
     
-    addWeatheringDetails(maskGroup) {
-        // Add moss patches for weathered stone masks
-        const mossGeometry = new THREE.SphereGeometry(0.2, 8, 6);
-        const mossMaterial = new THREE.MeshStandardMaterial({
-            color: 0x4a6a3a,
-            roughness: 0.9,
-            metalness: 0.0,
-            transparent: true,
-            opacity: 0.7
-        });
-        
-        // Random moss patches
-        for (let i = 0; i < 3; i++) {
-            const moss = new THREE.Mesh(mossGeometry, mossMaterial);
-            moss.position.set(
-                (Math.random() - 0.5) * 2,
-                (Math.random() - 0.5) * 2,
-                0.3 + Math.random() * 0.2
-            );
-            moss.scale.setScalar(0.5 + Math.random() * 0.5);
-            maskGroup.add(moss);
-        }
-        
-        // Add chipped edges
-        const chipGeometry = new THREE.SphereGeometry(0.1, 6, 4);
-        const chipMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3a2a1a,
-            roughness: 1.0,
-            metalness: 0.0,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        for (let i = 0; i < 4; i++) {
-            const chip = new THREE.Mesh(chipGeometry, chipMaterial);
-            const angle = (i / 4) * Math.PI * 2;
-            chip.position.set(
-                Math.cos(angle) * 2.8,
-                Math.sin(angle) * 2.8,
-                0.1 + Math.random() * 0.2
-            );
-            maskGroup.add(chip);
-        }
-    }
-    
     addPortalParticleEffects(portalGroup, isUnlocked) {
         const particleCount = 12;
-        const particleColor = isUnlocked ? 0x44ff44 : 0xff4444;
+        const particleColor = 0xFFB347; // Consistent warm amber for all portals
         
         for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.05, 8, 6);
-            const particleMaterial = new THREE.MeshStandardMaterial({
+            const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6);
+            const particleMaterial = new THREE.MeshBasicMaterial({
                 color: particleColor,
                 transparent: true,
-                opacity: 0.7,
+                opacity: isUnlocked ? 0.3 : 0.7, // Opacity-based instead of color-based
                 emissive: particleColor,
-                emissiveIntensity: 1.0,
-                roughness: 0.3,
-                metalness: 0.1
+                emissiveIntensity: isUnlocked ? 0.2 : 0.5
             });
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
@@ -1544,67 +1093,74 @@ class DungeonSystem {
                 
                 child.userData.isBlocking = !shouldOpen;
                 
-                // Update enhanced mask materials and colors
+                // Update geometric mask opacity instead of colors
                 if (child.userData.maskMesh && child.userData.maskMesh.userData) {
                     const maskData = child.userData.maskMesh.userData;
                     
                     try {
-                        // Update eye glow colors and materials
-                        const newEyeColor = shouldOpen ? 0x00ff00 : 0xff0000;
-                        if (maskData.leftGlow && maskData.leftGlow.material) {
-                            maskData.leftGlow.material.color.setHex(newEyeColor);
-                            maskData.leftGlow.material.emissive.setHex(newEyeColor);
-                            maskData.leftGlow.material.emissiveIntensity = shouldOpen ? 2.5 : 2.0;
-                        }
-                        if (maskData.rightGlow && maskData.rightGlow.material) {
-                            maskData.rightGlow.material.color.setHex(newEyeColor);
-                            maskData.rightGlow.material.emissive.setHex(newEyeColor);
-                            maskData.rightGlow.material.emissiveIntensity = shouldOpen ? 2.5 : 2.0;
+                        const newOpacity = shouldOpen ? 0.4 : 1.0;
+                        const newEyeOpacity = shouldOpen ? 0.2 : 0.6;
+                        const newEyeIntensity = shouldOpen ? 0.3 : 0.8;
+                        
+                        // Update face opacity
+                        if (maskData.face && maskData.face.material) {
+                            maskData.face.material.opacity = newOpacity;
                         }
                         
-                        // Update face material if needed
-                        if (maskData.face && maskData.face.material) {
-                            const currentTheme = maskData.theme || 'stone';
-                            const materialKey = shouldOpen ? 'unlocked' : 'locked';
-                            let newMaterial;
-                            
-                            if (this.currentFloor <= 10) {
-                                newMaterial = this.maskMaterials.get(`weathered_${materialKey}`);
-                            } else if (this.currentFloor <= 30) {
-                                newMaterial = this.maskMaterials.get(`porcelain_${materialKey}`);
-                            } else {
-                                newMaterial = this.maskMaterials.get(`stone_${materialKey}`);
-                            }
-                            
-                            if (newMaterial) {
-                                maskData.face.material = newMaterial;
-                            }
+                        // Update eye socket opacity
+                        if (maskData.leftEye && maskData.leftEye.material) {
+                            maskData.leftEye.material.opacity = newOpacity;
+                        }
+                        if (maskData.rightEye && maskData.rightEye.material) {
+                            maskData.rightEye.material.opacity = newOpacity;
+                        }
+                        
+                        // Update mouth opacity
+                        if (maskData.mouth && maskData.mouth.material) {
+                            maskData.mouth.material.opacity = newOpacity;
+                        }
+                        
+                        // Update eye glow opacity and intensity
+                        if (maskData.leftGlow && maskData.leftGlow.material) {
+                            maskData.leftGlow.material.opacity = newEyeOpacity;
+                            maskData.leftGlow.material.emissiveIntensity = newEyeIntensity;
+                        }
+                        if (maskData.rightGlow && maskData.rightGlow.material) {
+                            maskData.rightGlow.material.opacity = newEyeOpacity;
+                            maskData.rightGlow.material.emissiveIntensity = newEyeIntensity;
+                        }
+                        
+                        // Update cracks opacity
+                        if (maskData.cracks) {
+                            maskData.cracks.forEach(crack => {
+                                if (crack.material) {
+                                    crack.material.opacity = shouldOpen ? 0.3 : 0.7;
+                                }
+                            });
                         }
                         
                         maskData.isUnlocked = shouldOpen;
-                        console.log(`Updated enhanced mask materials for ${direction}`);
+                        console.log(`Updated mask opacity for ${direction} - ${shouldOpen ? 'translucent (open)' : 'solid (locked)'}`);
                     } catch (error) {
-                        console.error('Error updating enhanced mask materials:', error);
+                        console.error('Error updating mask opacity:', error);
                     }
+                } else {
+                    console.warn(`No maskMesh found for ${direction} portal`);
                 }
                 
-                // Update particle colors with enhanced materials
+                // Update particle opacity to match
                 child.traverse((subChild) => {
-                    if (subChild.material && subChild.material.color && subChild.userData.swirSpeed !== undefined) {
+                    if (subChild.material && subChild.material.opacity !== undefined && subChild.userData.swirSpeed !== undefined) {
                         try {
-                            const newColor = shouldOpen ? 0x44ff44 : 0xff4444;
-                            subChild.material.color.setHex(newColor);
-                            if (subChild.material.emissive) {
-                                subChild.material.emissive.setHex(newColor);
-                                subChild.material.emissiveIntensity = shouldOpen ? 1.2 : 1.0;
-                            }
+                            const newParticleOpacity = shouldOpen ? 0.3 : 0.7;
+                            subChild.material.opacity = newParticleOpacity;
                         } catch (error) {
-                            console.error('Error updating particle color:', error);
+                            console.error('Error updating particle opacity:', error);
                         }
                     }
                 });
                 
-                console.log(`Enhanced ${direction} room portal ${shouldOpen ? 'opened' : 'closed'}`);
+                console.log(`${direction} room portal ${shouldOpen ? 'opened (translucent)' : 'closed (solid)'}`);
             }
         });
     }
@@ -1628,7 +1184,7 @@ class DungeonSystem {
     }
     
     openExitPortal() {
-        console.log('All rooms completed - adding enhanced exit portal!');
+        console.log('All rooms completed - adding exit portal!');
         
         // Find center room
         if (this.currentDungeon && this.currentDungeon.roomLayout.rooms.center) {
@@ -1637,8 +1193,8 @@ class DungeonSystem {
             const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
             const roomSize = centerRoom.size * this.gridSize;
             
-            // Create and add exit portal using enhanced materials
-            const exitPortal = this.createEnhancedBillboardPortal('exit', this.getCurrentTheme(), true);
+            // Create and add exit portal using porcelain approach
+            const exitPortal = this.createBillboardPortal('exit', this.getCurrentTheme(), true);
             exitPortal.position.set(centerWorldX, this.floorHeight + 3, centerWorldZ + roomSize * 0.3);
             exitPortal.name = 'exit_portal';
             exitPortal.userData.isBlocking = false; // Exit is immediately usable
@@ -1646,7 +1202,7 @@ class DungeonSystem {
             exitPortal.userData.direction = 'exit';
             
             this.currentDungeonGroup.add(exitPortal);
-            console.log('Enhanced exit portal added and opened with realistic stone/porcelain materials!');
+            console.log('Exit portal added and opened with porcelain design!');
         }
     }
     
@@ -1839,9 +1395,9 @@ class DungeonSystem {
                         Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
                 }
                 
-                // Update enhanced portal animations
+                // Update geometric portal animations
                 if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
-                    this.updateEnhancedPortalAnimations(child, deltaTime);
+                    this.updateBillboardPortalAnimations(child, deltaTime);
                 }
                 
                 // Update portal particles
@@ -1849,7 +1405,7 @@ class DungeonSystem {
                     this.updatePortalParticles(child, deltaTime);
                 }
                 
-                // Make mask faces lock onto player for extra creepiness
+                // RE-ENABLED: Make mask faces lock onto player
                 if (child.userData.maskMesh && window.game && window.game.camera) {
                     child.userData.maskMesh.lookAt(window.game.camera.position);
                 }
@@ -1868,10 +1424,10 @@ class DungeonSystem {
         });
     }
     
-    updateEnhancedPortalAnimations(portalGroup, deltaTime) {
+    updateBillboardPortalAnimations(portalGroup, deltaTime) {
         const time = Date.now() * 0.001;
         
-        // Enhanced breathing/pulsing animation
+        // Gentle breathing/pulsing animation
         const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
         
         // Apply pulse to the mask mesh specifically
@@ -1879,36 +1435,10 @@ class DungeonSystem {
             portalGroup.userData.maskMesh.scale.setScalar(pulseScale);
         }
         
-        // Subtle floating motion - keep it within bounds
+        // Very subtle floating motion - keep it within bounds
         const originalY = portalGroup.userData.originalY;
         const floatOffset = Math.sin(time * 0.6) * 0.2; // Only 0.2 units up/down
         portalGroup.position.y = originalY + floatOffset;
-        
-        // Enhanced eye glow pulsing with material variations
-        if (portalGroup.userData.maskMesh && portalGroup.userData.maskMesh.userData) {
-            const maskData = portalGroup.userData.maskMesh.userData;
-            const glowIntensity = 1.5 + Math.sin(time * 3) * 0.8; // More dramatic pulsing
-            
-            if (maskData.leftGlow && maskData.leftGlow.material) {
-                maskData.leftGlow.material.emissiveIntensity = glowIntensity;
-                // Add subtle color temperature variation
-                const tempShift = Math.sin(time * 2) * 0.1;
-                if (maskData.isUnlocked) {
-                    maskData.leftGlow.material.emissive.setRGB(0, 1, tempShift);
-                } else {
-                    maskData.leftGlow.material.emissive.setRGB(1, tempShift, 0);
-                }
-            }
-            if (maskData.rightGlow && maskData.rightGlow.material) {
-                maskData.rightGlow.material.emissiveIntensity = glowIntensity * 0.9; // Slightly different timing
-                const tempShift = Math.sin(time * 2.3) * 0.1;
-                if (maskData.isUnlocked) {
-                    maskData.rightGlow.material.emissive.setRGB(0, 1, tempShift);
-                } else {
-                    maskData.rightGlow.material.emissive.setRGB(1, tempShift, 0);
-                }
-            }
-        }
         
         // Update particle effects around portal
         portalGroup.traverse((child) => {
@@ -1916,6 +1446,19 @@ class DungeonSystem {
                 this.updatePortalParticles(child, deltaTime);
             }
         });
+        
+        // Subtle eye glow pulsing
+        if (portalGroup.userData.maskMesh && portalGroup.userData.maskMesh.userData) {
+            const maskData = portalGroup.userData.maskMesh.userData;
+            const glowIntensity = 0.5 + Math.sin(time * 3) * 0.3;
+            
+            if (maskData.leftGlow && maskData.leftGlow.material) {
+                maskData.leftGlow.material.emissiveIntensity = glowIntensity;
+            }
+            if (maskData.rightGlow && maskData.rightGlow.material) {
+                maskData.rightGlow.material.emissiveIntensity = glowIntensity;
+            }
+        }
     }
     
     updatePortalParticles(particle, deltaTime) {
@@ -1932,12 +1475,6 @@ class DungeonSystem {
             
             // Gentle bobbing motion
             particle.position.y += Math.sin(time * particle.userData.bobSpeed) * particle.userData.bobAmount * deltaTime;
-        }
-        
-        // Enhanced particle glow pulsing
-        if (particle.material && particle.material.emissiveIntensity !== undefined) {
-            const pulseFactor = 0.8 + Math.sin(time * 4 + particle.userData.originalAngle) * 0.4;
-            particle.material.emissiveIntensity = pulseFactor;
         }
     }
     
