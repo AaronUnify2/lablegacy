@@ -68,7 +68,9 @@ class DungeonSystem {
     isPositionWalkable(worldX, worldZ) {
         if (!this.currentFloorMap) return true;
         
-        // Convert world coordinates to grid coordinates
+        // Convert world coordinates to grid coordinates more precisely
+        // Each grid cell represents a gridSize x gridSize area in world space
+        // Grid cells are centered at their world positions
         const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize);
         const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize);
         
@@ -79,6 +81,49 @@ class DungeonSystem {
         
         // Return walkable state from floor map
         return this.currentFloorMap[gridZ][gridX];
+    }
+    
+    // Helper method to check if a position is near a wall boundary
+    isNearWallBoundary(worldX, worldZ) {
+        if (!this.currentFloorMap) return false;
+        
+        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize);
+        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize);
+        
+        // Check if current position is walkable
+        if (!this.isValidGridPos(gridX, gridZ) || !this.currentFloorMap[gridZ][gridX]) {
+            return true; // Already in a wall
+        }
+        
+        // Check adjacent cells to see if we're near a wall
+        const directions = [
+            {dx: 0, dz: -1}, // North
+            {dx: 0, dz: 1},  // South  
+            {dx: 1, dz: 0},  // East
+            {dx: -1, dz: 0}  // West
+        ];
+        
+        for (const dir of directions) {
+            const neighborX = gridX + dir.dx;
+            const neighborZ = gridZ + dir.dz;
+            
+            if (!this.isValidGridPos(neighborX, neighborZ) || !this.currentFloorMap[neighborZ][neighborX]) {
+                // Adjacent to a wall - check distance to boundary
+                const cellCenterX = (gridX - this.gridWidth/2) * this.gridSize;
+                const cellCenterZ = (gridZ - this.gridDepth/2) * this.gridSize;
+                
+                const distanceToWall = Math.min(
+                    Math.abs(worldX - (cellCenterX + dir.dx * this.gridSize/2)),
+                    Math.abs(worldZ - (cellCenterZ + dir.dz * this.gridSize/2))
+                );
+                
+                if (distanceToWall < 0.6) { // Slightly larger than player radius
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
     
     getFloorHeight(worldX, worldZ) {
