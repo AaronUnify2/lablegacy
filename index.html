@@ -120,6 +120,51 @@
             pointer-events: none;
         }
 
+        /* Loading Screen */
+        #loadingScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #loadingProgress {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #4CAF50;
+        }
+
+        #loadingStatus {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .loading-bar {
+            width: 300px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #666;
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .loading-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
         /* Mobile Controls Styles */
         #mobile-controls {
             position: absolute;
@@ -340,6 +385,16 @@
     </style>
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div style="font-size: 32px; margin-bottom: 20px;">🏰 Labyrinth Legacy</div>
+        <div id="loadingProgress">Initializing...</div>
+        <div class="loading-bar">
+            <div class="loading-fill" id="loadingFill"></div>
+        </div>
+        <div id="loadingStatus">Preparing game engine...</div>
+    </div>
+
     <div id="gameContainer">
         <div id="ui">
             <div id="healthBar">
@@ -420,452 +475,530 @@
         </div>
     </div>
 
-    <!-- CRITICAL LOADING ORDER - GUARANTEED EXECUTION SEQUENCE -->
-    <!-- 1. Three.js Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- 2. Input System -->
-    <script src="src/core/input.js"></script>
-    
-    <!-- 3. Player System -->
-    <script src="src/systems/player.js"></script>
-    
-    <!-- 4. Dungeon System - LOAD FROM EXTERNAL FILE -->
-    <script src="src/systems/dungeon.js"></script>
-    
-    <!-- 5. MAIN GAME ENGINE (INLINE - GUARANTEED TO LOAD AFTER DEPENDENCIES) -->
+    <!-- SEQUENTIAL SCRIPT LOADING SYSTEM -->
     <script>
-        // Main Game Engine with progressive portal system
-        class LabyrinthGame {
+        // Sequential Script Loader Class
+        class SequentialLoader {
             constructor() {
-                console.log('Initializing Labyrinth Game with progressive portal system...');
-                
-                this.scene = null;
-                this.camera = null;
-                this.renderer = null;
-                this.player = null;
-                this.dungeonSystem = null;
-                
-                // Game state
-                this.gameState = 'loading'; // loading, playing, paused, menu
-                this.currentFloor = 1;
-                this.gameTime = 0;
-                
-                // Performance
-                this.clock = new THREE.Clock();
-                this.frameCount = 0;
-                
-                // Input handling
-                this.isPointerLocked = false;
-                
-                // Initialization phases
-                this.initializationPhases = [
-                    'scene',
-                    'renderer', 
-                    'camera',
-                    'lighting',
-                    'player',
-                    'dungeon',
-                    'ui',
-                    'complete'
+                this.scripts = [
+                    { url: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', name: 'Three.js', check: () => window.THREE },
+                    { url: 'src/core/input.js', name: 'Input System', check: () => window.setupInput && window.getInput },
+                    { url: 'src/systems/player.js', name: 'Player System', check: () => window.Player },
+                    { url: 'src/systems/dungeon.js', name: 'Dungeon System', check: () => window.DungeonSystem }
                 ];
-                this.currentPhase = 0;
-                
-                this.init();
+                this.currentIndex = 0;
+                this.loadingProgress = document.getElementById('loadingProgress');
+                this.loadingStatus = document.getElementById('loadingStatus');
+                this.loadingFill = document.getElementById('loadingFill');
+                this.loadingScreen = document.getElementById('loadingScreen');
             }
-            
-            async init() {
-                console.log('Starting game initialization sequence...');
+
+            updateProgress(step, total, status) {
+                const percentage = (step / total) * 100;
+                this.loadingFill.style.width = percentage + '%';
+                this.loadingProgress.textContent = `Loading... ${step}/${total} (${Math.round(percentage)}%)`;
+                this.loadingStatus.textContent = status;
+                console.log(`Loading: ${status} (${Math.round(percentage)}%)`);
+            }
+
+            loadScript(scriptInfo) {
+                return new Promise((resolve, reject) => {
+                    console.log(`Loading ${scriptInfo.name} from ${scriptInfo.url}...`);
+                    
+                    const script = document.createElement('script');
+                    script.src = scriptInfo.url;
+                    script.type = 'text/javascript';
+                    
+                    script.onload = () => {
+                        console.log(`${scriptInfo.name} script loaded, checking...`);
+                        
+                        // Wait a bit for the script to execute
+                        setTimeout(() => {
+                            if (scriptInfo.check()) {
+                                console.log(`${scriptInfo.name} verified successfully ✓`);
+                                resolve();
+                            } else {
+                                console.error(`${scriptInfo.name} failed verification - expected objects not found`);
+                                reject(new Error(`${scriptInfo.name} verification failed`));
+                            }
+                        }, 100);
+                    };
+                    
+                    script.onerror = () => {
+                        console.error(`Failed to load ${scriptInfo.name} from ${scriptInfo.url}`);
+                        reject(new Error(`Failed to load ${scriptInfo.name}`));
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+            }
+
+            async loadAllScripts() {
+                console.log('Starting sequential script loading...');
                 
                 try {
-                    // Execute each initialization phase in sequence
-                    for (let i = 0; i < this.initializationPhases.length; i++) {
-                        const phase = this.initializationPhases[i];
-                        console.log(`Initializing phase: ${phase}`);
+                    for (let i = 0; i < this.scripts.length; i++) {
+                        const script = this.scripts[i];
+                        this.updateProgress(i, this.scripts.length + 2, `Loading ${script.name}...`);
                         
-                        await this.executePhase(phase);
-                        this.currentPhase = i;
+                        await this.loadScript(script);
                         
-                        // Small delay to prevent blocking
-                        await new Promise(resolve => setTimeout(resolve, 10));
+                        // Small delay between scripts to ensure proper execution
+                        await new Promise(resolve => setTimeout(resolve, 50));
                     }
                     
-                    // All systems loaded - start game
-                    this.gameState = 'playing';
-                    console.log('Game initialization complete - starting game loop');
-                    this.gameLoop();
+                    // Initialize input system
+                    this.updateProgress(this.scripts.length, this.scripts.length + 2, 'Initializing input system...');
+                    console.log('Initializing input system...');
+                    setupInput();
+                    
+                    // Initialize game engine
+                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 2, 'Initializing game engine...');
+                    console.log('Creating game engine...');
+                    await this.initializeGameEngine();
+                    
+                    // Complete
+                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 2, 'Game ready!');
+                    
+                    // Hide loading screen
+                    setTimeout(() => {
+                        this.loadingScreen.style.opacity = '0';
+                        this.loadingScreen.style.transition = 'opacity 0.5s ease';
+                        setTimeout(() => {
+                            this.loadingScreen.style.display = 'none';
+                        }, 500);
+                    }, 500);
+                    
+                    console.log('All scripts loaded and game initialized successfully! 🎮');
                     
                 } catch (error) {
-                    console.error('Failed to initialize game:', error);
-                    this.gameState = 'error';
+                    console.error('Script loading failed:', error);
+                    this.loadingStatus.textContent = `Error: ${error.message}`;
+                    this.loadingStatus.style.color = '#ff4444';
                 }
             }
-            
-            async executePhase(phase) {
-                switch(phase) {
-                    case 'scene':
-                        this.setupScene();
-                        break;
-                    case 'renderer':
-                        this.setupRenderer();
-                        break;
-                    case 'camera':
-                        this.setupCamera();
-                        break;
-                    case 'lighting':
-                        this.setupLighting();
-                        break;
-                    case 'player':
-                        this.setupPlayer();
-                        break;
-                    case 'dungeon':
-                        this.setupDungeon();
-                        break;
-                    case 'ui':
-                        this.setupUI();
-                        break;
-                    case 'complete':
-                        this.onInitializationComplete();
-                        break;
-                }
-            }
-            
-            setupScene() {
-                this.scene = new THREE.Scene();
-                this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
-                this.scene.background = new THREE.Color(0x0f0f1f);
-            }
-            
-            setupRenderer() {
-                this.renderer = new THREE.WebGLRenderer({ 
-                    antialias: true,
-                    powerPreference: "high-performance"
-                });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                
-                // Enhanced rendering settings for atmosphere
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                this.renderer.outputEncoding = THREE.sRGBEncoding;
-                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                this.renderer.toneMappingExposure = 0.6;
-                
-                const gameContainer = document.getElementById('gameContainer');
-                if (gameContainer) {
-                    gameContainer.appendChild(this.renderer.domElement);
-                } else {
-                    console.error('gameContainer element not found!');
-                }
-                
-                // Set up pointer lock for desktop
-                if (!inputState.isMobile) {
-                    this.renderer.domElement.addEventListener('click', () => {
-                        this.requestPointerLock();
-                    });
-                    
-                    document.addEventListener('pointerlockchange', () => {
-                        this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
-                    });
-                }
-            }
-            
-            setupCamera() {
-                this.camera = new THREE.PerspectiveCamera(
-                    75, 
-                    window.innerWidth / window.innerHeight, 
-                    0.1, 
-                    1000
-                );
-                this.camera.position.set(0, 1.8, 0);
-                
-                // Window resize handler
-                window.addEventListener('resize', () => {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
-                    this.camera.updateProjectionMatrix();
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
-                });
-            }
-            
-            setupLighting() {
-                // Much brighter ambient lighting for testing
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-                this.scene.add(ambientLight);
-                
-                // Brighter main directional light for testing
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-                directionalLight.position.set(10, 20, 5);
-                directionalLight.castShadow = true;
-                directionalLight.shadow.mapSize.width = 2048;
-                directionalLight.shadow.mapSize.height = 2048;
-                directionalLight.shadow.camera.near = 0.5;
-                directionalLight.shadow.camera.far = 100;
-                directionalLight.shadow.camera.left = -50;
-                directionalLight.shadow.camera.right = 50;
-                directionalLight.shadow.camera.top = 50;
-                directionalLight.shadow.camera.bottom = -50;
-                this.scene.add(directionalLight);
-            }
-            
-            setupPlayer() {
-                // CRITICAL: Only create player AFTER scene is ready
-                if (!this.scene || !this.camera) {
-                    throw new Error('Scene and camera must be initialized before player');
-                }
-                
-                console.log('Creating player - scene is ready');
-                this.player = new Player(this.scene, this.camera);
-            }
-            
-            setupDungeon() {
-                // Initialize dungeon system AFTER player is created
-                if (!this.player) {
-                    throw new Error('Player must be initialized before dungeon system');
-                }
-                
-                console.log('Creating dungeon system...');
-                // Pass the player to the dungeon system for collision integration
-                this.dungeonSystem = new DungeonSystem(this.scene, this.player);
-                
-                // Generate the first dungeon floor
-                console.log('Generating first dungeon floor...');
-                this.dungeonSystem.generateDungeon(this.currentFloor);
-                
-                // Position player in center room - now with proper collision
-                this.player.position.set(0, 1.8, 0);
-                this.player.camera.position.copy(this.player.position);
-                
-                console.log('Dungeon system initialized with progressive portals and first floor generated');
-            }
-            
-            setupUI() {
-                this.updateUI();
-            }
-            
-            onInitializationComplete() {
-                console.log('All systems initialized successfully with progressive portal system');
-                
-                // Set up additional input handlers now that everything is ready
-                if (!inputState.isMobile) {
-                    document.addEventListener('keydown', (e) => {
-                        if (e.code === 'Escape' && this.isPointerLocked) {
-                            document.exitPointerLock();
-                        }
-                    });
-                }
-                
-                // Update floor indicator
-                this.updateFloorIndicator();
-            }
-            
-            requestPointerLock() {
-                if (!inputState.isMobile) {
-                    this.renderer.domElement.requestPointerLock();
-                }
-            }
-            
-            update(deltaTime) {
-                // Only update if game is playing
-                if (this.gameState !== 'playing') return;
-                
-                this.gameTime += deltaTime;
-                this.frameCount++;
-                
-                // Get current input state
-                const input = getInput();
-                
-                // Update player (only if initialized) - now with collision detection
-                if (this.player) {
-                    this.player.update(deltaTime, input);
-                }
-                
-                // Update dungeon system (animated elements, lighting, etc.)
-                if (this.dungeonSystem) {
-                    this.dungeonSystem.update(deltaTime);
-                }
-                
-                // Reset mouse delta
-                inputState.mouse.deltaX = 0;
-                inputState.mouse.deltaY = 0;
-                
-                // Update UI
-                this.updateUI();
-                
-                // Check for floor progression (placeholder - will be replaced with key system)
-                this.checkFloorProgression(input);
-            }
-            
-            checkFloorProgression(input) {
-                // Menu button: Skip 10 floors ahead for testing
-                if (input.justPressed.menu) {
-                    this.advanceFloors(10);
-                }
-                
-                // E + Esc together: Advance 1 floor for fine testing
-                if (input.justPressed.interact && input.menu) {
-                    this.advanceFloors(1);
-                }
-                
-                // Sword button or I key: Progress through rooms (simulate defeating enemies)
-                if (input.justPressed.attack || input.justPressed.inventory) {
-                    if (this.dungeonSystem) {
-                        this.dungeonSystem.togglePortals();
-                    }
-                }
-            }
-            
-            advanceFloors(count) {
-                this.currentFloor += count;
-                console.log(`Advancing ${count} floors to floor ${this.currentFloor}`);
-                
-                // Generate new dungeon floor
-                if (this.dungeonSystem) {
-                    this.dungeonSystem.generateDungeon(this.currentFloor);
-                }
-                
-                // Reset player position to center with proper height
-                this.player.position.set(0, 1.8, 0);
-                this.player.velocity.set(0, 0, 0);
-                this.player.camera.position.copy(this.player.position);
-                
-                // Update UI
-                this.updateFloorIndicator();
-            }
-            
-            advanceToNextFloor() {
-                // Keep this method for compatibility
-                this.advanceFloors(1);
-            }
-            
-            updateFloorIndicator() {
-                const floorElement = document.getElementById('floorIndicator');
-                if (floorElement) {
-                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
-                    floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
-                }
-            }
-            
-            updateUI() {
-                if (!this.player) return;
-                
-                const healthPercent = (this.player.health / this.player.maxHealth) * 100;
-                const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
-                const manaPercent = (this.player.mana / this.player.maxMana) * 100;
-                
-                const healthFill = document.getElementById('healthFill');
-                const staminaFill = document.getElementById('staminaFill');
-                const manaFill = document.getElementById('manaFill');
-                
-                if (healthFill) healthFill.style.width = healthPercent + '%';
-                if (staminaFill) staminaFill.style.width = staminaPercent + '%';
-                if (manaFill) manaFill.style.width = manaPercent + '%';
-                
-                // Update compass
-                this.updateCompass();
-                
-                // Update progression indicator
-                this.updateProgressionIndicator();
-            }
-            
-            updateProgressionIndicator() {
-                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
-                
-                const progression = this.dungeonSystem.roomProgression;
-                const directions = ['north', 'east', 'west', 'south'];
-                
-                directions.forEach(dir => {
-                    const element = document.getElementById(`progress-${dir}`);
-                    if (element) {
-                        const room = progression[dir];
-                        let status = '';
-                        let color = '';
+
+            async initializeGameEngine() {
+                return new Promise((resolve, reject) => {
+                    try {
+                        // Create the main game engine inline
+                        this.createGameEngine();
                         
-                        if (room.enemiesDefeated) {
-                            status = 'COMPLETED ✓';
-                            color = '#00ff00';
-                        } else if (room.unlocked) {
-                            status = 'OPEN - Fight!';
-                            color = '#ffff00';
+                        // Initialize the game
+                        window.game = new LabyrinthGame();
+                        
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }
+
+            createGameEngine() {
+                // Main Game Engine with progressive portal system
+                class LabyrinthGame {
+                    constructor() {
+                        console.log('Initializing Labyrinth Game with progressive portal system...');
+                        
+                        this.scene = null;
+                        this.camera = null;
+                        this.renderer = null;
+                        this.player = null;
+                        this.dungeonSystem = null;
+                        
+                        // Game state
+                        this.gameState = 'loading'; // loading, playing, paused, menu
+                        this.currentFloor = 1;
+                        this.gameTime = 0;
+                        
+                        // Performance
+                        this.clock = new THREE.Clock();
+                        this.frameCount = 0;
+                        
+                        // Input handling
+                        this.isPointerLocked = false;
+                        
+                        // Initialization phases
+                        this.initializationPhases = [
+                            'scene',
+                            'renderer', 
+                            'camera',
+                            'lighting',
+                            'player',
+                            'dungeon',
+                            'ui',
+                            'complete'
+                        ];
+                        this.currentPhase = 0;
+                        
+                        this.init();
+                    }
+                    
+                    async init() {
+                        console.log('Starting game initialization sequence...');
+                        
+                        try {
+                            // Execute each initialization phase in sequence
+                            for (let i = 0; i < this.initializationPhases.length; i++) {
+                                const phase = this.initializationPhases[i];
+                                console.log(`Initializing phase: ${phase}`);
+                                
+                                await this.executePhase(phase);
+                                this.currentPhase = i;
+                                
+                                // Small delay to prevent blocking
+                                await new Promise(resolve => setTimeout(resolve, 10));
+                            }
+                            
+                            // All systems loaded - start game
+                            this.gameState = 'playing';
+                            console.log('Game initialization complete - starting game loop');
+                            this.gameLoop();
+                            
+                        } catch (error) {
+                            console.error('Failed to initialize game:', error);
+                            this.gameState = 'error';
+                        }
+                    }
+                    
+                    async executePhase(phase) {
+                        switch(phase) {
+                            case 'scene':
+                                this.setupScene();
+                                break;
+                            case 'renderer':
+                                this.setupRenderer();
+                                break;
+                            case 'camera':
+                                this.setupCamera();
+                                break;
+                            case 'lighting':
+                                this.setupLighting();
+                                break;
+                            case 'player':
+                                this.setupPlayer();
+                                break;
+                            case 'dungeon':
+                                this.setupDungeon();
+                                break;
+                            case 'ui':
+                                this.setupUI();
+                                break;
+                            case 'complete':
+                                this.onInitializationComplete();
+                                break;
+                        }
+                    }
+                    
+                    setupScene() {
+                        this.scene = new THREE.Scene();
+                        this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+                        this.scene.background = new THREE.Color(0x0f0f1f);
+                    }
+                    
+                    setupRenderer() {
+                        this.renderer = new THREE.WebGLRenderer({ 
+                            antialias: true,
+                            powerPreference: "high-performance"
+                        });
+                        this.renderer.setSize(window.innerWidth, window.innerHeight);
+                        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                        
+                        // Enhanced rendering settings for atmosphere
+                        this.renderer.shadowMap.enabled = true;
+                        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                        this.renderer.outputEncoding = THREE.sRGBEncoding;
+                        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                        this.renderer.toneMappingExposure = 0.6;
+                        
+                        const gameContainer = document.getElementById('gameContainer');
+                        if (gameContainer) {
+                            gameContainer.appendChild(this.renderer.domElement);
                         } else {
-                            status = 'LOCKED';
-                            color = '#ff6666';
+                            console.error('gameContainer element not found!');
                         }
                         
-                        const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
-                        element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
-                        element.style.color = color;
+                        // Set up pointer lock for desktop
+                        if (!inputState.isMobile) {
+                            this.renderer.domElement.addEventListener('click', () => {
+                                this.requestPointerLock();
+                            });
+                            
+                            document.addEventListener('pointerlockchange', () => {
+                                this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
+                            });
+                        }
                     }
-                });
-            }
-            
-            updateCompass() {
-                if (!this.player) return;
-                
-                const compassNeedle = document.getElementById('compass-needle');
-                if (compassNeedle) {
-                    // Convert player yaw to degrees and adjust for compass orientation
-                    // Player yaw of 0 = facing negative Z (which is North in our coordinate system)
-                    const yawDegrees = (this.player.yaw * 180 / Math.PI);
                     
-                    // Rotate the needle - yaw of 0 should point North (up)
-                    compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
+                    setupCamera() {
+                        this.camera = new THREE.PerspectiveCamera(
+                            75, 
+                            window.innerWidth / window.innerHeight, 
+                            0.1, 
+                            1000
+                        );
+                        this.camera.position.set(0, 1.8, 0);
+                        
+                        // Window resize handler
+                        window.addEventListener('resize', () => {
+                            this.camera.aspect = window.innerWidth / window.innerHeight;
+                            this.camera.updateProjectionMatrix();
+                            this.renderer.setSize(window.innerWidth, window.innerHeight);
+                        });
+                    }
+                    
+                    setupLighting() {
+                        // Much brighter ambient lighting for testing
+                        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+                        this.scene.add(ambientLight);
+                        
+                        // Brighter main directional light for testing
+                        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                        directionalLight.position.set(10, 20, 5);
+                        directionalLight.castShadow = true;
+                        directionalLight.shadow.mapSize.width = 2048;
+                        directionalLight.shadow.mapSize.height = 2048;
+                        directionalLight.shadow.camera.near = 0.5;
+                        directionalLight.shadow.camera.far = 100;
+                        directionalLight.shadow.camera.left = -50;
+                        directionalLight.shadow.camera.right = 50;
+                        directionalLight.shadow.camera.top = 50;
+                        directionalLight.shadow.camera.bottom = -50;
+                        this.scene.add(directionalLight);
+                    }
+                    
+                    setupPlayer() {
+                        // CRITICAL: Only create player AFTER scene is ready
+                        if (!this.scene || !this.camera) {
+                            throw new Error('Scene and camera must be initialized before player');
+                        }
+                        
+                        console.log('Creating player - scene is ready');
+                        this.player = new Player(this.scene, this.camera);
+                    }
+                    
+                    setupDungeon() {
+                        // Initialize dungeon system AFTER player is created
+                        if (!this.player) {
+                            throw new Error('Player must be initialized before dungeon system');
+                        }
+                        
+                        console.log('Creating dungeon system...');
+                        // Pass the player to the dungeon system for collision integration
+                        this.dungeonSystem = new DungeonSystem(this.scene, this.player);
+                        
+                        // Generate the first dungeon floor
+                        console.log('Generating first dungeon floor...');
+                        this.dungeonSystem.generateDungeon(this.currentFloor);
+                        
+                        // Position player in center room - now with proper collision
+                        this.player.position.set(0, 1.8, 0);
+                        this.player.camera.position.copy(this.player.position);
+                        
+                        console.log('Dungeon system initialized with progressive portals and first floor generated');
+                    }
+                    
+                    setupUI() {
+                        this.updateUI();
+                    }
+                    
+                    onInitializationComplete() {
+                        console.log('All systems initialized successfully with progressive portal system');
+                        
+                        // Set up additional input handlers now that everything is ready
+                        if (!inputState.isMobile) {
+                            document.addEventListener('keydown', (e) => {
+                                if (e.code === 'Escape' && this.isPointerLocked) {
+                                    document.exitPointerLock();
+                                }
+                            });
+                        }
+                        
+                        // Update floor indicator
+                        this.updateFloorIndicator();
+                    }
+                    
+                    requestPointerLock() {
+                        if (!inputState.isMobile) {
+                            this.renderer.domElement.requestPointerLock();
+                        }
+                    }
+                    
+                    update(deltaTime) {
+                        // Only update if game is playing
+                        if (this.gameState !== 'playing') return;
+                        
+                        this.gameTime += deltaTime;
+                        this.frameCount++;
+                        
+                        // Get current input state
+                        const input = getInput();
+                        
+                        // Update player (only if initialized) - now with collision detection
+                        if (this.player) {
+                            this.player.update(deltaTime, input);
+                        }
+                        
+                        // Update dungeon system (animated elements, lighting, etc.)
+                        if (this.dungeonSystem) {
+                            this.dungeonSystem.update(deltaTime);
+                        }
+                        
+                        // Reset mouse delta
+                        inputState.mouse.deltaX = 0;
+                        inputState.mouse.deltaY = 0;
+                        
+                        // Update UI
+                        this.updateUI();
+                        
+                        // Check for floor progression (placeholder - will be replaced with key system)
+                        this.checkFloorProgression(input);
+                    }
+                    
+                    checkFloorProgression(input) {
+                        // Menu button: Skip 10 floors ahead for testing
+                        if (input.justPressed.menu) {
+                            this.advanceFloors(10);
+                        }
+                        
+                        // E + Esc together: Advance 1 floor for fine testing
+                        if (input.justPressed.interact && input.menu) {
+                            this.advanceFloors(1);
+                        }
+                        
+                        // Sword button or I key: Progress through rooms (simulate defeating enemies)
+                        if (input.justPressed.attack || input.justPressed.inventory) {
+                            if (this.dungeonSystem) {
+                                this.dungeonSystem.togglePortals();
+                            }
+                        }
+                    }
+                    
+                    advanceFloors(count) {
+                        this.currentFloor += count;
+                        console.log(`Advancing ${count} floors to floor ${this.currentFloor}`);
+                        
+                        // Generate new dungeon floor
+                        if (this.dungeonSystem) {
+                            this.dungeonSystem.generateDungeon(this.currentFloor);
+                        }
+                        
+                        // Reset player position to center with proper height
+                        this.player.position.set(0, 1.8, 0);
+                        this.player.velocity.set(0, 0, 0);
+                        this.player.camera.position.copy(this.player.position);
+                        
+                        // Update UI
+                        this.updateFloorIndicator();
+                    }
+                    
+                    advanceToNextFloor() {
+                        // Keep this method for compatibility
+                        this.advanceFloors(1);
+                    }
+                    
+                    updateFloorIndicator() {
+                        const floorElement = document.getElementById('floorIndicator');
+                        if (floorElement) {
+                            const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
+                            floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
+                        }
+                    }
+                    
+                    updateUI() {
+                        if (!this.player) return;
+                        
+                        const healthPercent = (this.player.health / this.player.maxHealth) * 100;
+                        const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
+                        const manaPercent = (this.player.mana / this.player.maxMana) * 100;
+                        
+                        const healthFill = document.getElementById('healthFill');
+                        const staminaFill = document.getElementById('staminaFill');
+                        const manaFill = document.getElementById('manaFill');
+                        
+                        if (healthFill) healthFill.style.width = healthPercent + '%';
+                        if (staminaFill) staminaFill.style.width = staminaPercent + '%';
+                        if (manaFill) manaFill.style.width = manaPercent + '%';
+                        
+                        // Update compass
+                        this.updateCompass();
+                        
+                        // Update progression indicator
+                        this.updateProgressionIndicator();
+                    }
+                    
+                    updateProgressionIndicator() {
+                        if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
+                        
+                        const progression = this.dungeonSystem.roomProgression;
+                        const directions = ['north', 'east', 'west', 'south'];
+                        
+                        directions.forEach(dir => {
+                            const element = document.getElementById(`progress-${dir}`);
+                            if (element) {
+                                const room = progression[dir];
+                                let status = '';
+                                let color = '';
+                                
+                                if (room.enemiesDefeated) {
+                                    status = 'COMPLETED ✓';
+                                    color = '#00ff00';
+                                } else if (room.unlocked) {
+                                    status = 'OPEN - Fight!';
+                                    color = '#ffff00';
+                                } else {
+                                    status = 'LOCKED';
+                                    color = '#ff6666';
+                                }
+                                
+                                const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
+                                element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
+                                element.style.color = color;
+                            }
+                        });
+                    }
+                    
+                    updateCompass() {
+                        if (!this.player) return;
+                        
+                        const compassNeedle = document.getElementById('compass-needle');
+                        if (compassNeedle) {
+                            // Convert player yaw to degrees and adjust for compass orientation
+                            // Player yaw of 0 = facing negative Z (which is North in our coordinate system)
+                            const yawDegrees = (this.player.yaw * 180 / Math.PI);
+                            
+                            // Rotate the needle - yaw of 0 should point North (up)
+                            compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
+                        }
+                    }
+                    
+                    render() {
+                        if (this.renderer && this.scene && this.camera) {
+                            this.renderer.render(this.scene, this.camera);
+                        }
+                    }
+                    
+                    gameLoop() {
+                        const deltaTime = this.clock.getDelta();
+                        
+                        this.update(deltaTime);
+                        this.render();
+                        
+                        requestAnimationFrame(() => this.gameLoop());
+                    }
                 }
-            }
-            
-            render() {
-                if (this.renderer && this.scene && this.camera) {
-                    this.renderer.render(this.scene, this.camera);
-                }
-            }
-            
-            gameLoop() {
-                const deltaTime = this.clock.getDelta();
-                
-                this.update(deltaTime);
-                this.render();
-                
-                requestAnimationFrame(() => this.gameLoop());
+
+                // Make LabyrinthGame available globally
+                window.LabyrinthGame = LabyrinthGame;
             }
         }
 
-        // Make LabyrinthGame available globally
-        window.LabyrinthGame = LabyrinthGame;
-    </script>
-    
-    <!-- 6. GUARANTEED FINAL INITIALIZATION -->
-    <script>
-        // Wait for DOM to be fully loaded before starting
+        // Start the loading process when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing game with progressive portal system...');
+            console.log('DOM loaded, starting sequential script loading...');
             
-            // Verify all dependencies are loaded
-            if (!window.THREE) {
-                console.error('Three.js not loaded!');
-                return;
-            }
-            
-            if (!window.setupInput) {
-                console.error('Input system not loaded!');
-                return;
-            }
-            
-            if (!window.Player) {
-                console.error('Player system not loaded!');
-                return;
-            }
-            
-            if (!window.DungeonSystem) {
-                console.error('Dungeon system not loaded!');
-                return;
-            }
-            
-            // Initialize input system first
-            setupInput();
-            
-            // Initialize game engine (this will create player, dungeon, etc. with progressive portals)
-            window.game = new LabyrinthGame();
-            
-            console.log('Game initialization complete with progressive portal system');
+            const loader = new SequentialLoader();
+            loader.loadAllScripts();
         });
     </script>
 </body>
