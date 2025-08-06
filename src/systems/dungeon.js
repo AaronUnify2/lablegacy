@@ -888,7 +888,7 @@ class DungeonSystem {
     createBillboardPortal(direction, theme, isUnlocked) {
         const portalGroup = new THREE.Group();
         
-        // Create simple geometric mask instead of canvas texture
+        // Create simple geometric mask with opacity-based state
         const mask = this.createGeometricMask(isUnlocked);
         portalGroup.add(mask);
         
@@ -903,7 +903,7 @@ class DungeonSystem {
             originalY: this.floorHeight + 3,
             pulseSpeed: 0.5 + Math.random() * 0.5,
             pulseAmount: 0.1,
-            maskMesh: mask // Store reference to the mask for color changes
+            maskMesh: mask // Store reference to the mask for opacity changes
         };
         
         console.log(`Created geometric portal for ${direction}, unlocked: ${isUnlocked}`);
@@ -918,11 +918,14 @@ class DungeonSystem {
         const faceGeometry = new THREE.SphereGeometry(3, 16, 12); // Increased from 2 to 3
         faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
         
-        const faceColor = isUnlocked ? 0x2a4a2a : 0x4a2a2a;
+        // Use a neutral dark color for the mask face
+        const faceColor = 0x3a3a3a; // Dark gray
+        const faceOpacity = isUnlocked ? 0.2 : 0.95; // Transparent when unlocked, solid when locked
+        
         const faceMaterial = new THREE.MeshLambertMaterial({ 
             color: faceColor,
             transparent: true,
-            opacity: 0.9
+            opacity: faceOpacity
         });
         
         const face = new THREE.Mesh(faceGeometry, faceMaterial);
@@ -930,7 +933,12 @@ class DungeonSystem {
         
         // Eye sockets (black holes) - MADE LARGER
         const eyeGeometry = new THREE.SphereGeometry(0.45, 8, 8); // Increased from 0.3 to 0.45
-        const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const eyeOpacity = isUnlocked ? 0.1 : 1.0;
+        const eyeMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x000000,
+            transparent: true,
+            opacity: eyeOpacity
+        });
         
         // Left eye socket
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
@@ -944,15 +952,16 @@ class DungeonSystem {
         rightEye.scale.set(0.8, 1.1, 0.8);
         maskGroup.add(rightEye);
         
-        // Glowing eyes - MADE LARGER AND BRIGHTER
-        const eyeColor = isUnlocked ? 0x00ff00 : 0xff0000;
+        // Glowing eyes - with opacity-based intensity
+        const eyeColor = 0xaaaaff; // Neutral blue-white glow
         const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 8, 8); // Increased from 0.15 to 0.25
+        const eyeGlowOpacity = isUnlocked ? 0.15 : 1.0;
         const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
             color: eyeColor,
             transparent: true,
-            opacity: 1.0, // Full opacity
+            opacity: eyeGlowOpacity,
             emissive: eyeColor,
-            emissiveIntensity: 1.2 // Increased intensity
+            emissiveIntensity: isUnlocked ? 0.2 : 1.2
         });
         
         // Left glowing eye
@@ -961,7 +970,7 @@ class DungeonSystem {
         maskGroup.add(leftGlow);
         
         // Right glowing eye
-        const rightGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
+        const rightGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial.clone());
         rightGlow.position.set(0.9, 0.45, 0.35);
         rightGlow.scale.set(0.8, 0.8, 0.8);
         maskGroup.add(rightGlow);
@@ -969,7 +978,12 @@ class DungeonSystem {
         // Mouth (dark opening) - MADE LARGER
         const mouthGeometry = new THREE.SphereGeometry(0.6, 8, 8); // Increased from 0.4 to 0.6
         mouthGeometry.scale(1, 0.5, 0.8);
-        const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const mouthOpacity = isUnlocked ? 0.1 : 1.0;
+        const mouthMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x000000,
+            transparent: true,
+            opacity: mouthOpacity
+        });
         
         const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
         mouth.position.set(0, -0.75, 0.2); // Adjusted for larger scale
@@ -977,20 +991,26 @@ class DungeonSystem {
         
         // Add some teeth - MADE LARGER
         const toothGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08); // Increased size
-        const toothMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFACD });
+        const toothOpacity = isUnlocked ? 0.2 : 0.9;
+        const toothMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xFFFACD,
+            transparent: true,
+            opacity: toothOpacity
+        });
         
         for (let i = 0; i < 4; i++) {
-            const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
+            const tooth = new THREE.Mesh(toothGeometry, toothMaterial.clone());
             tooth.position.set(-0.22 + i * 0.15, -0.6, 0.3); // Adjusted for larger scale
             maskGroup.add(tooth);
         }
         
         // Add cracks/weathering marks - MADE LARGER
         const crackGeometry = new THREE.BoxGeometry(0.03, 1.2, 0.03); // Increased size
+        const crackOpacity = isUnlocked ? 0.1 : 0.8;
         const crackMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x2a1a1a,
             transparent: true,
-            opacity: 0.8
+            opacity: crackOpacity
         });
         
         const crack1 = new THREE.Mesh(crackGeometry, crackMaterial);
@@ -998,17 +1018,22 @@ class DungeonSystem {
         crack1.rotation.z = Math.PI / 6;
         maskGroup.add(crack1);
         
-        const crack2 = new THREE.Mesh(crackGeometry, crackMaterial);
+        const crack2 = new THREE.Mesh(crackGeometry, crackMaterial.clone());
         crack2.position.set(1.05, -0.45, 0.35); // Adjusted for larger scale
         crack2.rotation.z = -Math.PI / 4;
         crack2.scale.set(1, 0.6, 1);
         maskGroup.add(crack2);
         
-        // Store references for color changes
+        // Store references for opacity changes
         maskGroup.userData = {
             face: face,
+            leftEye: leftEye,
+            rightEye: rightEye,
             leftGlow: leftGlow,
             rightGlow: rightGlow,
+            mouth: mouth,
+            teeth: maskGroup.children.filter(child => child.geometry === toothGeometry),
+            cracks: [crack1, crack2],
             isUnlocked: isUnlocked
         };
         
@@ -1017,16 +1042,17 @@ class DungeonSystem {
     
     addPortalParticleEffects(portalGroup, isUnlocked) {
         const particleCount = 12;
-        const particleColor = isUnlocked ? 0x44ff44 : 0xff4444;
+        const particleColor = 0x8888ff; // Neutral blue color for particles
+        const particleOpacity = isUnlocked ? 0.2 : 0.7;
         
         for (let i = 0; i < particleCount; i++) {
             const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6);
             const particleMaterial = new THREE.MeshBasicMaterial({
                 color: particleColor,
                 transparent: true,
-                opacity: 0.7,
+                opacity: particleOpacity,
                 emissive: particleColor,
-                emissiveIntensity: 0.5
+                emissiveIntensity: isUnlocked ? 0.1 : 0.5
             });
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
@@ -1046,7 +1072,8 @@ class DungeonSystem {
                 originalRadius: radius,
                 swirSpeed: 0.5 + Math.random() * 0.5,
                 bobSpeed: 0.8 + Math.random() * 0.4,
-                bobAmount: 0.3
+                bobAmount: 0.3,
+                particleMaterial: particleMaterial // Store reference for opacity updates
             };
             
             portalGroup.add(particle);
@@ -1061,219 +1088,6 @@ class DungeonSystem {
         // This just ensures the center room atmosphere is set up
     }
     
-    createPortalMask(portalType, theme) {
-        const maskGroup = new THREE.Group();
-        
-        // Main mask face - inspired by the creepy reference images
-        const faceGeometry = new THREE.SphereGeometry(1.2, 16, 12);
-        // Flatten it to be more mask-like
-        faceGeometry.scale(1, 0.8, 0.4);
-        
-        let faceColor, eyeColor, runeColor;
-        
-        if (portalType === 'entry') {
-            faceColor = 0x8B4513;
-            eyeColor = 0xff4444;
-            runeColor = 0xff6644;
-        } else if (portalType === 'exit') {
-            faceColor = 0x2F5F2F;
-            eyeColor = 0x44ff44;
-            runeColor = 0x44ff66;
-        } else {
-            // Room entrance portals - darker, more menacing
-            faceColor = 0x654321;
-            eyeColor = 0xff6666;
-            runeColor = 0xff8866;
-        }
-        
-        const faceMaterial = new THREE.MeshPhongMaterial({
-            color: faceColor,
-            transparent: true,
-            opacity: 0.95,
-            shininess: 10,
-            emissive: faceColor,
-            emissiveIntensity: 0.1
-        });
-        
-        const face = new THREE.Mesh(faceGeometry, faceMaterial);
-        maskGroup.add(face);
-        
-        // Eye holes - large, menacing, and dark
-        const eyeGeometry = new THREE.SphereGeometry(0.25, 12, 8);
-        const eyeMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 1.0
-        });
-        
-        // Left eye
-        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.4, 0.2, 0.3);
-        leftEye.scale.set(1.2, 1.5, 0.8); // Make eyes more oval and deep
-        maskGroup.add(leftEye);
-        
-        // Right eye
-        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.4, 0.2, 0.3);
-        rightEye.scale.set(1.2, 1.5, 0.8);
-        maskGroup.add(rightEye);
-        
-        // Creepy glowing eyes inside the holes
-        const glowEyeGeometry = new THREE.SphereGeometry(0.08, 8, 6);
-        const glowEyeMaterial = new THREE.MeshBasicMaterial({
-            color: eyeColor,
-            transparent: true,
-            opacity: 0.9,
-            emissive: eyeColor,
-            emissiveIntensity: 1.0
-        });
-        
-        const leftGlow = new THREE.Mesh(glowEyeGeometry, glowEyeMaterial);
-        leftGlow.position.set(-0.4, 0.2, 0.35);
-        maskGroup.add(leftGlow);
-        
-        const rightGlow = new THREE.Mesh(glowEyeGeometry, glowEyeMaterial);
-        rightGlow.position.set(0.4, 0.2, 0.35);
-        maskGroup.add(rightGlow);
-        
-        // Mouth - gaping and unsettling
-        const mouthGeometry = new THREE.CylinderGeometry(0.15, 0.25, 0.3, 8);
-        const mouthMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000,
-            transparent: true,
-            opacity: 1.0
-        });
-        
-        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-        mouth.position.set(0, -0.3, 0.2);
-        mouth.rotation.x = Math.PI / 2;
-        maskGroup.add(mouth);
-        
-        // Add some teeth for extra creepiness
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const toothGeometry = new THREE.ConeGeometry(0.03, 0.15, 4);
-            const toothMaterial = new THREE.MeshPhongMaterial({
-                color: 0xFFFACD,
-                shininess: 30
-            });
-            
-            const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
-            tooth.position.set(
-                Math.cos(angle) * 0.12,
-                -0.25,
-                0.25 + Math.sin(angle) * 0.12
-            );
-            tooth.rotation.x = Math.PI;
-            maskGroup.add(tooth);
-        }
-        
-        // Ancient rune markings on forehead
-        const runeGeometry = new THREE.RingGeometry(0.2, 0.3, 8);
-        const runeMaterial = new THREE.MeshBasicMaterial({
-            color: runeColor,
-            transparent: true,
-            opacity: 0.7,
-            emissive: runeColor,
-            emissiveIntensity: 0.8,
-            side: THREE.DoubleSide
-        });
-        
-        const rune = new THREE.Mesh(runeGeometry, runeMaterial);
-        rune.position.set(0, 0.6, 0.4);
-        maskGroup.add(rune);
-        
-        // Portal frame/archway around the mask
-        const frameGeometry = new THREE.TorusGeometry(2, 0.3, 8, 16);
-        const frameMaterial = new THREE.MeshPhongMaterial({
-            color: 0x444444,
-            transparent: true,
-            opacity: 0.8,
-            emissive: 0x222222,
-            emissiveIntensity: 0.2
-        });
-        
-        const frame = new THREE.Mesh(frameGeometry, frameMaterial);
-        frame.rotation.x = Math.PI / 2;
-        frame.position.set(0, 0, -0.2);
-        maskGroup.add(frame);
-        
-        // Mystical particle effects around the portal
-        const particleCount = 20;
-        const particleGeometry = new THREE.SphereGeometry(0.02, 4, 4);
-        const particleMaterial = new THREE.MeshBasicMaterial({
-            color: runeColor,
-            transparent: true,
-            opacity: 0.8,
-            emissive: runeColor,
-            emissiveIntensity: 1.0
-        });
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            const angle = (i / particleCount) * Math.PI * 2;
-            const radius = 2.5 + Math.random() * 0.5;
-            
-            particle.position.set(
-                Math.cos(angle) * radius,
-                -1 + Math.random() * 2,
-                Math.sin(angle) * radius * 0.3
-            );
-            
-            // Add swirling animation data
-            particle.userData = {
-                originalAngle: angle,
-                radius: radius,
-                swirSpeed: 0.3 + Math.random() * 0.4,
-                bobSpeed: 0.5 + Math.random() * 1.0,
-                bobAmount: 0.2 + Math.random() * 0.3
-            };
-            
-            maskGroup.add(particle);
-        }
-        
-        // Add eerie lighting
-        const portalLight = new THREE.PointLight(eyeColor, 1.5, 8);
-        portalLight.position.set(0, 0, 1);
-        maskGroup.add(portalLight);
-        this.lightSources.push(portalLight);
-        
-        // Add breathing/pulsing animation
-        maskGroup.userData = {
-            portalType: portalType,
-            originalScale: maskGroup.scale.clone(),
-            pulseSpeed: 0.8 + Math.random() * 0.4,
-            pulseAmount: 0.05 + Math.random() * 0.03,
-            isBlocking: true // Will be set to false when conditions are met
-        };
-        
-        return maskGroup;
-    }
-    
-    createRoomEntrancePortal(direction, theme, isUnlocked) {
-        const portal = this.createPortalMask('room_entrance', theme);
-        
-        // Set initial state based on unlock status
-        portal.userData.portalType = `room_entrance_${direction}`;
-        portal.userData.direction = direction;
-        portal.userData.isBlocking = !isUnlocked;
-        
-        if (isUnlocked) {
-            // Make unlocked portals more transparent and less threatening
-            portal.traverse((child) => {
-                if (child.material && child.material.opacity !== undefined) {
-                    child.material.opacity *= 0.3; // Much more transparent when unlocked
-                }
-                if (child.material && child.material.emissive) {
-                    child.material.emissive.setHex(0x00ff00); // Green = unlocked
-                    child.material.emissiveIntensity = 0.3;
-                }
-            });
-        }
-        
-        return portal;
-    }
-    
     updateRoomPortals(direction, shouldOpen) {
         if (!this.currentDungeonGroup) return;
         
@@ -1285,53 +1099,88 @@ class DungeonSystem {
                 
                 child.userData.isBlocking = !shouldOpen;
                 
-                // Update geometric mask colors
+                // Update geometric mask opacity
                 if (child.userData.maskMesh && child.userData.maskMesh.userData) {
                     const maskData = child.userData.maskMesh.userData;
                     
                     try {
-                        // Update face color
-                        const newFaceColor = shouldOpen ? 0x2a4a2a : 0x4a2a2a;
+                        // Update face opacity
+                        const newOpacity = shouldOpen ? 0.2 : 0.95;
                         if (maskData.face && maskData.face.material) {
-                            maskData.face.material.color.setHex(newFaceColor);
+                            maskData.face.material.opacity = newOpacity;
                         }
                         
-                        // Update eye glow colors
-                        const newEyeColor = shouldOpen ? 0x00ff00 : 0xff0000;
+                        // Update eye socket opacity
+                        const eyeOpacity = shouldOpen ? 0.1 : 1.0;
+                        if (maskData.leftEye && maskData.leftEye.material) {
+                            maskData.leftEye.material.opacity = eyeOpacity;
+                        }
+                        if (maskData.rightEye && maskData.rightEye.material) {
+                            maskData.rightEye.material.opacity = eyeOpacity;
+                        }
+                        
+                        // Update eye glow opacity and intensity
+                        const glowOpacity = shouldOpen ? 0.15 : 1.0;
+                        const glowIntensity = shouldOpen ? 0.2 : 1.2;
                         if (maskData.leftGlow && maskData.leftGlow.material) {
-                            maskData.leftGlow.material.color.setHex(newEyeColor);
-                            maskData.leftGlow.material.emissive.setHex(newEyeColor);
+                            maskData.leftGlow.material.opacity = glowOpacity;
+                            maskData.leftGlow.material.emissiveIntensity = glowIntensity;
                         }
                         if (maskData.rightGlow && maskData.rightGlow.material) {
-                            maskData.rightGlow.material.color.setHex(newEyeColor);
-                            maskData.rightGlow.material.emissive.setHex(newEyeColor);
+                            maskData.rightGlow.material.opacity = glowOpacity;
+                            maskData.rightGlow.material.emissiveIntensity = glowIntensity;
+                        }
+                        
+                        // Update mouth opacity
+                        const mouthOpacity = shouldOpen ? 0.1 : 1.0;
+                        if (maskData.mouth && maskData.mouth.material) {
+                            maskData.mouth.material.opacity = mouthOpacity;
+                        }
+                        
+                        // Update teeth opacity
+                        const toothOpacity = shouldOpen ? 0.2 : 0.9;
+                        if (maskData.teeth && maskData.teeth.length > 0) {
+                            maskData.teeth.forEach(tooth => {
+                                if (tooth.material) {
+                                    tooth.material.opacity = toothOpacity;
+                                }
+                            });
+                        }
+                        
+                        // Update cracks opacity
+                        const crackOpacity = shouldOpen ? 0.1 : 0.8;
+                        if (maskData.cracks && maskData.cracks.length > 0) {
+                            maskData.cracks.forEach(crack => {
+                                if (crack.material) {
+                                    crack.material.opacity = crackOpacity;
+                                }
+                            });
                         }
                         
                         maskData.isUnlocked = shouldOpen;
-                        console.log(`Updated mask materials for ${direction}`);
+                        console.log(`Updated mask opacity for ${direction}`);
                     } catch (error) {
-                        console.error('Error updating mask materials:', error);
+                        console.error('Error updating mask opacity:', error);
                     }
                 } else {
                     console.warn(`No maskMesh found for ${direction} portal`);
                 }
                 
-                // Update particle colors
+                // Update particle opacity
                 child.traverse((subChild) => {
-                    if (subChild.material && subChild.material.color && subChild.userData.swirSpeed !== undefined) {
+                    if (subChild.userData.particleMaterial) {
                         try {
-                            const newColor = shouldOpen ? 0x44ff44 : 0xff4444;
-                            subChild.material.color.setHex(newColor);
-                            if (subChild.material.emissive) {
-                                subChild.material.emissive.setHex(newColor);
-                            }
+                            const newParticleOpacity = shouldOpen ? 0.2 : 0.7;
+                            const newParticleIntensity = shouldOpen ? 0.1 : 0.5;
+                            subChild.userData.particleMaterial.opacity = newParticleOpacity;
+                            subChild.userData.particleMaterial.emissiveIntensity = newParticleIntensity;
                         } catch (error) {
-                            console.error('Error updating particle color:', error);
+                            console.error('Error updating particle opacity:', error);
                         }
                     }
                 });
                 
-                console.log(`${direction} room portal ${shouldOpen ? 'opened' : 'closed'}`);
+                console.log(`${direction} room portal ${shouldOpen ? 'opened (transparent)' : 'closed (solid)'}`);
             }
         });
     }
@@ -1364,7 +1213,7 @@ class DungeonSystem {
             const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
             const roomSize = centerRoom.size * this.gridSize;
             
-            // Create and add exit portal using geometric approach
+            // Create and add exit portal using geometric approach - always transparent/passable
             const exitPortal = this.createBillboardPortal('exit', this.getCurrentTheme(), true);
             exitPortal.position.set(centerWorldX, this.floorHeight + 3, centerWorldZ + roomSize * 0.3);
             exitPortal.name = 'exit_portal';
@@ -1372,8 +1221,28 @@ class DungeonSystem {
             exitPortal.userData.portalType = 'exit';
             exitPortal.userData.direction = 'exit';
             
+            // Make exit portal extra transparent/ghostly
+            if (exitPortal.userData.maskMesh && exitPortal.userData.maskMesh.userData) {
+                const maskData = exitPortal.userData.maskMesh.userData;
+                
+                // Make it even more transparent than regular unlocked portals
+                if (maskData.face && maskData.face.material) {
+                    maskData.face.material.opacity = 0.1;
+                    maskData.face.material.color.setHex(0x88ff88); // Greenish tint for exit
+                }
+                
+                if (maskData.leftGlow && maskData.leftGlow.material) {
+                    maskData.leftGlow.material.color.setHex(0x00ff00);
+                    maskData.leftGlow.material.emissive.setHex(0x00ff00);
+                }
+                if (maskData.rightGlow && maskData.rightGlow.material) {
+                    maskData.rightGlow.material.color.setHex(0x00ff00);
+                    maskData.rightGlow.material.emissive.setHex(0x00ff00);
+                }
+            }
+            
             this.currentDungeonGroup.add(exitPortal);
-            console.log('Exit portal added and opened with geometric design!');
+            console.log('Exit portal added and opened with transparent geometric design!');
         }
     }
     
@@ -1618,10 +1487,11 @@ class DungeonSystem {
             }
         });
         
-        // Subtle eye glow pulsing
+        // Subtle eye glow pulsing - only if mask data exists
         if (portalGroup.userData.maskMesh && portalGroup.userData.maskMesh.userData) {
             const maskData = portalGroup.userData.maskMesh.userData;
-            const glowIntensity = 0.5 + Math.sin(time * 3) * 0.3;
+            const baseIntensity = maskData.isUnlocked ? 0.2 : 1.2;
+            const glowIntensity = baseIntensity + Math.sin(time * 3) * 0.3;
             
             if (maskData.leftGlow && maskData.leftGlow.material) {
                 maskData.leftGlow.material.emissiveIntensity = glowIntensity;
