@@ -89,32 +89,54 @@ class DungeonSystem {
     }
     
     defeatEnemiesInRoom(roomDirection) {
+        console.log(`Attempting to defeat enemies in ${roomDirection} room...`);
+        
         if (this.roomProgression[roomDirection]) {
             this.roomProgression[roomDirection].enemiesDefeated = true;
             console.log(`Enemies defeated in ${roomDirection} room`);
             
             // Check if this unlocks the next room
             this.checkProgressionUnlock();
+        } else {
+            console.error(`Room ${roomDirection} not found in progression!`);
         }
     }
     
     checkProgressionUnlock() {
-        const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+        console.log('Checking progression unlock...');
         
-        if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
-            // Unlock next room in sequence
-            this.currentProgressionIndex++;
-            
-            if (this.currentProgressionIndex < this.progressionOrder.length) {
-                const nextRoom = this.progressionOrder[this.currentProgressionIndex];
-                this.roomProgression[nextRoom].unlocked = true;
-                this.updateRoomPortals(nextRoom, false); // Open entrance to next room
-                console.log(`${nextRoom} room unlocked!`);
-            } else {
-                // All orbital rooms completed - open exit portal
-                this.openExitPortal();
-                console.log('All rooms completed - exit portal opened!');
+        try {
+            if (this.currentProgressionIndex >= this.progressionOrder.length) {
+                console.log('Already at max progression');
+                return;
             }
+            
+            const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+            console.log(`Checking if ${currentRoom} room is completed...`);
+            
+            if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
+                // Unlock next room in sequence
+                this.currentProgressionIndex++;
+                console.log(`Moving to progression index ${this.currentProgressionIndex}`);
+                
+                if (this.currentProgressionIndex < this.progressionOrder.length) {
+                    const nextRoom = this.progressionOrder[this.currentProgressionIndex];
+                    console.log(`Unlocking ${nextRoom} room...`);
+                    
+                    this.roomProgression[nextRoom].unlocked = true;
+                    this.updateRoomPortals(nextRoom, true); // Open entrance to next room
+                    console.log(`${nextRoom} room unlocked!`);
+                } else {
+                    // All orbital rooms completed - open exit portal
+                    console.log('All orbital rooms completed!');
+                    this.openExitPortal();
+                    console.log('All rooms completed - exit portal opened!');
+                }
+            } else {
+                console.log(`${currentRoom} room not yet completed`);
+            }
+        } catch (error) {
+            console.error('Error in checkProgressionUnlock:', error);
         }
     }
     
@@ -1255,35 +1277,56 @@ class DungeonSystem {
     updateRoomPortals(direction, shouldOpen) {
         if (!this.currentDungeonGroup) return;
         
+        console.log(`Updating ${direction} portal to ${shouldOpen ? 'OPEN' : 'CLOSED'}`);
+        
         this.currentDungeonGroup.traverse((child) => {
             if (child.userData.direction === direction) {
+                console.log(`Found portal for ${direction}, updating...`);
+                
                 child.userData.isBlocking = !shouldOpen;
                 
                 // Update geometric mask colors
                 if (child.userData.maskMesh && child.userData.maskMesh.userData) {
                     const maskData = child.userData.maskMesh.userData;
                     
-                    // Update face color
-                    const newFaceColor = shouldOpen ? 0x2a4a2a : 0x4a2a2a;
-                    maskData.face.material.color.setHex(newFaceColor);
-                    
-                    // Update eye glow colors
-                    const newEyeColor = shouldOpen ? 0x00ff00 : 0xff0000;
-                    maskData.leftGlow.material.color.setHex(newEyeColor);
-                    maskData.leftGlow.material.emissive.setHex(newEyeColor);
-                    maskData.rightGlow.material.color.setHex(newEyeColor);
-                    maskData.rightGlow.material.emissive.setHex(newEyeColor);
-                    
-                    maskData.isUnlocked = shouldOpen;
+                    try {
+                        // Update face color
+                        const newFaceColor = shouldOpen ? 0x2a4a2a : 0x4a2a2a;
+                        if (maskData.face && maskData.face.material) {
+                            maskData.face.material.color.setHex(newFaceColor);
+                        }
+                        
+                        // Update eye glow colors
+                        const newEyeColor = shouldOpen ? 0x00ff00 : 0xff0000;
+                        if (maskData.leftGlow && maskData.leftGlow.material) {
+                            maskData.leftGlow.material.color.setHex(newEyeColor);
+                            maskData.leftGlow.material.emissive.setHex(newEyeColor);
+                        }
+                        if (maskData.rightGlow && maskData.rightGlow.material) {
+                            maskData.rightGlow.material.color.setHex(newEyeColor);
+                            maskData.rightGlow.material.emissive.setHex(newEyeColor);
+                        }
+                        
+                        maskData.isUnlocked = shouldOpen;
+                        console.log(`Updated mask materials for ${direction}`);
+                    } catch (error) {
+                        console.error('Error updating mask materials:', error);
+                    }
+                } else {
+                    console.warn(`No maskMesh found for ${direction} portal`);
                 }
                 
                 // Update particle colors
                 child.traverse((subChild) => {
                     if (subChild.material && subChild.material.color && subChild.userData.swirSpeed !== undefined) {
-                        const newColor = shouldOpen ? 0x44ff44 : 0xff4444;
-                        subChild.material.color.setHex(newColor);
-                        if (subChild.material.emissive) {
-                            subChild.material.emissive.setHex(newColor);
+                        try {
+                            const newColor = shouldOpen ? 0x44ff44 : 0xff4444;
+                            subChild.material.color.setHex(newColor);
+                            if (subChild.material.emissive) {
+                                subChild.material.emissive.setHex(newColor);
+                            }
+                        } catch (error) {
+                            console.error('Error updating particle color:', error);
                         }
                     }
                 });
@@ -1291,6 +1334,24 @@ class DungeonSystem {
                 console.log(`${direction} room portal ${shouldOpen ? 'opened' : 'closed'}`);
             }
         });
+    }
+    
+    // For testing - cycles through the progression
+    testProgressionAdvance() {
+        console.log('Testing progression advance...');
+        
+        try {
+            if (this.currentProgressionIndex < this.progressionOrder.length) {
+                const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+                console.log(`Defeating enemies in ${currentRoom} room...`);
+                
+                this.defeatEnemiesInRoom(currentRoom);
+            } else {
+                console.log('All rooms already completed!');
+            }
+        } catch (error) {
+            console.error('Error in progression advance:', error);
+        }
     }
     
     openExitPortal() {
