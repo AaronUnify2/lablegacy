@@ -892,8 +892,8 @@ class DungeonSystem {
     createGeometricMask(isUnlocked) {
         const maskGroup = new THREE.Group();
         
-        // Main mask face (oval)
-        const faceGeometry = new THREE.SphereGeometry(2, 16, 12);
+        // Main mask face (oval) - MADE LARGER
+        const faceGeometry = new THREE.SphereGeometry(3, 16, 12); // Increased from 2 to 3
         faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
         
         const faceColor = isUnlocked ? 0x2a4a2a : 0x4a2a2a;
@@ -906,65 +906,65 @@ class DungeonSystem {
         const face = new THREE.Mesh(faceGeometry, faceMaterial);
         maskGroup.add(face);
         
-        // Eye sockets (black holes)
-        const eyeGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+        // Eye sockets (black holes) - MADE LARGER
+        const eyeGeometry = new THREE.SphereGeometry(0.45, 8, 8); // Increased from 0.3 to 0.45
         const eyeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
         
         // Left eye socket
         const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.6, 0.3, 0.2);
+        leftEye.position.set(-0.9, 0.45, 0.3); // Adjusted positions for larger scale
         leftEye.scale.set(1, 1.3, 0.8);
         maskGroup.add(leftEye);
         
         // Right eye socket  
         const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.6, 0.3, 0.2);
+        rightEye.position.set(0.9, 0.45, 0.3); // Adjusted positions for larger scale
         rightEye.scale.set(0.8, 1.1, 0.8);
         maskGroup.add(rightEye);
         
-        // Glowing eyes
+        // Glowing eyes - MADE LARGER AND BRIGHTER
         const eyeColor = isUnlocked ? 0x00ff00 : 0xff0000;
-        const eyeGlowGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+        const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 8, 8); // Increased from 0.15 to 0.25
         const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
             color: eyeColor,
             transparent: true,
-            opacity: 0.9,
+            opacity: 1.0, // Full opacity
             emissive: eyeColor,
-            emissiveIntensity: 0.8
+            emissiveIntensity: 1.2 // Increased intensity
         });
         
         // Left glowing eye
         const leftGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
-        leftGlow.position.set(-0.6, 0.3, 0.25);
+        leftGlow.position.set(-0.9, 0.45, 0.35);
         maskGroup.add(leftGlow);
         
         // Right glowing eye
         const rightGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
-        rightGlow.position.set(0.6, 0.3, 0.25);
+        rightGlow.position.set(0.9, 0.45, 0.35);
         rightGlow.scale.set(0.8, 0.8, 0.8);
         maskGroup.add(rightGlow);
         
-        // Mouth (dark opening)
-        const mouthGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+        // Mouth (dark opening) - MADE LARGER
+        const mouthGeometry = new THREE.SphereGeometry(0.6, 8, 8); // Increased from 0.4 to 0.6
         mouthGeometry.scale(1, 0.5, 0.8);
         const mouthMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
         
         const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-        mouth.position.set(0, -0.5, 0.15);
+        mouth.position.set(0, -0.75, 0.2); // Adjusted for larger scale
         maskGroup.add(mouth);
         
-        // Add some teeth
-        const toothGeometry = new THREE.BoxGeometry(0.05, 0.2, 0.05);
+        // Add some teeth - MADE LARGER
+        const toothGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08); // Increased size
         const toothMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFACD });
         
         for (let i = 0; i < 4; i++) {
             const tooth = new THREE.Mesh(toothGeometry, toothMaterial);
-            tooth.position.set(-0.15 + i * 0.1, -0.4, 0.2);
+            tooth.position.set(-0.22 + i * 0.15, -0.6, 0.3); // Adjusted for larger scale
             maskGroup.add(tooth);
         }
         
-        // Add cracks/weathering marks
-        const crackGeometry = new THREE.BoxGeometry(0.02, 0.8, 0.02);
+        // Add cracks/weathering marks - MADE LARGER
+        const crackGeometry = new THREE.BoxGeometry(0.03, 1.2, 0.03); // Increased size
         const crackMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x2a1a1a,
             transparent: true,
@@ -972,12 +972,12 @@ class DungeonSystem {
         });
         
         const crack1 = new THREE.Mesh(crackGeometry, crackMaterial);
-        crack1.position.set(-0.8, 0, 0.25);
+        crack1.position.set(-1.2, 0, 0.35); // Adjusted for larger scale
         crack1.rotation.z = Math.PI / 6;
         maskGroup.add(crack1);
         
         const crack2 = new THREE.Mesh(crackGeometry, crackMaterial);
-        crack2.position.set(0.7, -0.3, 0.25);
+        crack2.position.set(1.05, -0.45, 0.35); // Adjusted for larger scale
         crack2.rotation.z = -Math.PI / 4;
         crack2.scale.set(1, 0.6, 1);
         maskGroup.add(crack2);
@@ -1513,6 +1513,11 @@ class DungeonSystem {
                 // Update portal particles
                 if (child.userData.swirSpeed !== undefined) {
                     this.updatePortalParticles(child, deltaTime);
+                }
+                
+                // RE-ENABLED: Make mask faces lock onto player
+                if (child.userData.maskMesh && window.game && window.game.camera) {
+                    child.userData.maskMesh.lookAt(window.game.camera.position);
                 }
             });
         }
