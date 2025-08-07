@@ -230,9 +230,7 @@ class DungeonSystem {
         const goldenPillar = new THREE.MeshLambertMaterial({
             color: 0xDAA520,
             emissive: 0xFFD700,
-            emissiveIntensity: 0.3,
-            metalness: 0.8,
-            roughness: 0.2
+            emissiveIntensity: 0.3
         });
         this.materials.set('golden_pillar', goldenPillar);
         
@@ -260,9 +258,7 @@ class DungeonSystem {
         const silverPillar = new THREE.MeshLambertMaterial({
             color: 0x808080,
             emissive: 0xC0C0C0,
-            emissiveIntensity: 0.2,
-            metalness: 0.9,
-            roughness: 0.3
+            emissiveIntensity: 0.2
         });
         this.materials.set('silver_pillar', silverPillar);
         
@@ -311,6 +307,14 @@ class DungeonSystem {
             opacity: 0.9
         });
         this.materials.set('corridor_ceiling', corridorCeiling);
+        
+        // GLOWING PILLAR MATERIAL - Universal pillar material
+        const glowingPillar = new THREE.MeshLambertMaterial({
+            color: 0x6080ff,
+            emissive: 0x6080ff,
+            emissiveIntensity: 0.3
+        });
+        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     createPatternedFloor(colors, tileSize) {
