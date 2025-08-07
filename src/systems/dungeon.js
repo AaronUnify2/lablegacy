@@ -311,14 +311,6 @@ class DungeonSystem {
             opacity: 0.9
         });
         this.materials.set('corridor_ceiling', corridorCeiling);
-        
-        // GLOWING PILLAR MATERIAL - Universal pillar material (for compatibility)
-        const glowingPillar = new THREE.MeshLambertMaterial({
-            color: 0x6080ff,
-            emissive: 0x6080ff,
-            emissiveIntensity: 0.3
-        });
-        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     createPatternedFloor(colors, tileSize) {
