@@ -1,5 +1,6 @@
 // Dungeon Generation System with Collision Detection and Progressive Portal System
 // Grid-based procedural dungeon generation with solid walls, floors, and ceilings
+// Simplified to use single consistent theme
 
 class DungeonSystem {
     constructor(scene, player) {
@@ -45,16 +46,7 @@ class DungeonSystem {
         this.ceilingHeight = 8; // Ceiling height from floor
         this.currentFloorMap = null; // For collision detection
         
-        // Theme progression
-        this.themes = {
-            STONE: { floors: [1, 10], name: 'stone' },
-            CRYSTAL: { floors: [11, 20], name: 'crystal' },
-            RUINS: { floors: [21, 30], name: 'ruins' },
-            CRYPT: { floors: [31, 40], name: 'crypt' },
-            FOREST: { floors: [41, 50], name: 'forest' }
-        };
-        
-        // Materials and lighting
+        // Materials and lighting (single theme)
         this.textureLoader = new THREE.TextureLoader();
         this.materials = new Map();
         this.lightSources = [];
@@ -72,7 +64,7 @@ class DungeonSystem {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with progressive portal system');
+        console.log('Unified Dungeon System initialized with single theme');
     }
     
     // Progressive Unlock System
@@ -208,212 +200,68 @@ class DungeonSystem {
     }
     
     setupMaterials() {
-        this.createStoneMaterials();
-        this.createCrystalMaterials();
-        this.createRuinsMaterials();
-        this.createCryptMaterials();
-        this.createForestMaterials();
+        // Single consistent theme - enhanced stone/fantasy dungeon
+        this.createDungeonMaterials();
     }
     
-    createStoneMaterials() {
+    createDungeonMaterials() {
         // Create beautiful stained glass mosaic floor pattern
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        // Create mosaic tile pattern
+        // Create sophisticated mosaic tile pattern with multiple colors
         const tileSize = 32;
-        const colors = ['#8B4513', '#CD853F', '#DAA520', '#B8860B', '#D2691E', '#A0522D'];
+        const floorColors = [
+            '#8B4513', '#CD853F', '#DAA520', '#B8860B', 
+            '#D2691E', '#A0522D', '#DEB887', '#F4A460'
+        ];
         
         for (let y = 0; y < canvas.height; y += tileSize) {
             for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
+                const color = floorColors[Math.floor(Math.random() * floorColors.length)];
                 ctx.fillStyle = color;
                 ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
                 
-                // Add highlight
-                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                // Add highlight and depth
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
                 ctx.fillRect(x, y, tileSize - 2, 4);
+                
+                // Add shadow edge
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(x, y + tileSize - 6, tileSize - 2, 4);
             }
         }
         
-        const stoneFloorTexture = new THREE.CanvasTexture(canvas);
-        stoneFloorTexture.wrapS = THREE.RepeatWrapping;
-        stoneFloorTexture.wrapT = THREE.RepeatWrapping;
-        stoneFloorTexture.repeat.set(4, 4);
+        const dungeonFloorTexture = new THREE.CanvasTexture(canvas);
+        dungeonFloorTexture.wrapS = THREE.RepeatWrapping;
+        dungeonFloorTexture.wrapT = THREE.RepeatWrapping;
+        dungeonFloorTexture.repeat.set(4, 4);
         
-        const stoneFloor = new THREE.MeshLambertMaterial({ 
-            map: stoneFloorTexture,
+        const dungeonFloor = new THREE.MeshLambertMaterial({ 
+            map: dungeonFloorTexture,
             transparent: true, 
             opacity: 0.9 
         });
         
-        const stoneWall = new THREE.MeshLambertMaterial({ color: 0x6a6a6a, transparent: true, opacity: 0.95 });
-        const stoneCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a4a, transparent: true, opacity: 0.8 });
-        
-        this.materials.set('stone_floor', stoneFloor);
-        this.materials.set('stone_wall', stoneWall);
-        this.materials.set('stone_ceiling', stoneCeiling);
-    }
-    
-    createCrystalMaterials() {
-        // Create crystal mosaic floor pattern
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        const tileSize = 32;
-        const colors = ['#4169E1', '#6495ED', '#7B68EE', '#9370DB', '#8A2BE2', '#4B0082'];
-        
-        for (let y = 0; y < canvas.height; y += tileSize) {
-            for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                ctx.fillStyle = color;
-                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
-                
-                // Add crystal shine
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.fillRect(x, y, tileSize - 2, 6);
-            }
-        }
-        
-        const crystalFloorTexture = new THREE.CanvasTexture(canvas);
-        crystalFloorTexture.wrapS = THREE.RepeatWrapping;
-        crystalFloorTexture.wrapT = THREE.RepeatWrapping;
-        crystalFloorTexture.repeat.set(4, 4);
-        
-        const crystalFloor = new THREE.MeshPhongMaterial({ 
-            map: crystalFloorTexture,
+        // Enhanced wall material with subtle texture
+        const dungeonWall = new THREE.MeshLambertMaterial({ 
+            color: 0x6a6a6a, 
             transparent: true, 
-            opacity: 0.9, 
-            shininess: 30 
+            opacity: 0.95 
         });
-        const crystalWall = new THREE.MeshPhongMaterial({ color: 0x7a7a9a, transparent: true, opacity: 0.95, shininess: 50 });
-        const crystalCeiling = new THREE.MeshPhongMaterial({ color: 0x5a5a7a, transparent: true, opacity: 0.8, shininess: 20 });
         
-        this.materials.set('crystal_floor', crystalFloor);
-        this.materials.set('crystal_wall', crystalWall);
-        this.materials.set('crystal_ceiling', crystalCeiling);
-    }
-    
-    createRuinsMaterials() {
-        // Create ruined mosaic floor pattern
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
+        // Ceiling with mystical appearance
+        const dungeonCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x4a4a4a, 
+            transparent: true, 
+            opacity: 0.8 
+        });
         
-        const tileSize = 32;
-        const colors = ['#8B008B', '#DA70D6', '#BA55D3', '#9932CC', '#8A2BE2', '#6A5ACD'];
-        
-        for (let y = 0; y < canvas.height; y += tileSize) {
-            for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                ctx.fillStyle = color;
-                
-                // Some tiles are "broken" - irregular shapes
-                if (Math.random() > 0.3) {
-                    ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
-                } else {
-                    ctx.fillRect(x + 4, y + 4, tileSize - 10, tileSize - 10);
-                }
-                
-                // Add mystical glow
-                ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.fillRect(x, y, tileSize - 2, 3);
-            }
-        }
-        
-        const ruinsFloorTexture = new THREE.CanvasTexture(canvas);
-        ruinsFloorTexture.wrapS = THREE.RepeatWrapping;
-        ruinsFloorTexture.wrapT = THREE.RepeatWrapping;
-        ruinsFloorTexture.repeat.set(4, 4);
-        
-        const ruinsFloor = new THREE.MeshLambertMaterial({ map: ruinsFloorTexture, transparent: true, opacity: 0.85 });
-        const ruinsWall = new THREE.MeshLambertMaterial({ color: 0x9a7a9a, transparent: true, opacity: 0.9 });
-        const ruinsCeiling = new THREE.MeshLambertMaterial({ color: 0x7a5a7a, transparent: true, opacity: 0.7 });
-        
-        this.materials.set('ruins_floor', ruinsFloor);
-        this.materials.set('ruins_wall', ruinsWall);
-        this.materials.set('ruins_ceiling', ruinsCeiling);
-    }
-    
-    createCryptMaterials() {
-        // Create dark mosaic floor pattern
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        const tileSize = 32;
-        const colors = ['#2F4F2F', '#556B2F', '#6B8E23', '#808000', '#9ACD32', '#32CD32'];
-        
-        for (let y = 0; y < canvas.height; y += tileSize) {
-            for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                ctx.fillStyle = color;
-                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
-                
-                // Add eerie glow
-                ctx.fillStyle = 'rgba(0,255,0,0.2)';
-                ctx.fillRect(x, y, tileSize - 2, 4);
-            }
-        }
-        
-        const cryptFloorTexture = new THREE.CanvasTexture(canvas);
-        cryptFloorTexture.wrapS = THREE.RepeatWrapping;
-        cryptFloorTexture.wrapT = THREE.RepeatWrapping;
-        cryptFloorTexture.repeat.set(4, 4);
-        
-        const cryptFloor = new THREE.MeshLambertMaterial({ map: cryptFloorTexture, transparent: true, opacity: 0.9 });
-        const cryptWall = new THREE.MeshLambertMaterial({ color: 0x6a6a5a, transparent: true, opacity: 0.95 });
-        const cryptCeiling = new THREE.MeshLambertMaterial({ color: 0x4a4a3a, transparent: true, opacity: 0.6 });
-        
-        this.materials.set('crypt_floor', cryptFloor);
-        this.materials.set('crypt_wall', cryptWall);
-        this.materials.set('crypt_ceiling', cryptCeiling);
-    }
-    
-    createForestMaterials() {
-        // Create natural mosaic floor pattern
-        const canvas = document.createElement('canvas');
-        canvas.width = 512;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-        
-        const tileSize = 32;
-        const colors = ['#228B22', '#32CD32', '#7CFC00', '#ADFF2F', '#9ACD32', '#6B8E23'];
-        
-        for (let y = 0; y < canvas.height; y += tileSize) {
-            for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = colors[Math.floor(Math.random() * colors.length)];
-                ctx.fillStyle = color;
-                
-                // Organic, leaf-like shapes
-                ctx.beginPath();
-                ctx.ellipse(x + tileSize/2, y + tileSize/2, tileSize/2 - 2, tileSize/3 - 1, Math.random() * Math.PI, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Add natural highlight
-                ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                ctx.fillRect(x, y, tileSize - 2, 3);
-            }
-        }
-        
-        const forestFloorTexture = new THREE.CanvasTexture(canvas);
-        forestFloorTexture.wrapS = THREE.RepeatWrapping;
-        forestFloorTexture.wrapT = THREE.RepeatWrapping;
-        forestFloorTexture.repeat.set(4, 4);
-        
-        const forestFloor = new THREE.MeshLambertMaterial({ map: forestFloorTexture, transparent: true, opacity: 0.8 });
-        const forestWall = new THREE.MeshLambertMaterial({ color: 0x5a7a5a, transparent: true, opacity: 0.7 });
-        const forestCeiling = new THREE.MeshLambertMaterial({ color: 0x3a5a3a, transparent: true, opacity: 0.5 });
-        
-        this.materials.set('forest_floor', forestFloor);
-        this.materials.set('forest_wall', forestWall);
-        this.materials.set('forest_ceiling', forestCeiling);
+        this.materials.set('dungeon_floor', dungeonFloor);
+        this.materials.set('dungeon_wall', dungeonWall);
+        this.materials.set('dungeon_ceiling', dungeonCeiling);
     }
     
     setupBillboardSystem() {
@@ -422,26 +270,21 @@ class DungeonSystem {
     }
     
     createBillboardMaterials() {
-        const mushroomMaterial = new THREE.MeshBasicMaterial({ color: 0x4a8a4a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-        const crystalSpriteMaterial = new THREE.MeshBasicMaterial({ color: 0x6a4aaa, transparent: true, opacity: 0.9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-        const orbMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaa4a, transparent: true, opacity: 0.7, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
-        const runeMaterial = new THREE.MeshBasicMaterial({ color: 0x8a6a8a, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
-        const treeMaterial = new THREE.MeshBasicMaterial({ color: 0x4a6a8a, transparent: true, opacity: 0.6, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+        // Consistent atmospheric elements
+        const orbMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffaa44, 
+            transparent: true, 
+            opacity: 0.7, 
+            side: THREE.DoubleSide, 
+            blending: THREE.AdditiveBlending 
+        });
         
-        this.materials.set('mushroom_billboard', mushroomMaterial);
-        this.materials.set('crystal_billboard', crystalSpriteMaterial);
         this.materials.set('orb_billboard', orbMaterial);
-        this.materials.set('rune_billboard', runeMaterial);
-        this.materials.set('tree_billboard', treeMaterial);
     }
     
     getCurrentTheme() {
-        for (const [themeName, themeData] of Object.entries(this.themes)) {
-            if (this.currentFloor >= themeData.floors[0] && this.currentFloor <= themeData.floors[1]) {
-                return themeData.name;
-            }
-        }
-        return 'forest';
+        // Always return consistent theme
+        return 'dungeon';
     }
     
     generateDungeon(floorNumber) {
@@ -453,8 +296,7 @@ class DungeonSystem {
         // Reset progression for new floor
         this.resetProgression();
         
-        const theme = this.getCurrentTheme();
-        console.log(`Using theme: ${theme}`);
+        console.log('Using consistent dungeon theme');
         
         // Phase 1: Plan room layout
         const roomLayout = this.planRoomLayout();
@@ -466,19 +308,19 @@ class DungeonSystem {
         this.currentFloorMap = floorMap;
         
         // Phase 3: Generate unified geometry
-        this.generateUnifiedGeometry(floorMap, theme);
+        this.generateUnifiedGeometry(floorMap);
         
         // Phase 4: Add lighting and atmosphere
-        this.addDungeonLighting(roomLayout, theme);
-        this.addAtmosphericElements(roomLayout, theme);
+        this.addDungeonLighting(roomLayout);
+        this.addAtmosphericElements(roomLayout);
         
         // Phase 5: Add progressive portal system
-        this.addProgressivePortals(roomLayout, theme);
+        this.addProgressivePortals(roomLayout);
         
         // Store dungeon data
         this.currentDungeon = {
             floor: floorNumber,
-            theme: theme,
+            theme: 'dungeon',
             roomLayout: roomLayout,
             floorMap: floorMap
         };
@@ -637,28 +479,27 @@ class DungeonSystem {
         return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
     }
     
-    generateUnifiedGeometry(floorMap, theme) {
+    generateUnifiedGeometry(floorMap) {
         console.log('Generating unified geometry with solid collision...');
         
         const dungeonGroup = new THREE.Group();
         dungeonGroup.name = 'unified_dungeon';
         
         // Generate unified floor
-        this.generateUnifiedFloor(dungeonGroup, floorMap, theme);
+        this.generateUnifiedFloor(dungeonGroup, floorMap);
         
         // Generate walls around walkable areas
-        this.generateWallsFromMap(dungeonGroup, floorMap, theme);
+        this.generateWallsFromMap(dungeonGroup, floorMap);
         
         // Generate unified ceiling
-        this.generateUnifiedCeiling(dungeonGroup, floorMap, theme);
+        this.generateUnifiedCeiling(dungeonGroup, floorMap);
         
         this.scene.add(dungeonGroup);
         this.currentDungeonGroup = dungeonGroup;
     }
     
-    generateUnifiedFloor(dungeonGroup, floorMap, theme) {
-        const floorMaterial = this.materials.get(`${theme}_floor`);
-        const floorSegments = [];
+    generateUnifiedFloor(dungeonGroup, floorMap) {
+        const floorMaterial = this.materials.get('dungeon_floor');
         
         // Find connected floor regions and create efficient meshes
         for (let z = 0; z < this.gridDepth; z++) {
@@ -682,8 +523,8 @@ class DungeonSystem {
         console.log('Generated unified floor geometry with collision');
     }
     
-    generateWallsFromMap(dungeonGroup, floorMap, theme) {
-        const wallMaterial = this.materials.get(`${theme}_wall`);
+    generateWallsFromMap(dungeonGroup, floorMap) {
+        const wallMaterial = this.materials.get('dungeon_wall');
         const wallHeight = this.ceilingHeight;
         
         // March around perimeter of walkable areas to create walls
@@ -724,8 +565,8 @@ class DungeonSystem {
         console.log('Generated unified wall geometry with collision');
     }
     
-    generateUnifiedCeiling(dungeonGroup, floorMap, theme) {
-        const ceilingMaterial = this.materials.get(`${theme}_ceiling`);
+    generateUnifiedCeiling(dungeonGroup, floorMap) {
+        const ceilingMaterial = this.materials.get('dungeon_ceiling');
         
         // Create ceiling segments over walkable areas
         for (let z = 0; z < this.gridDepth; z++) {
@@ -748,21 +589,21 @@ class DungeonSystem {
         console.log('Generated unified ceiling geometry with collision');
     }
     
-    addDungeonLighting(roomLayout, theme) {
+    addDungeonLighting(roomLayout) {
         console.log('Adding dungeon lighting...');
         
         // Add bright test lighting to each room
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomLighting(room, theme);
+            this.addRoomLighting(room);
         });
         
         // Add corridor lighting
         roomLayout.connections.forEach(connection => {
-            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to], theme);
+            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
     }
     
-    addRoomLighting(room, theme) {
+    addRoomLighting(room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         
@@ -791,7 +632,7 @@ class DungeonSystem {
         console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ})`);
     }
     
-    addCorridorLighting(roomA, roomB, theme) {
+    addCorridorLighting(roomA, roomB) {
         const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
         const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
@@ -813,48 +654,57 @@ class DungeonSystem {
         this.lightSources.push(midLight);
     }
     
-    addAtmosphericElements(roomLayout, theme) {
+    addAtmosphericElements(roomLayout) {
         console.log('Adding atmospheric elements...');
         
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomAtmosphere(room, theme);
+            this.addRoomAtmosphere(room);
         });
     }
     
-    addRoomAtmosphere(room, theme) {
+    addRoomAtmosphere(room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
         // Add entry/exit portals to center room
         if (room.type === 'center') {
-            this.addCenterRoomPortals(worldX, worldZ, roomSize, theme);
+            this.addCenterRoomPortals(worldX, worldZ, roomSize);
         }
         
-        // Add theme-specific atmospheric elements
-        switch (theme) {
-            case 'stone':
-                this.addStoneAtmosphere(worldX, worldZ, roomSize, room.type);
-                break;
-            case 'crystal':
-                this.addCrystalAtmosphere(worldX, worldZ, roomSize, room.type);
-                break;
-            case 'ruins':
-                this.addRuinsAtmosphere(worldX, worldZ, roomSize, room.type);
-                break;
-            case 'crypt':
-                this.addCryptAtmosphere(worldX, worldZ, roomSize, room.type);
-                break;
-            case 'forest':
-                this.addForestAtmosphere(worldX, worldZ, roomSize, room.type);
-                break;
-        }
+        // Add consistent atmospheric elements
+        this.addDungeonAtmosphere(worldX, worldZ, roomSize, room.type);
         
         // Add floating orbs to all rooms
-        this.addFloatingOrbs(worldX, worldZ, roomSize, theme);
+        this.addFloatingOrbs(worldX, worldZ, roomSize);
     }
     
-    addProgressivePortals(roomLayout, theme) {
+    addDungeonAtmosphere(worldX, worldZ, roomSize, roomType) {
+        // Consistent dungeon atmosphere - torches and pillars
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2;
+            const radius = roomSize * 0.3;
+            
+            const pillarX = worldX + Math.cos(angle) * radius;
+            const pillarZ = worldZ + Math.sin(angle) * radius;
+            
+            const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
+            const pillarMaterial = this.materials.get('dungeon_wall');
+            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+            pillar.position.set(pillarX, this.floorHeight + 2, pillarZ);
+            pillar.castShadow = true;
+            pillar.receiveShadow = true;
+            this.currentDungeonGroup.add(pillar);
+            
+            // Torch light on pillar
+            const torchLight = new THREE.PointLight(0xff6644, 0.8, 8);
+            torchLight.position.set(pillarX, this.floorHeight + 3.5, pillarZ);
+            this.currentDungeonGroup.add(torchLight);
+            this.lightSources.push(torchLight);
+        }
+    }
+    
+    addProgressivePortals(roomLayout) {
         console.log('Adding progressive billboard portal system...');
         
         // Find center room position
@@ -876,7 +726,7 @@ class DungeonSystem {
         // Add room entrance portals (initially blocked except north)
         Object.entries(portalPositions).forEach(([direction, pos]) => {
             const isUnlocked = this.roomProgression[direction].unlocked;
-            const portal = this.createBillboardPortal(direction, theme, isUnlocked);
+            const portal = this.createBillboardPortal(direction, isUnlocked);
             portal.position.set(pos.x, this.floorHeight + 3, pos.z); // Higher up, in the hallway
             portal.name = `${direction}_room_portal`;
             this.currentDungeonGroup.add(portal);
@@ -885,7 +735,7 @@ class DungeonSystem {
         });
     }
     
-    createBillboardPortal(direction, theme, isUnlocked) {
+    createBillboardPortal(direction, isUnlocked) {
         const portalGroup = new THREE.Group();
         
         // Create simple geometric mask with opacity-based state
@@ -1090,7 +940,7 @@ class DungeonSystem {
         }
     }
     
-    addCenterRoomPortals(worldX, worldZ, roomSize, theme) {
+    addCenterRoomPortals(worldX, worldZ, roomSize) {
         console.log('Center room ready - entry/exit portals will be handled separately...');
         
         // For now, we're not adding entry/exit portals here
@@ -1226,7 +1076,7 @@ class DungeonSystem {
             const roomSize = centerRoom.size * this.gridSize;
             
             // Create and add exit portal using geometric approach - always transparent/passable
-            const exitPortal = this.createBillboardPortal('exit', this.getCurrentTheme(), true);
+            const exitPortal = this.createBillboardPortal('exit', true);
             exitPortal.position.set(centerWorldX, this.floorHeight + 3, centerWorldZ + roomSize * 0.3);
             exitPortal.name = 'exit_portal';
             exitPortal.userData.isBlocking = false; // Exit is immediately usable
@@ -1258,148 +1108,17 @@ class DungeonSystem {
         }
     }
     
-    addStoneAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Stone pillars
-        for (let i = 0; i < 4; i++) {
-            const angle = (i / 4) * Math.PI * 2;
-            const radius = roomSize * 0.3;
-            
-            const pillarX = worldX + Math.cos(angle) * radius;
-            const pillarZ = worldZ + Math.sin(angle) * radius;
-            
-            const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
-            const pillarMaterial = this.materials.get('stone_wall');
-            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-            pillar.position.set(pillarX, this.floorHeight + 2, pillarZ);
-            pillar.castShadow = true;
-            pillar.receiveShadow = true;
-            this.currentDungeonGroup.add(pillar);
-            
-            // Torch light on pillar
-            const torchLight = new THREE.PointLight(0xff6644, 0.8, 8);
-            torchLight.position.set(pillarX, this.floorHeight + 3.5, pillarZ);
-            this.currentDungeonGroup.add(torchLight);
-            this.lightSources.push(torchLight);
-        }
-    }
-    
-    addCrystalAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Crystal formations
-        for (let i = 0; i < 6; i++) {
-            const crystalX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
-            const crystalZ = worldZ + (Math.random() - 0.5) * roomSize * 0.8;
-            
-            const crystalGeometry = new THREE.ConeGeometry(0.4, 2.5, 6);
-            const crystalMaterial = new THREE.MeshPhongMaterial({
-                color: 0x6c5ce7,
-                transparent: true,
-                opacity: 0.8,
-                emissive: 0x2d1b69,
-                emissiveIntensity: 0.3
-            });
-            
-            const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
-            crystal.position.set(crystalX, this.floorHeight + 1.25, crystalZ);
-            crystal.rotation.y = Math.random() * Math.PI * 2;
-            this.currentDungeonGroup.add(crystal);
-            
-            // Crystal glow
-            const crystalLight = new THREE.PointLight(0x8a6ae7, 0.6, 6);
-            crystalLight.position.set(crystalX, this.floorHeight + 2, crystalZ);
-            this.currentDungeonGroup.add(crystalLight);
-            this.lightSources.push(crystalLight);
-        }
-    }
-    
-    addRuinsAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Runed stones
-        for (let i = 0; i < 4; i++) {
-            const runeX = worldX + (Math.random() - 0.5) * roomSize * 0.6;
-            const runeZ = worldZ + (Math.random() - 0.5) * roomSize * 0.6;
-            
-            const runeGeometry = new THREE.BoxGeometry(1, 2, 0.3);
-            const runeMaterial = new THREE.MeshLambertMaterial({
-                color: 0x7a5a7a,
-                emissive: 0x3a1a3a,
-                emissiveIntensity: 0.2
-            });
-            
-            const runeStone = new THREE.Mesh(runeGeometry, runeMaterial);
-            runeStone.position.set(runeX, this.floorHeight + 1, runeZ);
-            runeStone.rotation.y = Math.random() * Math.PI * 2;
-            this.currentDungeonGroup.add(runeStone);
-            
-            // Rune glow
-            const runeLight = new THREE.PointLight(0xaa6aaa, 0.4, 5);
-            runeLight.position.set(runeX, this.floorHeight + 1.5, runeZ);
-            this.currentDungeonGroup.add(runeLight);
-            this.lightSources.push(runeLight);
-        }
-    }
-    
-    addCryptAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Ancient braziers
-        for (let i = 0; i < 3; i++) {
-            const angle = (i / 3) * Math.PI * 2;
-            const radius = roomSize * 0.4;
-            
-            const brazierX = worldX + Math.cos(angle) * radius;
-            const brazierZ = worldZ + Math.sin(angle) * radius;
-            
-            // Brazier stand
-            const brazierGeometry = new THREE.CylinderGeometry(0.5, 0.3, 1.5, 8);
-            const brazierMaterial = this.materials.get('crypt_wall');
-            const brazier = new THREE.Mesh(brazierGeometry, brazierMaterial);
-            brazier.position.set(brazierX, this.floorHeight + 0.75, brazierZ);
-            this.currentDungeonGroup.add(brazier);
-            
-            // Green flame light
-            const brazierLight = new THREE.PointLight(0x44aa44, 0.8, 8);
-            brazierLight.position.set(brazierX, this.floorHeight + 2.5, brazierZ);
-            this.currentDungeonGroup.add(brazierLight);
-            this.lightSources.push(brazierLight);
-        }
-    }
-    
-    addForestAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Glowing mushroom clusters
-        for (let i = 0; i < 8; i++) {
-            const mushroomX = worldX + (Math.random() - 0.5) * roomSize * 0.8;
-            const mushroomZ = worldZ + (Math.random() - 0.5) * roomSize * 0.8;
-            
-            const mushroomGeometry = new THREE.SphereGeometry(0.3, 8, 6);
-            const mushroomMaterial = new THREE.MeshBasicMaterial({
-                color: 0x4a8a4a,
-                transparent: true,
-                opacity: 0.7,
-                emissive: 0x2a5a2a,
-                emissiveIntensity: 0.4
-            });
-            
-            const mushroom = new THREE.Mesh(mushroomGeometry, mushroomMaterial);
-            mushroom.position.set(mushroomX, this.floorHeight + 0.3, mushroomZ);
-            mushroom.scale.set(1 + Math.random() * 0.5, 1, 1 + Math.random() * 0.5);
-            this.currentDungeonGroup.add(mushroom);
-            
-            // Mushroom glow
-            const mushroomLight = new THREE.PointLight(0x6aaa6a, 0.5, 4);
-            mushroomLight.position.set(mushroomX, this.floorHeight + 1, mushroomZ);
-            this.currentDungeonGroup.add(mushroomLight);
-            this.lightSources.push(mushroomLight);
-        }
-    }
-    
-    addFloatingOrbs(worldX, worldZ, roomSize, theme) {
+    addFloatingOrbs(worldX, worldZ, roomSize) {
         const numOrbs = 2 + Math.floor(Math.random() * 3);
-        const themeColor = this.getThemeColor(theme);
+        const orbColor = 0xffaa44; // Consistent golden color
         
         for (let i = 0; i < numOrbs; i++) {
             const orbGeometry = new THREE.SphereGeometry(0.15, 12, 8);
             const orbMaterial = new THREE.MeshBasicMaterial({
-                color: themeColor,
+                color: orbColor,
                 transparent: true,
                 opacity: 0.8,
-                emissive: themeColor,
+                emissive: orbColor,
                 emissiveIntensity: 0.5
             });
             
@@ -1420,22 +1139,11 @@ class DungeonSystem {
             this.currentDungeonGroup.add(orb);
             
             // Orb light
-            const orbLight = new THREE.PointLight(themeColor, 0.3, 5);
+            const orbLight = new THREE.PointLight(orbColor, 0.3, 5);
             orbLight.position.copy(orb.position);
             this.currentDungeonGroup.add(orbLight);
             this.lightSources.push(orbLight);
         }
-    }
-    
-    getThemeColor(theme) {
-        const colors = {
-            stone: 0xff6644,
-            crystal: 0x8a6ae7,
-            ruins: 0xaa6aaa,
-            crypt: 0x44aa44,
-            forest: 0x6aaa6a
-        };
-        return colors[theme] || 0xffffff;
     }
     
     update(deltaTime) {
