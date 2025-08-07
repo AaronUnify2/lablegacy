@@ -26,8 +26,8 @@ class DungeonSystem {
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
-        this.dungeonWidth = 120; // Total dungeon width in units
-        this.dungeonDepth = 120; // Total dungeon depth in units
+        this.dungeonWidth = 180; // Total dungeon width in units
+        this.dungeonDepth = 180; // Total dungeon depth in units
         this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
         this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
         
