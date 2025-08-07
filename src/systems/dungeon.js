@@ -35,7 +35,7 @@ class DungeonSystem {
         this.roomTemplates = {
             CENTER: { size: 13, type: 'center' },    // 26x26 units
             ORBITAL: { size: 10, type: 'orbital' },  // 20x20 units  
-            CARDINAL: { size: 15, type: 'cardinal' } // 30x30 units
+            CARDINAL: { size: 12, type: 'cardinal' } // 24x24 units (reduced from 15)
         };
         
         // Corridor width in grid cells
@@ -356,7 +356,7 @@ class DungeonSystem {
         };
         
         // Four orbital rooms in cardinal directions
-        const orbitalDistance = 25; // Grid cells from center
+        const orbitalDistance = 20; // Reduced from 25 to 20
         const orbitals = [
             { id: 'orbital_north', dir: 'north', offsetX: 0, offsetZ: -orbitalDistance },
             { id: 'orbital_south', dir: 'south', offsetX: 0, offsetZ: orbitalDistance },
@@ -382,29 +382,68 @@ class DungeonSystem {
             });
         });
         
-        // Cardinal rooms (chance-based)
-        const cardinalChance = Math.min(0.3 + (this.currentFloor * 0.02), 0.8);
-        const cardinalDistance = 25; // Additional distance from orbital
+        // Cardinal rooms (improved positioning and bounds checking)
+        const cardinalChance = Math.min(0.5 + (this.currentFloor * 0.02), 0.9); // Increased chance
+        const cardinalDistance = 15; // Reduced from 25 to 15
         
         orbitals.forEach(orbital => {
             if (Math.random() < cardinalChance) {
                 const cardinalId = `cardinal_${orbital.dir}`;
                 
-                layout.rooms[cardinalId] = {
-                    id: cardinalId,
-                    type: 'cardinal',
-                    direction: orbital.dir,
-                    gridX: layout.rooms.center.gridX + orbital.offsetX + (orbital.offsetX > 0 ? cardinalDistance : orbital.offsetX < 0 ? -cardinalDistance : 0),
-                    gridZ: layout.rooms.center.gridZ + orbital.offsetZ + (orbital.offsetZ > 0 ? cardinalDistance : orbital.offsetZ < 0 ? -cardinalDistance : 0),
-                    size: this.roomTemplates.CARDINAL.size
-                };
+                // Calculate cardinal room position with proper bounds checking
+                let cardinalGridX, cardinalGridZ;
                 
-                // Connect to orbital
-                layout.connections.push({
-                    from: orbital.id,
-                    to: cardinalId,
-                    type: 'orbital_to_cardinal'
-                });
+                switch(orbital.dir) {
+                    case 'north':
+                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX;
+                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ - cardinalDistance;
+                        break;
+                    case 'south':
+                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX;
+                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ + cardinalDistance;
+                        break;
+                    case 'east':
+                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX + cardinalDistance;
+                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ;
+                        break;
+                    case 'west':
+                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX - cardinalDistance;
+                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ;
+                        break;
+                }
+                
+                // Check if cardinal room position is within bounds
+                const roomSize = this.roomTemplates.CARDINAL.size;
+                const halfSize = Math.floor(roomSize / 2);
+                const minX = cardinalGridX - halfSize;
+                const maxX = cardinalGridX + halfSize;
+                const minZ = cardinalGridZ - halfSize;
+                const maxZ = cardinalGridZ + halfSize;
+                
+                // Ensure room fits within grid bounds with some margin
+                if (minX >= 2 && maxX < this.gridWidth - 2 && 
+                    minZ >= 2 && maxZ < this.gridDepth - 2) {
+                    
+                    layout.rooms[cardinalId] = {
+                        id: cardinalId,
+                        type: 'cardinal',
+                        direction: orbital.dir,
+                        gridX: cardinalGridX,
+                        gridZ: cardinalGridZ,
+                        size: roomSize
+                    };
+                    
+                    // Connect to orbital
+                    layout.connections.push({
+                        from: orbital.id,
+                        to: cardinalId,
+                        type: 'orbital_to_cardinal'
+                    });
+                    
+                    console.log(`Added cardinal room ${cardinalId} at grid (${cardinalGridX}, ${cardinalGridZ})`);
+                } else {
+                    console.log(`Skipped cardinal room ${cardinalId} - would be outside bounds`);
+                }
             }
         });
         
@@ -423,7 +462,7 @@ class DungeonSystem {
             this.carveRoomArea(floorMap, room);
         });
         
-        // Phase 2: Carve corridor paths
+        // Phase 2: Carve corridor paths (improved for better connections)
         roomLayout.connections.forEach(connection => {
             this.carveCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
@@ -447,7 +486,7 @@ class DungeonSystem {
     }
     
     carveCorridorPath(floorMap, roomA, roomB) {
-        // Use L-shaped corridors: go horizontal first, then vertical
+        // Improved L-shaped corridors with better connection points
         const startX = roomA.gridX;
         const startZ = roomA.gridZ;
         const endX = roomB.gridX;
@@ -455,33 +494,45 @@ class DungeonSystem {
         
         const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
         
-        // Horizontal segment
+        console.log(`Carving corridor from ${roomA.id} (${startX},${startZ}) to ${roomB.id} (${endX},${endZ})`);
+        
+        // Method 1: Horizontal first, then vertical
+        this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
+        this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
+        
+        // Method 2: Also carve from the other direction to ensure connection
+        this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
+        this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
+        
+        console.log(`Carved enhanced corridor between ${roomA.id} and ${roomB.id}`);
+    }
+    
+    carveHorizontalCorridor(floorMap, startX, endX, z, halfWidth) {
         const minX = Math.min(startX, endX);
         const maxX = Math.max(startX, endX);
         
         for (let x = minX; x <= maxX; x++) {
-            for (let zOffset = -corridorHalfWidth; zOffset <= corridorHalfWidth; zOffset++) {
-                const z = startZ + zOffset;
-                if (this.isValidGridPos(x, z)) {
-                    floorMap[z][x] = true;
+            for (let zOffset = -halfWidth; zOffset <= halfWidth; zOffset++) {
+                const corridorZ = z + zOffset;
+                if (this.isValidGridPos(x, corridorZ)) {
+                    floorMap[corridorZ][x] = true;
                 }
             }
         }
-        
-        // Vertical segment
+    }
+    
+    carveVerticalCorridor(floorMap, x, startZ, endZ, halfWidth) {
         const minZ = Math.min(startZ, endZ);
         const maxZ = Math.max(startZ, endZ);
         
         for (let z = minZ; z <= maxZ; z++) {
-            for (let xOffset = -corridorHalfWidth; xOffset <= corridorHalfWidth; xOffset++) {
-                const x = endX + xOffset;
-                if (this.isValidGridPos(x, z)) {
-                    floorMap[z][x] = true;
+            for (let xOffset = -halfWidth; xOffset <= halfWidth; xOffset++) {
+                const corridorX = x + xOffset;
+                if (this.isValidGridPos(corridorX, z)) {
+                    floorMap[z][corridorX] = true;
                 }
             }
         }
-        
-        console.log(`Carved L-shaped corridor from (${startX},${startZ}) to (${endX},${endZ})`);
     }
     
     isValidGridPos(x, z) {
