@@ -26,8 +26,8 @@ class DungeonSystem {
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
-        this.dungeonWidth = 120; // Total dungeon width in units
-        this.dungeonDepth = 120; // Total dungeon depth in units
+        this.dungeonWidth = 180; // Increased to 180 for cardinal rooms
+        this.dungeonDepth = 180; // Increased to 180 for cardinal rooms
         this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
         this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
         
@@ -35,11 +35,11 @@ class DungeonSystem {
         this.roomTemplates = {
             CENTER: { size: 13, type: 'center' },    // 26x26 units
             ORBITAL: { size: 10, type: 'orbital' },  // 20x20 units  
-            CARDINAL: { size: 12, type: 'cardinal' } // 24x24 units (reduced from 15)
+            CARDINAL: { size: 12, type: 'cardinal' } // 24x24 units
         };
         
         // Corridor width in grid cells
-        this.corridorWidth = 2; // 4 units wide
+        this.corridorWidth = 3; // Increased from 2 to 3 for better connectivity
         
         // Collision and height data
         this.floorHeight = 0; // Base floor height
@@ -356,7 +356,7 @@ class DungeonSystem {
         };
         
         // Four orbital rooms in cardinal directions
-        const orbitalDistance = 20; // Reduced from 25 to 20
+        const orbitalDistance = 20; // Distance in grid cells
         const orbitals = [
             { id: 'orbital_north', dir: 'north', offsetX: 0, offsetZ: -orbitalDistance },
             { id: 'orbital_south', dir: 'south', offsetX: 0, offsetZ: orbitalDistance },
@@ -384,7 +384,7 @@ class DungeonSystem {
         
         // Cardinal rooms (fixed positioning and bounds checking)
         const cardinalChance = Math.min(0.5 + (this.currentFloor * 0.02), 0.9); // Increased chance
-        const cardinalDistance = 12; // Reduced from 15 to 12
+        const cardinalDistance = 15; // Distance from orbital to cardinal
         
         orbitals.forEach(orbital => {
             if (Math.random() < cardinalChance) {
@@ -463,9 +463,9 @@ class DungeonSystem {
             this.carveRoomArea(floorMap, room);
         });
         
-        // Phase 2: Carve corridor paths (improved for better connections)
+        // Phase 2: Carve corridor paths with improved connection logic
         roomLayout.connections.forEach(connection => {
-            this.carveCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
+            this.carveImprovedCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
         
         console.log('Floor map created with carved rooms and corridors');
@@ -484,6 +484,65 @@ class DungeonSystem {
         }
         
         console.log(`Carved ${room.type} room at grid (${room.gridX}, ${room.gridZ}) size ${room.size}`);
+    }
+    
+    carveImprovedCorridorPath(floorMap, roomA, roomB) {
+        console.log(`Carving improved corridor from ${roomA.id} to ${roomB.id}...`);
+        
+        // Calculate room edges for better connection points
+        const roomAHalfSize = Math.floor(roomA.size / 2);
+        const roomBHalfSize = Math.floor(roomB.size / 2);
+        
+        // Determine connection points at room edges rather than centers
+        let startX = roomA.gridX;
+        let startZ = roomA.gridZ;
+        let endX = roomB.gridX;
+        let endZ = roomB.gridZ;
+        
+        // Adjust start point to edge of room A
+        if (endX > startX) startX += roomAHalfSize - 1; // Exit from east side
+        else if (endX < startX) startX -= roomAHalfSize - 1; // Exit from west side
+        
+        if (endZ > startZ) startZ += roomAHalfSize - 1; // Exit from south side
+        else if (endZ < startZ) startZ -= roomAHalfSize - 1; // Exit from north side
+        
+        // Adjust end point to edge of room B
+        if (startX > endX) endX += roomBHalfSize - 1; // Enter from east side
+        else if (startX < endX) endX -= roomBHalfSize - 1; // Enter from west side
+        
+        if (startZ > endZ) endZ += roomBHalfSize - 1; // Enter from south side
+        else if (startZ < endZ) endZ -= roomBHalfSize - 1; // Enter from north side
+        
+        const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
+        
+        // Create L-shaped corridor with both possible paths for redundancy
+        // Path 1: Horizontal first, then vertical
+        this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
+        this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
+        
+        // Path 2: Vertical first, then horizontal (creates intersection for better connectivity)
+        this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
+        this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
+        
+        // Carve junction areas for smoother connections
+        this.carveJunction(floorMap, endX, startZ, corridorHalfWidth + 1);
+        this.carveJunction(floorMap, startX, endZ, corridorHalfWidth + 1);
+        
+        console.log(`Carved improved corridor between ${roomA.id} and ${roomB.id}`);
+    }
+    
+    carveJunction(floorMap, centerX, centerZ, radius) {
+        // Carve a circular junction area for smoother corridor intersections
+        for (let z = centerZ - radius; z <= centerZ + radius; z++) {
+            for (let x = centerX - radius; x <= centerX + radius; x++) {
+                if (this.isValidGridPos(x, z)) {
+                    const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(z - centerZ, 2));
+                    if (dist <= radius) {
+                        floorMap[z][x] = true;
+                    }
+                }
+            }
+        }
     }
     
     carveCorridorPath(floorMap, roomA, roomB) {
