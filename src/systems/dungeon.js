@@ -206,71 +206,145 @@ class DungeonSystem {
     }
     
     createDungeonMaterials() {
-        // Create beautiful stained glass mosaic floor pattern
+        // CENTER ROOM - Golden Byzantine Style
+        const byzantineFloor = this.createPatternedFloor([
+            '#D4AF37', '#FFD700', '#B8860B', '#DAA520',
+            '#F0E68C', '#BDB76B', '#EEE8AA', '#F4E4BC'
+        ], 32);
+        this.materials.set('byzantine_floor', byzantineFloor);
+        
+        const byzantineWall = new THREE.MeshLambertMaterial({ 
+            color: 0xC19A6B,
+            emissive: 0x8B7355,
+            emissiveIntensity: 0.1
+        });
+        this.materials.set('byzantine_wall', byzantineWall);
+        
+        const byzantineCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0xFFD700,
+            emissive: 0xDAA520,
+            emissiveIntensity: 0.2
+        });
+        this.materials.set('byzantine_ceiling', byzantineCeiling);
+        
+        const goldenPillar = new THREE.MeshLambertMaterial({
+            color: 0xDAA520,
+            emissive: 0xFFD700,
+            emissiveIntensity: 0.3,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        this.materials.set('golden_pillar', goldenPillar);
+        
+        // ORBITAL ROOMS - Gothic Cathedral Style
+        const gothicFloor = this.createPatternedFloor([
+            '#2C3E50', '#34495E', '#1C2833', '#212F3D',
+            '#283747', '#2E4053', '#1B2631', '#273746'
+        ], 40);
+        this.materials.set('gothic_floor', gothicFloor);
+        
+        const gothicWall = new THREE.MeshLambertMaterial({ 
+            color: 0x3A3A3A,
+            emissive: 0x1A1A2E,
+            emissiveIntensity: 0.05
+        });
+        this.materials.set('gothic_wall', gothicWall);
+        
+        const gothicCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x1F1F2E,
+            emissive: 0x16213E,
+            emissiveIntensity: 0.1
+        });
+        this.materials.set('gothic_ceiling', gothicCeiling);
+        
+        const silverPillar = new THREE.MeshLambertMaterial({
+            color: 0x808080,
+            emissive: 0xC0C0C0,
+            emissiveIntensity: 0.2,
+            metalness: 0.9,
+            roughness: 0.3
+        });
+        this.materials.set('silver_pillar', silverPillar);
+        
+        // CARDINAL ROOMS - Celestial Chapel Style  
+        const celestialFloor = this.createPatternedFloor([
+            '#191970', '#000080', '#00008B', '#0000CD',
+            '#4169E1', '#1E3A8A', '#1E40AF', '#1E3A5F'
+        ], 36);
+        this.materials.set('celestial_floor', celestialFloor);
+        
+        const celestialWall = new THREE.MeshLambertMaterial({ 
+            color: 0x1E3A8A,
+            emissive: 0x4169E1,
+            emissiveIntensity: 0.15
+        });
+        this.materials.set('celestial_wall', celestialWall);
+        
+        const celestialCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x000033,
+            emissive: 0x191970,
+            emissiveIntensity: 0.3
+        });
+        this.materials.set('celestial_ceiling', celestialCeiling);
+        
+        const starPillar = new THREE.MeshLambertMaterial({
+            color: 0x4169E1,
+            emissive: 0x87CEEB,
+            emissiveIntensity: 0.4
+        });
+        this.materials.set('star_pillar', starPillar);
+        
+        // CORRIDOR MATERIALS - Neutral stone
+        const corridorFloor = this.createPatternedFloor([
+            '#696969', '#708090', '#778899', '#7F7F7F'
+        ], 24);
+        this.materials.set('corridor_floor', corridorFloor);
+        
+        const corridorWall = new THREE.MeshLambertMaterial({ 
+            color: 0x5C5C5C,
+            opacity: 0.95
+        });
+        this.materials.set('corridor_wall', corridorWall);
+        
+        const corridorCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x4A4A4A,
+            opacity: 0.9
+        });
+        this.materials.set('corridor_ceiling', corridorCeiling);
+    }
+    
+    createPatternedFloor(colors, tileSize) {
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        // Create sophisticated mosaic tile pattern with multiple colors
-        const tileSize = 32;
-        const floorColors = [
-            '#8B4513', '#CD853F', '#DAA520', '#B8860B', 
-            '#D2691E', '#A0522D', '#DEB887', '#F4A460'
-        ];
-        
         for (let y = 0; y < canvas.height; y += tileSize) {
             for (let x = 0; x < canvas.width; x += tileSize) {
-                const color = floorColors[Math.floor(Math.random() * floorColors.length)];
+                const color = colors[Math.floor(Math.random() * colors.length)];
                 ctx.fillStyle = color;
                 ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
                 
-                // Add highlight and depth
-                ctx.fillStyle = 'rgba(255,255,255,0.4)';
-                ctx.fillRect(x, y, tileSize - 2, 4);
+                // Add highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
                 
-                // Add shadow edge
+                // Add shadow
                 ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                ctx.fillRect(x, y + tileSize - 6, tileSize - 2, 4);
+                ctx.fillRect(x, y + tileSize - 5, tileSize - 2, 3);
             }
         }
         
-        const dungeonFloorTexture = new THREE.CanvasTexture(canvas);
-        dungeonFloorTexture.wrapS = THREE.RepeatWrapping;
-        dungeonFloorTexture.wrapT = THREE.RepeatWrapping;
-        dungeonFloorTexture.repeat.set(4, 4);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(4, 4);
         
-        const dungeonFloor = new THREE.MeshLambertMaterial({ 
-            map: dungeonFloorTexture,
-            transparent: true, 
-            opacity: 0.9 
-        });
-        
-        // Enhanced wall material with subtle texture
-        const dungeonWall = new THREE.MeshLambertMaterial({ 
-            color: 0x6a6a6a, 
+        return new THREE.MeshLambertMaterial({ 
+            map: texture,
             transparent: true, 
             opacity: 0.95 
         });
-        
-        // Ceiling with mystical appearance
-        const dungeonCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x4a4a4a, 
-            transparent: true, 
-            opacity: 0.8 
-        });
-        
-        // Glowing pillar material - NEW
-        const glowingPillar = new THREE.MeshLambertMaterial({
-            color: 0x4a5a7a,
-            emissive: 0x6080ff,
-            emissiveIntensity: 0.3
-        });
-        
-        this.materials.set('dungeon_floor', dungeonFloor);
-        this.materials.set('dungeon_wall', dungeonWall);
-        this.materials.set('dungeon_ceiling', dungeonCeiling);
-        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     setupBillboardSystem() {
@@ -600,37 +674,82 @@ class DungeonSystem {
     }
     
     generateUnifiedGeometry(floorMap) {
-        console.log('Generating unified geometry with solid collision...');
+        console.log('Generating unified geometry with themed rooms...');
         
         const dungeonGroup = new THREE.Group();
         dungeonGroup.name = 'unified_dungeon';
         
-        // Generate unified floor
-        this.generateUnifiedFloor(dungeonGroup, floorMap);
+        // Generate floors with room-specific materials
+        this.generateThemedFloors(dungeonGroup, floorMap);
         
-        // Generate walls around walkable areas
-        this.generateWallsFromMap(dungeonGroup, floorMap);
+        // Generate walls with room-specific materials
+        this.generateThemedWalls(dungeonGroup, floorMap);
         
-        // Generate unified ceiling
-        this.generateUnifiedCeiling(dungeonGroup, floorMap);
+        // Generate ceilings with room-specific materials
+        this.generateThemedCeilings(dungeonGroup, floorMap);
         
         this.scene.add(dungeonGroup);
         this.currentDungeonGroup = dungeonGroup;
     }
     
-    generateUnifiedFloor(dungeonGroup, floorMap) {
-        const floorMaterial = this.materials.get('dungeon_floor');
+    getRoomTypeAtGrid(gridX, gridZ) {
+        if (!this.currentDungeon || !this.currentDungeon.roomLayout) {
+            return 'corridor';
+        }
         
-        // Find connected floor regions and create efficient meshes
+        // Check each room to see if this grid position is inside it
+        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
+            const halfSize = Math.floor(room.size / 2);
+            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
+                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
+                return room.type; // 'center', 'orbital', or 'cardinal'
+            }
+        }
+        
+        return 'corridor'; // Default to corridor if not in any room
+    }
+    
+    getMaterialsForRoomType(roomType) {
+        switch(roomType) {
+            case 'center':
+                return {
+                    floor: this.materials.get('byzantine_floor'),
+                    wall: this.materials.get('byzantine_wall'),
+                    ceiling: this.materials.get('byzantine_ceiling')
+                };
+            case 'orbital':
+                return {
+                    floor: this.materials.get('gothic_floor'),
+                    wall: this.materials.get('gothic_wall'),
+                    ceiling: this.materials.get('gothic_ceiling')
+                };
+            case 'cardinal':
+                return {
+                    floor: this.materials.get('celestial_floor'),
+                    wall: this.materials.get('celestial_wall'),
+                    ceiling: this.materials.get('celestial_ceiling')
+                };
+            default: // corridor
+                return {
+                    floor: this.materials.get('corridor_floor'),
+                    wall: this.materials.get('corridor_wall'),
+                    ceiling: this.materials.get('corridor_ceiling')
+                };
+        }
+    }
+    
+    generateThemedFloors(dungeonGroup, floorMap) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
-                    // Create floor segment
+                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const materials = this.getMaterialsForRoomType(roomType);
+                    
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
                     const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const floorSegment = new THREE.Mesh(floorGeometry, floorMaterial);
+                    const floorSegment = new THREE.Mesh(floorGeometry, materials.floor);
                     floorSegment.rotation.x = -Math.PI / 2;
                     floorSegment.position.set(worldX, this.floorHeight, worldZ);
                     floorSegment.receiveShadow = true;
@@ -640,37 +759,51 @@ class DungeonSystem {
             }
         }
         
-        console.log('Generated unified floor geometry with collision');
+        console.log('Generated themed floor geometry');
     }
     
-    generateWallsFromMap(dungeonGroup, floorMap) {
-        const wallMaterial = this.materials.get('dungeon_wall');
+    generateThemedWalls(dungeonGroup, floorMap) {
         const wallHeight = this.ceilingHeight;
         
-        // March around perimeter of walkable areas to create walls
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
-                    // Check all 4 directions for wall placement
+                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const materials = this.getMaterialsForRoomType(roomType);
+                    
                     const directions = [
-                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0 }, // North wall
-                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0 },  // South wall  
-                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: Math.PI/2 }, // East wall
-                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: Math.PI/2 } // West wall
+                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0 },
+                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0 },
+                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: Math.PI/2 },
+                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: Math.PI/2 }
                     ];
                     
                     directions.forEach(dir => {
                         const neighborX = x + dir.dx;
                         const neighborZ = z + dir.dz;
                         
-                        // Place wall if neighbor is solid or out of bounds
                         if (!this.isValidGridPos(neighborX, neighborZ) || !floorMap[neighborZ][neighborX]) {
                             const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
                             const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
                             
-                            const wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
-                            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                            wall.position.set(worldX, this.floorHeight + wallHeight/2, worldZ);
+                            // Add decorative elements for room walls
+                            let wallGeometry;
+                            if (roomType === 'center') {
+                                // Byzantine arched walls
+                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.2, 0.5);
+                            } else if (roomType === 'orbital') {
+                                // Gothic pointed arch walls
+                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.4, 0.5);
+                            } else if (roomType === 'cardinal') {
+                                // Celestial rounded walls
+                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.1, 0.5);
+                            } else {
+                                // Standard corridor walls
+                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
+                            }
+                            
+                            const wall = new THREE.Mesh(wallGeometry, materials.wall);
+                            wall.position.set(worldX, this.floorHeight + wallGeometry.parameters.height/2, worldZ);
                             wall.rotation.y = dir.rotY;
                             wall.castShadow = true;
                             wall.receiveShadow = true;
@@ -682,31 +815,65 @@ class DungeonSystem {
             }
         }
         
-        console.log('Generated unified wall geometry with collision');
+        console.log('Generated themed wall geometry');
     }
     
-    generateUnifiedCeiling(dungeonGroup, floorMap) {
-        const ceilingMaterial = this.materials.get('dungeon_ceiling');
-        
-        // Create ceiling segments over walkable areas
+    generateThemedCeilings(dungeonGroup, floorMap) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
+                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const materials = this.getMaterialsForRoomType(roomType);
+                    
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
+                    // Variable ceiling heights based on room type
+                    let ceilingHeight = this.ceilingHeight;
+                    if (roomType === 'center') {
+                        ceilingHeight = this.ceilingHeight * 1.2; // Byzantine dome effect
+                    } else if (roomType === 'orbital') {
+                        ceilingHeight = this.ceilingHeight * 1.4; // Gothic vaulted ceiling
+                    } else if (roomType === 'cardinal') {
+                        ceilingHeight = this.ceilingHeight * 1.1; // Celestial chapel height
+                    }
+                    
                     const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const ceilingSegment = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+                    const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
                     ceilingSegment.rotation.x = Math.PI / 2;
-                    ceilingSegment.position.set(worldX, this.floorHeight + this.ceilingHeight, worldZ);
+                    ceilingSegment.position.set(worldX, this.floorHeight + ceilingHeight, worldZ);
                     ceilingSegment.receiveShadow = true;
+                    
+                    // Add stars to celestial ceilings
+                    if (roomType === 'cardinal' && Math.random() < 0.3) {
+                        this.addCeilingStars(dungeonGroup, worldX, worldZ, ceilingHeight);
+                    }
                     
                     dungeonGroup.add(ceilingSegment);
                 }
             }
         }
         
-        console.log('Generated unified ceiling geometry with collision');
+        console.log('Generated themed ceiling geometry');
+    }
+    
+    addCeilingStars(dungeonGroup, x, z, height) {
+        const starGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        const starMaterial = new THREE.MeshBasicMaterial({
+            color: 0xFFD700,
+            emissive: 0xFFD700,
+            emissiveIntensity: 0.8
+        });
+        
+        for (let i = 0; i < 3; i++) {
+            const star = new THREE.Mesh(starGeometry, starMaterial);
+            star.position.set(
+                x + (Math.random() - 0.5) * this.gridSize * 0.8,
+                this.floorHeight + height - 0.1,
+                z + (Math.random() - 0.5) * this.gridSize * 0.8
+            );
+            dungeonGroup.add(star);
+        }
     }
     
     addDungeonLighting(roomLayout) {
@@ -726,30 +893,73 @@ class DungeonSystem {
     addRoomLighting(room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        
-        // Dimmed overhead light (reduced by 90%)
-        const brightLight = new THREE.PointLight(0xffffff, 0.3, 50); // Was 3.0, now 0.3
-        brightLight.position.set(worldX, this.floorHeight + this.ceilingHeight - 1, worldZ);
-        this.currentDungeonGroup.add(brightLight);
-        this.lightSources.push(brightLight);
-        
-        // Dimmed corner lights for subtle coverage (reduced by 90%)
         const roomSize = room.size * this.gridSize;
-        const cornerPositions = [
-            [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
-            [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
-            [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3],
-            [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3]
-        ];
         
-        cornerPositions.forEach(pos => {
-            const cornerLight = new THREE.PointLight(0xffffff, 0.2, 30); // Was 2.0, now 0.2
-            cornerLight.position.set(...pos);
-            this.currentDungeonGroup.add(cornerLight);
-            this.lightSources.push(cornerLight);
-        });
+        // Room-type specific lighting
+        if (room.type === 'center') {
+            // Byzantine golden lighting
+            const goldenLight = new THREE.PointLight(0xFFD700, 0.5, 60);
+            goldenLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.2 - 1, worldZ);
+            this.currentDungeonGroup.add(goldenLight);
+            this.lightSources.push(goldenLight);
+            
+            // Warm corner lights
+            const cornerPositions = [
+                [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
+                [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
+                [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3],
+                [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3]
+            ];
+            
+            cornerPositions.forEach(pos => {
+                const warmLight = new THREE.PointLight(0xFFA500, 0.3, 30);
+                warmLight.position.set(...pos);
+                this.currentDungeonGroup.add(warmLight);
+                this.lightSources.push(warmLight);
+            });
+            
+        } else if (room.type === 'orbital') {
+            // Gothic dramatic lighting with chandelier effect
+            const chandelierLight = new THREE.PointLight(0xE6E6FA, 0.4, 50);
+            chandelierLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.4 - 2, worldZ);
+            this.currentDungeonGroup.add(chandelierLight);
+            this.lightSources.push(chandelierLight);
+            
+            // Cool silver accent lights
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const radius = roomSize * 0.4;
+                const silverLight = new THREE.PointLight(0xC0C0C0, 0.2, 25);
+                silverLight.position.set(
+                    worldX + Math.cos(angle) * radius,
+                    this.floorHeight + this.ceilingHeight * 0.7,
+                    worldZ + Math.sin(angle) * radius
+                );
+                this.currentDungeonGroup.add(silverLight);
+                this.lightSources.push(silverLight);
+            }
+            
+        } else if (room.type === 'cardinal') {
+            // Celestial mystical lighting
+            const celestialLight = new THREE.PointLight(0x4169E1, 0.35, 45);
+            celestialLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.1 - 1, worldZ);
+            this.currentDungeonGroup.add(celestialLight);
+            this.lightSources.push(celestialLight);
+            
+            // Starlight effect
+            for (let i = 0; i < 6; i++) {
+                const starLight = new THREE.PointLight(0x87CEEB, 0.15, 20);
+                starLight.position.set(
+                    worldX + (Math.random() - 0.5) * roomSize * 0.8,
+                    this.floorHeight + this.ceilingHeight * 1.1 - 0.5,
+                    worldZ + (Math.random() - 0.5) * roomSize * 0.8
+                );
+                this.currentDungeonGroup.add(starLight);
+                this.lightSources.push(starLight);
+            }
+        }
         
-        console.log(`Added atmospheric lighting to ${room.type} room at (${worldX}, ${worldZ})`);
+        console.log(`Added themed lighting to ${room.type} room at (${worldX}, ${worldZ})`);
     }
     
     addCorridorLighting(roomA, roomB) {
@@ -1295,6 +1505,12 @@ class DungeonSystem {
                         Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
                 }
                 
+                // Rotate constellation stars
+                if (child.userData.rotationSpeed) {
+                    child.rotation.x += child.userData.rotationSpeed;
+                    child.rotation.y += child.userData.rotationSpeed * 1.5;
+                }
+                
                 // Update geometric portal animations
                 if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
                     this.updateBillboardPortalAnimations(child, deltaTime);
@@ -1312,7 +1528,7 @@ class DungeonSystem {
             });
         }
         
-        // Update glowing pillars
+        // Update glowing pillars with room-specific effects
         this.glowingPillars.forEach(pillar => {
             if (pillar && pillar.userData.isPillar) {
                 const time = Date.now() * 0.001;
@@ -1321,6 +1537,11 @@ class DungeonSystem {
                 
                 if (pillar.material) {
                     pillar.material.emissiveIntensity = Math.max(0.1, glowIntensity);
+                }
+                
+                // Rotate crystal pillars
+                if (pillar.userData.rotation) {
+                    pillar.rotation.y += pillar.userData.rotation;
                 }
             }
         });
@@ -1341,7 +1562,7 @@ class DungeonSystem {
                 const pillar = light.userData.pillar;
                 if (pillar.material) {
                     // Sync light intensity with pillar glow
-                    light.intensity = 0.4 * (pillar.material.emissiveIntensity / 0.3);
+                    light.intensity = light.userData.originalIntensity * (pillar.material.emissiveIntensity / pillar.userData.baseEmissiveIntensity);
                 }
             }
         });
