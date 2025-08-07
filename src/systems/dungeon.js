@@ -51,6 +51,7 @@ class DungeonSystem {
         this.materials = new Map();
         this.lightSources = [];
         this.billboardSprites = [];
+        this.glowingPillars = []; // Track pillars for glow animation
         
         this.init();
     }
@@ -259,9 +260,17 @@ class DungeonSystem {
             opacity: 0.8 
         });
         
+        // Glowing pillar material - NEW
+        const glowingPillar = new THREE.MeshLambertMaterial({
+            color: 0x4a5a7a,
+            emissive: 0x6080ff,
+            emissiveIntensity: 0.3
+        });
+        
         this.materials.set('dungeon_floor', dungeonFloor);
         this.materials.set('dungeon_wall', dungeonWall);
         this.materials.set('dungeon_ceiling', dungeonCeiling);
+        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     setupBillboardSystem() {
@@ -590,9 +599,9 @@ class DungeonSystem {
     }
     
     addDungeonLighting(roomLayout) {
-        console.log('Adding dungeon lighting...');
+        console.log('Adding atmospheric dungeon lighting...');
         
-        // Add bright test lighting to each room
+        // Add dimmed lighting to each room
         Object.values(roomLayout.rooms).forEach(room => {
             this.addRoomLighting(room);
         });
@@ -607,13 +616,13 @@ class DungeonSystem {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Super bright overhead light
-        const brightLight = new THREE.PointLight(0xffffff, 3.0, 50);
+        // Dimmed overhead light (reduced by 90%)
+        const brightLight = new THREE.PointLight(0xffffff, 0.3, 50); // Was 3.0, now 0.3
         brightLight.position.set(worldX, this.floorHeight + this.ceilingHeight - 1, worldZ);
         this.currentDungeonGroup.add(brightLight);
         this.lightSources.push(brightLight);
         
-        // Corner lights for even coverage
+        // Dimmed corner lights for subtle coverage (reduced by 90%)
         const roomSize = room.size * this.gridSize;
         const cornerPositions = [
             [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
@@ -623,13 +632,13 @@ class DungeonSystem {
         ];
         
         cornerPositions.forEach(pos => {
-            const cornerLight = new THREE.PointLight(0xffffff, 2.0, 30);
+            const cornerLight = new THREE.PointLight(0xffffff, 0.2, 30); // Was 2.0, now 0.2
             cornerLight.position.set(...pos);
             this.currentDungeonGroup.add(cornerLight);
             this.lightSources.push(cornerLight);
         });
         
-        console.log(`Added bright lighting to ${room.type} room at (${worldX}, ${worldZ})`);
+        console.log(`Added atmospheric lighting to ${room.type} room at (${worldX}, ${worldZ})`);
     }
     
     addCorridorLighting(roomA, roomB) {
@@ -638,17 +647,17 @@ class DungeonSystem {
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
         const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Light at corner of L-shaped corridor
-        const cornerLight = new THREE.PointLight(0xffffff, 2.5, 40);
+        // Dimmed light at corner of L-shaped corridor (reduced by 90%)
+        const cornerLight = new THREE.PointLight(0xffffff, 0.25, 40); // Was 2.5, now 0.25
         cornerLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ); // Corner position
         this.currentDungeonGroup.add(cornerLight);
         this.lightSources.push(cornerLight);
         
-        // Additional lights along corridor path
+        // Additional dimmed lights along corridor path (reduced by 90%)
         const midWorldX = (startWorldX + endWorldX) / 2;
         const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
-        const midLight = new THREE.PointLight(0xffffff, 1.8, 25);
+        const midLight = new THREE.PointLight(0xffffff, 0.18, 25); // Was 1.8, now 0.18
         midLight.position.set(midWorldX, this.floorHeight + 3.5, midWorldZ);
         this.currentDungeonGroup.add(midLight);
         this.lightSources.push(midLight);
@@ -680,7 +689,7 @@ class DungeonSystem {
     }
     
     addDungeonAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Consistent dungeon atmosphere - torches and pillars
+        // Consistent dungeon atmosphere - glowing pillars
         for (let i = 0; i < 4; i++) {
             const angle = (i / 4) * Math.PI * 2;
             const radius = roomSize * 0.3;
@@ -689,18 +698,38 @@ class DungeonSystem {
             const pillarZ = worldZ + Math.sin(angle) * radius;
             
             const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
-            const pillarMaterial = this.materials.get('dungeon_wall');
+            const pillarMaterial = this.materials.get('glowing_pillar').clone(); // Use glowing material
             const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
             pillar.position.set(pillarX, this.floorHeight + 2, pillarZ);
             pillar.castShadow = true;
             pillar.receiveShadow = true;
-            this.currentDungeonGroup.add(pillar);
             
-            // Torch light on pillar
-            const torchLight = new THREE.PointLight(0xff6644, 0.8, 8);
+            // Store reference for animated glow
+            pillar.userData = {
+                isPillar: true,
+                glowPhase: Math.random() * Math.PI * 2, // Random starting phase
+                glowSpeed: 0.5 + Math.random() * 1.0, // Random glow speed
+                baseEmissiveIntensity: 0.3
+            };
+            
+            this.currentDungeonGroup.add(pillar);
+            this.glowingPillars.push(pillar);
+            
+            // Dimmed torch light on pillar (reduced by 90%)
+            const torchLight = new THREE.PointLight(0xff6644, 0.08, 8); // Was 0.8, now 0.08
             torchLight.position.set(pillarX, this.floorHeight + 3.5, pillarZ);
             this.currentDungeonGroup.add(torchLight);
             this.lightSources.push(torchLight);
+            
+            // Add pillar glow light (blue-ish glow from the pillar itself)
+            const pillarGlowLight = new THREE.PointLight(0x6080ff, 0.4, 10);
+            pillarGlowLight.position.set(pillarX, this.floorHeight + 2, pillarZ);
+            pillarGlowLight.userData = {
+                isPillarGlow: true,
+                pillar: pillar // Link to pillar for synchronized animation
+            };
+            this.currentDungeonGroup.add(pillarGlowLight);
+            this.lightSources.push(pillarGlowLight);
         }
     }
     
@@ -784,7 +813,7 @@ class DungeonSystem {
         maskGroup.add(face);
         
         // Add front-facing light to illuminate the mask
-        const maskLight = new THREE.PointLight(0xffffff, 1.0, 8);
+        const maskLight = new THREE.PointLight(0xffffff, 0.1, 8); // Dimmed by 90% (was 1.0, now 0.1)
         maskLight.position.set(0, 0, 4); // Position in front of the mask
         maskGroup.add(maskLight);
         
@@ -1138,8 +1167,8 @@ class DungeonSystem {
             
             this.currentDungeonGroup.add(orb);
             
-            // Orb light
-            const orbLight = new THREE.PointLight(orbColor, 0.3, 5);
+            // Dimmed orb light (reduced by 90%)
+            const orbLight = new THREE.PointLight(orbColor, 0.03, 5); // Was 0.3, now 0.03
             orbLight.position.copy(orb.position);
             this.currentDungeonGroup.add(orbLight);
             this.lightSources.push(orbLight);
@@ -1172,15 +1201,38 @@ class DungeonSystem {
             });
         }
         
-        // Animate light intensities
+        // Update glowing pillars
+        this.glowingPillars.forEach(pillar => {
+            if (pillar && pillar.userData.isPillar) {
+                const time = Date.now() * 0.001;
+                const glowIntensity = pillar.userData.baseEmissiveIntensity + 
+                    Math.sin(time * pillar.userData.glowSpeed + pillar.userData.glowPhase) * 0.2;
+                
+                if (pillar.material) {
+                    pillar.material.emissiveIntensity = Math.max(0.1, glowIntensity);
+                }
+            }
+        });
+        
+        // Animate light intensities with more subtle flicker in dark dungeon
         this.lightSources.forEach(light => {
             if (light.userData.originalIntensity === undefined) {
                 light.userData.originalIntensity = light.intensity;
                 light.userData.flickerSpeed = 0.5 + Math.random() * 2;
             }
             
-            const flicker = Math.sin(Date.now() * 0.001 * light.userData.flickerSpeed) * 0.1 + 1;
+            // More subtle flicker for atmospheric effect
+            const flicker = Math.sin(Date.now() * 0.001 * light.userData.flickerSpeed) * 0.05 + 1;
             light.intensity = light.userData.originalIntensity * flicker;
+            
+            // Sync pillar glow lights with their pillars
+            if (light.userData.isPillarGlow && light.userData.pillar) {
+                const pillar = light.userData.pillar;
+                if (pillar.material) {
+                    // Sync light intensity with pillar glow
+                    light.intensity = 0.4 * (pillar.material.emissiveIntensity / 0.3);
+                }
+            }
         });
     }
     
@@ -1246,6 +1298,7 @@ class DungeonSystem {
         
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
+        this.glowingPillars.length = 0;
         this.currentFloorMap = null;
         
         console.log('Previous dungeon cleared');
