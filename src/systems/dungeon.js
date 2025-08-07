@@ -26,8 +26,8 @@ class DungeonSystem {
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
-        this.dungeonWidth = 160; // Total dungeon width in units
-        this.dungeonDepth = 160; // Total dungeon depth in units
+        this.dungeonWidth = 120; // Total dungeon width in units
+        this.dungeonDepth = 120; // Total dungeon depth in units
         this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
         this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
         
@@ -382,33 +382,34 @@ class DungeonSystem {
             });
         });
         
-        // Cardinal rooms (improved positioning and bounds checking)
+        // Cardinal rooms (fixed positioning and bounds checking)
         const cardinalChance = Math.min(0.5 + (this.currentFloor * 0.02), 0.9); // Increased chance
-        const cardinalDistance = 15; // Reduced from 25 to 15
+        const cardinalDistance = 12; // Reduced from 15 to 12
         
         orbitals.forEach(orbital => {
             if (Math.random() < cardinalChance) {
                 const cardinalId = `cardinal_${orbital.dir}`;
+                const orbitalRoom = layout.rooms[orbital.id];
                 
-                // Calculate cardinal room position with proper bounds checking
+                // Calculate cardinal room position relative to the ORBITAL room (not center)
                 let cardinalGridX, cardinalGridZ;
                 
                 switch(orbital.dir) {
                     case 'north':
-                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX;
-                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ - cardinalDistance;
+                        cardinalGridX = orbitalRoom.gridX;
+                        cardinalGridZ = orbitalRoom.gridZ - cardinalDistance;
                         break;
                     case 'south':
-                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX;
-                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ + cardinalDistance;
+                        cardinalGridX = orbitalRoom.gridX;
+                        cardinalGridZ = orbitalRoom.gridZ + cardinalDistance;
                         break;
                     case 'east':
-                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX + cardinalDistance;
-                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ;
+                        cardinalGridX = orbitalRoom.gridX + cardinalDistance;
+                        cardinalGridZ = orbitalRoom.gridZ;
                         break;
                     case 'west':
-                        cardinalGridX = layout.rooms.center.gridX + orbital.offsetX - cardinalDistance;
-                        cardinalGridZ = layout.rooms.center.gridZ + orbital.offsetZ;
+                        cardinalGridX = orbitalRoom.gridX - cardinalDistance;
+                        cardinalGridZ = orbitalRoom.gridZ;
                         break;
                 }
                 
