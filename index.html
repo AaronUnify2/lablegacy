@@ -658,7 +658,7 @@
                 console.log('[LOADER] Screen:', window.innerWidth, 'x', window.innerHeight);
                 
                 try {
-                    // Load scripts sequentially with verification
+                    // Load all scripts sequentially with verification
                     for (let i = 0; i < this.scripts.length; i++) {
                         const script = this.scripts[i];
                         this.updateProgress(i, this.scripts.length + 3, `Loading ${script.name}...`);
@@ -666,15 +666,8 @@
                         try {
                             await this.loadScript(script);
                             
-                            // Add a 4-second delay after loading the Dungeon System script
-                            if (script.name === 'Dungeon System') {
-                                console.log('[LOADER] Dungeon System loaded, waiting 4 seconds for dungeon generation...');
-                                this.updateProgress(i, this.scripts.length + 3, 'Preparing dungeon (4s delay)...');
-                                await new Promise(resolve => setTimeout(resolve, 4000));
-                            } else {
-                                // Standard delay between other scripts
-                                await new Promise(resolve => setTimeout(resolve, 200));
-                            }
+                            // Add delay between scripts to ensure proper execution order
+                            await new Promise(resolve => setTimeout(resolve, 200));
                         } catch (error) {
                             if (script.critical) {
                                 throw error; // Critical scripts must load
@@ -1406,4 +1399,4 @@
         });
     </script>
 </body>
-    </html>
+</html>
