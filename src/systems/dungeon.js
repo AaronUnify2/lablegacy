@@ -230,7 +230,9 @@ class DungeonSystem {
         const goldenPillar = new THREE.MeshLambertMaterial({
             color: 0xDAA520,
             emissive: 0xFFD700,
-            emissiveIntensity: 0.3
+            emissiveIntensity: 0.3,
+            metalness: 0.8,
+            roughness: 0.2
         });
         this.materials.set('golden_pillar', goldenPillar);
         
@@ -258,7 +260,9 @@ class DungeonSystem {
         const silverPillar = new THREE.MeshLambertMaterial({
             color: 0x808080,
             emissive: 0xC0C0C0,
-            emissiveIntensity: 0.2
+            emissiveIntensity: 0.2,
+            metalness: 0.9,
+            roughness: 0.3
         });
         this.materials.set('silver_pillar', silverPillar);
         
@@ -307,14 +311,6 @@ class DungeonSystem {
             opacity: 0.9
         });
         this.materials.set('corridor_ceiling', corridorCeiling);
-        
-        // GLOWING PILLAR MATERIAL - Universal pillar material
-        const glowingPillar = new THREE.MeshLambertMaterial({
-            color: 0x6080ff,
-            emissive: 0x6080ff,
-            emissiveIntensity: 0.3
-        });
-        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     createPatternedFloor(colors, tileSize) {
@@ -394,8 +390,16 @@ class DungeonSystem {
         // Store floor map for collision detection
         this.currentFloorMap = floorMap;
         
-        // Phase 3: Generate unified geometry
-        this.generateUnifiedGeometry(floorMap);
+        // Store dungeon data BEFORE generating geometry so it's available for room type checks
+        this.currentDungeon = {
+            floor: floorNumber,
+            theme: 'dungeon',
+            roomLayout: roomLayout,
+            floorMap: floorMap
+        };
+        
+        // Phase 3: Generate unified geometry (now with access to currentDungeon)
+        this.generateUnifiedGeometry(floorMap, roomLayout);
         
         // Phase 4: Add lighting and atmosphere
         this.addDungeonLighting(roomLayout);
@@ -403,14 +407,6 @@ class DungeonSystem {
         
         // Phase 5: Add progressive portal system
         this.addProgressivePortals(roomLayout);
-        
-        // Store dungeon data
-        this.currentDungeon = {
-            floor: floorNumber,
-            theme: 'dungeon',
-            roomLayout: roomLayout,
-            floorMap: floorMap
-        };
         
         console.log(`Unified dungeon floor ${floorNumber} generated with progressive portal system`);
         return this.currentDungeon;
@@ -677,32 +673,32 @@ class DungeonSystem {
         return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
     }
     
-    generateUnifiedGeometry(floorMap) {
+    generateUnifiedGeometry(floorMap, roomLayout) {
         console.log('Generating unified geometry with themed rooms...');
         
         const dungeonGroup = new THREE.Group();
         dungeonGroup.name = 'unified_dungeon';
         
         // Generate floors with room-specific materials
-        this.generateThemedFloors(dungeonGroup, floorMap);
+        this.generateThemedFloors(dungeonGroup, floorMap, roomLayout);
         
         // Generate walls with room-specific materials
-        this.generateThemedWalls(dungeonGroup, floorMap);
+        this.generateThemedWalls(dungeonGroup, floorMap, roomLayout);
         
         // Generate ceilings with room-specific materials
-        this.generateThemedCeilings(dungeonGroup, floorMap);
+        this.generateThemedCeilings(dungeonGroup, floorMap, roomLayout);
         
         this.scene.add(dungeonGroup);
         this.currentDungeonGroup = dungeonGroup;
     }
     
-    getRoomTypeAtGrid(gridX, gridZ) {
-        if (!this.currentDungeon || !this.currentDungeon.roomLayout) {
+    getRoomTypeAtGrid(gridX, gridZ, roomLayout) {
+        if (!roomLayout) {
             return 'corridor';
         }
         
         // Check each room to see if this grid position is inside it
-        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
+        for (const room of Object.values(roomLayout.rooms)) {
             const halfSize = Math.floor(room.size / 2);
             if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
                 gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
@@ -742,11 +738,11 @@ class DungeonSystem {
         }
     }
     
-    generateThemedFloors(dungeonGroup, floorMap) {
+    generateThemedFloors(dungeonGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
                     const materials = this.getMaterialsForRoomType(roomType);
                     
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
@@ -766,13 +762,13 @@ class DungeonSystem {
         console.log('Generated themed floor geometry');
     }
     
-    generateThemedWalls(dungeonGroup, floorMap) {
+    generateThemedWalls(dungeonGroup, floorMap, roomLayout) {
         const wallHeight = this.ceilingHeight;
         
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
                     const materials = this.getMaterialsForRoomType(roomType);
                     
                     const directions = [
@@ -822,11 +818,11 @@ class DungeonSystem {
         console.log('Generated themed wall geometry');
     }
     
-    generateThemedCeilings(dungeonGroup, floorMap) {
+    generateThemedCeilings(dungeonGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z);
+                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
                     const materials = this.getMaterialsForRoomType(roomType);
                     
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
