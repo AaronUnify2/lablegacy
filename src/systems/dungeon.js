@@ -311,6 +311,14 @@ class DungeonSystem {
             opacity: 0.9
         });
         this.materials.set('corridor_ceiling', corridorCeiling);
+        
+        // GLOWING PILLAR MATERIAL - Universal pillar material (for compatibility)
+        const glowingPillar = new THREE.MeshLambertMaterial({
+            color: 0x6080ff,
+            emissive: 0x6080ff,
+            emissiveIntensity: 0.3
+        });
+        this.materials.set('glowing_pillar', glowingPillar);
     }
     
     createPatternedFloor(colors, tileSize) {
@@ -398,17 +406,32 @@ class DungeonSystem {
             floorMap: floorMap
         };
         
-        // Phase 3: Generate unified geometry (now with access to currentDungeon)
-        this.generateUnifiedGeometry(floorMap, roomLayout);
+        // Add a small delay to ensure Three.js is fully ready
+        setTimeout(() => {
+            try {
+                // Phase 3: Generate unified geometry (now with access to currentDungeon)
+                this.generateUnifiedGeometry(floorMap, roomLayout);
+                
+                // Phase 4: Add lighting and atmosphere
+                this.addDungeonLighting(roomLayout);
+                this.addAtmosphericElements(roomLayout);
+                
+                // Phase 5: Add progressive portal system
+                this.addProgressivePortals(roomLayout);
+                
+                console.log(`Unified dungeon floor ${floorNumber} generated successfully`);
+            } catch (error) {
+                console.error('Failed to generate dungeon geometry:', error);
+                // Try again after another delay
+                setTimeout(() => {
+                    this.generateUnifiedGeometry(floorMap, roomLayout);
+                    this.addDungeonLighting(roomLayout);
+                    this.addAtmosphericElements(roomLayout);
+                    this.addProgressivePortals(roomLayout);
+                }, 1000);
+            }
+        }, 500);
         
-        // Phase 4: Add lighting and atmosphere
-        this.addDungeonLighting(roomLayout);
-        this.addAtmosphericElements(roomLayout);
-        
-        // Phase 5: Add progressive portal system
-        this.addProgressivePortals(roomLayout);
-        
-        console.log(`Unified dungeon floor ${floorNumber} generated with progressive portal system`);
         return this.currentDungeon;
     }
     
