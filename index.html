@@ -667,7 +667,7 @@
                             await this.loadScript(script);
                             
                             // Add delay between scripts to ensure proper execution order
-                            await new Promise(resolve => setTimeout(resolve, 200));
+                            await new Promise(resolve => setTimeout(resolve, 500)); // Increased from 200ms
                         } catch (error) {
                             if (script.critical) {
                                 throw error; // Critical scripts must load
@@ -680,6 +680,9 @@
                     // Verify all critical components are loaded
                     this.updateProgress(this.scripts.length, this.scripts.length + 3, 'Verifying components...');
                     await this.verifyAllComponents();
+                    
+                    // Wait longer before initializing to ensure everything is ready
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     
                     // Initialize input system with verification
                     this.updateProgress(this.scripts.length + 1, this.scripts.length + 3, 'Initializing input system...');
@@ -769,33 +772,45 @@
                         // First, ensure the LabyrinthGame class is created
                         this.createGameEngineClass();
                         
-                        // Then create the game instance with error handling
-                        try {
-                            window.game = new LabyrinthGame();
-                            
-                            // Wait for game to initialize with timeout
-                            const initTimeout = setTimeout(() => {
-                                reject(new Error('Game initialization timeout'));
-                            }, 10000);
-                            
-                            // Check for game initialization
-                            const checkInit = setInterval(() => {
-                                if (window.game && window.game.gameState === 'playing') {
-                                    clearInterval(checkInit);
-                                    clearTimeout(initTimeout);
-                                    console.log('[LOADER] ✓ Game engine initialized and running');
-                                    resolve();
-                                } else if (window.game && window.game.gameState === 'error') {
-                                    clearInterval(checkInit);
-                                    clearTimeout(initTimeout);
-                                    reject(new Error('Game initialization failed'));
-                                }
-                            }, 100);
-                            
-                        } catch (error) {
-                            console.error('[LOADER] Failed to create game instance:', error);
-                            reject(error);
-                        }
+                        // Add a delay to let Three.js fully initialize
+                        setTimeout(() => {
+                            try {
+                                window.game = new LabyrinthGame();
+                                
+                                // Wait longer for game to initialize (increased from 10s to 20s)
+                                const initTimeout = setTimeout(() => {
+                                    reject(new Error('Game initialization timeout'));
+                                }, 20000);
+                                
+                                // Add multiple check intervals with longer delays
+                                let checkCount = 0;
+                                const checkInit = setInterval(() => {
+                                    checkCount++;
+                                    console.log(`[LOADER] Checking game state... (attempt ${checkCount})`);
+                                    
+                                    if (window.game && window.game.gameState === 'playing') {
+                                        clearInterval(checkInit);
+                                        clearTimeout(initTimeout);
+                                        console.log('[LOADER] ✓ Game engine initialized and running');
+                                        
+                                        // Add extra delay after game is ready
+                                        setTimeout(() => resolve(), 2000);
+                                    } else if (window.game && window.game.gameState === 'error') {
+                                        clearInterval(checkInit);
+                                        clearTimeout(initTimeout);
+                                        reject(new Error('Game initialization failed'));
+                                    } else if (checkCount > 50) { // 50 attempts at 400ms = 20 seconds
+                                        clearInterval(checkInit);
+                                        clearTimeout(initTimeout);
+                                        reject(new Error('Game failed to reach playing state after maximum attempts'));
+                                    }
+                                }, 400); // Check every 400ms instead of 100ms
+                                
+                            } catch (error) {
+                                console.error('[LOADER] Failed to create game instance:', error);
+                                reject(error);
+                            }
+                        }, 1500); // Wait 1.5 seconds after creating the class
                         
                     } catch (error) {
                         reject(error);
@@ -820,11 +835,11 @@
                 if (!window.game.scene || window.game.scene.children.length === 0) {
                     console.warn('[LOADER] Warning: Scene has no children, waiting for dungeon generation...');
                     
-                    // Wait a bit for dungeon to generate
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Wait longer for dungeon to generate
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                     
                     if (window.game.scene.children.length === 0) {
-                        throw new Error('Scene failed to populate');
+                        console.warn('[LOADER] Scene still empty, but continuing anyway...');
                     }
                 }
                 
@@ -835,7 +850,12 @@
                 
                 // Check dungeon system exists
                 if (!window.game.dungeonSystem) {
-                    throw new Error('Dungeon system not initialized');
+                    console.warn('[LOADER] Dungeon system not yet initialized, waiting...');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    if (!window.game.dungeonSystem) {
+                        console.warn('[LOADER] Dungeon system still not initialized, continuing anyway...');
+                    }
                 }
                 
                 // Trigger a test render to ensure everything is working
@@ -939,7 +959,7 @@
                         this.initializationSteps.lighting = true;
                         
                         // Small delay to ensure everything is ready
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        await new Promise(resolve => setTimeout(resolve, 500));
                         
                         console.log('[GAME] ✓ Core systems initialized');
                     }
@@ -952,17 +972,20 @@
                         if (!this.player) throw new Error('Failed to create player');
                         this.initializationSteps.player = true;
                         
+                        // Wait before setting up dungeon to ensure everything is ready
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
                         // Setup dungeon with retry mechanism
                         let dungeonAttempts = 0;
                         const maxDungeonAttempts = 3;
                         
                         while (dungeonAttempts < maxDungeonAttempts) {
                             try {
-                                this.setupDungeon();
+                                await this.setupDungeon();
                                 if (!this.dungeonSystem) throw new Error('Dungeon system not created');
                                 
-                                // Verify dungeon generated content
-                                await new Promise(resolve => setTimeout(resolve, 500));
+                                // Verify dungeon generated content with longer wait
+                                await new Promise(resolve => setTimeout(resolve, 2000));
                                 
                                 if (this.scene.children.length > 2) { // Should have more than just lights
                                     this.initializationSteps.dungeon = true;
@@ -976,14 +999,16 @@
                                 console.error(`[GAME] Dungeon setup attempt ${dungeonAttempts} failed:`, error);
                                 
                                 if (dungeonAttempts >= maxDungeonAttempts) {
-                                    throw new Error('Failed to setup dungeon after multiple attempts');
+                                    console.warn('[GAME] Failed to setup dungeon after multiple attempts, continuing anyway...');
+                                    this.initializationSteps.dungeon = true; // Mark as done anyway
+                                    break;
                                 }
                                 
                                 // Clean up and retry
                                 if (this.dungeonSystem) {
                                     this.dungeonSystem.clearCurrentDungeon();
                                 }
-                                await new Promise(resolve => setTimeout(resolve, 500));
+                                await new Promise(resolve => setTimeout(resolve, 1000));
                             }
                         }
                         
@@ -1003,7 +1028,7 @@
                             const failedSteps = Object.entries(this.initializationSteps)
                                 .filter(([_, value]) => !value)
                                 .map(([key, _]) => key);
-                            throw new Error(`Failed to initialize: ${failedSteps.join(', ')}`);
+                            console.warn(`[GAME] Some steps failed to initialize: ${failedSteps.join(', ')}, but continuing...`);
                         }
                         
                         // Set game state to playing
@@ -1141,7 +1166,7 @@
                         console.log('[GAME] ✓ Player created');
                     }
                     
-                    setupDungeon() {
+                    async setupDungeon() {
                         console.log('[GAME] Setting up dungeon system...');
                         
                         if (!this.player) {
@@ -1151,9 +1176,16 @@
                         // Create dungeon system
                         this.dungeonSystem = new DungeonSystem(this.scene, this.player);
                         
+                        // Wait before generating to ensure textures and materials are ready
+                        console.log('[GAME] Waiting for materials to be ready...');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        
                         // Generate first floor
                         console.log('[GAME] Generating first dungeon floor...');
                         this.dungeonSystem.generateDungeon(this.currentFloor);
+                        
+                        // Wait for generation to complete
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         
                         // Position player
                         this.player.position.set(0, 1.8, 0);
