@@ -176,11 +176,12 @@
             padding: 20px;
             border-radius: 10px;
             color: #ff6666;
-            font-size: 14px;
+            font-size: 12px;
             display: none;
             z-index: 2000;
             max-width: 80%;
-            text-align: center;
+            text-align: left;
+            font-family: monospace;
         }
 
         /* Mobile Controls Styles */
@@ -538,7 +539,7 @@
 
             showError(message) {
                 console.error('LOADING ERROR:', message);
-                this.errorMessage.textContent = message;
+                this.errorMessage.innerHTML = message; // Use innerHTML to preserve formatting
                 this.errorDisplay.style.display = 'block';
                 this.loadingScreen.style.display = 'none';
             }
@@ -568,13 +569,38 @@
                                 console.log(`[LOADER] ✓ ${scriptInfo.name} verified`);
                                 resolve();
                             } else {
-                                reject(new Error(`${scriptInfo.name} verification failed`));
+                                // THIS IS WHERE WE ADD THE DETAILED ERROR CHECK
+                                let errorMessage = `${scriptInfo.name} verification failed`;
+                                
+                                // If this is the Dungeon System, get detailed error info
+                                if (scriptInfo.name === 'Dungeon System' && window.getDungeonSystemError) {
+                                    try {
+                                        const detailedError = window.getDungeonSystemError();
+                                        errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
+                                        
+                                        // Also add the current status and error variables
+                                        if (window.DUNGEON_SYSTEM_STATUS) {
+                                            errorMessage += `<br><br><strong>Current Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
+                                        }
+                                        if (window.DUNGEON_SYSTEM_ERROR) {
+                                            errorMessage += `<br><br><strong>Error Details:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
+                                        }
+                                        
+                                        console.error('[DETAILED ERROR]', detailedError);
+                                        console.error('[STATUS]', window.DUNGEON_SYSTEM_STATUS);
+                                        console.error('[ERROR]', window.DUNGEON_SYSTEM_ERROR);
+                                    } catch (e) {
+                                        errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
+                                    }
+                                }
+                                
+                                reject(new Error(errorMessage));
                             }
                         }, 200);
                     };
                     
                     script.onerror = () => {
-                        reject(new Error(`Failed to load ${scriptInfo.name}`));
+                        reject(new Error(`Failed to load ${scriptInfo.name} from ${scriptInfo.url}`));
                     };
                     
                     document.head.appendChild(script);
