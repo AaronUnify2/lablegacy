@@ -1,6 +1,5 @@
-// Dungeon Generation System with Collision Detection and Progressive Portal System
-// Grid-based procedural dungeon generation with solid walls, floors, and ceilings
-// Enhanced with fixed texture loading and comprehensive error handling
+// Dungeon Generation System with Solid Colors and Enhanced Lighting
+// Simplified version with no texture generation - just solid colors
 
 class DungeonSystem {
     constructor(scene, player) {
@@ -47,18 +46,17 @@ class DungeonSystem {
         this.currentFloorMap = null; // For collision detection
         
         // Materials and lighting (single theme)
-        this.textureLoader = new THREE.TextureLoader();
         this.materials = new Map();
         this.lightSources = [];
         this.billboardSprites = [];
         this.glowingPillars = []; // Track pillars for glow animation
         
-        // Initialize asynchronously
-        this.initPromise = this.init();
+        // Initialize synchronously now
+        this.init();
     }
     
-    async init() {
-        await this.setupMaterials();
+    init() {
+        this.setupMaterials();
         this.setupBillboardSystem();
         
         // Connect player to this dungeon system for collision detection
@@ -66,7 +64,7 @@ class DungeonSystem {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with single theme');
+        console.log('Unified Dungeon System initialized with solid colors');
     }
     
     // Progressive Unlock System
@@ -201,7 +199,7 @@ class DungeonSystem {
         };
     }
     
-    async setupMaterials() {
+    setupMaterials() {
         console.log('Setting up simple solid color materials...');
         
         // Simple solid color materials - no canvas textures
@@ -366,7 +364,7 @@ class DungeonSystem {
         // Reset progression for new floor
         this.resetProgression();
         
-        console.log('Using consistent dungeon theme');
+        console.log('Using solid color theme');
         
         // Phase 1: Plan room layout
         const roomLayout = this.planRoomLayout();
@@ -626,28 +624,6 @@ class DungeonSystem {
         }
     }
     
-    carveCorridorPath(floorMap, roomA, roomB) {
-        // Improved L-shaped corridors with better connection points
-        const startX = roomA.gridX;
-        const startZ = roomA.gridZ;
-        const endX = roomB.gridX;
-        const endZ = roomB.gridZ;
-        
-        const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
-        
-        console.log(`Carving corridor from ${roomA.id} (${startX},${startZ}) to ${roomB.id} (${endX},${endZ})`);
-        
-        // Method 1: Horizontal first, then vertical
-        this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
-        this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
-        
-        // Method 2: Also carve from the other direction to ensure connection
-        this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
-        this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
-        
-        console.log(`Carved enhanced corridor between ${roomA.id} and ${roomB.id}`);
-    }
-    
     carveHorizontalCorridor(floorMap, startX, endX, z, halfWidth) {
         const minX = Math.min(startX, endX);
         const maxX = Math.max(startX, endX);
@@ -681,7 +657,7 @@ class DungeonSystem {
     }
     
     generateUnifiedGeometry(floorMap, roomLayout) {
-        console.log('Generating unified geometry with themed rooms...');
+        console.log('Generating unified geometry with solid colored rooms...');
         
         const dungeonGroup = new THREE.Group();
         dungeonGroup.name = 'unified_dungeon';
@@ -887,9 +863,9 @@ class DungeonSystem {
     }
     
     addDungeonLighting(roomLayout) {
-        console.log('Adding atmospheric dungeon lighting...');
+        console.log('Adding enhanced dungeon lighting...');
         
-        // Add dimmed lighting to each room
+        // Add enhanced lighting to each room
         Object.values(roomLayout.rooms).forEach(room => {
             this.addRoomLighting(room);
         });
