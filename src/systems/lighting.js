@@ -27,17 +27,29 @@ class DungeonLightingSystem {
     
     // Main lighting setup for dungeon
     addLighting(roomLayout, dungeonGroup) {
-        console.log('Adding comprehensive exploration lighting...');
+        console.log('[LIGHTING] Adding comprehensive exploration lighting...');
+        console.log('[LIGHTING] Room layout:', roomLayout);
+        console.log('[LIGHTING] Dungeon group:', dungeonGroup);
         
         this.clearLights();
         
+        // TEST: Add a bright light at player spawn (0,0,0) to verify system works
+        console.log('[LIGHTING] Adding test light at player spawn position...');
+        const testLight = new THREE.PointLight(0xFFFFFF, 8.0, 50);
+        testLight.position.set(0, 5, 0);
+        testLight.userData = { type: 'test_light', originalIntensity: 8.0 };
+        dungeonGroup.add(testLight);
+        this.lightSources.push(testLight);
+        
         // Add main lighting for each room
         Object.values(roomLayout.rooms).forEach(room => {
+            console.log(`[LIGHTING] Adding lighting for room: ${room.id} (${room.type})`);
             this.addRoomLighting(room, dungeonGroup);
         });
         
         // Add corridor lighting between rooms
         roomLayout.connections.forEach(connection => {
+            console.log(`[LIGHTING] Adding corridor lighting: ${connection.from} -> ${connection.to}`);
             this.addCorridorLighting(
                 roomLayout.rooms[connection.from], 
                 roomLayout.rooms[connection.to], 
@@ -46,17 +58,22 @@ class DungeonLightingSystem {
         });
         
         // Add atmospheric perimeter lighting
+        console.log('[LIGHTING] Adding perimeter lighting...');
         this.addPerimeterLighting(dungeonGroup);
         
         // Add special effect lighting
+        console.log('[LIGHTING] Adding effect lighting...');
         this.addEffectLighting(roomLayout, dungeonGroup);
         
-        console.log(`Added ${this.lightSources.length} exploration lights`);
+        console.log(`[LIGHTING] ✓ Added ${this.lightSources.length} exploration lights and ${this.effectLights.length} effect lights`);
     }
     
     addRoomLighting(room, dungeonGroup) {
-        const worldX = (room.gridX - (Math.floor(this.dungeonWidth / this.gridSize) / 2)) * this.gridSize;
-        const worldZ = (room.gridZ - (Math.floor(this.dungeonDepth / this.gridSize) / 2)) * this.gridSize;
+        // Use same coordinate system as dungeon system
+        const gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        const gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        const worldX = (room.gridX - gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
         if (room.type === 'center') {
@@ -83,6 +100,7 @@ class DungeonLightingSystem {
             flickerSpeed: 0.3
         };
         
+        console.log(`[LIGHTING] Adding arena main light at (${worldX}, ${this.floorHeight + this.ceilingHeight * 0.9}, ${worldZ})`);
         dungeonGroup.add(mainLight);
         this.lightSources.push(mainLight);
         
@@ -135,6 +153,7 @@ class DungeonLightingSystem {
             flickerSpeed: 0.4
         };
         
+        console.log(`[LIGHTING] Adding ${direction} chamber light at (${worldX}, ${this.floorHeight + this.ceilingHeight * 0.7}, ${worldZ})`);
         dungeonGroup.add(chamberLight);
         this.lightSources.push(chamberLight);
         
@@ -188,10 +207,13 @@ class DungeonLightingSystem {
     }
     
     addCorridorLighting(roomA, roomB, dungeonGroup) {
-        const startWorldX = (roomA.gridX - (Math.floor(this.dungeonWidth / this.gridSize) / 2)) * this.gridSize;
-        const startWorldZ = (roomA.gridZ - (Math.floor(this.dungeonDepth / this.gridSize) / 2)) * this.gridSize;
-        const endWorldX = (roomB.gridX - (Math.floor(this.dungeonWidth / this.gridSize) / 2)) * this.gridSize;
-        const endWorldZ = (roomB.gridZ - (Math.floor(this.dungeonDepth / this.gridSize) / 2)) * this.gridSize;
+        // Use same coordinate system as dungeon system
+        const gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        const gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        const startWorldX = (roomA.gridX - gridWidth/2) * this.gridSize;
+        const startWorldZ = (roomA.gridZ - gridDepth/2) * this.gridSize;
+        const endWorldX = (roomB.gridX - gridWidth/2) * this.gridSize;
+        const endWorldZ = (roomB.gridZ - gridDepth/2) * this.gridSize;
         
         // Calculate corridor path and add lights along it
         const distance = Math.sqrt(Math.pow(endWorldX - startWorldX, 2) + Math.pow(endWorldZ - startWorldZ, 2));
@@ -270,8 +292,11 @@ class DungeonLightingSystem {
     }
     
     addFloatingLights(room, dungeonGroup) {
-        const worldX = (room.gridX - (Math.floor(this.dungeonWidth / this.gridSize) / 2)) * this.gridSize;
-        const worldZ = (room.gridZ - (Math.floor(this.dungeonDepth / this.gridSize) / 2)) * this.gridSize;
+        // Use same coordinate system as dungeon system
+        const gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        const gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        const worldX = (room.gridX - gridWidth/2) * this.gridSize;
+        const worldZ = (room.gridZ - gridDepth/2) * this.gridSize;
         
         // Create 2-3 floating mystical lights per chamber
         const numFloatingLights = 2 + Math.floor(Math.random() * 2);
@@ -304,9 +329,12 @@ class DungeonLightingSystem {
     
     addArchitecturalLighting(roomLayout, dungeonGroup) {
         // Add dramatic uplighting and downlighting for architectural drama
+        const gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        const gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        
         Object.values(roomLayout.rooms).forEach(room => {
-            const worldX = (room.gridX - (Math.floor(this.dungeonWidth / this.gridSize) / 2)) * this.gridSize;
-            const worldZ = (room.gridZ - (Math.floor(this.dungeonDepth / this.gridSize) / 2)) * this.gridSize;
+            const worldX = (room.gridX - gridWidth/2) * this.gridSize;
+            const worldZ = (room.gridZ - gridDepth/2) * this.gridSize;
             
             if (room.type === 'center') {
                 // Add dramatic uplighting around the arena perimeter
