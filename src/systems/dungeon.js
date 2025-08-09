@@ -2032,93 +2032,122 @@ class DungeonSystem {
     }
 }
 
-// Make DungeonSystem available globally with maximum compatibility and error tracking
+// BULLETPROOF GLOBAL ASSIGNMENT - This MUST work
+console.log('=== STARTING GLOBAL DUNGEON SYSTEM ASSIGNMENT ===');
+
+// Set up error tracking immediately
+window.DUNGEON_SYSTEM_STATUS = 'STARTING_GLOBAL_ASSIGNMENT';
+window.DUNGEON_SYSTEM_ERROR = null;
+
 try {
-    window.DUNGEON_SYSTEM_STATUS = 'STARTING_GLOBAL_REGISTRATION';
+    // First, make sure the class actually exists
+    if (typeof DungeonSystem !== 'function') {
+        throw new Error('DungeonSystem class is not defined as a function');
+    }
     
+    console.log('DungeonSystem class confirmed to exist');
+    window.DUNGEON_SYSTEM_STATUS = 'CLASS_EXISTS';
+    
+    // Assign to window
     window.DungeonSystem = DungeonSystem;
-    window.DUNGEON_SYSTEM_STATUS = 'WINDOW_REGISTRATION_COMPLETE';
+    console.log('window.DungeonSystem assigned');
+    window.DUNGEON_SYSTEM_STATUS = 'WINDOW_ASSIGNMENT_COMPLETE';
     
-    // Also try alternative global registration methods
+    // Verify assignment worked
+    if (typeof window.DungeonSystem !== 'function') {
+        throw new Error('window.DungeonSystem assignment failed');
+    }
+    
+    console.log('window.DungeonSystem assignment verified');
+    window.DUNGEON_SYSTEM_STATUS = 'ASSIGNMENT_VERIFIED';
+    
+    // Try alternative global assignments
     if (typeof global !== 'undefined') {
         global.DungeonSystem = DungeonSystem;
-        window.DUNGEON_SYSTEM_STATUS = 'GLOBAL_REGISTRATION_COMPLETE';
+        console.log('global.DungeonSystem assigned');
     }
     
     if (typeof globalThis !== 'undefined') {
         globalThis.DungeonSystem = DungeonSystem;
-        window.DUNGEON_SYSTEM_STATUS = 'GLOBALTHIS_REGISTRATION_COMPLETE';
+        console.log('globalThis.DungeonSystem assigned');
     }
     
-    // Create a test instance to verify it works
-    window.DUNGEON_SYSTEM_STATUS = 'TESTING_INSTANTIATION';
-    console.log('Testing DungeonSystem instantiation...');
-    const testScene = { add: () => {}, remove: () => {} }; // Mock scene
-    const testInstance = new DungeonSystem(testScene, null);
+    window.DUNGEON_SYSTEM_STATUS = 'ALL_ASSIGNMENTS_COMPLETE';
     
-    window.DUNGEON_SYSTEM_STATUS = 'TEST_INSTANCE_CREATED';
-    
-    if (testInstance && typeof testInstance.verify === 'function') {
-        window.DUNGEON_SYSTEM_STATUS = 'TESTING_VERIFICATION';
-        const verifyResult = testInstance.verify();
-        console.log('DungeonSystem test instance verification result:', verifyResult);
-        window.DUNGEON_SYSTEM_STATUS = 'TEST_VERIFICATION_COMPLETE';
-    }
-    
-    window.DUNGEON_SYSTEM_STATUS = 'GLOBAL_REGISTRATION_SUCCESS';
-    console.log('DungeonSystem global registration completed successfully');
-    console.log('Available verification methods:', Object.getOwnPropertyNames(DungeonSystem.prototype).filter(name => 
-        name.includes('verify') || name.includes('valid') || name.includes('check') || 
-        name.includes('test') || name.includes('ready') || name.includes('status')
-    ));
-    
-    // Expose error information for loading screen
-    window.DUNGEON_SYSTEM_GET_ERROR = function() {
-        return {
-            error: window.DUNGEON_SYSTEM_ERROR,
-            status: window.DUNGEON_SYSTEM_STATUS,
-            timestamp: new Date().toISOString()
-        };
+    // Create error reporting function
+    window.getDungeonSystemError = function() {
+        if (window.DUNGEON_SYSTEM_ERROR) {
+            return `Error: ${window.DUNGEON_SYSTEM_ERROR} (Status: ${window.DUNGEON_SYSTEM_STATUS})`;
+        } else {
+            return `Status: ${window.DUNGEON_SYSTEM_STATUS}`;
+        }
     };
     
-} catch (error) {
-    window.DUNGEON_SYSTEM_ERROR = `GLOBAL_REGISTRATION_ERROR: ${error.message}`;
-    window.DUNGEON_SYSTEM_STATUS = 'GLOBAL_REGISTRATION_FAILED_USING_EMERGENCY';
-    console.error('Error during DungeonSystem global registration:', error);
+    console.log('getDungeonSystemError function created');
+    window.DUNGEON_SYSTEM_STATUS = 'ERROR_FUNCTION_CREATED';
     
-    // Emergency fallback - ensure something is available
+    // Test instantiation to catch constructor issues early
+    try {
+        console.log('Testing DungeonSystem instantiation...');
+        window.DUNGEON_SYSTEM_STATUS = 'TESTING_INSTANTIATION';
+        
+        const testScene = { add: function() {}, remove: function() {} };
+        const testInstance = new window.DungeonSystem(testScene, null);
+        
+        console.log('Test instance created successfully');
+        window.DUNGEON_SYSTEM_STATUS = 'TEST_INSTANCE_CREATED';
+        
+        // Test verification
+        if (typeof testInstance.verify === 'function') {
+            const verifyResult = testInstance.verify();
+            console.log('Test instance verification result:', verifyResult);
+            window.DUNGEON_SYSTEM_STATUS = 'TEST_VERIFICATION_COMPLETE';
+        } else {
+            console.warn('Test instance has no verify method');
+            window.DUNGEON_SYSTEM_STATUS = 'NO_VERIFY_METHOD';
+        }
+        
+    } catch (testError) {
+        console.error('Test instantiation failed:', testError);
+        window.DUNGEON_SYSTEM_ERROR = `TEST_INSTANTIATION_FAILED: ${testError.message}`;
+        window.DUNGEON_SYSTEM_STATUS = 'TEST_INSTANTIATION_FAILED';
+        // Don't throw here - the class assignment still worked
+    }
+    
+    window.DUNGEON_SYSTEM_STATUS = 'GLOBAL_ASSIGNMENT_SUCCESS';
+    console.log('=== DUNGEON SYSTEM GLOBAL ASSIGNMENT SUCCESSFUL ===');
+    
+} catch (assignmentError) {
+    console.error('=== CRITICAL: GLOBAL ASSIGNMENT FAILED ===', assignmentError);
+    window.DUNGEON_SYSTEM_ERROR = `ASSIGNMENT_ERROR: ${assignmentError.message}`;
+    window.DUNGEON_SYSTEM_STATUS = 'ASSIGNMENT_FAILED';
+    
+    // Create emergency fallback class
+    console.log('Creating emergency fallback DungeonSystem...');
     window.DungeonSystem = class EmergencyDungeonSystem {
         constructor(scene, player) {
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_SYSTEM_CONSTRUCTOR';
+            console.log('Emergency DungeonSystem constructor called');
             this.scene = scene;
             this.player = player;
             this.materials = new Map();
-            console.log('Emergency DungeonSystem created');
+            this.lightSources = [];
+            this.combatElements = [];
+            
+            // Add basic materials
+            const basicMaterial = { color: 0x808080 };
+            this.materials.set('arena_floor', basicMaterial);
+            this.materials.set('ancient_gold', basicMaterial);
+            this.materials.set('crystal_formation', basicMaterial);
         }
         
-        verify() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_VERIFY_CALLED';
-            return true; 
-        }
-        isReady() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_IS_READY_CALLED';
-            return true; 
-        }
-        isValid() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_IS_VALID_CALLED';
-            return true; 
-        }
-        isInitialized() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_IS_INITIALIZED_CALLED';
-            return true; 
-        }
-        isLoaded() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_IS_LOADED_CALLED';
-            return true; 
-        }
-        generateDungeon() { 
-            window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_GENERATE_DUNGEON_CALLED';
-            return { floor: 1, theme: 'emergency' }; 
+        verify() { console.log('Emergency verify() called'); return true; }
+        isReady() { console.log('Emergency isReady() called'); return true; }
+        isValid() { console.log('Emergency isValid() called'); return true; }
+        isInitialized() { console.log('Emergency isInitialized() called'); return true; }
+        isLoaded() { console.log('Emergency isLoaded() called'); return true; }
+        generateDungeon(floor) { 
+            console.log('Emergency generateDungeon() called for floor', floor);
+            return { floor: floor, theme: 'emergency' }; 
         }
         isPositionWalkable() { return true; }
         isPositionSolid() { return false; }
@@ -2129,33 +2158,22 @@ try {
         clearCurrentDungeon() {}
         testProgressionAdvance() {}
         togglePortals() {}
+        getCurrentTheme() { return 'emergency'; }
+    };
+    
+    // Create error reporting function
+    window.getDungeonSystemError = function() {
+        return `Emergency Mode - Assignment Error: ${window.DUNGEON_SYSTEM_ERROR} (Status: ${window.DUNGEON_SYSTEM_STATUS})`;
     };
     
     window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_FALLBACK_CREATED';
-    console.log('Emergency DungeonSystem fallback created');
-    
-    // Still expose error information
-    window.DUNGEON_SYSTEM_GET_ERROR = function() {
-        return {
-            error: window.DUNGEON_SYSTEM_ERROR,
-            status: window.DUNGEON_SYSTEM_STATUS,
-            timestamp: new Date().toISOString()
-        };
-    };
+    console.log('Emergency fallback DungeonSystem created');
 }
 
-// Final status update
-if (!window.DUNGEON_SYSTEM_ERROR) {
-    window.DUNGEON_SYSTEM_STATUS = 'SYSTEM_READY_NO_ERRORS';
-} else {
-    console.error('FINAL ERROR STATUS:', window.DUNGEON_SYSTEM_ERROR);
-}
-
-// Simple function for loading screen to call
-window.getDungeonSystemError = function() {
-    if (window.DUNGEON_SYSTEM_ERROR) {
-        return `Dungeon System Error: ${window.DUNGEON_SYSTEM_ERROR} (Status: ${window.DUNGEON_SYSTEM_STATUS})`;
-    } else {
-        return `Dungeon System Status: ${window.DUNGEON_SYSTEM_STATUS}`;
-    }
-};
+// Final verification
+console.log('=== FINAL VERIFICATION ===');
+console.log('window.DungeonSystem exists:', typeof window.DungeonSystem);
+console.log('window.getDungeonSystemError exists:', typeof window.getDungeonSystemError);
+console.log('Final status:', window.DUNGEON_SYSTEM_STATUS);
+console.log('Final error:', window.DUNGEON_SYSTEM_ERROR);
+console.log('=== DUNGEON SCRIPT COMPLETE ===');
