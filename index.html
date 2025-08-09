@@ -513,11 +513,6 @@
                         check: () => window.THREE
                     },
                     { 
-                        url: 'src/systems/dungeon.js', 
-                        name: 'Dungeon System', 
-                        check: () => window.DungeonSystem
-                    },
-                    { 
                         url: 'src/core/input.js', 
                         name: 'Input System', 
                         check: () => window.setupInput && window.getInput
@@ -526,6 +521,11 @@
                         url: 'src/systems/player.js', 
                         name: 'Player System', 
                         check: () => window.Player
+                    },
+                    { 
+                        url: 'src/systems/dungeon.js', 
+                        name: 'Dungeon System', 
+                        check: () => window.DungeonSystem
                     }
                 ];
                 
