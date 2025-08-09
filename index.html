@@ -500,61 +500,44 @@
         </div>
     </div>
 
-    <!-- ENHANCED SEQUENTIAL SCRIPT LOADING SYSTEM WITH ROBUST ERROR HANDLING -->
+    <!-- SIMPLIFIED SCRIPT LOADING SYSTEM -->
     <script>
-        // Enhanced Sequential Script Loader with retry mechanism and better verification
-        class RobustSequentialLoader {
+        // Simplified Script Loader
+        class SimplifiedLoader {
             constructor() {
                 this.scripts = [
                     { 
                         url: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 
                         name: 'Three.js', 
-                        check: () => window.THREE,
-                        critical: true, // Must load for game to work
-                        retries: 3
-                    },
-                    { 
-                        url: 'src/core/input.js', 
-                        name: 'Input System', 
-                        check: () => window.setupInput && window.getInput,
-                        critical: true,
-                        retries: 3
-                    },
-                    { 
-                        url: 'src/systems/player.js', 
-                        name: 'Player System', 
-                        check: () => window.Player,
-                        critical: true,
-                        retries: 3
+                        check: () => window.THREE
                     },
                     { 
                         url: 'src/systems/dungeon.js', 
                         name: 'Dungeon System', 
-                        check: () => window.DungeonSystem,
-                        critical: true,
-                        retries: 3
+                        check: () => window.DungeonSystem
+                    },
+                    { 
+                        url: 'src/core/input.js', 
+                        name: 'Input System', 
+                        check: () => window.setupInput && window.getInput
+                    },
+                    { 
+                        url: 'src/systems/player.js', 
+                        name: 'Player System', 
+                        check: () => window.Player
                     }
                 ];
                 
-                this.currentIndex = 0;
                 this.loadingProgress = document.getElementById('loadingProgress');
                 this.loadingStatus = document.getElementById('loadingStatus');
                 this.loadingFill = document.getElementById('loadingFill');
                 this.loadingScreen = document.getElementById('loadingScreen');
                 this.errorDisplay = document.getElementById('errorDisplay');
                 this.errorMessage = document.getElementById('errorMessage');
-                
-                // Track initialization state
-                this.initializationComplete = false;
-                this.gameStarted = false;
-                
-                // Performance monitoring
-                this.loadStartTime = Date.now();
-                this.scriptLoadTimes = {};
             }
 
             showError(message) {
-                console.error('FATAL ERROR:', message);
+                console.error('LOADING ERROR:', message);
                 this.errorMessage.textContent = message;
                 this.errorDisplay.style.display = 'block';
                 this.loadingScreen.style.display = 'none';
@@ -563,89 +546,35 @@
             updateProgress(step, total, status) {
                 const percentage = (step / total) * 100;
                 this.loadingFill.style.width = percentage + '%';
-                this.loadingProgress.textContent = `Loading... ${step}/${total} (${Math.round(percentage)}%)`;
+                this.loadingProgress.textContent = `Loading... ${Math.round(percentage)}%`;
                 this.loadingStatus.textContent = status;
                 console.log(`[LOADER] ${status} (${Math.round(percentage)}%)`);
             }
 
-            loadScript(scriptInfo, retryCount = 0) {
+            loadScript(scriptInfo) {
                 return new Promise((resolve, reject) => {
-                    const startTime = Date.now();
-                    console.log(`[LOADER] Loading ${scriptInfo.name} from ${scriptInfo.url} (attempt ${retryCount + 1}/${scriptInfo.retries})...`);
+                    console.log(`[LOADER] Loading ${scriptInfo.name}...`);
                     
                     const script = document.createElement('script');
                     script.src = scriptInfo.url;
                     script.type = 'text/javascript';
                     
-                    // Set timeout for script loading (30 seconds)
-                    const loadTimeout = setTimeout(() => {
-                        console.error(`[LOADER] Timeout loading ${scriptInfo.name}`);
-                        script.remove();
-                        
-                        if (retryCount < scriptInfo.retries - 1) {
-                            console.log(`[LOADER] Retrying ${scriptInfo.name}...`);
-                            this.loadScript(scriptInfo, retryCount + 1)
-                                .then(resolve)
-                                .catch(reject);
-                        } else {
-                            reject(new Error(`Failed to load ${scriptInfo.name} after ${scriptInfo.retries} attempts`));
-                        }
-                    }, 30000);
-                    
                     script.onload = () => {
-                        clearTimeout(loadTimeout);
-                        const loadTime = Date.now() - startTime;
-                        console.log(`[LOADER] ${scriptInfo.name} script loaded in ${loadTime}ms, verifying...`);
+                        console.log(`[LOADER] ${scriptInfo.name} loaded, verifying...`);
                         
-                        // Multiple verification attempts with increasing delays
-                        let verificationAttempts = 0;
-                        const maxVerificationAttempts = 10;
-                        
-                        const verify = () => {
-                            verificationAttempts++;
-                            
+                        // Give time for script to initialize
+                        setTimeout(() => {
                             if (scriptInfo.check()) {
-                                this.scriptLoadTimes[scriptInfo.name] = loadTime;
-                                console.log(`[LOADER] ✓ ${scriptInfo.name} verified successfully after ${verificationAttempts} attempts`);
+                                console.log(`[LOADER] ✓ ${scriptInfo.name} verified`);
                                 resolve();
-                            } else if (verificationAttempts < maxVerificationAttempts) {
-                                // Exponential backoff for verification
-                                const delay = Math.min(100 * Math.pow(2, verificationAttempts - 1), 2000);
-                                console.log(`[LOADER] ${scriptInfo.name} not ready, retrying verification in ${delay}ms...`);
-                                setTimeout(verify, delay);
                             } else {
-                                console.error(`[LOADER] ${scriptInfo.name} failed verification after ${maxVerificationAttempts} attempts`);
-                                
-                                if (retryCount < scriptInfo.retries - 1) {
-                                    script.remove();
-                                    console.log(`[LOADER] Retrying full load of ${scriptInfo.name}...`);
-                                    this.loadScript(scriptInfo, retryCount + 1)
-                                        .then(resolve)
-                                        .catch(reject);
-                                } else {
-                                    reject(new Error(`${scriptInfo.name} verification failed after all retries`));
-                                }
+                                reject(new Error(`${scriptInfo.name} verification failed`));
                             }
-                        };
-                        
-                        // Start verification with initial delay
-                        setTimeout(verify, 100);
+                        }, 200);
                     };
                     
-                    script.onerror = (error) => {
-                        clearTimeout(loadTimeout);
-                        console.error(`[LOADER] Failed to load ${scriptInfo.name}:`, error);
-                        
-                        if (retryCount < scriptInfo.retries - 1) {
-                            console.log(`[LOADER] Retrying ${scriptInfo.name}...`);
-                            setTimeout(() => {
-                                this.loadScript(scriptInfo, retryCount + 1)
-                                    .then(resolve)
-                                    .catch(reject);
-                            }, 1000); // Wait 1 second before retry
-                        } else {
-                            reject(new Error(`Failed to load ${scriptInfo.name} after ${scriptInfo.retries} attempts`));
-                        }
+                    script.onerror = () => {
+                        reject(new Error(`Failed to load ${scriptInfo.name}`));
                     };
                     
                     document.head.appendChild(script);
@@ -653,57 +582,33 @@
             }
 
             async loadAllScripts() {
-                console.log('[LOADER] Starting robust sequential script loading...');
-                console.log('[LOADER] User Agent:', navigator.userAgent);
-                console.log('[LOADER] Screen:', window.innerWidth, 'x', window.innerHeight);
+                console.log('[LOADER] Starting simplified script loading...');
                 
                 try {
-                    // Load all scripts sequentially with verification
+                    // Load all scripts
                     for (let i = 0; i < this.scripts.length; i++) {
                         const script = this.scripts[i];
-                        this.updateProgress(i, this.scripts.length + 3, `Loading ${script.name}...`);
+                        this.updateProgress(i, this.scripts.length + 2, `Loading ${script.name}...`);
                         
-                        try {
-                            await this.loadScript(script);
-                            
-                            // Add delay between scripts to ensure proper execution order
-                            await new Promise(resolve => setTimeout(resolve, 500)); // Increased from 200ms
-                        } catch (error) {
-                            if (script.critical) {
-                                throw error; // Critical scripts must load
-                            } else {
-                                console.warn(`[LOADER] Non-critical script ${script.name} failed:`, error);
-                            }
-                        }
+                        await this.loadScript(script);
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
                     
-                    // Verify all critical components are loaded
-                    this.updateProgress(this.scripts.length, this.scripts.length + 3, 'Verifying components...');
-                    await this.verifyAllComponents();
+                    // Initialize input
+                    this.updateProgress(this.scripts.length, this.scripts.length + 2, 'Initializing input...');
+                    if (window.setupInput) {
+                        setupInput();
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
                     
-                    // Wait longer before initializing to ensure everything is ready
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Initialize game
+                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 2, 'Starting game...');
+                    await this.initializeGame();
                     
-                    // Initialize input system with verification
-                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 3, 'Initializing input system...');
-                    await this.initializeInputSystem();
+                    // Complete
+                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 2, 'Game ready!');
                     
-                    // Initialize game engine with comprehensive checks
-                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 3, 'Initializing game engine...');
-                    await this.initializeGameEngine();
-                    
-                    // Final verification before starting
-                    this.updateProgress(this.scripts.length + 3, this.scripts.length + 3, 'Starting game...');
-                    await this.performFinalChecks();
-                    
-                    // Complete - fade out loading screen
-                    const totalLoadTime = Date.now() - this.loadStartTime;
-                    console.log(`[LOADER] ✓ All systems loaded successfully in ${totalLoadTime}ms`);
-                    console.log('[LOADER] Load times:', this.scriptLoadTimes);
-                    
-                    this.initializationComplete = true;
-                    
-                    // Smooth fade out
+                    // Hide loading screen
                     this.loadingScreen.style.opacity = '0';
                     this.loadingScreen.style.transition = 'opacity 0.5s ease';
                     setTimeout(() => {
@@ -712,716 +617,287 @@
                     }, 500);
                     
                 } catch (error) {
-                    console.error('[LOADER] Critical failure:', error);
-                    this.showError(`Failed to initialize game: ${error.message}`);
+                    console.error('[LOADER] Failed:', error);
+                    this.showError(error.message);
                 }
             }
 
-            async verifyAllComponents() {
-                console.log('[LOADER] Verifying all components...');
+            async initializeGame() {
+                // Create game engine
+                window.game = new LabyrinthGame();
                 
-                const checks = [
-                    { name: 'Three.js', check: () => window.THREE && window.THREE.Scene && window.THREE.WebGLRenderer },
-                    { name: 'Input System', check: () => window.setupInput && window.getInput && window.inputState },
-                    { name: 'Player Class', check: () => window.Player },
-                    { name: 'Dungeon System', check: () => window.DungeonSystem }
-                ];
-                
-                for (const component of checks) {
-                    if (!component.check()) {
-                        throw new Error(`Component verification failed: ${component.name}`);
-                    }
-                    console.log(`[LOADER] ✓ ${component.name} verified`);
+                // Wait for initialization
+                let attempts = 0;
+                while (attempts < 50 && (!window.game || window.game.gameState !== 'playing')) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
                 }
                 
-                return true;
-            }
-
-            async initializeInputSystem() {
-                return new Promise((resolve, reject) => {
-                    try {
-                        console.log('[LOADER] Setting up input system...');
-                        
-                        if (!window.setupInput) {
-                            throw new Error('setupInput function not found');
-                        }
-                        
-                        setupInput();
-                        
-                        // Verify input system is working
-                        setTimeout(() => {
-                            if (window.inputState && window.getInput) {
-                                console.log('[LOADER] ✓ Input system initialized');
-                                resolve();
-                            } else {
-                                reject(new Error('Input system verification failed'));
-                            }
-                        }, 100);
-                        
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-            }
-
-            async initializeGameEngine() {
-                return new Promise((resolve, reject) => {
-                    try {
-                        console.log('[LOADER] Creating game engine...');
-                        
-                        // First, ensure the LabyrinthGame class is created
-                        this.createGameEngineClass();
-                        
-                        // Add a delay to let Three.js fully initialize
-                        setTimeout(() => {
-                            try {
-                                window.game = new LabyrinthGame();
-                                
-                                // Wait longer for game to initialize (increased from 10s to 20s)
-                                const initTimeout = setTimeout(() => {
-                                    reject(new Error('Game initialization timeout'));
-                                }, 20000);
-                                
-                                // Add multiple check intervals with longer delays
-                                let checkCount = 0;
-                                const checkInit = setInterval(() => {
-                                    checkCount++;
-                                    console.log(`[LOADER] Checking game state... (attempt ${checkCount})`);
-                                    
-                                    if (window.game && window.game.gameState === 'playing') {
-                                        clearInterval(checkInit);
-                                        clearTimeout(initTimeout);
-                                        console.log('[LOADER] ✓ Game engine initialized and running');
-                                        
-                                        // Add extra delay after game is ready
-                                        setTimeout(() => resolve(), 2000);
-                                    } else if (window.game && window.game.gameState === 'error') {
-                                        clearInterval(checkInit);
-                                        clearTimeout(initTimeout);
-                                        reject(new Error('Game initialization failed'));
-                                    } else if (checkCount > 50) { // 50 attempts at 400ms = 20 seconds
-                                        clearInterval(checkInit);
-                                        clearTimeout(initTimeout);
-                                        reject(new Error('Game failed to reach playing state after maximum attempts'));
-                                    }
-                                }, 400); // Check every 400ms instead of 100ms
-                                
-                            } catch (error) {
-                                console.error('[LOADER] Failed to create game instance:', error);
-                                reject(error);
-                            }
-                        }, 1500); // Wait 1.5 seconds after creating the class
-                        
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-            }
-
-            async performFinalChecks() {
-                console.log('[LOADER] Performing final checks...');
-                
-                // Check that game is running
                 if (!window.game || window.game.gameState !== 'playing') {
-                    throw new Error('Game is not in playing state');
+                    throw new Error('Game failed to initialize properly');
                 }
                 
-                // Check renderer is working
-                if (!window.game.renderer || !window.game.renderer.domElement) {
-                    throw new Error('Renderer not properly initialized');
-                }
-                
-                // Check scene has content
-                if (!window.game.scene || window.game.scene.children.length === 0) {
-                    console.warn('[LOADER] Warning: Scene has no children, waiting for dungeon generation...');
-                    
-                    // Wait longer for dungeon to generate
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    
-                    if (window.game.scene.children.length === 0) {
-                        console.warn('[LOADER] Scene still empty, but continuing anyway...');
-                    }
-                }
-                
-                // Check player exists and is positioned
-                if (!window.game.player) {
-                    throw new Error('Player not initialized');
-                }
-                
-                // Check dungeon system exists
-                if (!window.game.dungeonSystem) {
-                    console.warn('[LOADER] Dungeon system not yet initialized, waiting...');
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    
-                    if (!window.game.dungeonSystem) {
-                        console.warn('[LOADER] Dungeon system still not initialized, continuing anyway...');
-                    }
-                }
-                
-                // Trigger a test render to ensure everything is working
-                try {
-                    window.game.renderer.render(window.game.scene, window.game.camera);
-                    console.log('[LOADER] ✓ Test render successful');
-                } catch (error) {
-                    throw new Error(`Render test failed: ${error.message}`);
-                }
-                
-                console.log('[LOADER] ✓ All final checks passed');
-                return true;
-            }
-
-            createGameEngineClass() {
-                // Main Game Engine with enhanced initialization and error recovery
-                class LabyrinthGame {
-                    constructor() {
-                        console.log('[GAME] Initializing Labyrinth Game with enhanced error handling...');
-                        
-                        this.scene = null;
-                        this.camera = null;
-                        this.renderer = null;
-                        this.player = null;
-                        this.dungeonSystem = null;
-                        
-                        // Game state - start in loading state
-                        this.gameState = 'loading';
-                        this.currentFloor = 1;
-                        this.gameTime = 0;
-                        
-                        // Performance
-                        this.clock = new THREE.Clock();
-                        this.frameCount = 0;
-                        this.lastFrameTime = Date.now();
-                        this.fps = 0;
-                        
-                        // Initialization tracking
-                        this.initializationSteps = {
-                            scene: false,
-                            renderer: false,
-                            camera: false,
-                            lighting: false,
-                            player: false,
-                            dungeon: false,
-                            ui: false
-                        };
-                        
-                        // Input handling
-                        this.isPointerLocked = false;
-                        
-                        // Start initialization with error handling
-                        this.init().catch(error => {
-                            console.error('[GAME] Initialization failed:', error);
-                            this.gameState = 'error';
-                        });
-                    }
-                    
-                    async init() {
-                        console.log('[GAME] Starting game initialization sequence...');
-                        
-                        try {
-                            // Phase 1: Core systems
-                            await this.initializeCoreSystem();
-                            
-                            // Phase 2: Game content
-                            await this.initializeGameContent();
-                            
-                            // Phase 3: Start game loop
-                            await this.startGameLoop();
-                            
-                            console.log('[GAME] ✓ Initialization complete');
-                            
-                        } catch (error) {
-                            console.error('[GAME] Failed to initialize:', error);
-                            this.gameState = 'error';
-                            throw error;
-                        }
-                    }
-                    
-                    async initializeCoreSystem() {
-                        console.log('[GAME] Initializing core systems...');
-                        
-                        // Setup scene first
-                        this.setupScene();
-                        if (!this.scene) throw new Error('Failed to create scene');
-                        this.initializationSteps.scene = true;
-                        
-                        // Setup renderer
-                        this.setupRenderer();
-                        if (!this.renderer) throw new Error('Failed to create renderer');
-                        this.initializationSteps.renderer = true;
-                        
-                        // Setup camera
-                        this.setupCamera();
-                        if (!this.camera) throw new Error('Failed to create camera');
-                        this.initializationSteps.camera = true;
-                        
-                        // Setup lighting
-                        this.setupLighting();
-                        this.initializationSteps.lighting = true;
-                        
-                        // Small delay to ensure everything is ready
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                        
-                        console.log('[GAME] ✓ Core systems initialized');
-                    }
-                    
-                    async initializeGameContent() {
-                        console.log('[GAME] Initializing game content...');
-                        
-                        // Setup player
-                        this.setupPlayer();
-                        if (!this.player) throw new Error('Failed to create player');
-                        this.initializationSteps.player = true;
-                        
-                        // Wait before setting up dungeon to ensure everything is ready
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        // Setup dungeon with retry mechanism
-                        let dungeonAttempts = 0;
-                        const maxDungeonAttempts = 3;
-                        
-                        while (dungeonAttempts < maxDungeonAttempts) {
-                            try {
-                                await this.setupDungeon();
-                                if (!this.dungeonSystem) throw new Error('Dungeon system not created');
-                                
-                                // Verify dungeon generated content with longer wait
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                                
-                                if (this.scene.children.length > 2) { // Should have more than just lights
-                                    this.initializationSteps.dungeon = true;
-                                    break;
-                                }
-                                
-                                throw new Error('Dungeon failed to generate content');
-                                
-                            } catch (error) {
-                                dungeonAttempts++;
-                                console.error(`[GAME] Dungeon setup attempt ${dungeonAttempts} failed:`, error);
-                                
-                                if (dungeonAttempts >= maxDungeonAttempts) {
-                                    console.warn('[GAME] Failed to setup dungeon after multiple attempts, continuing anyway...');
-                                    this.initializationSteps.dungeon = true; // Mark as done anyway
-                                    break;
-                                }
-                                
-                                // Clean up and retry
-                                if (this.dungeonSystem) {
-                                    this.dungeonSystem.clearCurrentDungeon();
-                                }
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                            }
-                        }
-                        
-                        // Setup UI
-                        this.setupUI();
-                        this.initializationSteps.ui = true;
-                        
-                        console.log('[GAME] ✓ Game content initialized');
-                    }
-                    
-                    async startGameLoop() {
-                        console.log('[GAME] Starting game loop...');
-                        
-                        // Final verification
-                        const allInitialized = Object.values(this.initializationSteps).every(step => step === true);
-                        if (!allInitialized) {
-                            const failedSteps = Object.entries(this.initializationSteps)
-                                .filter(([_, value]) => !value)
-                                .map(([key, _]) => key);
-                            console.warn(`[GAME] Some steps failed to initialize: ${failedSteps.join(', ')}, but continuing...`);
-                        }
-                        
-                        // Set game state to playing
-                        this.gameState = 'playing';
-                        
-                        // Force initial render to ensure scene is visible
-                        this.forceRender();
-                        
-                        // Start the game loop
-                        this.gameLoop();
-                        
-                        console.log('[GAME] ✓ Game loop started');
-                    }
-                    
-                    setupScene() {
-                        console.log('[GAME] Setting up scene...');
-                        this.scene = new THREE.Scene();
-                        this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
-                        this.scene.background = new THREE.Color(0x0f0f1f);
-                        console.log('[GAME] ✓ Scene created');
-                    }
-                    
-                    setupRenderer() {
-                        console.log('[GAME] Setting up renderer...');
-                        
-                        try {
-                            this.renderer = new THREE.WebGLRenderer({ 
-                                antialias: true,
-                                powerPreference: "high-performance",
-                                failIfMajorPerformanceCaveat: false // Don't fail on low-end devices
-                            });
-                            
-                            this.renderer.setSize(window.innerWidth, window.innerHeight);
-                            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                            
-                            // Enhanced rendering settings
-                            this.renderer.shadowMap.enabled = true;
-                            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                            this.renderer.outputEncoding = THREE.sRGBEncoding;
-                            this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                            this.renderer.toneMappingExposure = 0.6;
-                            
-                            // Add to DOM
-                            const gameContainer = document.getElementById('gameContainer');
-                            if (!gameContainer) {
-                                throw new Error('Game container element not found');
-                            }
-                            
-                            // Clear any existing canvas
-                            const existingCanvas = gameContainer.querySelector('canvas');
-                            if (existingCanvas) {
-                                existingCanvas.remove();
-                            }
-                            
-                            gameContainer.appendChild(this.renderer.domElement);
-                            
-                            // Setup pointer lock for desktop
-                            if (!inputState.isMobile) {
-                                this.renderer.domElement.addEventListener('click', () => {
-                                    this.requestPointerLock();
-                                });
-                                
-                                document.addEventListener('pointerlockchange', () => {
-                                    this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
-                                });
-                            }
-                            
-                            console.log('[GAME] ✓ Renderer created and added to DOM');
-                            
-                        } catch (error) {
-                            console.error('[GAME] Failed to create renderer:', error);
-                            throw error;
-                        }
-                    }
-                    
-                    setupCamera() {
-                        console.log('[GAME] Setting up camera...');
-                        
-                        this.camera = new THREE.PerspectiveCamera(
-                            75, 
-                            window.innerWidth / window.innerHeight, 
-                            0.1, 
-                            1000
-                        );
-                        this.camera.position.set(0, 1.8, 0);
-                        
-                        // Window resize handler
-                        window.addEventListener('resize', () => {
-                            this.camera.aspect = window.innerWidth / window.innerHeight;
-                            this.camera.updateProjectionMatrix();
-                            this.renderer.setSize(window.innerWidth, window.innerHeight);
-                        });
-                        
-                        console.log('[GAME] ✓ Camera created');
-                    }
-                    
-                    setupLighting() {
-                        console.log('[GAME] Setting up lighting...');
-                        
-                        // Ambient light
-                        const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
-                        this.scene.add(ambientLight);
-                        
-                        // Main directional light
-                        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-                        directionalLight.position.set(10, 20, 5);
-                        directionalLight.castShadow = true;
-                        directionalLight.shadow.mapSize.width = 2048;
-                        directionalLight.shadow.mapSize.height = 2048;
-                        directionalLight.shadow.camera.near = 0.5;
-                        directionalLight.shadow.camera.far = 100;
-                        directionalLight.shadow.camera.left = -50;
-                        directionalLight.shadow.camera.right = 50;
-                        directionalLight.shadow.camera.top = 50;
-                        directionalLight.shadow.camera.bottom = -50;
-                        this.scene.add(directionalLight);
-                        
-                        console.log('[GAME] ✓ Lighting added');
-                    }
-                    
-                    setupPlayer() {
-                        console.log('[GAME] Setting up player...');
-                        
-                        if (!this.scene || !this.camera) {
-                            throw new Error('Scene and camera must be initialized before player');
-                        }
-                        
-                        this.player = new Player(this.scene, this.camera);
-                        
-                        // Verify player was created properly
-                        if (!this.player.position || !this.player.velocity) {
-                            throw new Error('Player initialization incomplete');
-                        }
-                        
-                        console.log('[GAME] ✓ Player created');
-                    }
-                    
-                    async setupDungeon() {
-                        console.log('[GAME] Setting up dungeon system...');
-                        
-                        if (!this.player) {
-                            throw new Error('Player must be initialized before dungeon system');
-                        }
-                        
-                        // Create dungeon system
-                        this.dungeonSystem = new DungeonSystem(this.scene, this.player);
-                        
-                        // Wait before generating to ensure textures and materials are ready
-                        console.log('[GAME] Waiting for materials to be ready...');
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        
-                        // Generate first floor
-                        console.log('[GAME] Generating first dungeon floor...');
-                        this.dungeonSystem.generateDungeon(this.currentFloor);
-                        
-                        // Wait for generation to complete
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        // Position player
-                        this.player.position.set(0, 1.8, 0);
-                        this.player.camera.position.copy(this.player.position);
-                        
-                        console.log('[GAME] ✓ Dungeon system initialized');
-                    }
-                    
-                    setupUI() {
-                        console.log('[GAME] Setting up UI...');
-                        
-                        this.updateUI();
-                        this.updateFloorIndicator();
-                        
-                        // Setup additional input handlers
-                        if (!inputState.isMobile) {
-                            document.addEventListener('keydown', (e) => {
-                                if (e.code === 'Escape' && this.isPointerLocked) {
-                                    document.exitPointerLock();
-                                }
-                            });
-                        }
-                        
-                        console.log('[GAME] ✓ UI setup complete');
-                    }
-                    
-                    forceRender() {
-                        // Force an immediate render to ensure scene is visible
-                        try {
-                            this.renderer.render(this.scene, this.camera);
-                            console.log('[GAME] ✓ Force render successful');
-                        } catch (error) {
-                            console.error('[GAME] Force render failed:', error);
-                        }
-                    }
-                    
-                    requestPointerLock() {
-                        if (!inputState.isMobile) {
-                            this.renderer.domElement.requestPointerLock();
-                        }
-                    }
-                    
-                    update(deltaTime) {
-                        // Only update if game is playing
-                        if (this.gameState !== 'playing') return;
-                        
-                        this.gameTime += deltaTime;
-                        this.frameCount++;
-                        
-                        // Calculate FPS
-                        const now = Date.now();
-                        if (now - this.lastFrameTime > 1000) {
-                            this.fps = this.frameCount;
-                            this.frameCount = 0;
-                            this.lastFrameTime = now;
-                        }
-                        
-                        // Get current input state
-                        const input = getInput();
-                        
-                        // Update player
-                        if (this.player) {
-                            this.player.update(deltaTime, input);
-                        }
-                        
-                        // Update dungeon system
-                        if (this.dungeonSystem) {
-                            this.dungeonSystem.update(deltaTime);
-                        }
-                        
-                        // Reset mouse delta
-                        inputState.mouse.deltaX = 0;
-                        inputState.mouse.deltaY = 0;
-                        
-                        // Update UI
-                        this.updateUI();
-                        
-                        // Check for floor progression
-                        this.checkFloorProgression(input);
-                    }
-                    
-                    checkFloorProgression(input) {
-                        // Menu button: Skip 10 floors ahead
-                        if (input.justPressed.menu) {
-                            this.advanceFloors(10);
-                        }
-                        
-                        // E + Esc together: Advance 1 floor
-                        if (input.justPressed.interact && input.menu) {
-                            this.advanceFloors(1);
-                        }
-                        
-                        // Sword button or I key: Progress through rooms
-                        if (input.justPressed.attack || input.justPressed.inventory) {
-                            if (this.dungeonSystem) {
-                                this.dungeonSystem.togglePortals();
-                            }
-                        }
-                    }
-                    
-                    advanceFloors(count) {
-                        this.currentFloor += count;
-                        console.log(`[GAME] Advancing ${count} floors to floor ${this.currentFloor}`);
-                        
-                        // Generate new dungeon floor
-                        if (this.dungeonSystem) {
-                            this.dungeonSystem.generateDungeon(this.currentFloor);
-                        }
-                        
-                        // Reset player position
-                        this.player.position.set(0, 1.8, 0);
-                        this.player.velocity.set(0, 0, 0);
-                        this.player.camera.position.copy(this.player.position);
-                        
-                        // Update UI
-                        this.updateFloorIndicator();
-                    }
-                    
-                    updateFloorIndicator() {
-                        const floorElement = document.getElementById('floorIndicator');
-                        if (floorElement) {
-                            const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
-                            floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
-                        }
-                    }
-                    
-                    updateUI() {
-                        if (!this.player) return;
-                        
-                        const healthPercent = (this.player.health / this.player.maxHealth) * 100;
-                        const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
-                        const manaPercent = (this.player.mana / this.player.maxMana) * 100;
-                        
-                        const healthFill = document.getElementById('healthFill');
-                        const staminaFill = document.getElementById('staminaFill');
-                        const manaFill = document.getElementById('manaFill');
-                        
-                        if (healthFill) healthFill.style.width = healthPercent + '%';
-                        if (staminaFill) staminaFill.style.width = staminaPercent + '%';
-                        if (manaFill) manaFill.style.width = manaPercent + '%';
-                        
-                        // Update compass
-                        this.updateCompass();
-                        
-                        // Update progression indicator
-                        this.updateProgressionIndicator();
-                    }
-                    
-                    updateProgressionIndicator() {
-                        if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
-                        
-                        const progression = this.dungeonSystem.roomProgression;
-                        const directions = ['north', 'east', 'west', 'south'];
-                        
-                        directions.forEach(dir => {
-                            const element = document.getElementById(`progress-${dir}`);
-                            if (element) {
-                                const room = progression[dir];
-                                let status = '';
-                                let color = '';
-                                
-                                if (room.enemiesDefeated) {
-                                    status = 'COMPLETED ✓';
-                                    color = '#00ff00';
-                                } else if (room.unlocked) {
-                                    status = 'OPEN - Fight!';
-                                    color = '#ffff00';
-                                } else {
-                                    status = 'LOCKED';
-                                    color = '#ff6666';
-                                }
-                                
-                                const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
-                                element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
-                                element.style.color = color;
-                            }
-                        });
-                    }
-                    
-                    updateCompass() {
-                        if (!this.player) return;
-                        
-                        const compassNeedle = document.getElementById('compass-needle');
-                        if (compassNeedle) {
-                            const yawDegrees = (this.player.yaw * 180 / Math.PI);
-                            compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
-                        }
-                    }
-                    
-                    render() {
-                        // Only render if all systems are ready
-                        if (this.renderer && this.scene && this.camera && this.gameState === 'playing') {
-                            try {
-                                this.renderer.render(this.scene, this.camera);
-                            } catch (error) {
-                                console.error('[GAME] Render error:', error);
-                                // Don't crash the game loop on render errors
-                            }
-                        }
-                    }
-                    
-                    gameLoop() {
-                        // Use try-catch to prevent game loop from crashing
-                        try {
-                            const deltaTime = this.clock.getDelta();
-                            
-                            this.update(deltaTime);
-                            this.render();
-                            
-                        } catch (error) {
-                            console.error('[GAME] Game loop error:', error);
-                            // Continue running even if there's an error
-                        }
-                        
-                        requestAnimationFrame(() => this.gameLoop());
-                    }
-                }
-
-                // Make LabyrinthGame available globally
-                window.LabyrinthGame = LabyrinthGame;
-                console.log('[LOADER] ✓ Game engine class created');
+                console.log('[LOADER] ✓ Game initialized successfully');
             }
         }
 
-        // Start the loading process when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('[MAIN] DOM loaded, starting robust sequential script loading...');
+        // Main Game Engine - SIMPLIFIED VERSION
+        class LabyrinthGame {
+            constructor() {
+                console.log('[GAME] Initializing Simplified Labyrinth Game...');
+                
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.player = null;
+                this.dungeonSystem = null;
+                
+                this.gameState = 'loading';
+                this.currentFloor = 1;
+                this.clock = new THREE.Clock();
+                
+                this.isPointerLocked = false;
+                
+                this.init();
+            }
             
-            // Add a small delay to ensure everything is ready
-            setTimeout(() => {
-                const loader = new RobustSequentialLoader();
-                loader.loadAllScripts();
-            }, 100);
+            init() {
+                try {
+                    console.log('[GAME] Setting up core systems...');
+                    
+                    // Setup scene
+                    this.scene = new THREE.Scene();
+                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+                    this.scene.background = new THREE.Color(0x0f0f1f);
+                    
+                    // Setup renderer
+                    this.renderer = new THREE.WebGLRenderer({ 
+                        antialias: true,
+                        powerPreference: "high-performance"
+                    });
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    this.renderer.shadowMap.enabled = true;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    
+                    const gameContainer = document.getElementById('gameContainer');
+                    gameContainer.appendChild(this.renderer.domElement);
+                    
+                    // Setup camera
+                    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                    this.camera.position.set(0, 1.8, 0);
+                    
+                    // Setup lighting
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
+                    this.scene.add(ambientLight);
+                    
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                    directionalLight.position.set(10, 20, 5);
+                    directionalLight.castShadow = true;
+                    this.scene.add(directionalLight);
+                    
+                    // Setup player
+                    this.player = new Player(this.scene, this.camera);
+                    
+                    // Setup dungeon - NO ASYNC
+                    this.dungeonSystem = new DungeonSystem(this.scene, this.player);
+                    
+                    // Generate first floor immediately
+                    this.dungeonSystem.generateDungeon(this.currentFloor);
+                    
+                    // Position player
+                    this.player.position.set(0, 1.8, 0);
+                    this.player.camera.position.copy(this.player.position);
+                    
+                    // Setup window resize
+                    window.addEventListener('resize', () => {
+                        this.camera.aspect = window.innerWidth / window.innerHeight;
+                        this.camera.updateProjectionMatrix();
+                        this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    });
+                    
+                    // Setup pointer lock
+                    if (!inputState.isMobile) {
+                        this.renderer.domElement.addEventListener('click', () => {
+                            this.renderer.domElement.requestPointerLock();
+                        });
+                        
+                        document.addEventListener('pointerlockchange', () => {
+                            this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
+                        });
+                        
+                        document.addEventListener('keydown', (e) => {
+                            if (e.code === 'Escape' && this.isPointerLocked) {
+                                document.exitPointerLock();
+                            }
+                        });
+                    }
+                    
+                    this.gameState = 'playing';
+                    this.gameLoop();
+                    
+                    console.log('[GAME] ✓ Game initialized successfully');
+                    
+                } catch (error) {
+                    console.error('[GAME] Initialization failed:', error);
+                    this.gameState = 'error';
+                }
+            }
+            
+            update(deltaTime) {
+                if (this.gameState !== 'playing') return;
+                
+                const input = getInput();
+                
+                // Update player
+                if (this.player) {
+                    this.player.update(deltaTime, input);
+                }
+                
+                // Update dungeon system
+                if (this.dungeonSystem) {
+                    this.dungeonSystem.update(deltaTime);
+                }
+                
+                // Reset mouse delta
+                inputState.mouse.deltaX = 0;
+                inputState.mouse.deltaY = 0;
+                
+                // Update UI
+                this.updateUI();
+                this.checkFloorProgression(input);
+            }
+            
+            checkFloorProgression(input) {
+                // Menu button: Skip 10 floors ahead
+                if (input.justPressed.menu) {
+                    this.advanceFloors(10);
+                }
+                
+                // E + Esc together: Advance 1 floor
+                if (input.justPressed.interact && input.menu) {
+                    this.advanceFloors(1);
+                }
+                
+                // Sword button: Progress through rooms
+                if (input.justPressed.attack) {
+                    if (this.dungeonSystem) {
+                        this.dungeonSystem.togglePortals();
+                    }
+                }
+            }
+            
+            advanceFloors(count) {
+                this.currentFloor += count;
+                console.log(`[GAME] Advancing ${count} floors to floor ${this.currentFloor}`);
+                
+                if (this.dungeonSystem) {
+                    this.dungeonSystem.generateDungeon(this.currentFloor);
+                }
+                
+                this.player.position.set(0, 1.8, 0);
+                this.player.velocity.set(0, 0, 0);
+                this.player.camera.position.copy(this.player.position);
+                
+                this.updateFloorIndicator();
+            }
+            
+            updateFloorIndicator() {
+                const floorElement = document.getElementById('floorIndicator');
+                if (floorElement) {
+                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
+                    floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
+                }
+            }
+            
+            updateUI() {
+                if (!this.player) return;
+                
+                const healthPercent = (this.player.health / this.player.maxHealth) * 100;
+                const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
+                const manaPercent = (this.player.mana / this.player.maxMana) * 100;
+                
+                const healthFill = document.getElementById('healthFill');
+                const staminaFill = document.getElementById('staminaFill');
+                const manaFill = document.getElementById('manaFill');
+                
+                if (healthFill) healthFill.style.width = healthPercent + '%';
+                if (staminaFill) staminaFill.style.width = staminaPercent + '%';
+                if (manaFill) manaFill.style.width = manaPercent + '%';
+                
+                this.updateCompass();
+                this.updateProgressionIndicator();
+            }
+            
+            updateProgressionIndicator() {
+                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
+                
+                const progression = this.dungeonSystem.roomProgression;
+                const directions = ['north', 'east', 'west', 'south'];
+                
+                directions.forEach(dir => {
+                    const element = document.getElementById(`progress-${dir}`);
+                    if (element) {
+                        const room = progression[dir];
+                        let status = '';
+                        let color = '';
+                        
+                        if (room.enemiesDefeated) {
+                            status = 'COMPLETED ✓';
+                            color = '#00ff00';
+                        } else if (room.unlocked) {
+                            status = 'OPEN - Fight!';
+                            color = '#ffff00';
+                        } else {
+                            status = 'LOCKED';
+                            color = '#ff6666';
+                        }
+                        
+                        const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
+                        element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
+                        element.style.color = color;
+                    }
+                });
+            }
+            
+            updateCompass() {
+                if (!this.player) return;
+                
+                const compassNeedle = document.getElementById('compass-needle');
+                if (compassNeedle) {
+                    const yawDegrees = (this.player.yaw * 180 / Math.PI);
+                    compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
+                }
+            }
+            
+            render() {
+                if (this.renderer && this.scene && this.camera && this.gameState === 'playing') {
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
+            
+            gameLoop() {
+                try {
+                    const deltaTime = this.clock.getDelta();
+                    this.update(deltaTime);
+                    this.render();
+                } catch (error) {
+                    console.error('[GAME] Game loop error:', error);
+                }
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+        }
+
+        // Start loading when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('[MAIN] DOM loaded, starting simplified loading...');
+            
+            const loader = new SimplifiedLoader();
+            loader.loadAllScripts();
         });
         
-        // Global error handler for debugging
+        // Global error handlers
         window.addEventListener('error', function(event) {
             console.error('[GLOBAL ERROR]', event.error);
         });
