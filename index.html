@@ -407,7 +407,7 @@
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div style="font-size: 32px; margin-bottom: 10px;">🏰 Labyrinth Legacy</div>
-        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.9.0 - Modular Systems Edition</div>
+        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.9.1 - Lighting System Fix</div>
         <div id="loadingProgress">Initializing...</div>
         <div class="loading-bar">
             <div class="loading-fill" id="loadingFill"></div>
@@ -463,8 +463,8 @@
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
                 <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, ⚔️ = Defeat Enemies (Progress)</small><br>
-                <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
-                <small>Modular Systems: Separate files for dungeon, materials, lighting, and portals!</small>
+                <small>🔮 = Debug Lighting Info | Fixed coordinate system and lighting conflicts!</small><br>
+                <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small>
             </div>
         </div>
         
@@ -784,12 +784,12 @@
             }
             
             setupSceneLighting() {
-                // Ambient light
-                const ambientLight = new THREE.AmbientLight(0x404040, 0.25);
+                // Simple ambient light - let lighting system handle dramatic effects
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.15);
                 this.scene.add(ambientLight);
                 
-                // Main directional light
-                const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 2.0);
+                // Single directional light for basic shadows
+                const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 1.0);
                 directionalLight.position.set(30, 40, 20);
                 directionalLight.castShadow = true;
                 directionalLight.shadow.mapSize.width = 2048;
@@ -803,14 +803,7 @@
                 directionalLight.shadow.bias = -0.0001;
                 this.scene.add(directionalLight);
                 
-                // Fill light
-                const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.8);
-                fillLight.position.set(-20, 25, -30);
-                this.scene.add(fillLight);
-                
-                // Hemisphere light
-                const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
-                this.scene.add(hemisphereLight);
+                console.log('[GAME] Basic scene lighting setup - dungeon lighting system will handle dramatic effects');
             }
             
             update(deltaTime) {
@@ -858,6 +851,11 @@
                         this.dungeonSystem.togglePortals();
                     }
                 }
+                
+                // Staff button: Debug lighting (for testing)
+                if (input.justPressed.chargeAttack) {
+                    this.debugLighting();
+                }
             }
             
             advanceFloors(count) {
@@ -880,6 +878,38 @@
                 if (floorElement) {
                     const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'gothic_ruins';
                     floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
+                }
+            }
+            
+            debugLighting() {
+                console.log('[DEBUG] Lighting system debug info:');
+                if (window.lightingSystem) {
+                    const stats = window.lightingSystem.getLightingStats();
+                    console.log('[DEBUG] Lighting stats:', stats);
+                    
+                    // Count lights in scene
+                    let sceneLightCount = 0;
+                    this.scene.traverse((child) => {
+                        if (child.type && (child.type.includes('Light') || child.type === 'DirectionalLight' || child.type === 'PointLight' || child.type === 'AmbientLight')) {
+                            sceneLightCount++;
+                            console.log(`[DEBUG] Scene light: ${child.type} at (${child.position.x}, ${child.position.y}, ${child.position.z}) intensity: ${child.intensity}`);
+                        }
+                    });
+                    console.log(`[DEBUG] Total lights in scene: ${sceneLightCount}`);
+                    
+                    // Check dungeon group lights
+                    if (this.dungeonSystem && this.dungeonSystem.currentDungeonGroup) {
+                        let dungeonLightCount = 0;
+                        this.dungeonSystem.currentDungeonGroup.traverse((child) => {
+                            if (child.type && (child.type.includes('Light') || child.type === 'DirectionalLight' || child.type === 'PointLight' || child.type === 'AmbientLight')) {
+                                dungeonLightCount++;
+                                console.log(`[DEBUG] Dungeon light: ${child.type} at (${child.position.x}, ${child.position.y}, ${child.position.z}) intensity: ${child.intensity}`);
+                            }
+                        });
+                        console.log(`[DEBUG] Total lights in dungeon group: ${dungeonLightCount}`);
+                    }
+                } else {
+                    console.log('[DEBUG] No lighting system found!');
                 }
             }
             
