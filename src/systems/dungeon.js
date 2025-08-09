@@ -1,5 +1,5 @@
-// Dungeon Generation System with Solid Colors and Enhanced Lighting
-// Simplified version with no texture generation - just solid colors
+// Dungeon Generation System with Enhanced Room Styling and Lighting
+// Combines sophisticated textures with the existing solid color framework
 
 class DungeonSystem {
     constructor(scene, player) {
@@ -45,7 +45,8 @@ class DungeonSystem {
         this.ceilingHeight = 8; // Ceiling height from floor
         this.currentFloorMap = null; // For collision detection
         
-        // Materials and lighting (single theme)
+        // Materials and lighting (enhanced theme system)
+        this.textureLoader = new THREE.TextureLoader();
         this.materials = new Map();
         this.lightSources = [];
         this.billboardSprites = [];
@@ -64,7 +65,7 @@ class DungeonSystem {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with solid colors');
+        console.log('Unified Dungeon System initialized with enhanced room styling');
     }
     
     // Progressive Unlock System
@@ -200,107 +201,163 @@ class DungeonSystem {
     }
     
     setupMaterials() {
-        console.log('Setting up simple solid color materials...');
+        console.log('Setting up enhanced dungeon materials with sophisticated textures...');
         
-        // Simple solid color materials - no canvas textures
+        // Enhanced materials with canvas textures and sophisticated styling
         this.createDungeonMaterials();
         
-        console.log(`Materials setup complete. Created ${this.materials.size} solid color materials.`);
+        console.log(`Materials setup complete. Created ${this.materials.size} enhanced materials.`);
         console.log('Material types:', Array.from(this.materials.keys()));
     }
     
     createDungeonMaterials() {
-        console.log('Creating VERY OBVIOUS solid color materials for debugging...');
+        console.log('Creating sophisticated room materials with canvas textures...');
         
-        // SUPER BRIGHT OBVIOUS COLORS - no emissive, just pure colors
-        
-        // CENTER ROOM - BRIGHT YELLOW
-        const byzantineFloor = new THREE.MeshBasicMaterial({ 
-            color: 0xFFFF00  // Bright yellow - impossible to miss
-        });
+        // CENTER ROOM - Golden Byzantine Style
+        const byzantineFloor = this.createPatternedFloor([
+            '#D4AF37', '#FFD700', '#B8860B', '#DAA520',
+            '#F0E68C', '#BDB76B', '#EEE8AA', '#F4E4BC'
+        ], 32);
         this.materials.set('byzantine_floor', byzantineFloor);
         
-        const byzantineWall = new THREE.MeshBasicMaterial({ 
-            color: 0xFFAA00  // Orange walls
+        const byzantineWall = new THREE.MeshLambertMaterial({ 
+            color: 0xC19A6B,
+            emissive: 0x8B7355,
+            emissiveIntensity: 0.1
         });
         this.materials.set('byzantine_wall', byzantineWall);
         
-        const byzantineCeiling = new THREE.MeshBasicMaterial({ 
-            color: 0xFF8800  // Dark orange ceiling
+        const byzantineCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0xFFD700,
+            emissive: 0xDAA520,
+            emissiveIntensity: 0.2
         });
         this.materials.set('byzantine_ceiling', byzantineCeiling);
         
-        // ORBITAL ROOMS - BRIGHT RED
-        const gothicFloor = new THREE.MeshBasicMaterial({ 
-            color: 0xFF0000  // Bright red - impossible to miss
-        });
-        this.materials.set('gothic_floor', gothicFloor);
-        
-        const gothicWall = new THREE.MeshBasicMaterial({ 
-            color: 0xAA0000  // Dark red walls
-        });
-        this.materials.set('gothic_wall', gothicWall);
-        
-        const gothicCeiling = new THREE.MeshBasicMaterial({ 
-            color: 0x880000  // Darker red ceiling
-        });
-        this.materials.set('gothic_ceiling', gothicCeiling);
-        
-        // CARDINAL ROOMS - BRIGHT BLUE
-        const celestialFloor = new THREE.MeshBasicMaterial({ 
-            color: 0x0000FF  // Bright blue - impossible to miss
-        });
-        this.materials.set('celestial_floor', celestialFloor);
-        
-        const celestialWall = new THREE.MeshBasicMaterial({ 
-            color: 0x0000AA  // Dark blue walls
-        });
-        this.materials.set('celestial_wall', celestialWall);
-        
-        const celestialCeiling = new THREE.MeshBasicMaterial({ 
-            color: 0x000088  // Darker blue ceiling
-        });
-        this.materials.set('celestial_ceiling', celestialCeiling);
-        
-        // CORRIDORS - BRIGHT GREEN
-        const corridorFloor = new THREE.MeshBasicMaterial({ 
-            color: 0x00FF00  // Bright green - impossible to miss
-        });
-        this.materials.set('corridor_floor', corridorFloor);
-        
-        const corridorWall = new THREE.MeshBasicMaterial({ 
-            color: 0x00AA00  // Dark green walls
-        });
-        this.materials.set('corridor_wall', corridorWall);
-        
-        const corridorCeiling = new THREE.MeshBasicMaterial({ 
-            color: 0x008800  // Darker green ceiling
-        });
-        this.materials.set('corridor_ceiling', corridorCeiling);
-        
-        // PILLAR MATERIALS - BRIGHT COLORS
-        const goldenPillar = new THREE.MeshBasicMaterial({
-            color: 0xFFFF00  // Yellow pillars
+        const goldenPillar = new THREE.MeshLambertMaterial({
+            color: 0xDAA520,
+            emissive: 0xFFD700,
+            emissiveIntensity: 0.3
         });
         this.materials.set('golden_pillar', goldenPillar);
         
-        const silverPillar = new THREE.MeshBasicMaterial({
-            color: 0xFFFFFF  // White pillars
+        // ORBITAL ROOMS - Gothic Cathedral Style
+        const gothicFloor = this.createPatternedFloor([
+            '#2C3E50', '#34495E', '#1C2833', '#212F3D',
+            '#283747', '#2E4053', '#1B2631', '#273746'
+        ], 40);
+        this.materials.set('gothic_floor', gothicFloor);
+        
+        const gothicWall = new THREE.MeshLambertMaterial({ 
+            color: 0x3A3A3A,
+            emissive: 0x1A1A2E,
+            emissiveIntensity: 0.05
+        });
+        this.materials.set('gothic_wall', gothicWall);
+        
+        const gothicCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x1F1F2E,
+            emissive: 0x16213E,
+            emissiveIntensity: 0.1
+        });
+        this.materials.set('gothic_ceiling', gothicCeiling);
+        
+        const silverPillar = new THREE.MeshLambertMaterial({
+            color: 0x808080,
+            emissive: 0xC0C0C0,
+            emissiveIntensity: 0.2
         });
         this.materials.set('silver_pillar', silverPillar);
         
-        const starPillar = new THREE.MeshBasicMaterial({
-            color: 0xFF00FF  // Magenta pillars
+        // CARDINAL ROOMS - Celestial Chapel Style  
+        const celestialFloor = this.createPatternedFloor([
+            '#191970', '#000080', '#00008B', '#0000CD',
+            '#4169E1', '#1E3A8A', '#1E40AF', '#1E3A5F'
+        ], 36);
+        this.materials.set('celestial_floor', celestialFloor);
+        
+        const celestialWall = new THREE.MeshLambertMaterial({ 
+            color: 0x1E3A8A,
+            emissive: 0x4169E1,
+            emissiveIntensity: 0.15
+        });
+        this.materials.set('celestial_wall', celestialWall);
+        
+        const celestialCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x000033,
+            emissive: 0x191970,
+            emissiveIntensity: 0.3
+        });
+        this.materials.set('celestial_ceiling', celestialCeiling);
+        
+        const starPillar = new THREE.MeshLambertMaterial({
+            color: 0x4169E1,
+            emissive: 0x87CEEB,
+            emissiveIntensity: 0.4
         });
         this.materials.set('star_pillar', starPillar);
         
-        const glowingPillar = new THREE.MeshBasicMaterial({
-            color: 0x00FFFF  // Cyan pillars
+        // CORRIDOR MATERIALS - Neutral stone
+        const corridorFloor = this.createPatternedFloor([
+            '#696969', '#708090', '#778899', '#7F7F7F'
+        ], 24);
+        this.materials.set('corridor_floor', corridorFloor);
+        
+        const corridorWall = new THREE.MeshLambertMaterial({ 
+            color: 0x5C5C5C,
+            opacity: 0.95
+        });
+        this.materials.set('corridor_wall', corridorWall);
+        
+        const corridorCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x4A4A4A,
+            opacity: 0.9
+        });
+        this.materials.set('corridor_ceiling', corridorCeiling);
+        
+        // Enhanced glowing pillar material
+        const glowingPillar = new THREE.MeshLambertMaterial({
+            color: 0x6080ff,
+            emissive: 0x6080ff,
+            emissiveIntensity: 0.3
         });
         this.materials.set('glowing_pillar', glowingPillar);
         
-        console.log(`Created ${this.materials.size} BRIGHT DEBUG materials!`);
-        console.log('If you can\'t see bright yellow/red/blue/green rooms, the problem is elsewhere!');
+        console.log(`Created ${this.materials.size} sophisticated materials with canvas textures!`);
+    }
+    
+    createPatternedFloor(colors, tileSize) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+        
+        for (let y = 0; y < canvas.height; y += tileSize) {
+            for (let x = 0; x < canvas.width; x += tileSize) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, tileSize - 2, tileSize - 2);
+                
+                // Add highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fillRect(x, y, tileSize - 2, 3);
+                
+                // Add shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillRect(x, y + tileSize - 5, tileSize - 2, 3);
+            }
+        }
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(4, 4);
+        
+        return new THREE.MeshLambertMaterial({ 
+            map: texture,
+            transparent: true, 
+            opacity: 0.95 
+        });
     }
     
     setupBillboardSystem() {
@@ -335,7 +392,7 @@ class DungeonSystem {
         // Reset progression for new floor
         this.resetProgression();
         
-        console.log('Using solid color theme');
+        console.log('Using enhanced room styling theme');
         
         // Phase 1: Plan room layout
         const roomLayout = this.planRoomLayout();
@@ -354,7 +411,7 @@ class DungeonSystem {
             floorMap: floorMap
         };
         
-        // Quick generation with solid colors - no delays needed
+        // Quick generation with enhanced materials
         setTimeout(() => {
             try {
                 // Phase 3: Generate unified geometry
@@ -367,7 +424,7 @@ class DungeonSystem {
                 // Phase 5: Add progressive portal system
                 this.addProgressivePortals(roomLayout);
                 
-                console.log(`Unified dungeon floor ${floorNumber} generated successfully with solid colors!`);
+                console.log(`Unified dungeon floor ${floorNumber} generated successfully with enhanced styling!`);
             } catch (error) {
                 console.error('Failed to generate dungeon geometry:', error);
                 // Try again after a short delay
@@ -628,7 +685,7 @@ class DungeonSystem {
     }
     
     generateUnifiedGeometry(floorMap, roomLayout) {
-        console.log('Generating unified geometry with solid colored rooms...');
+        console.log('Generating unified geometry with enhanced room styling...');
         
         const dungeonGroup = new THREE.Group();
         dungeonGroup.name = 'unified_dungeon';
@@ -716,7 +773,7 @@ class DungeonSystem {
             }
         }
         
-        console.log(`Generated ${floorCount} solid color floor segments`);
+        console.log(`Generated ${floorCount} enhanced floor segments`);
     }
     
     generateThemedWalls(dungeonGroup, floorMap, roomLayout) {
@@ -772,7 +829,7 @@ class DungeonSystem {
             }
         }
         
-        console.log('Generated themed wall geometry');
+        console.log('Generated enhanced themed wall geometry');
     }
     
     generateThemedCeilings(dungeonGroup, floorMap, roomLayout) {
@@ -811,7 +868,7 @@ class DungeonSystem {
             }
         }
         
-        console.log('Generated themed ceiling geometry');
+        console.log('Generated enhanced themed ceiling geometry');
     }
     
     addCeilingStars(dungeonGroup, x, z, height) {
@@ -852,10 +909,10 @@ class DungeonSystem {
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
-        // Enhanced lighting to compensate for solid colors
+        // Enhanced lighting to complement sophisticated materials
         if (room.type === 'center') {
-            // Byzantine golden lighting - MUCH BRIGHTER
-            const goldenLight = new THREE.PointLight(0xFFD700, 2.0, 80);
+            // Byzantine golden lighting - brightened for enhanced materials
+            const goldenLight = new THREE.PointLight(0xFFD700, 1.5, 70);
             goldenLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.2 - 1, worldZ);
             this.currentDungeonGroup.add(goldenLight);
             this.lightSources.push(goldenLight);
@@ -869,7 +926,7 @@ class DungeonSystem {
             ];
             
             cornerPositions.forEach(pos => {
-                const warmLight = new THREE.PointLight(0xFFA500, 1.0, 40);
+                const warmLight = new THREE.PointLight(0xFFA500, 0.8, 35);
                 warmLight.position.set(...pos);
                 this.currentDungeonGroup.add(warmLight);
                 this.lightSources.push(warmLight);
@@ -879,7 +936,7 @@ class DungeonSystem {
             for (let i = 0; i < 8; i++) {
                 const angle = (i / 8) * Math.PI * 2;
                 const radius = roomSize * 0.45;
-                const rimLight = new THREE.PointLight(0xDAA520, 0.8, 25);
+                const rimLight = new THREE.PointLight(0xDAA520, 0.6, 25);
                 rimLight.position.set(
                     worldX + Math.cos(angle) * radius,
                     this.floorHeight + 2,
@@ -890,17 +947,17 @@ class DungeonSystem {
             }
             
         } else if (room.type === 'orbital') {
-            // Gothic dramatic lighting - ENHANCED
-            const chandelierLight = new THREE.PointLight(0xE6E6FA, 1.5, 70);
+            // Gothic dramatic lighting - enhanced for textured materials
+            const chandelierLight = new THREE.PointLight(0xE6E6FA, 1.2, 60);
             chandelierLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.4 - 2, worldZ);
             this.currentDungeonGroup.add(chandelierLight);
             this.lightSources.push(chandelierLight);
             
-            // Cool silver accent lights - MORE OF THEM
+            // Cool silver accent lights
             for (let i = 0; i < 6; i++) {
                 const angle = (i / 6) * Math.PI * 2;
                 const radius = roomSize * 0.4;
-                const silverLight = new THREE.PointLight(0xC0C0C0, 0.7, 35);
+                const silverLight = new THREE.PointLight(0xC0C0C0, 0.5, 30);
                 silverLight.position.set(
                     worldX + Math.cos(angle) * radius,
                     this.floorHeight + this.ceilingHeight * 0.7,
@@ -911,21 +968,21 @@ class DungeonSystem {
             }
             
             // Add blue accent lighting for gothic atmosphere
-            const blueAccent = new THREE.PointLight(0x4169E1, 0.6, 50);
+            const blueAccent = new THREE.PointLight(0x4169E1, 0.4, 40);
             blueAccent.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.8, worldZ);
             this.currentDungeonGroup.add(blueAccent);
             this.lightSources.push(blueAccent);
             
         } else if (room.type === 'cardinal') {
-            // Celestial mystical lighting - MUCH BRIGHTER
-            const celestialLight = new THREE.PointLight(0x4169E1, 1.8, 65);
+            // Celestial mystical lighting - enhanced for blue textured materials
+            const celestialLight = new THREE.PointLight(0x4169E1, 1.3, 55);
             celestialLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.1 - 1, worldZ);
             this.currentDungeonGroup.add(celestialLight);
             this.lightSources.push(celestialLight);
             
             // Many starlight effects
-            for (let i = 0; i < 12; i++) {
-                const starLight = new THREE.PointLight(0x87CEEB, 0.5, 30);
+            for (let i = 0; i < 10; i++) {
+                const starLight = new THREE.PointLight(0x87CEEB, 0.4, 25);
                 starLight.position.set(
                     worldX + (Math.random() - 0.5) * roomSize * 0.8,
                     this.floorHeight + this.ceilingHeight * 1.1 - 0.5,
@@ -936,7 +993,7 @@ class DungeonSystem {
             }
             
             // Purple mystical accent
-            const mysticalLight = new THREE.PointLight(0x9370DB, 0.8, 45);
+            const mysticalLight = new THREE.PointLight(0x9370DB, 0.6, 35);
             mysticalLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.6, worldZ);
             this.currentDungeonGroup.add(mysticalLight);
             this.lightSources.push(mysticalLight);
@@ -951,23 +1008,23 @@ class DungeonSystem {
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
         const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Enhanced corridor lighting - much brighter
-        const cornerLight = new THREE.PointLight(0xffffff, 1.0, 50);
+        // Enhanced corridor lighting for textured materials
+        const cornerLight = new THREE.PointLight(0xffffff, 0.8, 40);
         cornerLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ);
         this.currentDungeonGroup.add(cornerLight);
         this.lightSources.push(cornerLight);
         
-        // Additional bright lights along corridor path
+        // Additional lights along corridor path
         const midWorldX = (startWorldX + endWorldX) / 2;
         const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
-        const midLight = new THREE.PointLight(0xffffff, 0.8, 35);
+        const midLight = new THREE.PointLight(0xffffff, 0.6, 30);
         midLight.position.set(midWorldX, this.floorHeight + 3.5, midWorldZ);
         this.currentDungeonGroup.add(midLight);
         this.lightSources.push(midLight);
         
         // Add warm accent lighting for atmosphere
-        const warmAccent = new THREE.PointLight(0xFFA500, 0.6, 30);
+        const warmAccent = new THREE.PointLight(0xFFA500, 0.4, 25);
         warmAccent.position.set(startWorldX, this.floorHeight + 3, endWorldZ);
         this.currentDungeonGroup.add(warmAccent);
         this.lightSources.push(warmAccent);
@@ -999,7 +1056,7 @@ class DungeonSystem {
     }
     
     addDungeonAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Enhanced glowing pillars with room-specific materials and bright lighting
+        // Enhanced glowing pillars with room-specific materials and lighting
         for (let i = 0; i < 4; i++) {
             const angle = (i / 4) * Math.PI * 2;
             const radius = roomSize * 0.3;
@@ -1031,14 +1088,14 @@ class DungeonSystem {
                 isPillar: true,
                 glowPhase: Math.random() * Math.PI * 2,
                 glowSpeed: 0.5 + Math.random() * 1.0,
-                baseEmissiveIntensity: 0.4 // Increased base intensity
+                baseEmissiveIntensity: 0.3 // Base intensity for enhanced materials
             };
             
             this.currentDungeonGroup.add(pillar);
             this.glowingPillars.push(pillar);
             
-            // Enhanced torch light on pillar - much brighter
-            const torchLight = new THREE.PointLight(0xff6644, 0.8, 15);
+            // Enhanced torch light on pillar
+            const torchLight = new THREE.PointLight(0xff6644, 0.6, 12);
             torchLight.position.set(pillarX, this.floorHeight + 3.5, pillarZ);
             this.currentDungeonGroup.add(torchLight);
             this.lightSources.push(torchLight);
@@ -1049,7 +1106,7 @@ class DungeonSystem {
             else if (roomType === 'orbital') glowColor = 0xC0C0C0;
             else if (roomType === 'cardinal') glowColor = 0x87CEEB;
             
-            const pillarGlowLight = new THREE.PointLight(glowColor, 1.2, 18);
+            const pillarGlowLight = new THREE.PointLight(glowColor, 0.8, 15);
             pillarGlowLight.position.set(pillarX, this.floorHeight + 2, pillarZ);
             pillarGlowLight.userData = {
                 isPillarGlow: true,
@@ -1494,8 +1551,8 @@ class DungeonSystem {
             
             this.currentDungeonGroup.add(orb);
             
-            // Much brighter orb light
-            const orbLight = new THREE.PointLight(orbColor, 0.6, 12); // Was 0.03, now 0.6
+            // Enhanced orb light for textured environments
+            const orbLight = new THREE.PointLight(orbColor, 0.4, 10); // Balanced for enhanced materials
             orbLight.position.copy(orb.position);
             this.currentDungeonGroup.add(orbLight);
             this.lightSources.push(orbLight);
