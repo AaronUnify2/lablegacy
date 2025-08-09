@@ -714,10 +714,10 @@
             }
         }
 
-        // Main Game Engine - SIMPLIFIED VERSION
+        // Main Game Engine - Enhanced Lighting Version
         class LabyrinthGame {
             constructor() {
-                console.log('[GAME] Initializing Simplified Labyrinth Game...');
+                console.log('[GAME] Initializing Enhanced Labyrinth Game with improved lighting...');
                 
                 this.scene = null;
                 this.camera = null;
@@ -736,22 +736,31 @@
             
             init() {
                 try {
-                    console.log('[GAME] Setting up core systems...');
+                    console.log('[GAME] Setting up core systems with enhanced lighting...');
                     
-                    // Setup scene
+                    // Setup scene with lighter fog for better exploration
                     this.scene = new THREE.Scene();
-                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
+                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.008); // Reduced fog density from 0.02 to 0.008
                     this.scene.background = new THREE.Color(0x0f0f1f);
                     
-                    // Setup renderer
+                    // Setup renderer with enhanced shadow settings
                     this.renderer = new THREE.WebGLRenderer({ 
                         antialias: true,
                         powerPreference: "high-performance"
                     });
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    
+                    // Enhanced shadow settings for better exploration
                     this.renderer.shadowMap.enabled = true;
-                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+                    
+                    // Better tone mapping for more realistic lighting
+                    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                    this.renderer.toneMappingExposure = 1.0;
+                    
+                    // Enable gamma correction for more realistic colors
+                    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                     
                     const gameContainer = document.getElementById('gameContainer');
                     gameContainer.appendChild(this.renderer.domElement);
@@ -760,14 +769,43 @@
                     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                     this.camera.position.set(0, 1.8, 0);
                     
-                    // Setup lighting
-                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
+                    // Setup enhanced lighting for exploration
+                    console.log('[GAME] Setting up enhanced exploration lighting...');
+                    
+                    // Ambient light - provides base illumination so nothing is completely dark
+                    const ambientLight = new THREE.AmbientLight(0x404040, 0.25);
                     this.scene.add(ambientLight);
                     
-                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-                    directionalLight.position.set(10, 20, 5);
+                    // Main directional light - simulates sunlight coming through cathedral ruins
+                    const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 2.0);
+                    directionalLight.position.set(30, 40, 20);
                     directionalLight.castShadow = true;
+                    
+                    // Configure shadow settings for better quality
+                    directionalLight.shadow.mapSize.width = 2048;
+                    directionalLight.shadow.mapSize.height = 2048;
+                    directionalLight.shadow.camera.near = 0.5;
+                    directionalLight.shadow.camera.far = 200;
+                    directionalLight.shadow.camera.left = -100;
+                    directionalLight.shadow.camera.right = 100;
+                    directionalLight.shadow.camera.top = 100;
+                    directionalLight.shadow.camera.bottom = -100;
+                    directionalLight.shadow.bias = -0.0001;
+                    
                     this.scene.add(directionalLight);
+                    
+                    // Secondary directional light for fill lighting
+                    const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.8);
+                    fillLight.position.set(-20, 25, -30);
+                    fillLight.castShadow = false; // No shadows for fill light to avoid conflicts
+                    this.scene.add(fillLight);
+                    
+                    // Hemisphere light for realistic sky/ground lighting
+                    const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
+                    hemisphereLight.position.set(0, 50, 0);
+                    this.scene.add(hemisphereLight);
+                    
+                    console.log('[GAME] ✓ Enhanced lighting setup complete');
                     
                     // Setup player
                     this.player = new Player(this.scene, this.camera);
@@ -809,7 +847,7 @@
                     this.gameState = 'playing';
                     this.gameLoop();
                     
-                    console.log('[GAME] ✓ Game initialized successfully');
+                    console.log('[GAME] ✓ Enhanced lighting game initialized successfully');
                     
                 } catch (error) {
                     console.error('[GAME] Initialization failed:', error);
@@ -964,7 +1002,7 @@
 
         // Start loading when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('[MAIN] DOM loaded, starting simplified loading...');
+            console.log('[MAIN] DOM loaded, starting enhanced lighting game...');
             
             const loader = new SimplifiedLoader();
             loader.loadAllScripts();
