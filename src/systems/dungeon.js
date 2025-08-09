@@ -1025,23 +1025,17 @@ class DungeonSystem {
     }
     
     addRuinedArchDetails(ruinsGroup, worldX, worldZ, rotY, wallHeight, roomType) {
-        // Broken arches and architectural remnants
-        if (roomType === 'center') {
-            // Partially collapsed arch for arena drama
-            const archGeometry = new THREE.RingGeometry(0.8, 1.2, 8, 1, 0, Math.PI * 0.75);
-            const arch = new THREE.Mesh(archGeometry, this.materials.get('broken_stone'));
-            arch.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
-            arch.rotation.y = rotY;
-            arch.rotation.x = Math.PI / 2;
-            arch.rotation.z = Math.random() * 0.3 - 0.15; // Slight random tilt
-            ruinsGroup.add(arch);
-        } else if (roomType === 'orbital') {
-            // Tactical wall damage
-            const damageGeometry = new THREE.BoxGeometry(0.8, 2, 0.4);
-            const damage = new THREE.Mesh(damageGeometry, this.materials.get('rusted_metal'));
-            damage.position.set(worldX, this.floorHeight + wallHeight * 0.4, worldZ + 0.2);
-            damage.rotation.y = rotY + (Math.random() - 0.5) * 0.5;
-            ruinsGroup.add(damage);
+        // Keep wall details minimal - just basic ruined architecture
+        if (Math.random() < 0.1) { // Much less frequent
+            if (roomType === 'center') {
+                // Occasional broken arch
+                const archGeometry = new THREE.RingGeometry(0.8, 1.2, 8, 1, 0, Math.PI * 0.75);
+                const arch = new THREE.Mesh(archGeometry, this.materials.get('broken_stone'));
+                arch.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
+                arch.rotation.y = rotY;
+                arch.rotation.x = Math.PI / 2;
+                ruinsGroup.add(arch);
+            }
         }
     }
     
@@ -1064,8 +1058,8 @@ class DungeonSystem {
                         ceilingHeight = this.ceilingHeight * 1.1; // Tactical chamber height
                     }
                     
-                    // Only generate ceiling if it's not too damaged
-                    if (Math.random() < 0.85) { // 15% chance of open sky/collapsed ceiling
+                    // Generate ceiling - no debris or clutter
+                    if (Math.random() < 0.95) { // Most ceilings intact
                         const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
                         const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
                         ceilingSegment.rotation.x = Math.PI / 2;
@@ -1074,265 +1068,65 @@ class DungeonSystem {
                         
                         ruinsGroup.add(ceilingSegment);
                     }
-                    
-                    // Add hanging debris for atmosphere
-                    if (roomType === 'center' && Math.random() < 0.15) {
-                        this.addHangingDebris(ruinsGroup, worldX, worldZ, ceilingHeight);
-                    }
                 }
             }
         }
         
-        console.log('Generated ruined ceiling architecture');
+        console.log('Generated clean ceiling architecture');
     }
     
-    addHangingDebris(ruinsGroup, x, z, height) {
-        const debrisGeometry = new THREE.BoxGeometry(0.3, 1.5, 0.3);
-        const debris = new THREE.Mesh(debrisGeometry, this.materials.get('broken_stone'));
-        debris.position.set(
-            x + (Math.random() - 0.5) * this.gridSize * 0.8,
-            this.floorHeight + height - 0.75,
-            z + (Math.random() - 0.5) * this.gridSize * 0.8
-        );
-        debris.rotation.z = (Math.random() - 0.5) * 0.5;
-        
-        // Add swaying animation
-        debris.userData = {
-            originalRotation: debris.rotation.z,
-            swaySpeed: 0.5 + Math.random() * 0.5,
-            swayAmount: 0.1
-        };
-        
-        ruinsGroup.add(debris);
-        this.combatElements.push(debris);
-    }
+    // Removed clutter methods for clean, spacious rooms:
+    // - addHangingDebris (hanging debris removed)
+    // - addArenaCombatFeatures (pillars, rubble, crystals removed)  
+    // - addChamberCombatFeatures (cover objects removed)
+    // - addPlatformCombatFeatures (platforms, bridges removed)
+    // - addFloatingDust (atmospheric particles removed)
+    // - addMagicalResidue (magical effects removed)
+    // - addArenaAtmosphere (ember effects removed)
     
     addCombatArchitecture(ruinsGroup, roomLayout) {
-        console.log('Adding combat-oriented architecture...');
+        console.log('Adding minimal central orb feature...');
         
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.addCombatElements(ruinsGroup, room);
-        });
+        // Only add the central orb to the main room
+        const centerRoom = Object.values(roomLayout.rooms).find(room => room.type === 'center');
+        if (centerRoom) {
+            this.addCentralOrb(ruinsGroup, centerRoom);
+        }
     }
     
-    addCombatElements(ruinsGroup, room) {
+    addCentralOrb(ruinsGroup, room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
         
-        if (room.type === 'center') {
-            // Large combat arena with cover and elevation
-            this.addArenaCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
-        } else if (room.type === 'orbital') {
-            // Tactical chamber with cover objects
-            this.addChamberCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
-        } else if (room.type === 'cardinal') {
-            // Multi-level platform combat zone
-            this.addPlatformCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
-        }
-    }
-    
-    addArenaCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
-        // Broken columns for cover
-        for (let i = 0; i < 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const radius = roomSize * 0.35;
-            
-            const columnX = worldX + Math.cos(angle) * radius;
-            const columnZ = worldZ + Math.sin(angle) * radius;
-            
-            // Broken column shaft (varying heights for tactical cover)
-            const columnHeight = 3 + Math.random() * 4; // 3-7 units tall
-            const columnGeometry = new THREE.CylinderGeometry(0.8, 1.0, columnHeight, 8);
-            const column = new THREE.Mesh(columnGeometry, this.materials.get('broken_stone'));
-            column.position.set(columnX, this.floorHeight + columnHeight/2, columnZ);
-            column.castShadow = true;
-            column.receiveShadow = true;
-            
-            // Add battle damage
-            column.rotation.z = (Math.random() - 0.5) * 0.3; // Slight lean
-            
-            ruinsGroup.add(column);
-            this.combatElements.push(column);
-            
-            // Rubble around the base
-            for (let j = 0; j < 3; j++) {
-                const rubbleGeometry = new THREE.BoxGeometry(
-                    0.3 + Math.random() * 0.4,
-                    0.2 + Math.random() * 0.3,
-                    0.3 + Math.random() * 0.4
-                );
-                const rubble = new THREE.Mesh(rubbleGeometry, this.materials.get('broken_stone'));
-                rubble.position.set(
-                    columnX + (Math.random() - 0.5) * 2,
-                    this.floorHeight + rubble.geometry.parameters.height/2,
-                    columnZ + (Math.random() - 0.5) * 2
-                );
-                rubble.rotation.set(
-                    Math.random() * Math.PI,
-                    Math.random() * Math.PI,
-                    Math.random() * Math.PI
-                );
-                ruinsGroup.add(rubble);
-            }
-        }
+        // Simple circular basin/pedestal
+        const basinGeometry = new THREE.CylinderGeometry(2, 2.2, 0.8, 16);
+        const basin = new THREE.Mesh(basinGeometry, this.materials.get('ancient_gold'));
+        basin.position.set(worldX, this.floorHeight + 0.4, worldZ);
+        basin.castShadow = true;
+        basin.receiveShadow = true;
+        ruinsGroup.add(basin);
         
-        // Central raised platform for dramatic encounters
-        const platformGeometry = new THREE.CylinderGeometry(4, 5, 1, 12);
-        const platform = new THREE.Mesh(platformGeometry, this.materials.get('ancient_gold'));
-        platform.position.set(worldX, this.floorHeight + 0.5, worldZ);
-        platform.castShadow = true;
-        platform.receiveShadow = true;
-        ruinsGroup.add(platform);
+        // Glowing orb
+        const orbGeometry = new THREE.SphereGeometry(0.8, 16, 12);
+        const orb = new THREE.Mesh(orbGeometry, this.materials.get('crystal_formation'));
+        orb.position.set(worldX, this.floorHeight + 1.4, worldZ);
         
-        // Mysterious crystal formations for light and atmosphere
-        for (let i = 0; i < 4; i++) {
-            const angle = (i / 4) * Math.PI * 2 + Math.PI/4; // Offset from columns
-            const radius = roomSize * 0.25;
-            
-            const crystalX = worldX + Math.cos(angle) * radius;
-            const crystalZ = worldZ + Math.sin(angle) * radius;
-            
-            const crystalGeometry = new THREE.ConeGeometry(0.4, 2 + Math.random(), 6);
-            const crystal = new THREE.Mesh(crystalGeometry, this.materials.get('crystal_formation'));
-            crystal.position.set(crystalX, this.floorHeight + 1, crystalZ);
-            crystal.rotation.z = (Math.random() - 0.5) * 0.5;
-            
-            // Add glowing effect
-            crystal.userData = {
-                originalEmissiveIntensity: 0.3,
-                pulseSpeed: 0.8 + Math.random() * 0.4
-            };
-            
-            ruinsGroup.add(crystal);
-            this.combatElements.push(crystal);
-        }
-    }
-    
-    addChamberCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
-        // Tactical cover objects scattered around
-        const coverCount = 4 + Math.floor(Math.random() * 3);
-        
-        for (let i = 0; i < coverCount; i++) {
-            const coverX = worldX + (Math.random() - 0.5) * roomSize * 0.7;
-            const coverZ = worldZ + (Math.random() - 0.5) * roomSize * 0.7;
-            
-            // Variety of cover types
-            const coverType = Math.random();
-            
-            if (coverType < 0.4) {
-                // Stone blocks
-                const blockGeometry = new THREE.BoxGeometry(
-                    1.5 + Math.random(),
-                    1 + Math.random() * 1.5,
-                    1 + Math.random()
-                );
-                const block = new THREE.Mesh(blockGeometry, this.materials.get('broken_stone'));
-                block.position.set(coverX, this.floorHeight + block.geometry.parameters.height/2, coverZ);
-                block.rotation.y = Math.random() * Math.PI;
-                block.castShadow = true;
-                block.receiveShadow = true;
-                ruinsGroup.add(block);
-            } else if (coverType < 0.7) {
-                // Fallen pillar segments
-                const segmentGeometry = new THREE.CylinderGeometry(0.5, 0.5, 3, 8);
-                const segment = new THREE.Mesh(segmentGeometry, this.materials.get('broken_stone'));
-                segment.position.set(coverX, this.floorHeight + 0.5, coverZ);
-                segment.rotation.z = Math.PI/2; // Fallen over
-                segment.rotation.y = Math.random() * Math.PI;
-                segment.castShadow = true;
-                ruinsGroup.add(segment);
-            } else {
-                // Rusted metal debris
-                const debrisGeometry = new THREE.BoxGeometry(1.2, 0.8, 2);
-                const debris = new THREE.Mesh(debrisGeometry, this.materials.get('rusted_metal'));
-                debris.position.set(coverX, this.floorHeight + 0.4, coverZ);
-                debris.rotation.y = Math.random() * Math.PI;
-                debris.rotation.z = (Math.random() - 0.5) * 0.4;
-                debris.castShadow = true;
-                ruinsGroup.add(debris);
-            }
-        }
-        
-        // Small altar or shrine (now broken and suitable for cover)
-        const altarGeometry = new THREE.BoxGeometry(2, 1.2, 1.2);
-        const altar = new THREE.Mesh(altarGeometry, this.materials.get('ancient_gold'));
-        altar.position.set(worldX, this.floorHeight + 0.6, worldZ + roomSize * 0.3);
-        altar.rotation.y = (Math.random() - 0.5) * 0.3; // Slightly askew
-        altar.castShadow = true;
-        ruinsGroup.add(altar);
-    }
-    
-    addPlatformCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
-        // Multi-level platforms for vertical combat
-        const platformCount = 3 + Math.floor(Math.random() * 2);
-        
-        for (let i = 0; i < platformCount; i++) {
-            const angle = (i / platformCount) * Math.PI * 2;
-            const radius = roomSize * (0.2 + Math.random() * 0.25);
-            
-            const platformX = worldX + Math.cos(angle) * radius;
-            const platformZ = worldZ + Math.sin(angle) * radius;
-            const platformHeight = 1.5 + Math.random() * 2; // Varying heights
-            
-            // Platform structure
-            const platformGeometry = new THREE.BoxGeometry(3, platformHeight, 3);
-            const platform = new THREE.Mesh(platformGeometry, this.materials.get('platform_floor'));
-            platform.position.set(platformX, this.floorHeight + platformHeight/2, platformZ);
-            platform.castShadow = true;
-            platform.receiveShadow = true;
-            ruinsGroup.add(platform);
-            
-            // Platform top
-            const topGeometry = new THREE.BoxGeometry(3.2, 0.2, 3.2);
-            const top = new THREE.Mesh(topGeometry, this.materials.get('ancient_gold'));
-            top.position.set(platformX, this.floorHeight + platformHeight + 0.1, platformZ);
-            top.receiveShadow = true;
-            ruinsGroup.add(top);
-            
-            // Connecting bridge elements (partial)
-            if (i < platformCount - 1 && Math.random() < 0.6) {
-                const nextAngle = ((i + 1) / platformCount) * Math.PI * 2;
-                const nextRadius = roomSize * (0.2 + Math.random() * 0.25);
-                const nextX = worldX + Math.cos(nextAngle) * nextRadius;
-                const nextZ = worldZ + Math.sin(nextAngle) * nextRadius;
-                
-                const bridgeLength = Math.sqrt(Math.pow(nextX - platformX, 2) + Math.pow(nextZ - platformZ, 2));
-                const bridgeGeometry = new THREE.BoxGeometry(bridgeLength, 0.3, 0.8);
-                const bridge = new THREE.Mesh(bridgeGeometry, this.materials.get('broken_stone'));
-                
-                bridge.position.set(
-                    (platformX + nextX) / 2,
-                    this.floorHeight + platformHeight + 0.2,
-                    (platformZ + nextZ) / 2
-                );
-                bridge.rotation.y = Math.atan2(nextZ - platformZ, nextX - platformX);
-                bridge.castShadow = true;
-                ruinsGroup.add(bridge);
-            }
-        }
-        
-        // Central elevated structure
-        const centralHeight = 2.5;
-        const centralGeometry = new THREE.CylinderGeometry(2, 2.5, centralHeight, 8);
-        const central = new THREE.Mesh(centralGeometry, this.materials.get('platform_floor'));
-        central.position.set(worldX, this.floorHeight + centralHeight/2, worldZ);
-        central.castShadow = true;
-        ruinsGroup.add(central);
-        
-        // Mysterious artifact on top (objective or decoration)
-        const artifactGeometry = new THREE.SphereGeometry(0.5, 12, 8);
-        const artifact = new THREE.Mesh(artifactGeometry, this.materials.get('crystal_formation'));
-        artifact.position.set(worldX, this.floorHeight + centralHeight + 0.7, worldZ);
-        
-        artifact.userData = {
-            originalEmissiveIntensity: 0.4,
+        // Add glowing animation to the orb
+        orb.userData = {
+            originalEmissiveIntensity: 0.5,
             pulseSpeed: 1.2,
             rotationSpeed: 0.01
         };
         
-        ruinsGroup.add(artifact);
-        this.combatElements.push(artifact);
+        ruinsGroup.add(orb);
+        this.combatElements.push(orb);
+        
+        console.log('Added central orb feature');
+    }
+    
+    addCombatElements(ruinsGroup, room) {
+        // Remove all the clutter - rooms are now clean and spacious
+        console.log(`Keeping ${room.type} room clean and uncluttered`);
     }
     
     addCombatLighting(roomLayout) {
@@ -1449,102 +1243,64 @@ class DungeonSystem {
     }
     
     addCombatEnvironment(roomLayout) {
-        console.log('Adding combat environmental elements...');
-        
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.addEnvironmentalAtmosphere(room);
-        });
+        console.log('Keeping environment minimal and clean...');
+        // No atmospheric clutter - just clean, spacious rooms
     }
     
     addEnvironmentalAtmosphere(room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
-        
-        // Floating dust motes and particles
-        this.addFloatingDust(worldX, worldZ, roomSize);
-        
-        // Magical residue from ancient battles
-        this.addMagicalResidue(worldX, worldZ, roomSize, room.type);
-        
-        // Environmental hazards and atmosphere
-        if (room.type === 'center') {
-            this.addArenaAtmosphere(worldX, worldZ, roomSize);
-        }
+        // Keep rooms clean - no floating particles or clutter
+        console.log(`Keeping ${room.type} room atmosphere minimal`);
     }
     
-    addFloatingDust(worldX, worldZ, roomSize) {
-        const dustCount = 8 + Math.floor(Math.random() * 4);
+    update(deltaTime) {
+        if (this.currentDungeonGroup) {
+            this.currentDungeonGroup.traverse((child) => {
+                // Only animate the central orb
+                if (child.userData.rotationSpeed) {
+                    child.rotation.y += child.userData.rotationSpeed;
+                }
+                
+                // Portal animations
+                if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
+                    this.updatePortalAnimations(child, deltaTime);
+                }
+                
+                // Portal battle effects
+                if (child.userData.swirSpeed !== undefined) {
+                    this.updateBattleEffects(child, deltaTime);
+                }
+                
+                // Billboard facing camera
+                if (child.userData.archway && window.game && window.game.camera) {
+                    child.userData.archway.lookAt(window.game.camera.position);
+                }
+            });
+        }
         
-        for (let i = 0; i < dustCount; i++) {
-            const dustGeometry = new THREE.SphereGeometry(0.05, 6, 6);
-            const dust = new THREE.Mesh(dustGeometry, this.materials.get('dust_mote'));
-            dust.position.set(
-                worldX + (Math.random() - 0.5) * roomSize * 0.8,
-                this.floorHeight + 2 + Math.random() * 4,
-                worldZ + (Math.random() - 0.5) * roomSize * 0.8
-            );
-            
-            dust.userData = {
-                originalY: dust.position.y,
-                floatSpeed: 0.2 + Math.random() * 0.4,
-                floatAmount: 0.3,
-                driftX: (Math.random() - 0.5) * 0.005,
-                driftZ: (Math.random() - 0.5) * 0.005
-            };
-            
-            this.currentDungeonGroup.add(dust);
-        }
-    }
-    
-    addMagicalResidue(worldX, worldZ, roomSize, roomType) {
-        // Ancient magical energy still lingers from past battles
-        const residueCount = roomType === 'center' ? 6 : 3;
+        // Update central orb with pulsing glow
+        this.combatElements.forEach(element => {
+            if (element && element.material && element.userData.pulseSpeed) {
+                const time = Date.now() * 0.001;
+                const pulse = element.userData.originalEmissiveIntensity + 
+                    Math.sin(time * element.userData.pulseSpeed) * 0.2;
+                
+                if (element.material.emissive) {
+                    element.material.emissiveIntensity = Math.max(0.1, pulse);
+                }
+            }
+        });
         
-        for (let i = 0; i < residueCount; i++) {
-            const residueGeometry = new THREE.SphereGeometry(0.12, 8, 8);
-            const residue = new THREE.Mesh(residueGeometry, this.materials.get('magical_residue'));
-            residue.position.set(
-                worldX + (Math.random() - 0.5) * roomSize * 0.6,
-                this.floorHeight + 1.5 + Math.random() * 2,
-                worldZ + (Math.random() - 0.5) * roomSize * 0.6
-            );
+        // Gentle lighting flicker
+        this.lightSources.forEach(light => {
+            if (light.userData.originalIntensity === undefined) {
+                light.userData.originalIntensity = light.intensity;
+                light.userData.flickerSpeed = 0.5 + Math.random() * 1.5;
+            }
             
-            residue.userData = {
-                originalY: residue.position.y,
-                pulseSpeed: 1.5 + Math.random(),
-                pulseAmount: 0.4,
-                orbitSpeed: 0.3 + Math.random() * 0.2,
-                orbitRadius: 0.5 + Math.random() * 0.3
-            };
-            
-            this.currentDungeonGroup.add(residue);
-        }
-    }
-    
-    addArenaAtmosphere(worldX, worldZ, roomSize) {
-        // Ember effects around the arena perimeter
-        for (let i = 0; i < 12; i++) {
-            const angle = (i / 12) * Math.PI * 2;
-            const radius = roomSize * 0.4;
-            
-            const emberGeometry = new THREE.SphereGeometry(0.08, 6, 6);
-            const ember = new THREE.Mesh(emberGeometry, this.materials.get('ember_glow'));
-            ember.position.set(
-                worldX + Math.cos(angle) * radius,
-                this.floorHeight + 0.5 + Math.random() * 2,
-                worldZ + Math.sin(angle) * radius
-            );
-            
-            ember.userData = {
-                originalY: ember.position.y,
-                flickerSpeed: 3 + Math.random() * 2,
-                flickerAmount: 0.2,
-                driftY: 0.01 + Math.random() * 0.01
-            };
-            
-            this.currentDungeonGroup.add(ember);
-        }
+            const time = Date.now() * 0.001;
+            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.15 + 1;
+            light.intensity = light.userData.originalIntensity * flicker;
+        });
     }
     
     addProgressivePortals(roomLayout) {
@@ -1752,98 +1508,32 @@ class DungeonSystem {
         }
     }
     
-    update(deltaTime) {
-        if (this.currentDungeonGroup) {
-            this.currentDungeonGroup.traverse((child) => {
-                // Floating atmospheric elements
-                if (child.userData.floatSpeed && child.userData.originalY !== undefined) {
-                    const time = Date.now() * 0.001;
-                    child.position.y = child.userData.originalY + 
-                        Math.sin(time * child.userData.floatSpeed) * child.userData.floatAmount;
-                    
-                    if (child.userData.driftX) {
-                        child.position.x += child.userData.driftX;
-                        child.position.z += child.userData.driftZ;
-                    }
-                    
-                    if (child.userData.driftY) {
-                        child.position.y += child.userData.driftY;
-                    }
-                }
-                
-                // Ember and magical effects
-                if (child.userData.flickerSpeed) {
-                    const time = Date.now() * 0.001;
-                    child.position.y = child.userData.originalY + 
-                        Math.sin(time * child.userData.flickerSpeed) * child.userData.flickerAmount;
-                    child.scale.setScalar(1 + Math.sin(time * child.userData.flickerSpeed * 2) * 0.15);
-                }
-                
-                // Magical residue pulsing and orbiting
-                if (child.userData.pulseSpeed && child.userData.orbitSpeed) {
-                    const time = Date.now() * 0.001;
-                    const pulse = 1 + Math.sin(time * child.userData.pulseSpeed) * child.userData.pulseAmount;
-                    child.scale.setScalar(pulse);
-                    
-                    const orbitX = Math.cos(time * child.userData.orbitSpeed) * child.userData.orbitRadius;
-                    const orbitZ = Math.sin(time * child.userData.orbitSpeed) * child.userData.orbitRadius;
-                    child.position.x += orbitX * deltaTime;
-                    child.position.z += orbitZ * deltaTime;
-                }
-                
-                // Crystal and artifact rotation
-                if (child.userData.rotationSpeed) {
-                    child.rotation.y += child.userData.rotationSpeed;
-                }
-                
-                // Hanging debris swaying
-                if (child.userData.swaySpeed) {
-                    const time = Date.now() * 0.001;
-                    child.rotation.z = child.userData.originalRotation + 
-                        Math.sin(time * child.userData.swaySpeed) * child.userData.swayAmount;
-                }
-                
-                // Portal animations
-                if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
-                    this.updatePortalAnimations(child, deltaTime);
-                }
-                
-                // Portal battle effects
-                if (child.userData.swirSpeed !== undefined) {
-                    this.updateBattleEffects(child, deltaTime);
-                }
-                
-                // Billboard facing camera
-                if (child.userData.archway && window.game && window.game.camera) {
-                    child.userData.archway.lookAt(window.game.camera.position);
-                }
-            });
+    updatePortalAnimations(portalGroup, deltaTime) {
+        const time = Date.now() * 0.001;
+        
+        const originalY = portalGroup.userData.originalY;
+        const floatOffset = Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
+        portalGroup.position.y = originalY + floatOffset;
+        
+        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed * 2.5) * 0.03;
+        if (portalGroup.userData.archway) {
+            portalGroup.userData.archway.scale.setScalar(pulseScale);
         }
+    }
+    
+    updateBattleEffects(effect, deltaTime) {
+        const time = Date.now() * 0.001;
         
-        // Update combat elements with pulsing glow
-        this.combatElements.forEach(element => {
-            if (element && element.material && element.userData.pulseSpeed) {
-                const time = Date.now() * 0.001;
-                const pulse = element.userData.originalEmissiveIntensity + 
-                    Math.sin(time * element.userData.pulseSpeed) * 0.2;
-                
-                if (element.material.emissive) {
-                    element.material.emissiveIntensity = Math.max(0.1, pulse);
-                }
-            }
-        });
-        
-        // Dramatic lighting flicker for combat atmosphere
-        this.lightSources.forEach(light => {
-            if (light.userData.originalIntensity === undefined) {
-                light.userData.originalIntensity = light.intensity;
-                light.userData.flickerSpeed = 0.5 + Math.random() * 1.5;
-            }
+        if (effect.userData.originalAngle !== undefined) {
+            effect.userData.originalAngle += effect.userData.swirSpeed * deltaTime;
+            const angle = effect.userData.originalAngle;
+            const radius = effect.userData.originalRadius || 3.5;
             
-            const time = Date.now() * 0.001;
-            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.15 + 1;
-            light.intensity = light.userData.originalIntensity * flicker;
-        });
+            effect.position.x = Math.cos(angle) * radius;
+            effect.position.z = Math.sin(angle) * radius;
+            
+            effect.position.y += Math.sin(time * effect.userData.bobSpeed) * effect.userData.bobAmount * deltaTime;
+        }
     }
     
     updatePortalAnimations(portalGroup, deltaTime) {
