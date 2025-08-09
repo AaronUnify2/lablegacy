@@ -574,24 +574,70 @@
                                 let errorMessage = `${scriptInfo.name} verification failed`;
                                 
                                 // If this is the Dungeon System, get detailed error info
-                                if (scriptInfo.name === 'Dungeon System' && window.getDungeonSystemError) {
-                                    try {
-                                        const detailedError = window.getDungeonSystemError();
-                                        errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
-                                        
-                                        // Also add the current status and error variables
-                                        if (window.DUNGEON_SYSTEM_STATUS) {
-                                            errorMessage += `<br><br><strong>Current Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
+                                if (scriptInfo.name === 'Dungeon System') {
+                                    console.log('[LOADER] Dungeon System failed, checking error details...');
+                                    
+                                    // Check if error function exists
+                                    if (typeof window.getDungeonSystemError === 'function') {
+                                        try {
+                                            console.log('[LOADER] getDungeonSystemError function found, calling...');
+                                            const detailedError = window.getDungeonSystemError();
+                                            console.log('[LOADER] Detailed error:', detailedError);
+                                            errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
+                                        } catch (e) {
+                                            console.log('[LOADER] Error calling getDungeonSystemError:', e);
+                                            errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
                                         }
-                                        if (window.DUNGEON_SYSTEM_ERROR) {
-                                            errorMessage += `<br><br><strong>Error Details:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
-                                        }
+                                    } else {
+                                        console.log('[LOADER] getDungeonSystemError function not found');
+                                        errorMessage += `<br><br>Error function not available`;
+                                    }
+                                    
+                                    // Check for global error variables directly
+                                    if (window.DUNGEON_SYSTEM_STATUS) {
+                                        console.log('[LOADER] Found DUNGEON_SYSTEM_STATUS:', window.DUNGEON_SYSTEM_STATUS);
+                                        errorMessage += `<br><br><strong>Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
+                                    } else {
+                                        console.log('[LOADER] DUNGEON_SYSTEM_STATUS not found');
+                                        errorMessage += `<br><br>No status information available`;
+                                    }
+                                    
+                                    if (window.DUNGEON_SYSTEM_ERROR) {
+                                        console.log('[LOADER] Found DUNGEON_SYSTEM_ERROR:', window.DUNGEON_SYSTEM_ERROR);
+                                        errorMessage += `<br><br><strong>Error:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
+                                    } else {
+                                        console.log('[LOADER] DUNGEON_SYSTEM_ERROR not found');
+                                        errorMessage += `<br><br>No error details available`;
+                                    }
+                                    
+                                    // Check if DungeonSystem class exists but verification failed
+                                    if (window.DungeonSystem) {
+                                        console.log('[LOADER] DungeonSystem class exists, checking verification methods...');
                                         
-                                        console.error('[DETAILED ERROR]', detailedError);
-                                        console.error('[STATUS]', window.DUNGEON_SYSTEM_STATUS);
-                                        console.error('[ERROR]', window.DUNGEON_SYSTEM_ERROR);
-                                    } catch (e) {
-                                        errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
+                                        try {
+                                            // Try to create a test instance
+                                            const testScene = { add: () => {}, remove: () => {} };
+                                            const testInstance = new window.DungeonSystem(testScene, null);
+                                            
+                                            // Check verification methods
+                                            const verifyMethods = ['verify', 'isReady', 'isValid', 'isInitialized'];
+                                            for (const method of verifyMethods) {
+                                                if (typeof testInstance[method] === 'function') {
+                                                    const result = testInstance[method]();
+                                                    console.log(`[LOADER] ${method}() returned:`, result);
+                                                    errorMessage += `<br>${method}(): ${result}`;
+                                                } else {
+                                                    console.log(`[LOADER] ${method} method not found`);
+                                                    errorMessage += `<br>${method}: NOT FOUND`;
+                                                }
+                                            }
+                                        } catch (constructorError) {
+                                            console.log('[LOADER] Error creating test instance:', constructorError);
+                                            errorMessage += `<br><br><strong>Constructor Error:</strong><br>${constructorError.message}`;
+                                        }
+                                    } else {
+                                        console.log('[LOADER] DungeonSystem class not found at all');
+                                        errorMessage += `<br><br>DungeonSystem class not found in window object`;
                                     }
                                 }
                                 
