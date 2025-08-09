@@ -160,12 +160,20 @@ class DungeonSystem {
         this.generateArchitecture(floorMap, roomLayout);
         
         // Let sub-systems enhance the dungeon
+        console.log('[DUNGEON] Calling lighting system...');
         if (this.lightingSystem) {
+            console.log('[DUNGEON] Lighting system found, adding lighting...');
             this.lightingSystem.addLighting(roomLayout, this.currentDungeonGroup);
+        } else {
+            console.warn('[DUNGEON] No lighting system available!');
         }
         
+        console.log('[DUNGEON] Calling portal system...');
         if (this.portalSystem) {
+            console.log('[DUNGEON] Portal system found, adding portals...');
             this.portalSystem.addPortals(roomLayout, this.currentDungeonGroup);
+        } else {
+            console.warn('[DUNGEON] No portal system available!');
         }
         
         console.log(`Floor ${floorNumber} core architecture complete`);
