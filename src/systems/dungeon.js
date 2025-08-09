@@ -1,5 +1,5 @@
 // Gothic Cathedral Ruins - Combat-Oriented Dungeon System
-// Ancient cathedral ruins perfect for tactical combat encounters
+// Ancient cathedral ruins with simple repeating textures for enhanced visual style
 
 class DungeonSystem {
     constructor(scene, player) {
@@ -185,80 +185,356 @@ class DungeonSystem {
     }
     
     setupRuinsMaterials() {
-        console.log('Setting up Gothic Ruins materials...');
+        console.log('Setting up Gothic Ruins materials with simple textures...');
+        this.createSimpleTextures();
         this.createRuinsMaterials();
         console.log(`Ruins materials setup complete. Created ${this.materials.size} materials.`);
     }
     
+    createSimpleTextures() {
+        console.log('Creating simple repeating texture patterns...');
+        
+        // Create canvas textures for simple, reliable patterns
+        this.textures = new Map();
+        
+        // Stone Floor Pattern
+        const stoneCanvas = document.createElement('canvas');
+        stoneCanvas.width = 64;
+        stoneCanvas.height = 64;
+        const stoneCtx = stoneCanvas.getContext('2d');
+        
+        // Base stone color
+        stoneCtx.fillStyle = '#2C3E50';
+        stoneCtx.fillRect(0, 0, 64, 64);
+        
+        // Stone blocks pattern
+        stoneCtx.strokeStyle = '#1B2631';
+        stoneCtx.lineWidth = 2;
+        stoneCtx.beginPath();
+        stoneCtx.moveTo(0, 32);
+        stoneCtx.lineTo(64, 32);
+        stoneCtx.moveTo(32, 0);
+        stoneCtx.lineTo(32, 32);
+        stoneCtx.moveTo(16, 32);
+        stoneCtx.lineTo(16, 64);
+        stoneCtx.moveTo(48, 32);
+        stoneCtx.lineTo(48, 64);
+        stoneCtx.stroke();
+        
+        // Add some weathering spots
+        stoneCtx.fillStyle = '#34495E';
+        for (let i = 0; i < 8; i++) {
+            stoneCtx.beginPath();
+            stoneCtx.arc(Math.random() * 64, Math.random() * 64, 2 + Math.random() * 2, 0, Math.PI * 2);
+            stoneCtx.fill();
+        }
+        
+        const stoneTexture = new THREE.CanvasTexture(stoneCanvas);
+        stoneTexture.wrapS = THREE.RepeatWrapping;
+        stoneTexture.wrapT = THREE.RepeatWrapping;
+        stoneTexture.repeat.set(4, 4);
+        this.textures.set('stone_floor', stoneTexture);
+        
+        // Wall Stone Pattern
+        const wallCanvas = document.createElement('canvas');
+        wallCanvas.width = 64;
+        wallCanvas.height = 64;
+        const wallCtx = wallCanvas.getContext('2d');
+        
+        wallCtx.fillStyle = '#34495E';
+        wallCtx.fillRect(0, 0, 64, 64);
+        
+        // Large stone blocks
+        wallCtx.strokeStyle = '#2C3E50';
+        wallCtx.lineWidth = 3;
+        wallCtx.strokeRect(2, 2, 60, 28);
+        wallCtx.strokeRect(2, 34, 28, 28);
+        wallCtx.strokeRect(34, 34, 28, 28);
+        
+        // Add mortar lines
+        wallCtx.strokeStyle = '#1B2631';
+        wallCtx.lineWidth = 1;
+        wallCtx.strokeRect(2, 2, 60, 28);
+        wallCtx.strokeRect(2, 34, 28, 28);
+        wallCtx.strokeRect(34, 34, 28, 28);
+        
+        const wallTexture = new THREE.CanvasTexture(wallCanvas);
+        wallTexture.wrapS = THREE.RepeatWrapping;
+        wallTexture.wrapT = THREE.RepeatWrapping;
+        wallTexture.repeat.set(2, 2);
+        this.textures.set('stone_wall', wallTexture);
+        
+        // Tactical Chamber Floor
+        const chamberCanvas = document.createElement('canvas');
+        chamberCanvas.width = 64;
+        chamberCanvas.height = 64;
+        const chamberCtx = chamberCanvas.getContext('2d');
+        
+        chamberCtx.fillStyle = '#5D4E37';
+        chamberCtx.fillRect(0, 0, 64, 64);
+        
+        // Hexagonal tile pattern
+        chamberCtx.strokeStyle = '#483D30';
+        chamberCtx.lineWidth = 2;
+        for (let x = 0; x < 64; x += 16) {
+            for (let y = 0; y < 64; y += 16) {
+                chamberCtx.beginPath();
+                chamberCtx.moveTo(x + 8, y);
+                chamberCtx.lineTo(x + 16, y + 4);
+                chamberCtx.lineTo(x + 16, y + 12);
+                chamberCtx.lineTo(x + 8, y + 16);
+                chamberCtx.lineTo(x, y + 12);
+                chamberCtx.lineTo(x, y + 4);
+                chamberCtx.closePath();
+                chamberCtx.stroke();
+            }
+        }
+        
+        const chamberTexture = new THREE.CanvasTexture(chamberCanvas);
+        chamberTexture.wrapS = THREE.RepeatWrapping;
+        chamberTexture.wrapT = THREE.RepeatWrapping;
+        chamberTexture.repeat.set(3, 3);
+        this.textures.set('chamber_floor', chamberTexture);
+        
+        // Platform Blue Stone
+        const platformCanvas = document.createElement('canvas');
+        platformCanvas.width = 64;
+        platformCanvas.height = 64;
+        const platformCtx = platformCanvas.getContext('2d');
+        
+        platformCtx.fillStyle = '#1F3A93';
+        platformCtx.fillRect(0, 0, 64, 64);
+        
+        // Ornate tile pattern
+        platformCtx.strokeStyle = '#2E4BC6';
+        platformCtx.lineWidth = 2;
+        platformCtx.strokeRect(4, 4, 24, 24);
+        platformCtx.strokeRect(36, 4, 24, 24);
+        platformCtx.strokeRect(4, 36, 24, 24);
+        platformCtx.strokeRect(36, 36, 24, 24);
+        
+        // Central crosses
+        platformCtx.lineWidth = 1;
+        platformCtx.beginPath();
+        platformCtx.moveTo(16, 8);
+        platformCtx.lineTo(16, 24);
+        platformCtx.moveTo(8, 16);
+        platformCtx.lineTo(24, 16);
+        platformCtx.moveTo(48, 8);
+        platformCtx.lineTo(48, 24);
+        platformCtx.moveTo(40, 16);
+        platformCtx.lineTo(56, 16);
+        platformCtx.moveTo(16, 40);
+        platformCtx.lineTo(16, 56);
+        platformCtx.moveTo(8, 48);
+        platformCtx.lineTo(24, 48);
+        platformCtx.moveTo(48, 40);
+        platformCtx.lineTo(48, 56);
+        platformCtx.moveTo(40, 48);
+        platformCtx.lineTo(56, 48);
+        platformCtx.stroke();
+        
+        const platformTexture = new THREE.CanvasTexture(platformCanvas);
+        platformTexture.wrapS = THREE.RepeatWrapping;
+        platformTexture.wrapT = THREE.RepeatWrapping;
+        platformTexture.repeat.set(2, 2);
+        this.textures.set('platform_floor', platformTexture);
+        
+        // Passage Stone
+        const passageCanvas = document.createElement('canvas');
+        passageCanvas.width = 64;
+        passageCanvas.height = 64;
+        const passageCtx = passageCanvas.getContext('2d');
+        
+        passageCtx.fillStyle = '#566573';
+        passageCtx.fillRect(0, 0, 64, 64);
+        
+        // Simple brick pattern
+        passageCtx.strokeStyle = '#455A64';
+        passageCtx.lineWidth = 2;
+        for (let y = 0; y < 64; y += 16) {
+            passageCtx.beginPath();
+            passageCtx.moveTo(0, y);
+            passageCtx.lineTo(64, y);
+            passageCtx.stroke();
+            
+            if (y % 32 === 0) {
+                passageCtx.beginPath();
+                passageCtx.moveTo(32, y);
+                passageCtx.lineTo(32, y + 16);
+                passageCtx.stroke();
+            } else {
+                passageCtx.beginPath();
+                passageCtx.moveTo(16, y);
+                passageCtx.lineTo(16, y + 16);
+                passageCtx.moveTo(48, y);
+                passageCtx.lineTo(48, y + 16);
+                passageCtx.stroke();
+            }
+        }
+        
+        const passageTexture = new THREE.CanvasTexture(passageCanvas);
+        passageTexture.wrapS = THREE.RepeatWrapping;
+        passageTexture.wrapT = THREE.RepeatWrapping;
+        passageTexture.repeat.set(3, 3);
+        this.textures.set('passage_floor', passageTexture);
+        
+        
+        // Create additional textures for combat elements
+        
+        // Broken Stone Texture
+        const brokenCanvas = document.createElement('canvas');
+        brokenCanvas.width = 64;
+        brokenCanvas.height = 64;
+        const brokenCtx = brokenCanvas.getContext('2d');
+        
+        brokenCtx.fillStyle = '#8B7355';
+        brokenCtx.fillRect(0, 0, 64, 64);
+        
+        // Add cracks and weathering
+        brokenCtx.strokeStyle = '#6B5B45';
+        brokenCtx.lineWidth = 2;
+        brokenCtx.beginPath();
+        brokenCtx.moveTo(10, 0);
+        brokenCtx.lineTo(25, 64);
+        brokenCtx.moveTo(45, 0);
+        brokenCtx.lineTo(30, 64);
+        brokenCtx.moveTo(0, 20);
+        brokenCtx.lineTo(64, 35);
+        brokenCtx.stroke();
+        
+        // Add small debris spots
+        brokenCtx.fillStyle = '#5A4B35';
+        for (let i = 0; i < 12; i++) {
+            brokenCtx.beginPath();
+            brokenCtx.arc(Math.random() * 64, Math.random() * 64, 1 + Math.random() * 2, 0, Math.PI * 2);
+            brokenCtx.fill();
+        }
+        
+        const brokenTexture = new THREE.CanvasTexture(brokenCanvas);
+        brokenTexture.wrapS = THREE.RepeatWrapping;
+        brokenTexture.wrapT = THREE.RepeatWrapping;
+        brokenTexture.repeat.set(2, 2);
+        this.textures.set('broken_stone', brokenTexture);
+        
+        // Metal Rust Texture
+        const metalCanvas = document.createElement('canvas');
+        metalCanvas.width = 64;
+        metalCanvas.height = 64;
+        const metalCtx = metalCanvas.getContext('2d');
+        
+        metalCtx.fillStyle = '#8B4513';
+        metalCtx.fillRect(0, 0, 64, 64);
+        
+        // Add rust patches
+        metalCtx.fillStyle = '#A0522D';
+        for (let i = 0; i < 8; i++) {
+            metalCtx.beginPath();
+            metalCtx.arc(Math.random() * 64, Math.random() * 64, 3 + Math.random() * 5, 0, Math.PI * 2);
+            metalCtx.fill();
+        }
+        
+        // Add metal streaks
+        metalCtx.strokeStyle = '#654321';
+        metalCtx.lineWidth = 1;
+        for (let i = 0; i < 10; i++) {
+            metalCtx.beginPath();
+            metalCtx.moveTo(Math.random() * 64, 0);
+            metalCtx.lineTo(Math.random() * 64, 64);
+            metalCtx.stroke();
+        }
+        
+        const metalTexture = new THREE.CanvasTexture(metalCanvas);
+        metalTexture.wrapS = THREE.RepeatWrapping;
+        metalTexture.wrapT = THREE.RepeatWrapping;
+        metalTexture.repeat.set(1, 1);
+        this.textures.set('rusted_metal', metalTexture);
+        
+        console.log('Additional combat textures created!');
+    }
+    
     createRuinsMaterials() {
-        console.log('Creating Gothic Cathedral Ruins materials...');
+        console.log('Creating Gothic Cathedral Ruins materials with textures...');
         
         // MAIN COMBAT ARENA (Center) - Weathered stone with dramatic shadows
         const arenaFloor = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_floor'),
             color: 0x2C3E50  // Dark weathered stone
         });
         this.materials.set('arena_floor', arenaFloor);
         
         const arenaWall = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x34495E  // Battle-scarred walls
         });
         this.materials.set('arena_wall', arenaWall);
         
         const arenaCeiling = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x1B2631  // Shadowy vaulted ceiling
         });
         this.materials.set('arena_ceiling', arenaCeiling);
         
         // TACTICAL CHAMBERS (Orbital) - Ruined stone with cover elements
         const chamberFloor = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('chamber_floor'),
             color: 0x5D4E37  // Dusty brown stone
         });
         this.materials.set('chamber_floor', chamberFloor);
         
         const chamberWall = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x6B5B73  // Cracked purple-grey walls
         });
         this.materials.set('chamber_wall', chamberWall);
         
         const chamberCeiling = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x483D54  // Partially collapsed ceiling
         });
         this.materials.set('chamber_ceiling', chamberCeiling);
         
         // MULTI-LEVEL ZONES (Cardinal) - Ancient blue stone with platforms
         const platformFloor = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('platform_floor'),
             color: 0x1F3A93  // Deep blue ancient stone
         });
         this.materials.set('platform_floor', platformFloor);
         
         const platformWall = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x2E4BC6  // Rich blue ruined walls
         });
         this.materials.set('platform_wall', platformWall);
         
         const platformCeiling = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x1A237E  // High vaulted ruins
         });
         this.materials.set('platform_ceiling', platformCeiling);
         
         // CORRIDORS - Connecting passages
         const passageFloor = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('passage_floor'),
             color: 0x566573  // Medium grey passage stone
         });
         this.materials.set('passage_floor', passageFloor);
         
         const passageWall = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x626567  // Worn passage walls
         });
         this.materials.set('passage_wall', passageWall);
         
         const passageCeiling = new THREE.MeshLambertMaterial({ 
+            map: this.textures.get('stone_wall'),
             color: 0x455A64  // Lower passage ceiling
         });
         this.materials.set('passage_ceiling', passageCeiling);
         
-        // COMBAT ELEMENTS - Cover, platforms, hazards
+        // COMBAT ELEMENTS - Cover, platforms, hazards with textures
         const brokenStone = new THREE.MeshLambertMaterial({
+            map: this.textures.get('broken_stone'),
             color: 0x8B7355,  // Weathered brown stone
             emissive: 0x2C1810,
             emissiveIntensity: 0.1
@@ -266,6 +542,7 @@ class DungeonSystem {
         this.materials.set('broken_stone', brokenStone);
         
         const rustedMetal = new THREE.MeshLambertMaterial({
+            map: this.textures.get('rusted_metal'),
             color: 0x8B4513,  // Rusty metal elements
             emissive: 0x4A1810,
             emissiveIntensity: 0.15
@@ -305,7 +582,8 @@ class DungeonSystem {
         });
         this.materials.set('magical_residue', magicalResidue);
         
-        console.log(`Created ${this.materials.size} Gothic Ruins materials!`);
+        console.log(`Created ${this.materials.size} Gothic Ruins materials with simple repeating textures!`);
+        console.log('Texture types created:', Array.from(this.textures.keys()));
     }
     
     setupBillboardSystem() {
@@ -1601,13 +1879,20 @@ class DungeonSystem {
             this.scene.remove(this.currentDungeonGroup);
         }
         
+        // Dispose of textures to prevent memory leaks
+        if (this.textures) {
+            this.textures.forEach(texture => {
+                texture.dispose();
+            });
+        }
+        
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
         this.combatElements.length = 0;
         this.environmentalHazards.length = 0;
         this.currentFloorMap = null;
         
-        console.log('Previous battle ruins cleared');
+        console.log('Previous battle ruins and textures cleared');
     }
     
     togglePortals() {
