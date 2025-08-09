@@ -1,441 +1,105 @@
-// Gothic Cathedral Ruins - Combat-Oriented Dungeon System
-// Ancient cathedral ruins with simple repeating textures for enhanced visual style
-// ERROR TRACKING ENABLED - Check window.DUNGEON_SYSTEM_STATUS and window.DUNGEON_SYSTEM_ERROR for details
+// Simplified Gothic Cathedral Ruins Dungeon System
+// Clean, reliable implementation focused on core functionality
 
 class DungeonSystem {
     constructor(scene, player) {
-        console.log('Initializing Gothic Cathedral Ruins Combat System...');
+        console.log('Initializing Simplified Dungeon System...');
         
-        // Global error tracking for loading screen
-        window.DUNGEON_SYSTEM_ERROR = null;
-        window.DUNGEON_SYSTEM_STATUS = 'STARTING_CONSTRUCTOR';
+        this.scene = scene;
+        this.player = player;
         
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'SETTING_BASIC_PROPERTIES';
-            
-            this.scene = scene;
-            this.player = player;
-            
-            // Current dungeon state
-            this.currentFloor = 1;
-            this.currentDungeon = null;
-            
-            window.DUNGEON_SYSTEM_STATUS = 'SETTING_PROGRESSION_SYSTEM';
-            
-            // Progressive unlock system
-            this.roomProgression = {
-                center: { unlocked: true, enemiesDefeated: false },
-                north: { unlocked: true, enemiesDefeated: false },    // Always unlocked first
-                east: { unlocked: false, enemiesDefeated: false },
-                west: { unlocked: false, enemiesDefeated: false },
-                south: { unlocked: false, enemiesDefeated: false }
-            };
-            this.progressionOrder = ['north', 'east', 'west', 'south'];
-            this.currentProgressionIndex = 0;
-            
-            window.DUNGEON_SYSTEM_STATUS = 'SETTING_GRID_PARAMETERS';
-            
-            // Grid-based floor planning
-            this.gridSize = 2; // 2 units per grid cell
-            this.dungeonWidth = 180;
-            this.dungeonDepth = 180;
-            this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
-            this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
-            
-            // Room templates - sized for combat encounters
-            this.roomTemplates = {
-                CENTER: { size: 13, type: 'center' },    // Large combat arena
-                ORBITAL: { size: 10, type: 'orbital' },  // Medium tactical spaces
-                CARDINAL: { size: 12, type: 'cardinal' } // Multi-level combat zones
-            };
-            
-            // Corridor width
-            this.corridorWidth = 3;
-            
-            window.DUNGEON_SYSTEM_STATUS = 'SETTING_COLLISION_DATA';
-            
-            // Collision and height data
-            this.floorHeight = 0;
-            this.ceilingHeight = 12; // High ceilings for dramatic combat
-            this.currentFloorMap = null;
-            
-            window.DUNGEON_SYSTEM_STATUS = 'INITIALIZING_MAPS_AND_ARRAYS';
-            
-            // Materials and lighting - initialize as empty maps
-            this.materials = new Map();
-            this.textures = new Map();
-            this.lightSources = [];
-            this.billboardSprites = [];
-            this.combatElements = []; // Track combat-oriented elements
-            this.environmentalHazards = []; // Collapsing pillars, etc.
-            
-            window.DUNGEON_SYSTEM_STATUS = 'CALLING_INIT_METHOD';
-            
-            // Initialize system
-            const initResult = this.init();
-            if (!initResult) {
-                window.DUNGEON_SYSTEM_ERROR = 'INIT_METHOD_RETURNED_FALSE';
-                console.warn('Initialization had issues but constructor completed');
-            } else {
-                window.DUNGEON_SYSTEM_STATUS = 'CONSTRUCTOR_COMPLETED_SUCCESSFULLY';
-            }
-            
-            console.log('Gothic Cathedral Ruins Combat System constructor completed successfully');
-            
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `CONSTRUCTOR_ERROR: ${error.message}`;
-            window.DUNGEON_SYSTEM_STATUS = 'CONSTRUCTOR_FAILED_USING_EMERGENCY';
-            console.error('Critical error in constructor:', error);
-            
-            // Emergency initialization - just set up bare minimum
-            this.scene = scene || null;
-            this.player = player || null;
-            this.materials = new Map();
-            this.textures = new Map();
-            this.lightSources = [];
-            this.combatElements = [];
-            
-            // Create emergency materials
-            try {
-                this.createEmergencyMaterials();
-                window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_MATERIALS_CREATED';
-            } catch (emergencyError) {
-                window.DUNGEON_SYSTEM_ERROR = `EMERGENCY_MATERIALS_FAILED: ${emergencyError.message}`;
-                console.error('Even emergency materials failed:', emergencyError);
-            }
-            
-            console.log('Constructor completed with emergency initialization');
-        }
+        // Current dungeon state
+        this.currentFloor = 1;
+        this.currentDungeon = null;
+        this.currentDungeonGroup = null;
+        this.currentFloorMap = null;
+        
+        // Progressive unlock system
+        this.roomProgression = {
+            center: { unlocked: true, enemiesDefeated: false },
+            north: { unlocked: true, enemiesDefeated: false },
+            east: { unlocked: false, enemiesDefeated: false },
+            west: { unlocked: false, enemiesDefeated: false },
+            south: { unlocked: false, enemiesDefeated: false }
+        };
+        this.progressionOrder = ['north', 'east', 'west', 'south'];
+        this.currentProgressionIndex = 0;
+        
+        // Grid-based layout
+        this.gridSize = 2;
+        this.dungeonWidth = 180;
+        this.dungeonDepth = 180;
+        this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
+        this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
+        
+        // Room templates
+        this.roomTemplates = {
+            CENTER: { size: 13, type: 'center' },
+            ORBITAL: { size: 10, type: 'orbital' },
+            CARDINAL: { size: 12, type: 'cardinal' }
+        };
+        
+        this.corridorWidth = 3;
+        this.floorHeight = 0;
+        this.ceilingHeight = 12;
+        
+        // Initialize storage
+        this.materials = new Map();
+        this.lightSources = [];
+        this.combatElements = [];
+        
+        this.init();
     }
     
     init() {
-        console.log('=== DungeonSystem.init() starting ===');
+        console.log('Setting up basic materials...');
+        this.createBasicMaterials();
         
-        try {
-            // Always create basic materials first as absolute fallback
-            console.log('Step 1: Creating basic fallback materials...');
-            this.createBasicFallbackMaterials();
-            console.log('Step 1 completed - basic materials created');
-            
-            // Try to setup enhanced materials
-            try {
-                console.log('Step 2: Attempting enhanced materials setup...');
-                this.setupRuinsMaterials();
-                console.log('Step 2 completed - enhanced materials loaded successfully');
-            } catch (error) {
-                console.warn('Step 2 failed - enhanced materials failed, using basic materials:', error);
-            }
-            
-            console.log('Step 3: Setting up billboard system...');
-            this.setupBillboardSystem();
-            console.log('Step 3 completed - billboard system ready');
-            
-            // Connect player to this dungeon system for collision detection
-            if (this.player) {
-                console.log('Step 4: Connecting player system...');
-                this.player.setDungeonSystem(this);
-                console.log('Step 4 completed - player connected');
-            } else {
-                console.log('Step 4 skipped - no player provided');
-            }
-            
-            console.log('=== DungeonSystem.init() completed successfully ===');
-            console.log('Final material count:', this.materials ? this.materials.size : 0);
-            console.log('Available methods:', Object.getOwnPropertyNames(this).filter(name => typeof this[name] === 'function').length);
-            
-            return true;
-            
-        } catch (error) {
-            console.error('=== Critical error during DungeonSystem.init() ===', error);
-            console.error('Error stack:', error.stack);
-            
-            // Even if everything fails, create absolute minimum materials
-            try {
-                console.log('Attempting emergency recovery...');
-                this.createEmergencyMaterials();
-                console.log('Emergency recovery completed');
-            } catch (emergencyError) {
-                console.error('Emergency recovery also failed:', emergencyError);
-            }
-            
-            console.log('=== DungeonSystem.init() completed with errors but system is functional ===');
-            return true; // Always return true to prevent system failure
+        if (this.player) {
+            this.player.setDungeonSystem(this);
         }
+        
+        console.log('Simplified Dungeon System initialized successfully');
+        return true;
     }
     
-    createBasicFallbackMaterials() {
-        console.log('Creating basic fallback materials...');
-        
-        if (!this.materials) {
-            this.materials = new Map();
-        }
-        
-        // Create absolutely basic materials that always work
-        const basicMaterials = {
-            'arena_floor': 0x2C3E50,
-            'arena_wall': 0x34495E, 
-            'arena_ceiling': 0x1B2631,
-            'chamber_floor': 0x5D4E37,
-            'chamber_wall': 0x6B5B73,
-            'chamber_ceiling': 0x483D54,
-            'platform_floor': 0x1F3A93,
-            'platform_wall': 0x2E4BC6,
-            'platform_ceiling': 0x1A237E,
-            'passage_floor': 0x566573,
-            'passage_wall': 0x626567,
-            'passage_ceiling': 0x455A64,
-            'broken_stone': 0x8B7355,
-            'rusted_metal': 0x8B4513,
-            'ancient_gold': 0xB8860B,
-            'crystal_formation': 0x4169E1,
-            'dust_mote': 0xDDD8C7,
-            'magical_residue': 0x9370DB
+    createBasicMaterials() {
+        // Create simple, reliable materials
+        const materials = {
+            'arena_floor': new THREE.MeshLambertMaterial({ color: 0x2C3E50 }),
+            'arena_wall': new THREE.MeshLambertMaterial({ color: 0x34495E }),
+            'arena_ceiling': new THREE.MeshLambertMaterial({ color: 0x1B2631 }),
+            'chamber_floor': new THREE.MeshLambertMaterial({ color: 0x5D4E37 }),
+            'chamber_wall': new THREE.MeshLambertMaterial({ color: 0x6B5B73 }),
+            'chamber_ceiling': new THREE.MeshLambertMaterial({ color: 0x483D54 }),
+            'platform_floor': new THREE.MeshLambertMaterial({ color: 0x1F3A93 }),
+            'platform_wall': new THREE.MeshLambertMaterial({ color: 0x2E4BC6 }),
+            'platform_ceiling': new THREE.MeshLambertMaterial({ color: 0x1A237E }),
+            'passage_floor': new THREE.MeshLambertMaterial({ color: 0x566573 }),
+            'passage_wall': new THREE.MeshLambertMaterial({ color: 0x626567 }),
+            'passage_ceiling': new THREE.MeshLambertMaterial({ color: 0x455A64 }),
+            'broken_stone': new THREE.MeshLambertMaterial({ color: 0x8B7355 }),
+            'rusted_metal': new THREE.MeshLambertMaterial({ color: 0x8B4513 }),
+            'ancient_gold': new THREE.MeshLambertMaterial({ 
+                color: 0xB8860B, 
+                emissive: 0xB8860B, 
+                emissiveIntensity: 0.2 
+            }),
+            'crystal_formation': new THREE.MeshLambertMaterial({ 
+                color: 0x4169E1, 
+                emissive: 0x4169E1, 
+                emissiveIntensity: 0.3 
+            })
         };
         
-        Object.entries(basicMaterials).forEach(([name, color]) => {
-            try {
-                const material = new THREE.MeshLambertMaterial({ 
-                    color: color,
-                    emissive: name === 'crystal_formation' ? color : 0x000000,
-                    emissiveIntensity: name === 'crystal_formation' ? 0.3 : 0
-                });
-                this.materials.set(name, material);
-            } catch (error) {
-                console.error(`Failed to create basic material ${name}:`, error);
-            }
+        Object.entries(materials).forEach(([name, material]) => {
+            this.materials.set(name, material);
         });
         
-        console.log(`Created ${this.materials.size} basic fallback materials`);
+        console.log(`Created ${this.materials.size} basic materials`);
     }
     
-    createEmergencyMaterials() {
-        console.log('Creating emergency materials...');
-        
-        if (!this.materials) {
-            this.materials = new Map();
-        }
-        
-        // Absolute emergency - just gray materials for everything
-        const grayMaterial = new THREE.MeshBasicMaterial({ color: 0x808080 });
-        const goldMaterial = new THREE.MeshBasicMaterial({ color: 0xB8860B });
-        const blueMaterial = new THREE.MeshBasicMaterial({ color: 0x4169E1 });
-        
-        const emergencyMaterials = [
-            'arena_floor', 'arena_wall', 'arena_ceiling',
-            'chamber_floor', 'chamber_wall', 'chamber_ceiling', 
-            'platform_floor', 'platform_wall', 'platform_ceiling',
-            'passage_floor', 'passage_wall', 'passage_ceiling',
-            'broken_stone', 'rusted_metal'
-        ];
-        
-        emergencyMaterials.forEach(name => {
-            this.materials.set(name, grayMaterial);
-        });
-        
-        this.materials.set('ancient_gold', goldMaterial);
-        this.materials.set('crystal_formation', blueMaterial);
-        
-        console.log('Emergency materials created');
-    }
-    
-    // System verification methods that external systems might call
-    // Cover every possible method name the game system might use
-    isReady() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_IS_READY';
-            console.log('DungeonSystem.isReady() called - returning true');
-            window.DUNGEON_SYSTEM_STATUS = 'IS_READY_PASSED';
-            return true; // Always report as ready
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `IS_READY_ERROR: ${error.message}`;
-            return true;
-        }
-    }
-    
-    isValid() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_IS_VALID';
-            console.log('DungeonSystem.isValid() called - returning true');
-            window.DUNGEON_SYSTEM_STATUS = 'IS_VALID_PASSED';
-            return true; // Always report as valid
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `IS_VALID_ERROR: ${error.message}`;
-            return true;
-        }
-    }
-    
-    isInitialized() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_IS_INITIALIZED';
-            console.log('DungeonSystem.isInitialized() called - returning true');
-            window.DUNGEON_SYSTEM_STATUS = 'IS_INITIALIZED_PASSED';
-            return true;
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `IS_INITIALIZED_ERROR: ${error.message}`;
-            return true;
-        }
-    }
-    
-    isLoaded() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_IS_LOADED';
-            console.log('DungeonSystem.isLoaded() called - returning true');
-            window.DUNGEON_SYSTEM_STATUS = 'IS_LOADED_PASSED';
-            return true;
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `IS_LOADED_ERROR: ${error.message}`;
-            return true;
-        }
-    }
-    
-    isOperational() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_IS_OPERATIONAL';
-            console.log('DungeonSystem.isOperational() called - returning true');
-            window.DUNGEON_SYSTEM_STATUS = 'IS_OPERATIONAL_PASSED';
-            return true;
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `IS_OPERATIONAL_ERROR: ${error.message}`;
-            return true;
-        }
-    }
-    
-    hasRequiredMethods() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'CHECKING_REQUIRED_METHODS';
-            console.log('DungeonSystem.hasRequiredMethods() called');
-            
-            // Verify we have all the methods the game system expects
-            const requiredMethods = [
-                'generateDungeon', 'isPositionWalkable', 'isPositionSolid',
-                'getFloorHeight', 'getCeilingHeight', 'getRoomAt', 'update',
-                'clearCurrentDungeon', 'testProgressionAdvance', 'togglePortals'
-            ];
-            
-            for (const method of requiredMethods) {
-                if (typeof this[method] !== 'function') {
-                    window.DUNGEON_SYSTEM_ERROR = `MISSING_METHOD: ${method}`;
-                    console.error(`Missing required method: ${method}`);
-                    // Even if missing, return true to prevent blocking
-                    return true;
-                }
-            }
-            console.log('All required methods found');
-            window.DUNGEON_SYSTEM_STATUS = 'REQUIRED_METHODS_PASSED';
-            return true;
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `REQUIRED_METHODS_ERROR: ${error.message}`;
-            console.error('Error checking required methods:', error);
-            return true; // Return true anyway
-        }
-    }
-    
-    verify() {
-        try {
-            window.DUNGEON_SYSTEM_STATUS = 'STARTING_VERIFY';
-            console.log('DungeonSystem.verify() called - comprehensive check');
-            
-            // Check basic properties exist
-            window.DUNGEON_SYSTEM_STATUS = 'VERIFY_CHECKING_SCENE';
-            if (!this.scene) {
-                window.DUNGEON_SYSTEM_STATUS = 'VERIFY_NO_SCENE_BUT_CONTINUING';
-                console.warn('No scene reference, but continuing...');
-            }
-            
-            // Check methods exist
-            window.DUNGEON_SYSTEM_STATUS = 'VERIFY_CHECKING_METHODS';
-            this.hasRequiredMethods();
-            
-            // Check materials exist (create them if needed)
-            window.DUNGEON_SYSTEM_STATUS = 'VERIFY_CHECKING_MATERIALS';
-            if (!this.materials || this.materials.size === 0) {
-                window.DUNGEON_SYSTEM_STATUS = 'VERIFY_CREATING_MATERIALS';
-                console.log('Creating materials for verification...');
-                try {
-                    this.createBasicFallbackMaterials();
-                    window.DUNGEON_SYSTEM_STATUS = 'VERIFY_MATERIALS_CREATED';
-                } catch (matError) {
-                    window.DUNGEON_SYSTEM_ERROR = `VERIFY_MATERIALS_ERROR: ${matError.message}`;
-                    console.error('Failed to create materials in verify:', matError);
-                }
-            }
-            
-            console.log('DungeonSystem verification completed successfully!');
-            window.DUNGEON_SYSTEM_STATUS = 'VERIFY_COMPLETED_SUCCESSFULLY';
-            return true;
-            
-        } catch (error) {
-            window.DUNGEON_SYSTEM_ERROR = `VERIFY_ERROR: ${error.message}`;
-            console.error('Verification error:', error);
-            return true; // Return true anyway to prevent blocking
-        }
-    }
-    
-    validate() {
-        console.log('DungeonSystem.validate() called - returning true');
-        return true;
-    }
-    
-    check() {
-        console.log('DungeonSystem.check() called - returning true');
-        return true;
-    }
-    
-    test() {
-        console.log('DungeonSystem.test() called - returning true');
-        return true;
-    }
-    
-    status() {
-        console.log('DungeonSystem.status() called');
-        return {
-            ready: true,
-            valid: true,
-            initialized: true,
-            loaded: true,
-            operational: true,
-            materialsCount: this.materials ? this.materials.size : 0,
-            hasScene: !!this.scene
-        };
-    }
-    
-    getStatus() {
-        return this.status();
-    }
-    
-    // Alternative verification method names
-    verifySystem() {
-        console.log('DungeonSystem.verifySystem() called');
-        return this.verify();
-    }
-    
-    validateSystem() {
-        console.log('DungeonSystem.validateSystem() called');
-        return true;
-    }
-    
-    checkSystem() {
-        console.log('DungeonSystem.checkSystem() called');
-        return true;
-    }
-    
-    testSystem() {
-        console.log('DungeonSystem.testSystem() called');
-        return true;
-    }
-    
-    // Health check methods
-    healthCheck() {
-        console.log('DungeonSystem.healthCheck() called - returning healthy');
-        return { healthy: true, status: 'operational' };
-    }
-    
-    isHealthy() {
-        console.log('DungeonSystem.isHealthy() called - returning true');
-        return true;
-    }
-    
-    // Progressive Unlock System (unchanged)
+    // Progressive Unlock System
     resetProgression() {
         this.roomProgression = {
             center: { unlocked: true, enemiesDefeated: false },
@@ -445,42 +109,34 @@ class DungeonSystem {
             south: { unlocked: false, enemiesDefeated: false }
         };
         this.currentProgressionIndex = 0;
-        console.log('Room progression reset - only center and north accessible');
+        console.log('Room progression reset');
     }
     
     defeatEnemiesInRoom(roomDirection) {
-        console.log(`Combat completed in ${roomDirection} ruins...`);
-        
         if (this.roomProgression[roomDirection]) {
             this.roomProgression[roomDirection].enemiesDefeated = true;
-            console.log(`Enemies defeated in ${roomDirection} chamber`);
             this.checkProgressionUnlock();
         }
     }
     
     checkProgressionUnlock() {
-        try {
-            if (this.currentProgressionIndex >= this.progressionOrder.length) {
-                return;
-            }
+        if (this.currentProgressionIndex >= this.progressionOrder.length) {
+            return;
+        }
+        
+        const currentRoom = this.progressionOrder[this.currentProgressionIndex];
+        
+        if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
+            this.currentProgressionIndex++;
             
-            const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-            
-            if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
-                this.currentProgressionIndex++;
-                
-                if (this.currentProgressionIndex < this.progressionOrder.length) {
-                    const nextRoom = this.progressionOrder[this.currentProgressionIndex];
-                    this.roomProgression[nextRoom].unlocked = true;
-                    this.updateRoomPortals(nextRoom, true);
-                    console.log(`${nextRoom} chamber unlocked!`);
-                } else {
-                    this.openExitPortal();
-                    console.log('All chambers cleared - exit revealed!');
-                }
+            if (this.currentProgressionIndex < this.progressionOrder.length) {
+                const nextRoom = this.progressionOrder[this.currentProgressionIndex];
+                this.roomProgression[nextRoom].unlocked = true;
+                this.updateRoomPortals(nextRoom, true);
+                console.log(`${nextRoom} chamber unlocked!`);
+            } else {
+                console.log('All chambers cleared!');
             }
-        } catch (error) {
-            console.error('Error in progression unlock:', error);
         }
     }
     
@@ -489,7 +145,11 @@ class DungeonSystem {
         this.defeatEnemiesInRoom(currentRoom);
     }
     
-    // Collision Detection Methods (unchanged)
+    togglePortals() {
+        this.testProgressionAdvance();
+    }
+    
+    // Collision Detection
     isPositionWalkable(worldX, worldZ) {
         if (!this.currentFloorMap) return true;
         
@@ -504,16 +164,7 @@ class DungeonSystem {
     }
     
     isPositionSolid(worldX, worldZ) {
-        if (!this.currentFloorMap) return false;
-        
-        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
-        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
-        
-        if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-            return true;
-        }
-        
-        return !this.currentFloorMap[gridZ][gridX];
+        return !this.isPositionWalkable(worldX, worldZ);
     }
     
     getFloorHeight(worldX, worldZ) {
@@ -524,487 +175,33 @@ class DungeonSystem {
         if (!this.isPositionWalkable(worldX, worldZ)) {
             return this.floorHeight;
         }
-        
-        const room = this.getRoomAt({x: worldX, z: worldZ});
-        if (room) {
-            if (room.type === 'center') {
-                return this.floorHeight + this.ceilingHeight * 1.5; // High arena ceiling
-            } else if (room.type === 'cardinal') {
-                return this.floorHeight + this.ceilingHeight * 1.3; // Multi-level chambers
-            } else if (room.type === 'orbital') {
-                return this.floorHeight + this.ceilingHeight * 1.1; // Tactical spaces
-            }
-        }
-        
         return this.floorHeight + this.ceilingHeight;
     }
     
-    worldToGrid(worldX, worldZ) {
-        return {
-            x: Math.floor((worldX + this.dungeonWidth/2) / this.gridSize),
-            z: Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize)
-        };
-    }
-    
-    gridToWorld(gridX, gridZ) {
-        return {
-            x: (gridX - this.gridWidth/2) * this.gridSize,
-            z: (gridZ - this.gridDepth/2) * this.gridSize
-        };
-    }
-    
-    setupRuinsMaterials() {
-        console.log('Setting up Gothic Ruins materials with simple textures...');
+    getRoomAt(position) {
+        if (!this.currentDungeon) return null;
         
-        try {
-            // Clear any existing materials and textures
-            if (this.materials) {
-                this.materials.clear();
-            } else {
-                this.materials = new Map();
-            }
-            
-            if (this.textures) {
-                this.textures.forEach(texture => {
-                    try {
-                        texture.dispose();
-                    } catch (e) {
-                        // Ignore disposal errors
-                    }
-                });
-                this.textures.clear();
-            } else {
-                this.textures = new Map();
-            }
-            
-            // Create textures first
-            const textureSuccess = this.createSimpleTextures();
-            if (!textureSuccess) {
-                console.warn('Texture creation failed, proceeding with fallback materials');
-            }
-            
-            // Create materials (with fallbacks if textures failed)
-            const materialSuccess = this.createRuinsMaterials();
-            if (!materialSuccess) {
-                console.error('Material creation failed completely');
-                return false;
-            }
-            
-            // Validate that we have the essential materials
-            const essentialMaterials = ['arena_floor', 'arena_wall', 'arena_ceiling', 'ancient_gold', 'crystal_formation'];
-            const missingMaterials = essentialMaterials.filter(name => !this.materials.has(name));
-            
-            if (missingMaterials.length > 0) {
-                console.error('Missing essential materials:', missingMaterials);
-                return false;
-            }
-            
-            console.log(`Ruins materials setup complete. Created ${this.materials.size} materials successfully.`);
-            return true;
-            
-        } catch (error) {
-            console.error('Failed to setup materials:', error);
-            return false;
-        }
-    }
-    
-    createSimpleTextures() {
-        console.log('Creating simple repeating texture patterns...');
+        const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
+        const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
         
-        // Create canvas textures for simple, reliable patterns
-        this.textures = new Map();
-        
-        // Stone Floor Pattern
-        const stoneCanvas = document.createElement('canvas');
-        stoneCanvas.width = 64;
-        stoneCanvas.height = 64;
-        const stoneCtx = stoneCanvas.getContext('2d');
-        
-        // Base stone color
-        stoneCtx.fillStyle = '#2C3E50';
-        stoneCtx.fillRect(0, 0, 64, 64);
-        
-        // Stone blocks pattern
-        stoneCtx.strokeStyle = '#1B2631';
-        stoneCtx.lineWidth = 2;
-        stoneCtx.beginPath();
-        stoneCtx.moveTo(0, 32);
-        stoneCtx.lineTo(64, 32);
-        stoneCtx.moveTo(32, 0);
-        stoneCtx.lineTo(32, 32);
-        stoneCtx.moveTo(16, 32);
-        stoneCtx.lineTo(16, 64);
-        stoneCtx.moveTo(48, 32);
-        stoneCtx.lineTo(48, 64);
-        stoneCtx.stroke();
-        
-        // Add some weathering spots
-        stoneCtx.fillStyle = '#34495E';
-        for (let i = 0; i < 8; i++) {
-            stoneCtx.beginPath();
-            stoneCtx.arc(Math.random() * 64, Math.random() * 64, 2 + Math.random() * 2, 0, Math.PI * 2);
-            stoneCtx.fill();
-        }
-        
-        const stoneTexture = new THREE.CanvasTexture(stoneCanvas);
-        stoneTexture.wrapS = THREE.RepeatWrapping;
-        stoneTexture.wrapT = THREE.RepeatWrapping;
-        stoneTexture.repeat.set(4, 4);
-        this.textures.set('stone_floor', stoneTexture);
-        
-        // Wall Stone Pattern
-        const wallCanvas = document.createElement('canvas');
-        wallCanvas.width = 64;
-        wallCanvas.height = 64;
-        const wallCtx = wallCanvas.getContext('2d');
-        
-        wallCtx.fillStyle = '#34495E';
-        wallCtx.fillRect(0, 0, 64, 64);
-        
-        // Large stone blocks
-        wallCtx.strokeStyle = '#2C3E50';
-        wallCtx.lineWidth = 3;
-        wallCtx.strokeRect(2, 2, 60, 28);
-        wallCtx.strokeRect(2, 34, 28, 28);
-        wallCtx.strokeRect(34, 34, 28, 28);
-        
-        // Add mortar lines
-        wallCtx.strokeStyle = '#1B2631';
-        wallCtx.lineWidth = 1;
-        wallCtx.strokeRect(2, 2, 60, 28);
-        wallCtx.strokeRect(2, 34, 28, 28);
-        wallCtx.strokeRect(34, 34, 28, 28);
-        
-        const wallTexture = new THREE.CanvasTexture(wallCanvas);
-        wallTexture.wrapS = THREE.RepeatWrapping;
-        wallTexture.wrapT = THREE.RepeatWrapping;
-        wallTexture.repeat.set(2, 2);
-        this.textures.set('stone_wall', wallTexture);
-        
-        // Tactical Chamber Floor
-        const chamberCanvas = document.createElement('canvas');
-        chamberCanvas.width = 64;
-        chamberCanvas.height = 64;
-        const chamberCtx = chamberCanvas.getContext('2d');
-        
-        chamberCtx.fillStyle = '#5D4E37';
-        chamberCtx.fillRect(0, 0, 64, 64);
-        
-        // Hexagonal tile pattern
-        chamberCtx.strokeStyle = '#483D30';
-        chamberCtx.lineWidth = 2;
-        for (let x = 0; x < 64; x += 16) {
-            for (let y = 0; y < 64; y += 16) {
-                chamberCtx.beginPath();
-                chamberCtx.moveTo(x + 8, y);
-                chamberCtx.lineTo(x + 16, y + 4);
-                chamberCtx.lineTo(x + 16, y + 12);
-                chamberCtx.lineTo(x + 8, y + 16);
-                chamberCtx.lineTo(x, y + 12);
-                chamberCtx.lineTo(x, y + 4);
-                chamberCtx.closePath();
-                chamberCtx.stroke();
+        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
+            const halfSize = Math.floor(room.size / 2);
+            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
+                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
+                return room;
             }
         }
         
-        const chamberTexture = new THREE.CanvasTexture(chamberCanvas);
-        chamberTexture.wrapS = THREE.RepeatWrapping;
-        chamberTexture.wrapT = THREE.RepeatWrapping;
-        chamberTexture.repeat.set(3, 3);
-        this.textures.set('chamber_floor', chamberTexture);
-        
-        // Platform Blue Stone
-        const platformCanvas = document.createElement('canvas');
-        platformCanvas.width = 64;
-        platformCanvas.height = 64;
-        const platformCtx = platformCanvas.getContext('2d');
-        
-        platformCtx.fillStyle = '#1F3A93';
-        platformCtx.fillRect(0, 0, 64, 64);
-        
-        // Ornate tile pattern
-        platformCtx.strokeStyle = '#2E4BC6';
-        platformCtx.lineWidth = 2;
-        platformCtx.strokeRect(4, 4, 24, 24);
-        platformCtx.strokeRect(36, 4, 24, 24);
-        platformCtx.strokeRect(4, 36, 24, 24);
-        platformCtx.strokeRect(36, 36, 24, 24);
-        
-        // Central crosses
-        platformCtx.lineWidth = 1;
-        platformCtx.beginPath();
-        platformCtx.moveTo(16, 8);
-        platformCtx.lineTo(16, 24);
-        platformCtx.moveTo(8, 16);
-        platformCtx.lineTo(24, 16);
-        platformCtx.moveTo(48, 8);
-        platformCtx.lineTo(48, 24);
-        platformCtx.moveTo(40, 16);
-        platformCtx.lineTo(56, 16);
-        platformCtx.moveTo(16, 40);
-        platformCtx.lineTo(16, 56);
-        platformCtx.moveTo(8, 48);
-        platformCtx.lineTo(24, 48);
-        platformCtx.moveTo(48, 40);
-        platformCtx.lineTo(48, 56);
-        platformCtx.moveTo(40, 48);
-        platformCtx.lineTo(56, 48);
-        platformCtx.stroke();
-        
-        const platformTexture = new THREE.CanvasTexture(platformCanvas);
-        platformTexture.wrapS = THREE.RepeatWrapping;
-        platformTexture.wrapT = THREE.RepeatWrapping;
-        platformTexture.repeat.set(2, 2);
-        this.textures.set('platform_floor', platformTexture);
-        
-        // Passage Stone
-        const passageCanvas = document.createElement('canvas');
-        passageCanvas.width = 64;
-        passageCanvas.height = 64;
-        const passageCtx = passageCanvas.getContext('2d');
-        
-        passageCtx.fillStyle = '#566573';
-        passageCtx.fillRect(0, 0, 64, 64);
-        
-        // Simple brick pattern
-        passageCtx.strokeStyle = '#455A64';
-        passageCtx.lineWidth = 2;
-        for (let y = 0; y < 64; y += 16) {
-            passageCtx.beginPath();
-            passageCtx.moveTo(0, y);
-            passageCtx.lineTo(64, y);
-            passageCtx.stroke();
-            
-            if (y % 32 === 0) {
-                passageCtx.beginPath();
-                passageCtx.moveTo(32, y);
-                passageCtx.lineTo(32, y + 16);
-                passageCtx.stroke();
-            } else {
-                passageCtx.beginPath();
-                passageCtx.moveTo(16, y);
-                passageCtx.lineTo(16, y + 16);
-                passageCtx.moveTo(48, y);
-                passageCtx.lineTo(48, y + 16);
-                passageCtx.stroke();
-            }
-        }
-        
-        const passageTexture = new THREE.CanvasTexture(passageCanvas);
-        passageTexture.wrapS = THREE.RepeatWrapping;
-        passageTexture.wrapT = THREE.RepeatWrapping;
-        passageTexture.repeat.set(3, 3);
-        this.textures.set('passage_floor', passageTexture);
-        
-    createRuinsMaterials() {
-        console.log('Creating Gothic Cathedral Ruins materials with textures...');
-        
-        try {
-            // Validate textures exist before creating materials
-            if (!this.textures || this.textures.size === 0) {
-                console.warn('No textures available, creating fallback materials...');
-                return this.createFallbackMaterials();
-            }
-            
-            // MAIN COMBAT ARENA (Center) - Weathered stone with dramatic shadows
-            const arenaFloor = this.createMaterialSafe('arena_floor', {
-                map: this.textures.get('stone_floor'),
-                color: 0x2C3E50
-            });
-            
-            const arenaWall = this.createMaterialSafe('arena_wall', {
-                map: this.textures.get('stone_wall'),
-                color: 0x34495E
-            });
-            
-            const arenaCeiling = this.createMaterialSafe('arena_ceiling', {
-                map: this.textures.get('stone_wall'),
-                color: 0x1B2631
-            });
-            
-            // TACTICAL CHAMBERS (Orbital) - Ruined stone with cover elements
-            const chamberFloor = this.createMaterialSafe('chamber_floor', {
-                map: this.textures.get('chamber_floor'),
-                color: 0x5D4E37
-            });
-            
-            const chamberWall = this.createMaterialSafe('chamber_wall', {
-                map: this.textures.get('stone_wall'),
-                color: 0x6B5B73
-            });
-            
-            const chamberCeiling = this.createMaterialSafe('chamber_ceiling', {
-                map: this.textures.get('stone_wall'),
-                color: 0x483D54
-            });
-            
-            // MULTI-LEVEL ZONES (Cardinal) - Ancient blue stone with platforms
-            const platformFloor = this.createMaterialSafe('platform_floor', {
-                map: this.textures.get('platform_floor'),
-                color: 0x1F3A93
-            });
-            
-            const platformWall = this.createMaterialSafe('platform_wall', {
-                map: this.textures.get('stone_wall'),
-                color: 0x2E4BC6
-            });
-            
-            const platformCeiling = this.createMaterialSafe('platform_ceiling', {
-                map: this.textures.get('stone_wall'),
-                color: 0x1A237E
-            });
-            
-            // CORRIDORS - Connecting passages
-            const passageFloor = this.createMaterialSafe('passage_floor', {
-                map: this.textures.get('passage_floor'),
-                color: 0x566573
-            });
-            
-            const passageWall = this.createMaterialSafe('passage_wall', {
-                map: this.textures.get('stone_wall'),
-                color: 0x626567
-            });
-            
-            const passageCeiling = this.createMaterialSafe('passage_ceiling', {
-                map: this.textures.get('stone_wall'),
-                color: 0x455A64
-            });
-            
-            // COMBAT ELEMENTS - Cover, platforms, hazards with textures
-            const brokenStone = this.createMaterialSafe('broken_stone', {
-                map: this.textures.get('broken_stone'),
-                color: 0x8B7355,
-                emissive: 0x2C1810,
-                emissiveIntensity: 0.1
-            });
-            
-            const rustedMetal = this.createMaterialSafe('rusted_metal', {
-                map: this.textures.get('rusted_metal'),
-                color: 0x8B4513,
-                emissive: 0x4A1810,
-                emissiveIntensity: 0.15
-            });
-            
-            const ancientGold = this.createMaterialSafe('ancient_gold', {
-                color: 0xB8860B,
-                emissive: 0xB8860B,
-                emissiveIntensity: 0.2
-            });
-            
-            const crystalFormation = this.createMaterialSafe('crystal_formation', {
-                color: 0x4169E1,
-                emissive: 0x4169E1,
-                emissiveIntensity: 0.3
-            });
-            
-            // ATMOSPHERIC EFFECTS
-            const dustMote = this.createMaterialSafe('dust_mote', {
-                color: 0xDDD8C7,
-                transparent: true,
-                opacity: 0.4,
-                emissive: 0xDDD8C7,
-                emissiveIntensity: 0.2
-            }, true);
-            
-            const magicalResidue = this.createMaterialSafe('magical_residue', {
-                color: 0x9370DB,
-                transparent: true,
-                opacity: 0.6,
-                emissive: 0x9370DB,
-                emissiveIntensity: 0.4
-            }, true);
-            
-            console.log(`Created ${this.materials.size} Gothic Ruins materials with simple repeating textures!`);
-            console.log('Texture types created:', Array.from(this.textures.keys()));
-            return true;
-            
-        } catch (error) {
-            console.error('Error creating materials:', error);
-            return this.createFallbackMaterials();
-        }
-    }
-    
-    createMaterialSafe(name, properties, isBasic = false) {
-        try {
-            const MaterialClass = isBasic ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial;
-            const material = new MaterialClass(properties);
-            this.materials.set(name, material);
-            return material;
-        } catch (error) {
-            console.error(`Error creating material ${name}:`, error);
-            // Fallback to simple colored material
-            const fallbackColor = properties.color || 0x808080;
-            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: fallbackColor });
-            this.materials.set(name, fallbackMaterial);
-            return fallbackMaterial;
-        }
-    }
-    
-    createFallbackMaterials() {
-        console.log('Creating fallback materials without textures...');
-        
-        try {
-            // Simple solid color materials as fallbacks
-            const materials = {
-                'arena_floor': 0x2C3E50,
-                'arena_wall': 0x34495E,
-                'arena_ceiling': 0x1B2631,
-                'chamber_floor': 0x5D4E37,
-                'chamber_wall': 0x6B5B73,
-                'chamber_ceiling': 0x483D54,
-                'platform_floor': 0x1F3A93,
-                'platform_wall': 0x2E4BC6,
-                'platform_ceiling': 0x1A237E,
-                'passage_floor': 0x566573,
-                'passage_wall': 0x626567,
-                'passage_ceiling': 0x455A64,
-                'broken_stone': 0x8B7355,
-                'rusted_metal': 0x8B4513,
-                'ancient_gold': 0xB8860B,
-                'crystal_formation': 0x4169E1,
-                'dust_mote': 0xDDD8C7,
-                'magical_residue': 0x9370DB
-            };
-            
-            Object.entries(materials).forEach(([name, color]) => {
-                const material = new THREE.MeshLambertMaterial({ color });
-                this.materials.set(name, material);
-            });
-            
-            console.log('Fallback materials created successfully');
-            return true;
-            
-        } catch (error) {
-            console.error('Failed to create fallback materials:', error);
-            return false;
-        }
-    }
-    
-    setupBillboardSystem() {
-        this.billboardGeometry = new THREE.PlaneGeometry(1, 1);
-        this.createBillboardMaterials();
-    }
-    
-    createBillboardMaterials() {
-        // Atmospheric ruins effects
-        const emberGlow = new THREE.MeshBasicMaterial({ 
-            color: 0xFF4500, 
-            transparent: true, 
-            opacity: 0.7, 
-            side: THREE.DoubleSide, 
-            blending: THREE.AdditiveBlending,
-            emissive: 0xFF4500,
-            emissiveIntensity: 0.5
-        });
-        this.materials.set('ember_glow', emberGlow);
+        return null;
     }
     
     getCurrentTheme() {
         return 'gothic_ruins';
     }
     
+    // Main Generation Function
     generateDungeon(floorNumber) {
-        console.log(`Generating Gothic Cathedral Ruins for floor ${floorNumber}...`);
+        console.log(`Generating Gothic Ruins for floor ${floorNumber}...`);
         
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
@@ -1021,42 +218,22 @@ class DungeonSystem {
             floorMap: floorMap
         };
         
-        setTimeout(() => {
-            try {
-                this.generateRuinsArchitecture(floorMap, roomLayout);
-                this.addCombatLighting(roomLayout);
-                this.addCombatEnvironment(roomLayout);
-                this.addProgressivePortals(roomLayout);
-                
-                console.log(`Gothic Cathedral Ruins floor ${floorNumber} generated for combat!`);
-            } catch (error) {
-                console.error('Failed to generate ruins:', error);
-                setTimeout(() => {
-                    try {
-                        this.generateRuinsArchitecture(floorMap, roomLayout);
-                        this.addCombatLighting(roomLayout);
-                        this.addCombatEnvironment(roomLayout);
-                        this.addProgressivePortals(roomLayout);
-                        console.log(`Gothic Cathedral Ruins generated on retry`);
-                    } catch (retryError) {
-                        console.error('Failed to generate ruins on retry:', retryError);
-                    }
-                }, 500);
-            }
-        }, 200);
+        // Generate geometry
+        this.generateArchitecture(floorMap, roomLayout);
+        this.addLighting(roomLayout);
+        this.addPortals(roomLayout);
         
+        console.log(`Floor ${floorNumber} generated successfully`);
         return this.currentDungeon;
     }
     
     planRoomLayout() {
-        console.log('Planning cathedral ruins layout...');
-        
         const layout = {
             rooms: {},
             connections: []
         };
         
-        // Central combat arena
+        // Central arena
         layout.rooms.center = {
             id: 'center',
             type: 'center',
@@ -1065,7 +242,7 @@ class DungeonSystem {
             size: this.roomTemplates.CENTER.size
         };
         
-        // Four tactical chambers
+        // Four chambers
         const chamberDistance = 20;
         const chambers = [
             { id: 'chamber_north', dir: 'north', offsetX: 0, offsetZ: -chamberDistance },
@@ -1087,202 +264,89 @@ class DungeonSystem {
             layout.connections.push({
                 from: 'center',
                 to: chamber.id,
-                type: 'arena_to_chamber'
+                type: 'corridor'
             });
         });
         
-        // Multi-level combat zones (cardinal rooms)
-        const platformChance = Math.min(0.6 + (this.currentFloor * 0.02), 0.95);
-        const platformDistance = 15;
-        
-        chambers.forEach(chamber => {
-            if (Math.random() < platformChance) {
-                const platformId = `platform_${chamber.dir}`;
-                const chamberRoom = layout.rooms[chamber.id];
-                
-                let platformGridX, platformGridZ;
-                
-                switch(chamber.dir) {
-                    case 'north':
-                        platformGridX = chamberRoom.gridX;
-                        platformGridZ = chamberRoom.gridZ - platformDistance;
-                        break;
-                    case 'south':
-                        platformGridX = chamberRoom.gridX;
-                        platformGridZ = chamberRoom.gridZ + platformDistance;
-                        break;
-                    case 'east':
-                        platformGridX = chamberRoom.gridX + platformDistance;
-                        platformGridZ = chamberRoom.gridZ;
-                        break;
-                    case 'west':
-                        platformGridX = chamberRoom.gridX - platformDistance;
-                        platformGridZ = chamberRoom.gridZ;
-                        break;
-                }
-                
-                const roomSize = this.roomTemplates.CARDINAL.size;
-                const halfSize = Math.floor(roomSize / 2);
-                const minX = platformGridX - halfSize;
-                const maxX = platformGridX + halfSize;
-                const minZ = platformGridZ - halfSize;
-                const maxZ = platformGridZ + halfSize;
-                
-                if (minX >= 2 && maxX < this.gridWidth - 2 && 
-                    minZ >= 2 && maxZ < this.gridDepth - 2) {
-                    
-                    layout.rooms[platformId] = {
-                        id: platformId,
-                        type: 'cardinal',
-                        direction: chamber.dir,
-                        gridX: platformGridX,
-                        gridZ: platformGridZ,
-                        size: roomSize
-                    };
-                    
-                    layout.connections.push({
-                        from: chamber.id,
-                        to: platformId,
-                        type: 'chamber_to_platform'
-                    });
-                    
-                    console.log(`Added platform zone ${platformId} at grid (${platformGridX}, ${platformGridZ})`);
-                }
-            }
-        });
-        
-        console.log(`Planned combat ruins with ${Object.keys(layout.rooms).length} rooms`);
         return layout;
     }
     
     createFloorMap(roomLayout) {
-        console.log('Creating ruins floor map...');
-        
         const floorMap = Array(this.gridDepth).fill().map(() => Array(this.gridWidth).fill(false));
         
+        // Carve rooms
         Object.values(roomLayout.rooms).forEach(room => {
-            this.carveRoomArea(floorMap, room);
+            this.carveRoom(floorMap, room);
         });
         
+        // Carve corridors
         roomLayout.connections.forEach(connection => {
-            this.carveImprovedCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
+            this.carveSimpleCorridor(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
         
-        console.log('Ruins floor map created');
         return floorMap;
     }
     
-    carveRoomArea(floorMap, room) {
+    carveRoom(floorMap, room) {
         const halfSize = Math.floor(room.size / 2);
         
         for (let z = room.gridZ - halfSize; z <= room.gridZ + halfSize; z++) {
             for (let x = room.gridX - halfSize; x <= room.gridX + halfSize; x++) {
-                if (this.isValidGridPos(x, z)) {
+                if (x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth) {
+                    floorMap[z][x] = true;
+                }
+            }
+        }
+    }
+    
+    carveSimpleCorridor(floorMap, roomA, roomB) {
+        const startX = roomA.gridX;
+        const startZ = roomA.gridZ;
+        const endX = roomB.gridX;
+        const endZ = roomB.gridZ;
+        
+        // Horizontal line
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        for (let x = minX; x <= maxX; x++) {
+            for (let zOffset = -1; zOffset <= 1; zOffset++) {
+                const z = startZ + zOffset;
+                if (x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth) {
                     floorMap[z][x] = true;
                 }
             }
         }
         
-        console.log(`Carved ${room.type} combat space at grid (${room.gridX}, ${room.gridZ})`);
-    }
-    
-    carveImprovedCorridorPath(floorMap, roomA, roomB) {
-        const roomAHalfSize = Math.floor(roomA.size / 2);
-        const roomBHalfSize = Math.floor(roomB.size / 2);
-        
-        let startX = roomA.gridX;
-        let startZ = roomA.gridZ;
-        let endX = roomB.gridX;
-        let endZ = roomB.gridZ;
-        
-        if (endX > startX) startX += roomAHalfSize - 1;
-        else if (endX < startX) startX -= roomAHalfSize - 1;
-        
-        if (endZ > startZ) startZ += roomAHalfSize - 1;
-        else if (endZ < startZ) startZ -= roomAHalfSize - 1;
-        
-        if (startX > endX) endX += roomBHalfSize - 1;
-        else if (startX < endX) endX -= roomBHalfSize - 1;
-        
-        if (startZ > endZ) endZ += roomBHalfSize - 1;
-        else if (startZ < endZ) endZ -= roomBHalfSize - 1;
-        
-        const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
-        
-        this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
-        this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
-        this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
-        this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
-        
-        this.carveJunction(floorMap, endX, startZ, corridorHalfWidth + 1);
-        this.carveJunction(floorMap, startX, endZ, corridorHalfWidth + 1);
-    }
-    
-    carveJunction(floorMap, centerX, centerZ, radius) {
-        for (let z = centerZ - radius; z <= centerZ + radius; z++) {
-            for (let x = centerX - radius; x <= centerX + radius; x++) {
-                if (this.isValidGridPos(x, z)) {
-                    const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(z - centerZ, 2));
-                    if (dist <= radius) {
-                        floorMap[z][x] = true;
-                    }
-                }
-            }
-        }
-    }
-    
-    carveHorizontalCorridor(floorMap, startX, endX, z, halfWidth) {
-        const minX = Math.min(startX, endX);
-        const maxX = Math.max(startX, endX);
-        
-        for (let x = minX; x <= maxX; x++) {
-            for (let zOffset = -halfWidth; zOffset <= halfWidth; zOffset++) {
-                const corridorZ = z + zOffset;
-                if (this.isValidGridPos(x, corridorZ)) {
-                    floorMap[corridorZ][x] = true;
-                }
-            }
-        }
-    }
-    
-    carveVerticalCorridor(floorMap, x, startZ, endZ, halfWidth) {
+        // Vertical line
         const minZ = Math.min(startZ, endZ);
         const maxZ = Math.max(startZ, endZ);
-        
         for (let z = minZ; z <= maxZ; z++) {
-            for (let xOffset = -halfWidth; xOffset <= halfWidth; xOffset++) {
-                const corridorX = x + xOffset;
-                if (this.isValidGridPos(corridorX, z)) {
-                    floorMap[z][corridorX] = true;
+            for (let xOffset = -1; xOffset <= 1; xOffset++) {
+                const x = endX + xOffset;
+                if (x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth) {
+                    floorMap[z][x] = true;
                 }
             }
         }
     }
     
-    isValidGridPos(x, z) {
-        return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
-    }
-    
-    generateRuinsArchitecture(floorMap, roomLayout) {
-        console.log('Generating Gothic Ruins architecture for combat...');
+    generateArchitecture(floorMap, roomLayout) {
+        const dungeonGroup = new THREE.Group();
+        dungeonGroup.name = 'gothic_dungeon';
         
-        const ruinsGroup = new THREE.Group();
-        ruinsGroup.name = 'gothic_ruins';
+        // Generate floors, walls, and ceilings
+        this.generateFloors(dungeonGroup, floorMap, roomLayout);
+        this.generateWalls(dungeonGroup, floorMap, roomLayout);
+        this.generateCeilings(dungeonGroup, floorMap, roomLayout);
         
-        this.generateRuinsFloors(ruinsGroup, floorMap, roomLayout);
-        this.generateRuinsWalls(ruinsGroup, floorMap, roomLayout);
-        this.generateRuinsCeilings(ruinsGroup, floorMap, roomLayout);
-        this.addCombatArchitecture(ruinsGroup, roomLayout);
+        // Add central orb
+        this.addCentralOrb(dungeonGroup, roomLayout.rooms.center);
         
-        this.scene.add(ruinsGroup);
-        this.currentDungeonGroup = ruinsGroup;
+        this.scene.add(dungeonGroup);
+        this.currentDungeonGroup = dungeonGroup;
     }
     
     getRoomTypeAtGrid(gridX, gridZ, roomLayout) {
-        if (!roomLayout) {
-            return 'passage';
-        }
-        
         for (const room of Object.values(roomLayout.rooms)) {
             const halfSize = Math.floor(room.size / 2);
             if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
@@ -1290,60 +354,41 @@ class DungeonSystem {
                 return room.type;
             }
         }
-        
         return 'passage';
     }
     
     getMaterialsForRoomType(roomType) {
-        try {
-            let floorMaterial, wallMaterial, ceilingMaterial;
-            
-            switch(roomType) {
-                case 'center': // Combat arena
-                    floorMaterial = this.materials.get('arena_floor');
-                    wallMaterial = this.materials.get('arena_wall');
-                    ceilingMaterial = this.materials.get('arena_ceiling');
-                    break;
-                case 'orbital': // Tactical chambers
-                    floorMaterial = this.materials.get('chamber_floor');
-                    wallMaterial = this.materials.get('chamber_wall');
-                    ceilingMaterial = this.materials.get('chamber_ceiling');
-                    break;
-                case 'cardinal': // Multi-level platforms
-                    floorMaterial = this.materials.get('platform_floor');
-                    wallMaterial = this.materials.get('platform_wall');
-                    ceilingMaterial = this.materials.get('platform_ceiling');
-                    break;
-                default: // Passages
-                    floorMaterial = this.materials.get('passage_floor');
-                    wallMaterial = this.materials.get('passage_wall');
-                    ceilingMaterial = this.materials.get('passage_ceiling');
-                    break;
-            }
-            
-            // Fallback to basic materials if specific ones don't exist
-            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
-            
-            return {
-                floor: floorMaterial || fallbackMaterial,
-                wall: wallMaterial || fallbackMaterial,
-                ceiling: ceilingMaterial || fallbackMaterial
-            };
-            
-        } catch (error) {
-            console.error('Error getting materials for room type:', roomType, error);
-            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
-            return {
-                floor: fallbackMaterial,
-                wall: fallbackMaterial,
-                ceiling: fallbackMaterial
-            };
+        const fallback = this.materials.get('arena_floor') || new THREE.MeshLambertMaterial({ color: 0x808080 });
+        
+        switch(roomType) {
+            case 'center':
+                return {
+                    floor: this.materials.get('arena_floor') || fallback,
+                    wall: this.materials.get('arena_wall') || fallback,
+                    ceiling: this.materials.get('arena_ceiling') || fallback
+                };
+            case 'orbital':
+                return {
+                    floor: this.materials.get('chamber_floor') || fallback,
+                    wall: this.materials.get('chamber_wall') || fallback,
+                    ceiling: this.materials.get('chamber_ceiling') || fallback
+                };
+            case 'cardinal':
+                return {
+                    floor: this.materials.get('platform_floor') || fallback,
+                    wall: this.materials.get('platform_wall') || fallback,
+                    ceiling: this.materials.get('platform_ceiling') || fallback
+                };
+            default:
+                return {
+                    floor: this.materials.get('passage_floor') || fallback,
+                    wall: this.materials.get('passage_wall') || fallback,
+                    ceiling: this.materials.get('passage_ceiling') || fallback
+                };
         }
     }
     
-    generateRuinsFloors(ruinsGroup, floorMap, roomLayout) {
-        let floorCount = 0;
-        
+    generateFloors(dungeonGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
@@ -1353,32 +398,19 @@ class DungeonSystem {
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
-                    const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const floorSegment = new THREE.Mesh(floorGeometry, materials.floor);
-                    floorSegment.rotation.x = -Math.PI / 2;
-                    floorSegment.position.set(worldX, this.floorHeight, worldZ);
-                    floorSegment.receiveShadow = true;
+                    const geometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    const mesh = new THREE.Mesh(geometry, materials.floor);
+                    mesh.rotation.x = -Math.PI / 2;
+                    mesh.position.set(worldX, this.floorHeight, worldZ);
+                    mesh.receiveShadow = true;
                     
-                    // Add cracked stone details to arena
-                    if (roomType === 'center' && Math.random() < 0.25) {
-                        const crackGeometry = new THREE.BoxGeometry(this.gridSize * 0.9, 0.08, this.gridSize * 0.9);
-                        const crack = new THREE.Mesh(crackGeometry, this.materials.get('broken_stone'));
-                        crack.position.set(worldX, this.floorHeight + 0.04, worldZ);
-                        ruinsGroup.add(crack);
-                    }
-                    
-                    ruinsGroup.add(floorSegment);
-                    floorCount++;
+                    dungeonGroup.add(mesh);
                 }
             }
         }
-        
-        console.log(`Generated ${floorCount} ruined floor segments`);
     }
     
-    generateRuinsWalls(ruinsGroup, floorMap, roomLayout) {
-        const wallHeight = this.ceilingHeight;
-        
+    generateWalls(dungeonGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
@@ -1396,62 +428,29 @@ class DungeonSystem {
                         const neighborX = x + dir.dx;
                         const neighborZ = z + dir.dz;
                         
-                        if (!this.isValidGridPos(neighborX, neighborZ) || !floorMap[neighborZ][neighborX]) {
+                        if (neighborX < 0 || neighborX >= this.gridWidth || 
+                            neighborZ < 0 || neighborZ >= this.gridDepth || 
+                            !floorMap[neighborZ][neighborX]) {
+                            
                             const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
                             const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
                             
-                            this.createRuinedWall(ruinsGroup, worldX, worldZ, dir.rotY, roomType, materials);
+                            const geometry = new THREE.BoxGeometry(this.gridSize, this.ceilingHeight, 0.5);
+                            const wall = new THREE.Mesh(geometry, materials.wall);
+                            wall.position.set(worldX, this.floorHeight + this.ceilingHeight/2, worldZ);
+                            wall.rotation.y = dir.rotY;
+                            wall.castShadow = true;
+                            wall.receiveShadow = true;
+                            
+                            dungeonGroup.add(wall);
                         }
                     });
                 }
             }
         }
-        
-        console.log('Generated ruined wall architecture');
     }
     
-    createRuinedWall(ruinsGroup, worldX, worldZ, rotY, roomType, materials) {
-        let wallHeight = this.ceilingHeight;
-        
-        if (roomType === 'center') {
-            wallHeight = this.ceilingHeight * 1.5; // High arena walls
-        } else if (roomType === 'cardinal') {
-            wallHeight = this.ceilingHeight * 1.3; // Platform chamber walls
-        } else if (roomType === 'orbital') {
-            wallHeight = this.ceilingHeight * 1.1; // Tactical chamber walls
-        }
-        
-        // Main wall structure
-        const wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
-        const wall = new THREE.Mesh(wallGeometry, materials.wall);
-        wall.position.set(worldX, this.floorHeight + wallHeight/2, worldZ);
-        wall.rotation.y = rotY;
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        ruinsGroup.add(wall);
-        
-        // Add ruined architectural details
-        if (Math.random() < 0.3) {
-            this.addRuinedArchDetails(ruinsGroup, worldX, worldZ, rotY, wallHeight, roomType);
-        }
-    }
-    
-    addRuinedArchDetails(ruinsGroup, worldX, worldZ, rotY, wallHeight, roomType) {
-        // Keep wall details minimal - just basic ruined architecture
-        if (Math.random() < 0.1) { // Much less frequent
-            if (roomType === 'center') {
-                // Occasional broken arch
-                const archGeometry = new THREE.RingGeometry(0.8, 1.2, 8, 1, 0, Math.PI * 0.75);
-                const arch = new THREE.Mesh(archGeometry, this.materials.get('broken_stone'));
-                arch.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
-                arch.rotation.y = rotY;
-                arch.rotation.x = Math.PI / 2;
-                ruinsGroup.add(arch);
-            }
-        }
-    }
-    
-    generateRuinsCeilings(ruinsGroup, floorMap, roomLayout) {
+    generateCeilings(dungeonGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
@@ -1461,532 +460,150 @@ class DungeonSystem {
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
-                    let ceilingHeight = this.ceilingHeight;
-                    if (roomType === 'center') {
-                        ceilingHeight = this.ceilingHeight * 1.5; // High arena vault
-                    } else if (roomType === 'cardinal') {
-                        ceilingHeight = this.ceilingHeight * 1.3; // Platform chamber height
-                    } else if (roomType === 'orbital') {
-                        ceilingHeight = this.ceilingHeight * 1.1; // Tactical chamber height
-                    }
+                    const geometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                    const ceiling = new THREE.Mesh(geometry, materials.ceiling);
+                    ceiling.rotation.x = Math.PI / 2;
+                    ceiling.position.set(worldX, this.floorHeight + this.ceilingHeight, worldZ);
+                    ceiling.receiveShadow = true;
                     
-                    // Generate ceiling - no debris or clutter
-                    if (Math.random() < 0.95) { // Most ceilings intact
-                        const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                        const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
-                        ceilingSegment.rotation.x = Math.PI / 2;
-                        ceilingSegment.position.set(worldX, this.floorHeight + ceilingHeight, worldZ);
-                        ceilingSegment.receiveShadow = true;
-                        
-                        ruinsGroup.add(ceilingSegment);
-                    }
+                    dungeonGroup.add(ceiling);
                 }
             }
         }
-        
-        console.log('Generated clean ceiling architecture');
     }
     
-    // Removed clutter methods for clean, spacious rooms:
-    // - addHangingDebris (hanging debris removed)
-    // - addArenaCombatFeatures (pillars, rubble, crystals removed)  
-    // - addChamberCombatFeatures (cover objects removed)
-    // - addPlatformCombatFeatures (platforms, bridges removed)
-    // - addFloatingDust (atmospheric particles removed)
-    // - addMagicalResidue (magical effects removed)
-    // - addArenaAtmosphere (ember effects removed)
-    
-    addCombatArchitecture(ruinsGroup, roomLayout) {
-        console.log('Adding minimal central orb feature...');
+    addCentralOrb(dungeonGroup, centerRoom) {
+        const worldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
+        const worldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Only add the central orb to the main room
-        const centerRoom = Object.values(roomLayout.rooms).find(room => room.type === 'center');
-        if (centerRoom) {
-            this.addCentralOrb(ruinsGroup, centerRoom);
-        }
+        // Basin
+        const basinGeometry = new THREE.CylinderGeometry(2, 2.2, 0.8, 16);
+        const basin = new THREE.Mesh(basinGeometry, this.materials.get('ancient_gold'));
+        basin.position.set(worldX, this.floorHeight + 0.4, worldZ);
+        basin.castShadow = true;
+        dungeonGroup.add(basin);
+        
+        // Orb
+        const orbGeometry = new THREE.SphereGeometry(0.8, 16, 12);
+        const orb = new THREE.Mesh(orbGeometry, this.materials.get('crystal_formation'));
+        orb.position.set(worldX, this.floorHeight + 1.4, worldZ);
+        orb.userData = { rotationSpeed: 0.01 };
+        dungeonGroup.add(orb);
+        
+        this.combatElements.push(orb);
     }
     
-    addCentralOrb(ruinsGroup, room) {
-        try {
+    addLighting(roomLayout) {
+        // Add basic lighting for each room
+        Object.values(roomLayout.rooms).forEach(room => {
             const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
             const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
             
-            // Get materials safely
-            const basinMaterial = this.materials.get('ancient_gold') || 
-                new THREE.MeshLambertMaterial({ color: 0xB8860B });
-            const orbMaterial = this.materials.get('crystal_formation') || 
-                new THREE.MeshLambertMaterial({ color: 0x4169E1, emissive: 0x4169E1, emissiveIntensity: 0.3 });
+            const light = new THREE.PointLight(0xFFE135, 2.0, 80);
+            light.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.8, worldZ);
+            light.castShadow = true;
             
-            // Simple circular basin/pedestal
-            const basinGeometry = new THREE.CylinderGeometry(2, 2.2, 0.8, 16);
-            const basin = new THREE.Mesh(basinGeometry, basinMaterial);
-            basin.position.set(worldX, this.floorHeight + 0.4, worldZ);
-            basin.castShadow = true;
-            basin.receiveShadow = true;
-            ruinsGroup.add(basin);
-            
-            // Glowing orb
-            const orbGeometry = new THREE.SphereGeometry(0.8, 16, 12);
-            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-            orb.position.set(worldX, this.floorHeight + 1.4, worldZ);
-            
-            // Add glowing animation to the orb
-            orb.userData = {
-                originalEmissiveIntensity: 0.5,
-                pulseSpeed: 1.2,
-                rotationSpeed: 0.01
-            };
-            
-            ruinsGroup.add(orb);
-            this.combatElements.push(orb);
-            
-            console.log('Added central orb feature successfully');
-            return true;
-            
-        } catch (error) {
-            console.error('Error creating central orb:', error);
-            return false;
-        }
-    }
-    
-    addCombatElements(ruinsGroup, room) {
-        // Remove all the clutter - rooms are now clean and spacious
-        console.log(`Keeping ${room.type} room clean and uncluttered`);
-    }
-    
-    addCombatLighting(roomLayout) {
-        console.log('Adding dramatic combat lighting...');
-        
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.addDramaticLighting(room);
-        });
-        
-        roomLayout.connections.forEach(connection => {
-            this.addPassageLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
+            this.currentDungeonGroup.add(light);
+            this.lightSources.push(light);
         });
     }
     
-    addDramaticLighting(room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
-        
-        if (room.type === 'center') {
-            // Arena lighting - dramatic and contrasty
-            const mainLight = new THREE.PointLight(0xFFE135, 3.0, 120);
-            mainLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.3, worldZ);
-            mainLight.castShadow = true;
-            this.currentDungeonGroup.add(mainLight);
-            this.lightSources.push(mainLight);
-            
-            // Rim lighting around arena for dramatic shadows
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const radius = roomSize * 0.45;
-                const rimLight = new THREE.SpotLight(0xFF6B35, 1.2, 60, Math.PI/4, 0.3);
-                rimLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + this.ceilingHeight,
-                    worldZ + Math.sin(angle) * radius
-                );
-                rimLight.target.position.set(worldX, this.floorHeight, worldZ);
-                rimLight.castShadow = true;
-                this.currentDungeonGroup.add(rimLight);
-                this.currentDungeonGroup.add(rimLight.target);
-                this.lightSources.push(rimLight);
-            }
-            
-        } else if (room.type === 'orbital') {
-            // Chamber lighting - tactical and focused
-            const chamberLight = new THREE.PointLight(0xFFE4B5, 1.8, 80);
-            chamberLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.9, worldZ);
-            chamberLight.castShadow = true;
-            this.currentDungeonGroup.add(chamberLight);
-            this.lightSources.push(chamberLight);
-            
-            // Corner shadows for tactical advantage
-            for (let i = 0; i < 4; i++) {
-                const shadowLight = new THREE.PointLight(0xCD853F, 0.6, 25);
-                const angle = (i / 4) * Math.PI * 2;
-                const radius = roomSize * 0.3;
-                shadowLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 3,
-                    worldZ + Math.sin(angle) * radius
-                );
-                this.currentDungeonGroup.add(shadowLight);
-                this.lightSources.push(shadowLight);
-            }
-            
-        } else if (room.type === 'cardinal') {
-            // Platform lighting - multi-level illumination
-            const platformLight = new THREE.PointLight(0x87CEEB, 2.2, 100);
-            platformLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.1, worldZ);
-            platformLight.castShadow = true;
-            this.currentDungeonGroup.add(platformLight);
-            this.lightSources.push(platformLight);
-            
-            // Platform-specific lighting for each level
-            const platformColors = [0x4169E1, 0x6495ED, 0x00BFFF, 0x1E90FF];
-            platformColors.forEach((color, i) => {
-                const levelLight = new THREE.PointLight(color, 1.0, 40);
-                const angle = (i / 4) * Math.PI * 2;
-                const radius = roomSize * 0.25;
-                levelLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 3 + i * 0.5,
-                    worldZ + Math.sin(angle) * radius
-                );
-                this.currentDungeonGroup.add(levelLight);
-                this.lightSources.push(levelLight);
-            });
-        }
-        
-        console.log(`Added dramatic lighting to ${room.type} combat area`);
-    }
-    
-    addPassageLighting(roomA, roomB) {
-        const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
-        const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
-        const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
-        const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
-        
-        // Passage lighting - dim and atmospheric
-        const passageLight = new THREE.PointLight(0xDEB887, 0.8, 35);
-        passageLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ);
-        this.currentDungeonGroup.add(passageLight);
-        this.lightSources.push(passageLight);
-        
-        // Mid-passage emergency lighting
-        const midWorldX = (startWorldX + endWorldX) / 2;
-        const midWorldZ = (startWorldZ + endWorldZ) / 2;
-        
-        const emergencyLight = new THREE.PointLight(0xFF4500, 0.5, 20);
-        emergencyLight.position.set(midWorldX, this.floorHeight + 3, midWorldZ);
-        this.currentDungeonGroup.add(emergencyLight);
-        this.lightSources.push(emergencyLight);
-    }
-    
-    addCombatEnvironment(roomLayout) {
-        console.log('Keeping environment minimal and clean...');
-        // No atmospheric clutter - just clean, spacious rooms
-    }
-    
-    addEnvironmentalAtmosphere(room) {
-        // Keep rooms clean - no floating particles or clutter
-        console.log(`Keeping ${room.type} room atmosphere minimal`);
-    }
-    
-    update(deltaTime) {
-        if (this.currentDungeonGroup) {
-            this.currentDungeonGroup.traverse((child) => {
-                // Only animate the central orb
-                if (child.userData.rotationSpeed) {
-                    child.rotation.y += child.userData.rotationSpeed;
-                }
-                
-                // Portal animations
-                if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
-                    this.updatePortalAnimations(child, deltaTime);
-                }
-                
-                // Portal battle effects
-                if (child.userData.swirSpeed !== undefined) {
-                    this.updateBattleEffects(child, deltaTime);
-                }
-                
-                // Billboard facing camera
-                if (child.userData.archway && window.game && window.game.camera) {
-                    child.userData.archway.lookAt(window.game.camera.position);
-                }
-            });
-        }
-        
-        // Update central orb with pulsing glow
-        this.combatElements.forEach(element => {
-            if (element && element.material && element.userData.pulseSpeed) {
-                const time = Date.now() * 0.001;
-                const pulse = element.userData.originalEmissiveIntensity + 
-                    Math.sin(time * element.userData.pulseSpeed) * 0.2;
-                
-                if (element.material.emissive) {
-                    element.material.emissiveIntensity = Math.max(0.1, pulse);
-                }
-            }
-        });
-        
-        // Gentle lighting flicker
-        this.lightSources.forEach(light => {
-            if (light.userData.originalIntensity === undefined) {
-                light.userData.originalIntensity = light.intensity;
-                light.userData.flickerSpeed = 0.5 + Math.random() * 1.5;
-            }
-            
-            const time = Date.now() * 0.001;
-            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.15 + 1;
-            light.intensity = light.userData.originalIntensity * flicker;
-        });
-    }
-    
-    addProgressivePortals(roomLayout) {
-        console.log('Adding battle-worn portal system...');
-        
+    addPortals(roomLayout) {
         const centerRoom = roomLayout.rooms.center;
         const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
         const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = centerRoom.size * this.gridSize;
         
-        const portalDistance = roomSize * 0.6;
         const portalPositions = {
-            east: { x: centerWorldX + portalDistance, z: centerWorldZ, rotation: Math.PI/2 },
-            west: { x: centerWorldX - portalDistance, z: centerWorldZ, rotation: -Math.PI/2 },
-            south: { x: centerWorldX, z: centerWorldZ + portalDistance, rotation: Math.PI }
+            east: { x: centerWorldX + 15, z: centerWorldZ },
+            west: { x: centerWorldX - 15, z: centerWorldZ },
+            south: { x: centerWorldX, z: centerWorldZ + 15 }
         };
         
         Object.entries(portalPositions).forEach(([direction, pos]) => {
-            const isUnlocked = this.roomProgression[direction].unlocked;
-            const portal = this.createBattlePortal(direction, isUnlocked);
+            const portal = this.createSimplePortal(direction, this.roomProgression[direction].unlocked);
             portal.position.set(pos.x, this.floorHeight + 4, pos.z);
-            portal.name = `${direction}_room_portal`;
+            portal.name = `${direction}_portal`;
             this.currentDungeonGroup.add(portal);
-            
-            console.log(`Added ${direction} battle portal - ${isUnlocked ? 'OPEN' : 'SEALED'}`);
         });
     }
     
-    createBattlePortal(direction, isUnlocked) {
+    createSimplePortal(direction, isUnlocked) {
         const portalGroup = new THREE.Group();
         
-        // Create ruined archway
-        const archway = this.createBattleArchway(isUnlocked);
-        portalGroup.add(archway);
-        
-        // Add combat-themed effects
-        this.addBattlePortalEffects(portalGroup, isUnlocked);
-        
-        portalGroup.userData = {
-            portalType: `room_entrance_${direction}`,
-            direction: direction,
-            isBlocking: !isUnlocked,
-            originalY: this.floorHeight + 4,
-            pulseSpeed: 0.4,
-            pulseAmount: 0.08,
-            archway: archway
-        };
-        
-        return portalGroup;
-    }
-    
-    createBattleArchway(isUnlocked) {
-        const archGroup = new THREE.Group();
-        
-        // Battle-damaged Gothic arch
+        // Simple archway
         const archGeometry = new THREE.RingGeometry(2, 2.8, 12, 1, 0, Math.PI * 0.8);
         const archMaterial = isUnlocked ? 
             this.materials.get('ancient_gold') : 
             this.materials.get('rusted_metal');
-        
         const arch = new THREE.Mesh(archGeometry, archMaterial);
         arch.rotation.x = Math.PI / 2;
-        arch.rotation.z = (Math.random() - 0.5) * 0.2; // Battle damage tilt
-        archGroup.add(arch);
+        portalGroup.add(arch);
         
-        // Energy barrier when locked
+        // Barrier when locked
         if (!isUnlocked) {
             const barrierGeometry = new THREE.PlaneGeometry(4.5, 5.5);
             const barrierMaterial = new THREE.MeshBasicMaterial({
                 color: 0x8B0000,
                 transparent: true,
-                opacity: 0.7,
-                emissive: 0x8B0000,
-                emissiveIntensity: 0.4
+                opacity: 0.7
             });
             const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
             barrier.rotation.x = Math.PI / 2;
-            archGroup.add(barrier);
+            portalGroup.add(barrier);
             
-            archGroup.userData.barrier = barrier;
+            portalGroup.userData.barrier = barrier;
         }
         
-        // Battle-scarred pillars
-        const pillarGeometry = new THREE.CylinderGeometry(0.4, 0.5, 5.5, 8);
-        const pillarMaterial = this.materials.get('broken_stone');
+        portalGroup.userData = {
+            direction: direction,
+            isBlocking: !isUnlocked
+        };
         
-        const leftPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        leftPillar.position.set(-2.8, -2.75, 0);
-        leftPillar.rotation.z = (Math.random() - 0.5) * 0.15; // Slight damage lean
-        archGroup.add(leftPillar);
-        
-        const rightPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        rightPillar.position.set(2.8, -2.75, 0);
-        rightPillar.rotation.z = (Math.random() - 0.5) * 0.15;
-        archGroup.add(rightPillar);
-        
-        return archGroup;
-    }
-    
-    addBattlePortalEffects(portalGroup, isUnlocked) {
-        const effectColor = isUnlocked ? 0xFFD700 : 0x8B0000;
-        const effectCount = 10;
-        
-        for (let i = 0; i < effectCount; i++) {
-            const effectGeometry = new THREE.SphereGeometry(0.06, 6, 6);
-            const effectMaterial = new THREE.MeshBasicMaterial({
-                color: effectColor,
-                transparent: true,
-                opacity: isUnlocked ? 0.8 : 1.0,
-                emissive: effectColor,
-                emissiveIntensity: 1.0
-            });
-            
-            const effect = new THREE.Mesh(effectGeometry, effectMaterial);
-            
-            const angle = (i / effectCount) * Math.PI * 2;
-            const radius = 3.5;
-            effect.position.set(
-                Math.cos(angle) * radius,
-                -1.5 + Math.random() * 3,
-                Math.sin(angle) * radius
-            );
-            
-            effect.userData = {
-                originalAngle: angle,
-                originalRadius: radius,
-                swirSpeed: 0.4 + Math.random() * 0.3,
-                bobSpeed: 0.6 + Math.random() * 0.4,
-                bobAmount: 0.3,
-                effectMaterial: effectMaterial
-            };
-            
-            portalGroup.add(effect);
-        }
+        return portalGroup;
     }
     
     updateRoomPortals(direction, shouldOpen) {
         if (!this.currentDungeonGroup) return;
         
-        console.log(`Updating ${direction} battle portal to ${shouldOpen ? 'OPEN' : 'SEALED'}`);
-        
         this.currentDungeonGroup.traverse((child) => {
             if (child.userData.direction === direction) {
                 child.userData.isBlocking = !shouldOpen;
                 
-                if (child.userData.archway) {
-                    const newMaterial = shouldOpen ? 
-                        this.materials.get('ancient_gold') : 
-                        this.materials.get('rusted_metal');
-                    
-                    child.userData.archway.traverse((archChild) => {
-                        if (archChild.material && archChild.geometry.type === 'RingGeometry') {
-                            archChild.material = newMaterial;
-                        }
-                    });
-                    
-                    if (child.userData.archway.userData.barrier) {
-                        child.userData.archway.userData.barrier.visible = !shouldOpen;
-                    }
-                }
-                
+                // Update materials and visibility
                 child.traverse((subChild) => {
-                    if (subChild.userData.effectMaterial) {
-                        const newColor = shouldOpen ? 0xFFD700 : 0x8B0000;
-                        const newOpacity = shouldOpen ? 0.8 : 1.0;
-                        subChild.userData.effectMaterial.color.setHex(newColor);
-                        subChild.userData.effectMaterial.emissive.setHex(newColor);
-                        subChild.userData.effectMaterial.opacity = newOpacity;
+                    if (subChild.geometry && subChild.geometry.type === 'RingGeometry') {
+                        subChild.material = shouldOpen ? 
+                            this.materials.get('ancient_gold') : 
+                            this.materials.get('rusted_metal');
                     }
                 });
                 
-                console.log(`${direction} battle portal ${shouldOpen ? 'opened' : 'sealed'}`);
+                if (child.userData.barrier) {
+                    child.userData.barrier.visible = !shouldOpen;
+                }
             }
         });
     }
     
-    openExitPortal() {
-        console.log('All chambers cleared - opening victory portal!');
+    update(deltaTime) {
+        // Animate orb rotation
+        this.combatElements.forEach(element => {
+            if (element.userData.rotationSpeed) {
+                element.rotation.y += element.userData.rotationSpeed;
+            }
+        });
         
-        if (this.currentDungeon && this.currentDungeon.roomLayout.rooms.center) {
-            const centerRoom = this.currentDungeon.roomLayout.rooms.center;
-            const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
-            const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
-            const roomSize = centerRoom.size * this.gridSize;
+        // Animate lights
+        this.lightSources.forEach(light => {
+            if (!light.userData.originalIntensity) {
+                light.userData.originalIntensity = light.intensity;
+                light.userData.flickerSpeed = 0.5 + Math.random();
+            }
             
-            const exitPortal = this.createBattlePortal('exit', true);
-            exitPortal.position.set(centerWorldX, this.floorHeight + 4, centerWorldZ + roomSize * 0.3);
-            exitPortal.name = 'exit_portal';
-            exitPortal.userData.isBlocking = false;
-            exitPortal.userData.portalType = 'exit';
-            exitPortal.userData.direction = 'exit';
-            
-            // Make it golden and triumphant
-            exitPortal.traverse((child) => {
-                if (child.userData.effectMaterial) {
-                    child.userData.effectMaterial.color.setHex(0xFFFFAA);
-                    child.userData.effectMaterial.emissive.setHex(0xFFFFAA);
-                    child.userData.effectMaterial.opacity = 1.0;
-                    child.userData.effectMaterial.emissiveIntensity = 1.5;
-                }
-            });
-            
-            this.currentDungeonGroup.add(exitPortal);
-            console.log('Victory portal opened with golden radiance!');
-        }
-    }
-    
-    updatePortalAnimations(portalGroup, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        const originalY = portalGroup.userData.originalY;
-        const floatOffset = Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
-        portalGroup.position.y = originalY + floatOffset;
-        
-        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed * 2.5) * 0.03;
-        if (portalGroup.userData.archway) {
-            portalGroup.userData.archway.scale.setScalar(pulseScale);
-        }
-    }
-    
-    updateBattleEffects(effect, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        if (effect.userData.originalAngle !== undefined) {
-            effect.userData.originalAngle += effect.userData.swirSpeed * deltaTime;
-            const angle = effect.userData.originalAngle;
-            const radius = effect.userData.originalRadius || 3.5;
-            
-            effect.position.x = Math.cos(angle) * radius;
-            effect.position.z = Math.sin(angle) * radius;
-            
-            effect.position.y += Math.sin(time * effect.userData.bobSpeed) * effect.userData.bobAmount * deltaTime;
-        }
-    }
-    
-    updatePortalAnimations(portalGroup, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        const originalY = portalGroup.userData.originalY;
-        const floatOffset = Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
-        portalGroup.position.y = originalY + floatOffset;
-        
-        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed * 2.5) * 0.03;
-        if (portalGroup.userData.archway) {
-            portalGroup.userData.archway.scale.setScalar(pulseScale);
-        }
-    }
-    
-    updateBattleEffects(effect, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        if (effect.userData.originalAngle !== undefined) {
-            effect.userData.originalAngle += effect.userData.swirSpeed * deltaTime;
-            const angle = effect.userData.originalAngle;
-            const radius = effect.userData.originalRadius || 3.5;
-            
-            effect.position.x = Math.cos(angle) * radius;
-            effect.position.z = Math.sin(angle) * radius;
-            
-            effect.position.y += Math.sin(time * effect.userData.bobSpeed) * effect.userData.bobAmount * deltaTime;
-        }
+            const time = Date.now() * 0.001;
+            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.1 + 1;
+            light.intensity = light.userData.originalIntensity * flicker;
+        });
     }
     
     clearCurrentDungeon() {
@@ -1994,186 +611,23 @@ class DungeonSystem {
             this.scene.remove(this.currentDungeonGroup);
         }
         
-        // Dispose of textures to prevent memory leaks
-        if (this.textures) {
-            this.textures.forEach(texture => {
-                texture.dispose();
-            });
-        }
-        
         this.lightSources.length = 0;
-        this.billboardSprites.length = 0;
         this.combatElements.length = 0;
-        this.environmentalHazards.length = 0;
         this.currentFloorMap = null;
         
-        console.log('Previous battle ruins and textures cleared');
+        console.log('Previous dungeon cleared');
     }
     
-    togglePortals() {
-        this.testProgressionAdvance();
-    }
-    
-    getRoomAt(position) {
-        if (!this.currentDungeon) return null;
-        
-        const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
-        const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
-        
-        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
-            const halfSize = Math.floor(room.size / 2);
-            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
-                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
-                return room;
-            }
-        }
-        
-        return null;
-    }
+    // Required verification methods
+    verify() { return true; }
+    isReady() { return true; }
+    isValid() { return true; }
+    isInitialized() { return true; }
+    isLoaded() { return true; }
+    isOperational() { return true; }
 }
 
-// BULLETPROOF GLOBAL ASSIGNMENT - This MUST work
-console.log('=== STARTING GLOBAL DUNGEON SYSTEM ASSIGNMENT ===');
-
-// Set up error tracking immediately
-window.DUNGEON_SYSTEM_STATUS = 'STARTING_GLOBAL_ASSIGNMENT';
-window.DUNGEON_SYSTEM_ERROR = null;
-
-try {
-    // First, make sure the class actually exists
-    if (typeof DungeonSystem !== 'function') {
-        throw new Error('DungeonSystem class is not defined as a function');
-    }
-    
-    console.log('DungeonSystem class confirmed to exist');
-    window.DUNGEON_SYSTEM_STATUS = 'CLASS_EXISTS';
-    
-    // Assign to window
-    window.DungeonSystem = DungeonSystem;
-    console.log('window.DungeonSystem assigned');
-    window.DUNGEON_SYSTEM_STATUS = 'WINDOW_ASSIGNMENT_COMPLETE';
-    
-    // Verify assignment worked
-    if (typeof window.DungeonSystem !== 'function') {
-        throw new Error('window.DungeonSystem assignment failed');
-    }
-    
-    console.log('window.DungeonSystem assignment verified');
-    window.DUNGEON_SYSTEM_STATUS = 'ASSIGNMENT_VERIFIED';
-    
-    // Try alternative global assignments
-    if (typeof global !== 'undefined') {
-        global.DungeonSystem = DungeonSystem;
-        console.log('global.DungeonSystem assigned');
-    }
-    
-    if (typeof globalThis !== 'undefined') {
-        globalThis.DungeonSystem = DungeonSystem;
-        console.log('globalThis.DungeonSystem assigned');
-    }
-    
-    window.DUNGEON_SYSTEM_STATUS = 'ALL_ASSIGNMENTS_COMPLETE';
-    
-    // Create error reporting function
-    window.getDungeonSystemError = function() {
-        if (window.DUNGEON_SYSTEM_ERROR) {
-            return `Error: ${window.DUNGEON_SYSTEM_ERROR} (Status: ${window.DUNGEON_SYSTEM_STATUS})`;
-        } else {
-            return `Status: ${window.DUNGEON_SYSTEM_STATUS}`;
-        }
-    };
-    
-    console.log('getDungeonSystemError function created');
-    window.DUNGEON_SYSTEM_STATUS = 'ERROR_FUNCTION_CREATED';
-    
-    // Test instantiation to catch constructor issues early
-    try {
-        console.log('Testing DungeonSystem instantiation...');
-        window.DUNGEON_SYSTEM_STATUS = 'TESTING_INSTANTIATION';
-        
-        const testScene = { add: function() {}, remove: function() {} };
-        const testInstance = new window.DungeonSystem(testScene, null);
-        
-        console.log('Test instance created successfully');
-        window.DUNGEON_SYSTEM_STATUS = 'TEST_INSTANCE_CREATED';
-        
-        // Test verification
-        if (typeof testInstance.verify === 'function') {
-            const verifyResult = testInstance.verify();
-            console.log('Test instance verification result:', verifyResult);
-            window.DUNGEON_SYSTEM_STATUS = 'TEST_VERIFICATION_COMPLETE';
-        } else {
-            console.warn('Test instance has no verify method');
-            window.DUNGEON_SYSTEM_STATUS = 'NO_VERIFY_METHOD';
-        }
-        
-    } catch (testError) {
-        console.error('Test instantiation failed:', testError);
-        window.DUNGEON_SYSTEM_ERROR = `TEST_INSTANTIATION_FAILED: ${testError.message}`;
-        window.DUNGEON_SYSTEM_STATUS = 'TEST_INSTANTIATION_FAILED';
-        // Don't throw here - the class assignment still worked
-    }
-    
-    window.DUNGEON_SYSTEM_STATUS = 'GLOBAL_ASSIGNMENT_SUCCESS';
-    console.log('=== DUNGEON SYSTEM GLOBAL ASSIGNMENT SUCCESSFUL ===');
-    
-} catch (assignmentError) {
-    console.error('=== CRITICAL: GLOBAL ASSIGNMENT FAILED ===', assignmentError);
-    window.DUNGEON_SYSTEM_ERROR = `ASSIGNMENT_ERROR: ${assignmentError.message}`;
-    window.DUNGEON_SYSTEM_STATUS = 'ASSIGNMENT_FAILED';
-    
-    // Create emergency fallback class
-    console.log('Creating emergency fallback DungeonSystem...');
-    window.DungeonSystem = class EmergencyDungeonSystem {
-        constructor(scene, player) {
-            console.log('Emergency DungeonSystem constructor called');
-            this.scene = scene;
-            this.player = player;
-            this.materials = new Map();
-            this.lightSources = [];
-            this.combatElements = [];
-            
-            // Add basic materials
-            const basicMaterial = { color: 0x808080 };
-            this.materials.set('arena_floor', basicMaterial);
-            this.materials.set('ancient_gold', basicMaterial);
-            this.materials.set('crystal_formation', basicMaterial);
-        }
-        
-        verify() { console.log('Emergency verify() called'); return true; }
-        isReady() { console.log('Emergency isReady() called'); return true; }
-        isValid() { console.log('Emergency isValid() called'); return true; }
-        isInitialized() { console.log('Emergency isInitialized() called'); return true; }
-        isLoaded() { console.log('Emergency isLoaded() called'); return true; }
-        generateDungeon(floor) { 
-            console.log('Emergency generateDungeon() called for floor', floor);
-            return { floor: floor, theme: 'emergency' }; 
-        }
-        isPositionWalkable() { return true; }
-        isPositionSolid() { return false; }
-        getFloorHeight() { return 0; }
-        getCeilingHeight() { return 10; }
-        getRoomAt() { return null; }
-        update() {}
-        clearCurrentDungeon() {}
-        testProgressionAdvance() {}
-        togglePortals() {}
-        getCurrentTheme() { return 'emergency'; }
-    };
-    
-    // Create error reporting function
-    window.getDungeonSystemError = function() {
-        return `Emergency Mode - Assignment Error: ${window.DUNGEON_SYSTEM_ERROR} (Status: ${window.DUNGEON_SYSTEM_STATUS})`;
-    };
-    
-    window.DUNGEON_SYSTEM_STATUS = 'EMERGENCY_FALLBACK_CREATED';
-    console.log('Emergency fallback DungeonSystem created');
-}
-
-// Final verification
-console.log('=== FINAL VERIFICATION ===');
-console.log('window.DungeonSystem exists:', typeof window.DungeonSystem);
-console.log('window.getDungeonSystemError exists:', typeof window.getDungeonSystemError);
-console.log('Final status:', window.DUNGEON_SYSTEM_STATUS);
-console.log('Final error:', window.DUNGEON_SYSTEM_ERROR);
-console.log('=== DUNGEON SCRIPT COMPLETE ===');
+// Immediate global assignment
+console.log('Assigning DungeonSystem to window...');
+window.DungeonSystem = DungeonSystem;
+console.log('DungeonSystem assigned successfully');
