@@ -1,1699 +1,777 @@
-// Dungeon Generation System with Solid Colors and Enhanced Lighting
-// Simplified version with no texture generation - just solid colors
+// Castle Labyrinth Dungeon Generation System
 
 class DungeonSystem {
     constructor(scene, player) {
-        console.log('Initializing Unified Dungeon System...');
+        console.log('Initializing DungeonSystem...');
         
         this.scene = scene;
         this.player = player;
         
-        // Current dungeon state
-        this.currentFloor = 1;
-        this.currentDungeon = null;
-        
-        // Progressive unlock system
-        this.roomProgression = {
-            center: { unlocked: true, enemiesDefeated: false },
-            north: { unlocked: true, enemiesDefeated: false },    // Always unlocked first
-            east: { unlocked: false, enemiesDefeated: false },
-            west: { unlocked: false, enemiesDefeated: false },
-            south: { unlocked: false, enemiesDefeated: false }
-        };
-        this.progressionOrder = ['north', 'east', 'west', 'south'];
-        this.currentProgressionIndex = 0;
-        
-        // Grid-based floor planning
-        this.gridSize = 2; // 2 units per grid cell
-        this.dungeonWidth = 180; // Increased to 180 for cardinal rooms
-        this.dungeonDepth = 180; // Increased to 180 for cardinal rooms
-        this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
-        this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
-        
-        // Room templates
-        this.roomTemplates = {
-            CENTER: { size: 13, type: 'center' },    // 26x26 units
-            ORBITAL: { size: 10, type: 'orbital' },  // 20x20 units  
-            CARDINAL: { size: 12, type: 'cardinal' } // 24x24 units
-        };
-        
-        // Corridor width in grid cells
-        this.corridorWidth = 3; // Increased from 2 to 3 for better connectivity
-        
-        // Collision and height data
-        this.floorHeight = 0; // Base floor height
-        this.ceilingHeight = 8; // Ceiling height from floor
-        this.currentFloorMap = null; // For collision detection
-        
-        // Materials and lighting (single theme)
-        this.materials = new Map();
-        this.lightSources = [];
-        this.billboardSprites = [];
-        this.glowingPillars = []; // Track pillars for glow animation
-        
-        // Initialize synchronously now
-        this.init();
-    }
-    
-    init() {
-        this.setupMaterials();
-        this.setupBillboardSystem();
-        
-        // Connect player to this dungeon system for collision detection
-        if (this.player) {
+        // Connect player to this dungeon system for collision
+        if (this.player && this.player.setDungeonSystem) {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Unified Dungeon System initialized with solid colors');
-    }
-    
-    // Progressive Unlock System
-    resetProgression() {
+        // Dungeon state
+        this.currentFloor = 1;
+        this.currentDungeonGroup = null;
+        this.dungeonSize = 60; // Total dungeon area size
+        this.roomSize = 25; // Size of each room
+        this.wallHeight = 6;
+        this.currentTheme = 'stone';
+        
+        // Collision grid for pathfinding (higher resolution)
+        this.gridSize = 120; // 2x dungeon size for better precision
+        this.cellSize = this.dungeonSize / this.gridSize;
+        this.collisionGrid = [];
+        
+        // Room progression system
         this.roomProgression = {
-            center: { unlocked: true, enemiesDefeated: false },
             north: { unlocked: true, enemiesDefeated: false },
             east: { unlocked: false, enemiesDefeated: false },
             west: { unlocked: false, enemiesDefeated: false },
             south: { unlocked: false, enemiesDefeated: false }
         };
-        this.currentProgressionIndex = 0;
-        console.log('Room progression reset - only center and north rooms accessible');
-    }
-    
-    defeatEnemiesInRoom(roomDirection) {
-        console.log(`Attempting to defeat enemies in ${roomDirection} room...`);
         
-        if (this.roomProgression[roomDirection]) {
-            this.roomProgression[roomDirection].enemiesDefeated = true;
-            console.log(`Enemies defeated in ${roomDirection} room`);
-            
-            // Check if this unlocks the next room
-            this.checkProgressionUnlock();
-        } else {
-            console.error(`Room ${roomDirection} not found in progression!`);
-        }
-    }
-    
-    checkProgressionUnlock() {
-        console.log('Checking progression unlock...');
+        // Portal management
+        this.portals = [];
+        this.portalMasks = [];
         
-        try {
-            if (this.currentProgressionIndex >= this.progressionOrder.length) {
-                console.log('Already at max progression');
-                return;
+        // Materials cache
+        this.materials = {};
+        this.geometries = {};
+        
+        // Theme definitions
+        this.themes = {
+            stone: {
+                name: 'Stone Castle',
+                wallColor: 0x8B7355,
+                floorColor: 0x696969,
+                ceilingColor: 0x2F4F4F,
+                ambientColor: 0x404040,
+                lightColor: 0xFFE4B5,
+                lightIntensity: 0.8,
+                fogColor: 0x1a1a2e,
+                decorations: ['torch', 'banner', 'pillar']
+            },
+            dark: {
+                name: 'Dark Fortress',
+                wallColor: 0x2F2F2F,
+                floorColor: 0x1C1C1C,
+                ceilingColor: 0x0F0F0F,
+                ambientColor: 0x1a1a1a,
+                lightColor: 0x8B0000,
+                lightIntensity: 0.6,
+                fogColor: 0x0f0f1f,
+                decorations: ['skull', 'chain', 'darkPillar']
+            },
+            cursed: {
+                name: 'Cursed Depths',
+                wallColor: 0x4B0082,
+                floorColor: 0x301934,
+                ceilingColor: 0x191919,
+                ambientColor: 0x2d1b3d,
+                lightColor: 0x9370DB,
+                lightIntensity: 0.7,
+                fogColor: 0x2a1a3e,
+                decorations: ['crystal', 'rune', 'cursedPillar']
+            },
+            infernal: {
+                name: 'Infernal Sanctum',
+                wallColor: 0x8B0000,
+                floorColor: 0x2F0000,
+                ceilingColor: 0x1a0000,
+                ambientColor: 0x330000,
+                lightColor: 0xFF4500,
+                lightIntensity: 0.9,
+                fogColor: 0x1f0808,
+                decorations: ['flame', 'lava', 'infernalPillar']
+            },
+            celestial: {
+                name: 'Celestial Sanctum',
+                wallColor: 0xF0F8FF,
+                floorColor: 0xE6E6FA,
+                ceilingColor: 0xB0C4DE,
+                ambientColor: 0xF5F5F5,
+                lightColor: 0xFFFFE0,
+                lightIntensity: 1.2,
+                fogColor: 0xe8e8f0,
+                decorations: ['star', 'light', 'celestialPillar']
             }
-            
-            const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-            console.log(`Checking if ${currentRoom} room is completed...`);
-            
-            if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
-                // Unlock next room in sequence
-                this.currentProgressionIndex++;
-                console.log(`Moving to progression index ${this.currentProgressionIndex}`);
-                
-                if (this.currentProgressionIndex < this.progressionOrder.length) {
-                    const nextRoom = this.progressionOrder[this.currentProgressionIndex];
-                    console.log(`Unlocking ${nextRoom} room...`);
-                    
-                    this.roomProgression[nextRoom].unlocked = true;
-                    this.updateRoomPortals(nextRoom, true); // Open entrance to next room
-                    console.log(`${nextRoom} room unlocked!`);
-                } else {
-                    // All orbital rooms completed - open exit portal
-                    console.log('All orbital rooms completed!');
-                    this.openExitPortal();
-                    console.log('All rooms completed - exit portal opened!');
-                }
-            } else {
-                console.log(`${currentRoom} room not yet completed`);
-            }
-        } catch (error) {
-            console.error('Error in checkProgressionUnlock:', error);
-        }
-    }
-    
-    // For testing - cycles through the progression
-    testProgressionAdvance() {
-        const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-        this.defeatEnemiesInRoom(currentRoom);
-    }
-    
-    // Collision Detection Methods
-    isPositionWalkable(worldX, worldZ) {
-        if (!this.currentFloorMap) return true;
-        
-        // Convert world coordinates to grid coordinates with symmetric rounding
-        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
-        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
-        
-        // Check bounds
-        if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-            return false; // Outside dungeon bounds
-        }
-        
-        // Return walkable state from floor map
-        return this.currentFloorMap[gridZ][gridX];
-    }
-    
-    // More precise position checking for collision detection
-    isPositionSolid(worldX, worldZ) {
-        if (!this.currentFloorMap) return false;
-        
-        // Use symmetric coordinate conversion
-        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
-        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
-        
-        // Check bounds - treat out of bounds as solid
-        if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-            return true; // Outside dungeon bounds = solid
-        }
-        
-        // Return solid state (inverse of walkable)
-        return !this.currentFloorMap[gridZ][gridX];
-    }
-    
-    getFloorHeight(worldX, worldZ) {
-        return this.floorHeight;
-    }
-    
-    getCeilingHeight(worldX, worldZ) {
-        // Check if position is inside dungeon
-        if (!this.isPositionWalkable(worldX, worldZ)) {
-            return this.floorHeight; // No ceiling if not in walkable area
-        }
-        
-        return this.floorHeight + this.ceilingHeight;
-    }
-    
-    worldToGrid(worldX, worldZ) {
-        return {
-            x: Math.floor((worldX + this.dungeonWidth/2) / this.gridSize),
-            z: Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize)
         };
+        
+        this.initializeMaterials();
+        console.log('DungeonSystem initialized');
     }
     
-    gridToWorld(gridX, gridZ) {
-        return {
-            x: (gridX - this.gridWidth/2) * this.gridSize,
-            z: (gridZ - this.gridDepth/2) * this.gridSize
+    initializeMaterials() {
+        // Initialize basic geometries
+        this.geometries.wall = new THREE.BoxGeometry(1, this.wallHeight, 1);
+        this.geometries.floor = new THREE.BoxGeometry(1, 0.2, 1);
+        this.geometries.ceiling = new THREE.BoxGeometry(1, 0.2, 1);
+        this.geometries.pillar = new THREE.BoxGeometry(1, this.wallHeight, 1);
+        this.geometries.decoration = new THREE.BoxGeometry(0.5, 1, 0.5);
+        
+        // Initialize materials for all themes
+        Object.keys(this.themes).forEach(themeName => {
+            this.createThemeMaterials(themeName);
+        });
+        
+        console.log('Materials and geometries initialized');
+    }
+    
+    createThemeMaterials(themeName) {
+        const theme = this.themes[themeName];
+        
+        this.materials[themeName] = {
+            wall: new THREE.MeshLambertMaterial({ 
+                color: theme.wallColor,
+                transparent: false
+            }),
+            floor: new THREE.MeshLambertMaterial({ 
+                color: theme.floorColor,
+                transparent: false
+            }),
+            ceiling: new THREE.MeshLambertMaterial({ 
+                color: theme.ceilingColor,
+                transparent: false
+            }),
+            pillar: new THREE.MeshLambertMaterial({ 
+                color: theme.wallColor * 0.8,
+                transparent: false
+            }),
+            decoration: new THREE.MeshLambertMaterial({ 
+                color: theme.lightColor,
+                transparent: false
+            }),
+            portal: new THREE.MeshLambertMaterial({
+                color: 0x000033,
+                transparent: true,
+                opacity: 0.8
+            }),
+            portalMask: new THREE.MeshLambertMaterial({
+                color: 0x8B0000,
+                transparent: true,
+                opacity: 0.9
+            })
         };
-    }
-    
-    setupMaterials() {
-        console.log('Setting up simple solid color materials...');
-        
-        // Simple solid color materials - no canvas textures
-        this.createDungeonMaterials();
-        
-        console.log(`Materials setup complete. Created ${this.materials.size} solid color materials.`);
-        console.log('Material types:', Array.from(this.materials.keys()));
-    }
-    
-    createDungeonMaterials() {
-        console.log('Creating simple solid color materials...');
-        
-        // CENTER ROOM - Golden Byzantine Style (solid colors)
-        const byzantineFloor = new THREE.MeshLambertMaterial({ 
-            color: 0xDAA520,  // Gold
-            emissive: 0x8B7300,
-            emissiveIntensity: 0.1
-        });
-        this.materials.set('byzantine_floor', byzantineFloor);
-        
-        const byzantineWall = new THREE.MeshLambertMaterial({ 
-            color: 0xC19A6B,  // Sandy brown
-            emissive: 0x8B7355,
-            emissiveIntensity: 0.05
-        });
-        this.materials.set('byzantine_wall', byzantineWall);
-        
-        const byzantineCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0xFFD700,  // Bright gold
-            emissive: 0xDAA520,
-            emissiveIntensity: 0.15
-        });
-        this.materials.set('byzantine_ceiling', byzantineCeiling);
-        
-        // ORBITAL ROOMS - Gothic Cathedral Style (solid colors)
-        const gothicFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x2C3E50,  // Dark blue-grey
-            emissive: 0x1A252F,
-            emissiveIntensity: 0.05
-        });
-        this.materials.set('gothic_floor', gothicFloor);
-        
-        const gothicWall = new THREE.MeshLambertMaterial({ 
-            color: 0x34495E,  // Slate grey
-            emissive: 0x1A1A2E,
-            emissiveIntensity: 0.03
-        });
-        this.materials.set('gothic_wall', gothicWall);
-        
-        const gothicCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x1C2833,  // Very dark grey
-            emissive: 0x16213E,
-            emissiveIntensity: 0.08
-        });
-        this.materials.set('gothic_ceiling', gothicCeiling);
-        
-        // CARDINAL ROOMS - Celestial Chapel Style (solid colors)
-        const celestialFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x191970,  // Midnight blue
-            emissive: 0x0F0F35,
-            emissiveIntensity: 0.1
-        });
-        this.materials.set('celestial_floor', celestialFloor);
-        
-        const celestialWall = new THREE.MeshLambertMaterial({ 
-            color: 0x1E3A8A,  // Royal blue
-            emissive: 0x4169E1,
-            emissiveIntensity: 0.1
-        });
-        this.materials.set('celestial_wall', celestialWall);
-        
-        const celestialCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x000033,  // Deep navy
-            emissive: 0x191970,
-            emissiveIntensity: 0.2
-        });
-        this.materials.set('celestial_ceiling', celestialCeiling);
-        
-        // CORRIDOR MATERIALS - Neutral stone (solid colors)
-        const corridorFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x696969,  // Dim grey
-            emissive: 0x404040,
-            emissiveIntensity: 0.02
-        });
-        this.materials.set('corridor_floor', corridorFloor);
-        
-        const corridorWall = new THREE.MeshLambertMaterial({ 
-            color: 0x5C5C5C,  // Grey
-            emissive: 0x2A2A2A,
-            emissiveIntensity: 0.01
-        });
-        this.materials.set('corridor_wall', corridorWall);
-        
-        const corridorCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x4A4A4A,  // Dark grey
-            emissive: 0x1A1A1A,
-            emissiveIntensity: 0.02
-        });
-        this.materials.set('corridor_ceiling', corridorCeiling);
-        
-        // PILLAR MATERIALS
-        const goldenPillar = new THREE.MeshLambertMaterial({
-            color: 0xDAA520,
-            emissive: 0xFFD700,
-            emissiveIntensity: 0.3
-        });
-        this.materials.set('golden_pillar', goldenPillar);
-        
-        const silverPillar = new THREE.MeshLambertMaterial({
-            color: 0x808080,
-            emissive: 0xC0C0C0,
-            emissiveIntensity: 0.2
-        });
-        this.materials.set('silver_pillar', silverPillar);
-        
-        const starPillar = new THREE.MeshLambertMaterial({
-            color: 0x4169E1,
-            emissive: 0x87CEEB,
-            emissiveIntensity: 0.4
-        });
-        this.materials.set('star_pillar', starPillar);
-        
-        const glowingPillar = new THREE.MeshLambertMaterial({
-            color: 0x6080ff,
-            emissive: 0x6080ff,
-            emissiveIntensity: 0.3
-        });
-        this.materials.set('glowing_pillar', glowingPillar);
-        
-        console.log(`Created ${this.materials.size} solid color materials successfully!`);
-    }
-    
-    setupBillboardSystem() {
-        this.billboardGeometry = new THREE.PlaneGeometry(1, 1);
-        this.createBillboardMaterials();
-    }
-    
-    createBillboardMaterials() {
-        // Consistent atmospheric elements
-        const orbMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xffaa44, 
-            transparent: true, 
-            opacity: 0.7, 
-            side: THREE.DoubleSide, 
-            blending: THREE.AdditiveBlending 
-        });
-        
-        this.materials.set('orb_billboard', orbMaterial);
-    }
-    
-    getCurrentTheme() {
-        // Always return consistent theme
-        return 'dungeon';
     }
     
     generateDungeon(floorNumber) {
-        console.log(`Generating unified dungeon for floor ${floorNumber}...`);
+        console.log(`Generating dungeon for floor ${floorNumber}`);
         
         this.currentFloor = floorNumber;
-        this.clearCurrentDungeon();
+        this.currentTheme = this.determineTheme(floorNumber);
         
-        // Reset progression for new floor
-        this.resetProgression();
+        // Clear existing dungeon
+        this.clearDungeon();
         
-        console.log('Using solid color theme');
+        // Reset room progression
+        this.resetRoomProgression();
         
-        // Phase 1: Plan room layout
-        const roomLayout = this.planRoomLayout();
+        // Initialize collision grid
+        this.initializeCollisionGrid();
         
-        // Phase 2: Create unified floor map
-        const floorMap = this.createFloorMap(roomLayout);
+        // Create new dungeon group
+        this.currentDungeonGroup = new THREE.Group();
+        this.currentDungeonGroup.name = `Dungeon_Floor_${floorNumber}`;
         
-        // Store floor map for collision detection
-        this.currentFloorMap = floorMap;
+        // Generate the castle layout
+        this.generateCastleLayout();
         
-        // Store dungeon data BEFORE generating geometry so it's available for room type checks
-        this.currentDungeon = {
-            floor: floorNumber,
-            theme: 'dungeon',
-            roomLayout: roomLayout,
-            floorMap: floorMap
-        };
+        // Add atmospheric elements
+        this.addAtmosphere();
         
-        // Quick generation with solid colors - no delays needed
-        setTimeout(() => {
-            try {
-                // Phase 3: Generate unified geometry
-                this.generateUnifiedGeometry(floorMap, roomLayout);
-                
-                // Phase 4: Add enhanced lighting and atmosphere
-                this.addDungeonLighting(roomLayout);
-                this.addAtmosphericElements(roomLayout);
-                
-                // Phase 5: Add progressive portal system
-                this.addProgressivePortals(roomLayout);
-                
-                console.log(`Unified dungeon floor ${floorNumber} generated successfully with solid colors!`);
-            } catch (error) {
-                console.error('Failed to generate dungeon geometry:', error);
-                // Try again after a short delay
-                setTimeout(() => {
-                    try {
-                        this.generateUnifiedGeometry(floorMap, roomLayout);
-                        this.addDungeonLighting(roomLayout);
-                        this.addAtmosphericElements(roomLayout);
-                        this.addProgressivePortals(roomLayout);
-                        console.log(`Unified dungeon floor ${floorNumber} generated successfully on retry`);
-                    } catch (retryError) {
-                        console.error('Failed to generate dungeon geometry on retry:', retryError);
-                    }
-                }, 500);
-            }
-        }, 200); // Much shorter delay
+        // Add the dungeon to the scene
+        this.scene.add(this.currentDungeonGroup);
         
-        return this.currentDungeon;
+        console.log(`✓ Dungeon floor ${floorNumber} generated with ${this.currentTheme} theme`);
     }
     
-    planRoomLayout() {
-        console.log('Planning room layout...');
+    determineTheme(floorNumber) {
+        const themeNames = Object.keys(this.themes);
+        const themeIndex = Math.min(Math.floor((floorNumber - 1) / 5), themeNames.length - 1);
+        return themeNames[themeIndex];
+    }
+    
+    clearDungeon() {
+        if (this.currentDungeonGroup) {
+            // Dispose of geometries and materials
+            this.currentDungeonGroup.traverse((child) => {
+                if (child.geometry) {
+                    child.geometry.dispose();
+                }
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            
+            this.scene.remove(this.currentDungeonGroup);
+            this.currentDungeonGroup = null;
+        }
         
-        const layout = {
-            rooms: {},
-            connections: []
+        this.portals = [];
+        this.portalMasks = [];
+    }
+    
+    resetRoomProgression() {
+        this.roomProgression = {
+            north: { unlocked: true, enemiesDefeated: false },
+            east: { unlocked: false, enemiesDefeated: false },
+            west: { unlocked: false, enemiesDefeated: false },
+            south: { unlocked: false, enemiesDefeated: false }
         };
+    }
+    
+    initializeCollisionGrid() {
+        this.collisionGrid = [];
+        for (let x = 0; x < this.gridSize; x++) {
+            this.collisionGrid[x] = [];
+            for (let z = 0; z < this.gridSize; z++) {
+                this.collisionGrid[x][z] = 0; // 0 = walkable, 1 = wall
+            }
+        }
+    }
+    
+    generateCastleLayout() {
+        const halfSize = this.dungeonSize / 2;
+        const halfRoom = this.roomSize / 2;
         
-        // Center room at origin
-        layout.rooms.center = {
-            id: 'center',
-            type: 'center',
-            gridX: Math.floor(this.gridWidth / 2),
-            gridZ: Math.floor(this.gridDepth / 2),
-            size: this.roomTemplates.CENTER.size
-        };
+        // Generate central hub room (starting room)
+        this.generateRoom(0, 0, 'center');
         
-        // Four orbital rooms in cardinal directions
-        const orbitalDistance = 20; // Distance in grid cells
-        const orbitals = [
-            { id: 'orbital_north', dir: 'north', offsetX: 0, offsetZ: -orbitalDistance },
-            { id: 'orbital_south', dir: 'south', offsetX: 0, offsetZ: orbitalDistance },
-            { id: 'orbital_east', dir: 'east', offsetX: orbitalDistance, offsetZ: 0 },
-            { id: 'orbital_west', dir: 'west', offsetX: -orbitalDistance, offsetZ: 0 }
+        // Generate directional rooms
+        this.generateRoom(0, -halfRoom, 'north');   // North room
+        this.generateRoom(halfRoom, 0, 'east');     // East room  
+        this.generateRoom(-halfRoom, 0, 'west');    // West room
+        this.generateRoom(0, halfRoom, 'south');    // South room
+        
+        // Create connecting corridors
+        this.createCorridor(0, 0, 0, -halfRoom, 'north');   // Center to North
+        this.createCorridor(0, 0, halfRoom, 0, 'east');     // Center to East
+        this.createCorridor(0, 0, -halfRoom, 0, 'west');    // Center to West
+        this.createCorridor(0, 0, 0, halfRoom, 'south');    // Center to South
+        
+        // Add outer boundary walls
+        this.createOuterWalls();
+        
+        // Place portals with blocking masks
+        this.placePortals();
+    }
+    
+    generateRoom(centerX, centerZ, roomType) {
+        const roomHalf = this.roomSize / 2;
+        const wallThickness = 1;
+        
+        // Create floor
+        this.createFloorSection(
+            centerX - roomHalf, centerZ - roomHalf, 
+            this.roomSize, this.roomSize
+        );
+        
+        // Create walls around the room perimeter
+        const walls = [
+            // North wall
+            { x: centerX, z: centerZ - roomHalf, width: this.roomSize, depth: wallThickness },
+            // South wall  
+            { x: centerX, z: centerZ + roomHalf, width: this.roomSize, depth: wallThickness },
+            // East wall
+            { x: centerX + roomHalf, z: centerZ, width: wallThickness, depth: this.roomSize },
+            // West wall
+            { x: centerX - roomHalf, z: centerZ, width: wallThickness, depth: this.roomSize }
         ];
         
-        orbitals.forEach(orbital => {
-            layout.rooms[orbital.id] = {
-                id: orbital.id,
-                type: 'orbital',
-                direction: orbital.dir,
-                gridX: layout.rooms.center.gridX + orbital.offsetX,
-                gridZ: layout.rooms.center.gridZ + orbital.offsetZ,
-                size: this.roomTemplates.ORBITAL.size
-            };
+        walls.forEach(wall => {
+            this.createWallSection(wall.x, wall.z, wall.width, wall.depth);
+        });
+        
+        // Add decorations based on room type and theme
+        this.addRoomDecorations(centerX, centerZ, roomType);
+        
+        // Add enemy spawn points for non-center rooms
+        if (roomType !== 'center') {
+            this.addEnemySpawnPoints(centerX, centerZ, roomType);
+        }
+    }
+    
+    createCorridor(startX, startZ, endX, endZ, direction) {
+        const corridorWidth = 6;
+        const wallThickness = 1;
+        
+        // Determine corridor orientation
+        const isVertical = Math.abs(endZ - startZ) > Math.abs(endX - startX);
+        
+        if (isVertical) {
+            // Vertical corridor
+            const length = Math.abs(endZ - startZ);
+            const centerX = (startX + endX) / 2;
+            const centerZ = (startZ + endZ) / 2;
             
-            // Connect to center
-            layout.connections.push({
-                from: 'center',
-                to: orbital.id,
-                type: 'center_to_orbital'
-            });
-        });
-        
-        // Cardinal rooms (fixed positioning and bounds checking)
-        const cardinalChance = Math.min(0.5 + (this.currentFloor * 0.02), 0.9); // Increased chance
-        const cardinalDistance = 15; // Distance from orbital to cardinal
-        
-        orbitals.forEach(orbital => {
-            if (Math.random() < cardinalChance) {
-                const cardinalId = `cardinal_${orbital.dir}`;
-                const orbitalRoom = layout.rooms[orbital.id];
-                
-                // Calculate cardinal room position relative to the ORBITAL room (not center)
-                let cardinalGridX, cardinalGridZ;
-                
-                switch(orbital.dir) {
-                    case 'north':
-                        cardinalGridX = orbitalRoom.gridX;
-                        cardinalGridZ = orbitalRoom.gridZ - cardinalDistance;
-                        break;
-                    case 'south':
-                        cardinalGridX = orbitalRoom.gridX;
-                        cardinalGridZ = orbitalRoom.gridZ + cardinalDistance;
-                        break;
-                    case 'east':
-                        cardinalGridX = orbitalRoom.gridX + cardinalDistance;
-                        cardinalGridZ = orbitalRoom.gridZ;
-                        break;
-                    case 'west':
-                        cardinalGridX = orbitalRoom.gridX - cardinalDistance;
-                        cardinalGridZ = orbitalRoom.gridZ;
-                        break;
-                }
-                
-                // Check if cardinal room position is within bounds
-                const roomSize = this.roomTemplates.CARDINAL.size;
-                const halfSize = Math.floor(roomSize / 2);
-                const minX = cardinalGridX - halfSize;
-                const maxX = cardinalGridX + halfSize;
-                const minZ = cardinalGridZ - halfSize;
-                const maxZ = cardinalGridZ + halfSize;
-                
-                // Ensure room fits within grid bounds with some margin
-                if (minX >= 2 && maxX < this.gridWidth - 2 && 
-                    minZ >= 2 && maxZ < this.gridDepth - 2) {
-                    
-                    layout.rooms[cardinalId] = {
-                        id: cardinalId,
-                        type: 'cardinal',
-                        direction: orbital.dir,
-                        gridX: cardinalGridX,
-                        gridZ: cardinalGridZ,
-                        size: roomSize
-                    };
-                    
-                    // Connect to orbital
-                    layout.connections.push({
-                        from: orbital.id,
-                        to: cardinalId,
-                        type: 'orbital_to_cardinal'
-                    });
-                    
-                    console.log(`Added cardinal room ${cardinalId} at grid (${cardinalGridX}, ${cardinalGridZ})`);
-                } else {
-                    console.log(`Skipped cardinal room ${cardinalId} - would be outside bounds`);
-                }
-            }
-        });
-        
-        console.log(`Planned ${Object.keys(layout.rooms).length} rooms with ${layout.connections.length} connections`);
-        return layout;
-    }
-    
-    createFloorMap(roomLayout) {
-        console.log('Creating unified floor map...');
-        
-        // Initialize grid (false = wall/solid, true = walkable)
-        const floorMap = Array(this.gridDepth).fill().map(() => Array(this.gridWidth).fill(false));
-        
-        // Phase 1: Carve out room areas
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.carveRoomArea(floorMap, room);
-        });
-        
-        // Phase 2: Carve corridor paths with improved connection logic
-        roomLayout.connections.forEach(connection => {
-            this.carveImprovedCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
-        });
-        
-        console.log('Floor map created with carved rooms and corridors');
-        return floorMap;
-    }
-    
-    carveRoomArea(floorMap, room) {
-        const halfSize = Math.floor(room.size / 2);
-        
-        for (let z = room.gridZ - halfSize; z <= room.gridZ + halfSize; z++) {
-            for (let x = room.gridX - halfSize; x <= room.gridX + halfSize; x++) {
-                if (this.isValidGridPos(x, z)) {
-                    floorMap[z][x] = true; // Mark as walkable
-                }
-            }
+            // Create floor
+            this.createFloorSection(centerX - corridorWidth/2, centerZ - length/2, corridorWidth, length);
+            
+            // Create side walls
+            this.createWallSection(centerX - corridorWidth/2, centerZ, wallThickness, length);
+            this.createWallSection(centerX + corridorWidth/2, centerZ, wallThickness, length);
+            
+        } else {
+            // Horizontal corridor
+            const length = Math.abs(endX - startX);
+            const centerX = (startX + endX) / 2;
+            const centerZ = (startZ + endZ) / 2;
+            
+            // Create floor
+            this.createFloorSection(centerX - length/2, centerZ - corridorWidth/2, length, corridorWidth);
+            
+            // Create side walls
+            this.createWallSection(centerX, centerZ - corridorWidth/2, length, wallThickness);
+            this.createWallSection(centerX, centerZ + corridorWidth/2, length, wallThickness);
         }
         
-        console.log(`Carved ${room.type} room at grid (${room.gridX}, ${room.gridZ}) size ${room.size}`);
+        // Create corridor openings in room walls
+        this.createCorridorOpenings(startX, startZ, endX, endZ, direction);
     }
     
-    carveImprovedCorridorPath(floorMap, roomA, roomB) {
-        console.log(`Carving improved corridor from ${roomA.id} to ${roomB.id}...`);
+    createCorridorOpenings(startX, startZ, endX, endZ, direction) {
+        // Remove wall sections where corridors connect to rooms
+        const openingWidth = 5;
+        const positions = [
+            { x: startX, z: startZ },
+            { x: endX, z: endZ }
+        ];
         
-        // Calculate room edges for better connection points
-        const roomAHalfSize = Math.floor(roomA.size / 2);
-        const roomBHalfSize = Math.floor(roomB.size / 2);
-        
-        // Determine connection points at room edges rather than centers
-        let startX = roomA.gridX;
-        let startZ = roomA.gridZ;
-        let endX = roomB.gridX;
-        let endZ = roomB.gridZ;
-        
-        // Adjust start point to edge of room A
-        if (endX > startX) startX += roomAHalfSize - 1; // Exit from east side
-        else if (endX < startX) startX -= roomAHalfSize - 1; // Exit from west side
-        
-        if (endZ > startZ) startZ += roomAHalfSize - 1; // Exit from south side
-        else if (endZ < startZ) startZ -= roomAHalfSize - 1; // Exit from north side
-        
-        // Adjust end point to edge of room B
-        if (startX > endX) endX += roomBHalfSize - 1; // Enter from east side
-        else if (startX < endX) endX -= roomBHalfSize - 1; // Enter from west side
-        
-        if (startZ > endZ) endZ += roomBHalfSize - 1; // Enter from south side
-        else if (startZ < endZ) endZ -= roomBHalfSize - 1; // Enter from north side
-        
-        const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
-        
-        // Create L-shaped corridor with both possible paths for redundancy
-        // Path 1: Horizontal first, then vertical
-        this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
-        this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
-        
-        // Path 2: Vertical first, then horizontal (creates intersection for better connectivity)
-        this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
-        this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
-        
-        // Carve junction areas for smoother connections
-        this.carveJunction(floorMap, endX, startZ, corridorHalfWidth + 1);
-        this.carveJunction(floorMap, startX, endZ, corridorHalfWidth + 1);
-        
-        console.log(`Carved improved corridor between ${roomA.id} and ${roomB.id}`);
-    }
-    
-    carveJunction(floorMap, centerX, centerZ, radius) {
-        // Carve a circular junction area for smoother corridor intersections
-        for (let z = centerZ - radius; z <= centerZ + radius; z++) {
-            for (let x = centerX - radius; x <= centerX + radius; x++) {
-                if (this.isValidGridPos(x, z)) {
-                    const dist = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(z - centerZ, 2));
-                    if (dist <= radius) {
-                        floorMap[z][x] = true;
-                    }
-                }
-            }
-        }
-    }
-    
-    carveHorizontalCorridor(floorMap, startX, endX, z, halfWidth) {
-        const minX = Math.min(startX, endX);
-        const maxX = Math.max(startX, endX);
-        
-        for (let x = minX; x <= maxX; x++) {
-            for (let zOffset = -halfWidth; zOffset <= halfWidth; zOffset++) {
-                const corridorZ = z + zOffset;
-                if (this.isValidGridPos(x, corridorZ)) {
-                    floorMap[corridorZ][x] = true;
-                }
-            }
-        }
-    }
-    
-    carveVerticalCorridor(floorMap, x, startZ, endZ, halfWidth) {
-        const minZ = Math.min(startZ, endZ);
-        const maxZ = Math.max(startZ, endZ);
-        
-        for (let z = minZ; z <= maxZ; z++) {
-            for (let xOffset = -halfWidth; xOffset <= halfWidth; xOffset++) {
-                const corridorX = x + xOffset;
-                if (this.isValidGridPos(corridorX, z)) {
-                    floorMap[z][corridorX] = true;
-                }
-            }
-        }
-    }
-    
-    isValidGridPos(x, z) {
-        return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
-    }
-    
-    generateUnifiedGeometry(floorMap, roomLayout) {
-        console.log('Generating unified geometry with solid colored rooms...');
-        
-        const dungeonGroup = new THREE.Group();
-        dungeonGroup.name = 'unified_dungeon';
-        
-        // Generate floors with room-specific materials
-        this.generateThemedFloors(dungeonGroup, floorMap, roomLayout);
-        
-        // Generate walls with room-specific materials
-        this.generateThemedWalls(dungeonGroup, floorMap, roomLayout);
-        
-        // Generate ceilings with room-specific materials
-        this.generateThemedCeilings(dungeonGroup, floorMap, roomLayout);
-        
-        this.scene.add(dungeonGroup);
-        this.currentDungeonGroup = dungeonGroup;
-    }
-    
-    getRoomTypeAtGrid(gridX, gridZ, roomLayout) {
-        if (!roomLayout) {
-            return 'corridor';
-        }
-        
-        // Check each room to see if this grid position is inside it
-        for (const room of Object.values(roomLayout.rooms)) {
-            const halfSize = Math.floor(room.size / 2);
-            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
-                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
-                return room.type; // 'center', 'orbital', or 'cardinal'
-            }
-        }
-        
-        return 'corridor'; // Default to corridor if not in any room
-    }
-    
-    getMaterialsForRoomType(roomType) {
-        switch(roomType) {
-            case 'center':
-                return {
-                    floor: this.materials.get('byzantine_floor'),
-                    wall: this.materials.get('byzantine_wall'),
-                    ceiling: this.materials.get('byzantine_ceiling')
-                };
-            case 'orbital':
-                return {
-                    floor: this.materials.get('gothic_floor'),
-                    wall: this.materials.get('gothic_wall'),
-                    ceiling: this.materials.get('gothic_ceiling')
-                };
-            case 'cardinal':
-                return {
-                    floor: this.materials.get('celestial_floor'),
-                    wall: this.materials.get('celestial_wall'),
-                    ceiling: this.materials.get('celestial_ceiling')
-                };
-            default: // corridor
-                return {
-                    floor: this.materials.get('corridor_floor'),
-                    wall: this.materials.get('corridor_wall'),
-                    ceiling: this.materials.get('corridor_ceiling')
-                };
-        }
-    }
-    
-    generateThemedFloors(dungeonGroup, floorMap, roomLayout) {
-        let floorCount = 0;
-        
-        for (let z = 0; z < this.gridDepth; z++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
-                    const materials = this.getMaterialsForRoomType(roomType);
-                    
-                    const worldX = (x - this.gridWidth/2) * this.gridSize;
-                    const worldZ = (z - this.gridDepth/2) * this.gridSize;
-                    
-                    const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const floorSegment = new THREE.Mesh(floorGeometry, materials.floor);
-                    floorSegment.rotation.x = -Math.PI / 2;
-                    floorSegment.position.set(worldX, this.floorHeight, worldZ);
-                    floorSegment.receiveShadow = true;
-                    
-                    dungeonGroup.add(floorSegment);
-                    floorCount++;
-                }
-            }
-        }
-        
-        console.log(`Generated ${floorCount} solid color floor segments`);
-    }
-    
-    generateThemedWalls(dungeonGroup, floorMap, roomLayout) {
-        const wallHeight = this.ceilingHeight;
-        
-        for (let z = 0; z < this.gridDepth; z++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
-                    const materials = this.getMaterialsForRoomType(roomType);
-                    
-                    const directions = [
-                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2, rotY: 0 },
-                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2, rotY: 0 },
-                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0, rotY: Math.PI/2 },
-                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0, rotY: Math.PI/2 }
-                    ];
-                    
-                    directions.forEach(dir => {
-                        const neighborX = x + dir.dx;
-                        const neighborZ = z + dir.dz;
-                        
-                        if (!this.isValidGridPos(neighborX, neighborZ) || !floorMap[neighborZ][neighborX]) {
-                            const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
-                            const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
-                            
-                            // Add decorative elements for room walls
-                            let wallGeometry;
-                            if (roomType === 'center') {
-                                // Byzantine arched walls
-                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.2, 0.5);
-                            } else if (roomType === 'orbital') {
-                                // Gothic pointed arch walls
-                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.4, 0.5);
-                            } else if (roomType === 'cardinal') {
-                                // Celestial rounded walls
-                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight * 1.1, 0.5);
-                            } else {
-                                // Standard corridor walls
-                                wallGeometry = new THREE.BoxGeometry(this.gridSize, wallHeight, 0.5);
-                            }
-                            
-                            const wall = new THREE.Mesh(wallGeometry, materials.wall);
-                            wall.position.set(worldX, this.floorHeight + wallGeometry.parameters.height/2, worldZ);
-                            wall.rotation.y = dir.rotY;
-                            wall.castShadow = true;
-                            wall.receiveShadow = true;
-                            
-                            dungeonGroup.add(wall);
-                        }
-                    });
-                }
-            }
-        }
-        
-        console.log('Generated themed wall geometry');
-    }
-    
-    generateThemedCeilings(dungeonGroup, floorMap, roomLayout) {
-        for (let z = 0; z < this.gridDepth; z++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                if (floorMap[z][x]) {
-                    const roomType = this.getRoomTypeAtGrid(x, z, roomLayout);
-                    const materials = this.getMaterialsForRoomType(roomType);
-                    
-                    const worldX = (x - this.gridWidth/2) * this.gridSize;
-                    const worldZ = (z - this.gridDepth/2) * this.gridSize;
-                    
-                    // Variable ceiling heights based on room type
-                    let ceilingHeight = this.ceilingHeight;
-                    if (roomType === 'center') {
-                        ceilingHeight = this.ceilingHeight * 1.2; // Byzantine dome effect
-                    } else if (roomType === 'orbital') {
-                        ceilingHeight = this.ceilingHeight * 1.4; // Gothic vaulted ceiling
-                    } else if (roomType === 'cardinal') {
-                        ceilingHeight = this.ceilingHeight * 1.1; // Celestial chapel height
-                    }
-                    
-                    const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
-                    ceilingSegment.rotation.x = Math.PI / 2;
-                    ceilingSegment.position.set(worldX, this.floorHeight + ceilingHeight, worldZ);
-                    ceilingSegment.receiveShadow = true;
-                    
-                    // Add stars to celestial ceilings
-                    if (roomType === 'cardinal' && Math.random() < 0.3) {
-                        this.addCeilingStars(dungeonGroup, worldX, worldZ, ceilingHeight);
-                    }
-                    
-                    dungeonGroup.add(ceilingSegment);
-                }
-            }
-        }
-        
-        console.log('Generated themed ceiling geometry');
-    }
-    
-    addCeilingStars(dungeonGroup, x, z, height) {
-        const starGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-        const starMaterial = new THREE.MeshBasicMaterial({
-            color: 0xFFD700,
-            emissive: 0xFFD700,
-            emissiveIntensity: 0.8
-        });
-        
-        for (let i = 0; i < 3; i++) {
-            const star = new THREE.Mesh(starGeometry, starMaterial);
-            star.position.set(
-                x + (Math.random() - 0.5) * this.gridSize * 0.8,
-                this.floorHeight + height - 0.1,
-                z + (Math.random() - 0.5) * this.gridSize * 0.8
-            );
-            dungeonGroup.add(star);
-        }
-    }
-    
-    addDungeonLighting(roomLayout) {
-        console.log('Adding enhanced dungeon lighting...');
-        
-        // Add enhanced lighting to each room
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomLighting(room);
-        });
-        
-        // Add corridor lighting
-        roomLayout.connections.forEach(connection => {
-            this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
+        positions.forEach(pos => {
+            this.removeWallsInArea(pos.x - openingWidth/2, pos.z - openingWidth/2, openingWidth, openingWidth);
         });
     }
     
-    addRoomLighting(room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
+    createOuterWalls() {
+        const halfSize = this.dungeonSize / 2;
+        const wallThickness = 2;
         
-        // Enhanced lighting to compensate for solid colors
-        if (room.type === 'center') {
-            // Byzantine golden lighting - MUCH BRIGHTER
-            const goldenLight = new THREE.PointLight(0xFFD700, 2.0, 80);
-            goldenLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.2 - 1, worldZ);
-            this.currentDungeonGroup.add(goldenLight);
-            this.lightSources.push(goldenLight);
-            
-            // Multiple warm corner lights
-            const cornerPositions = [
-                [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
-                [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ - roomSize/3],
-                [worldX - roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3],
-                [worldX + roomSize/3, this.floorHeight + this.ceilingHeight/2, worldZ + roomSize/3]
-            ];
-            
-            cornerPositions.forEach(pos => {
-                const warmLight = new THREE.PointLight(0xFFA500, 1.0, 40);
-                warmLight.position.set(...pos);
-                this.currentDungeonGroup.add(warmLight);
-                this.lightSources.push(warmLight);
-            });
-            
-            // Add golden rim lighting
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const radius = roomSize * 0.45;
-                const rimLight = new THREE.PointLight(0xDAA520, 0.8, 25);
-                rimLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 2,
-                    worldZ + Math.sin(angle) * radius
-                );
-                this.currentDungeonGroup.add(rimLight);
-                this.lightSources.push(rimLight);
-            }
-            
-        } else if (room.type === 'orbital') {
-            // Gothic dramatic lighting - ENHANCED
-            const chandelierLight = new THREE.PointLight(0xE6E6FA, 1.5, 70);
-            chandelierLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.4 - 2, worldZ);
-            this.currentDungeonGroup.add(chandelierLight);
-            this.lightSources.push(chandelierLight);
-            
-            // Cool silver accent lights - MORE OF THEM
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const radius = roomSize * 0.4;
-                const silverLight = new THREE.PointLight(0xC0C0C0, 0.7, 35);
-                silverLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + this.ceilingHeight * 0.7,
-                    worldZ + Math.sin(angle) * radius
-                );
-                this.currentDungeonGroup.add(silverLight);
-                this.lightSources.push(silverLight);
-            }
-            
-            // Add blue accent lighting for gothic atmosphere
-            const blueAccent = new THREE.PointLight(0x4169E1, 0.6, 50);
-            blueAccent.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.8, worldZ);
-            this.currentDungeonGroup.add(blueAccent);
-            this.lightSources.push(blueAccent);
-            
-        } else if (room.type === 'cardinal') {
-            // Celestial mystical lighting - MUCH BRIGHTER
-            const celestialLight = new THREE.PointLight(0x4169E1, 1.8, 65);
-            celestialLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.1 - 1, worldZ);
-            this.currentDungeonGroup.add(celestialLight);
-            this.lightSources.push(celestialLight);
-            
-            // Many starlight effects
-            for (let i = 0; i < 12; i++) {
-                const starLight = new THREE.PointLight(0x87CEEB, 0.5, 30);
-                starLight.position.set(
-                    worldX + (Math.random() - 0.5) * roomSize * 0.8,
-                    this.floorHeight + this.ceilingHeight * 1.1 - 0.5,
-                    worldZ + (Math.random() - 0.5) * roomSize * 0.8
-                );
-                this.currentDungeonGroup.add(starLight);
-                this.lightSources.push(starLight);
-            }
-            
-            // Purple mystical accent
-            const mysticalLight = new THREE.PointLight(0x9370DB, 0.8, 45);
-            mysticalLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.6, worldZ);
-            this.currentDungeonGroup.add(mysticalLight);
-            this.lightSources.push(mysticalLight);
-        }
+        // Create massive outer boundary walls
+        const outerWalls = [
+            // North boundary
+            { x: 0, z: -halfSize, width: this.dungeonSize, depth: wallThickness },
+            // South boundary
+            { x: 0, z: halfSize, width: this.dungeonSize, depth: wallThickness },
+            // East boundary
+            { x: halfSize, z: 0, width: wallThickness, depth: this.dungeonSize },
+            // West boundary
+            { x: -halfSize, z: 0, width: wallThickness, depth: this.dungeonSize }
+        ];
         
-        console.log(`Added enhanced lighting to ${room.type} room at (${worldX}, ${worldZ})`);
-    }
-    
-    addCorridorLighting(roomA, roomB) {
-        const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
-        const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
-        const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
-        const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
-        
-        // Enhanced corridor lighting - much brighter
-        const cornerLight = new THREE.PointLight(0xffffff, 1.0, 50);
-        cornerLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ);
-        this.currentDungeonGroup.add(cornerLight);
-        this.lightSources.push(cornerLight);
-        
-        // Additional bright lights along corridor path
-        const midWorldX = (startWorldX + endWorldX) / 2;
-        const midWorldZ = (startWorldZ + endWorldZ) / 2;
-        
-        const midLight = new THREE.PointLight(0xffffff, 0.8, 35);
-        midLight.position.set(midWorldX, this.floorHeight + 3.5, midWorldZ);
-        this.currentDungeonGroup.add(midLight);
-        this.lightSources.push(midLight);
-        
-        // Add warm accent lighting for atmosphere
-        const warmAccent = new THREE.PointLight(0xFFA500, 0.6, 30);
-        warmAccent.position.set(startWorldX, this.floorHeight + 3, endWorldZ);
-        this.currentDungeonGroup.add(warmAccent);
-        this.lightSources.push(warmAccent);
-    }
-    
-    addAtmosphericElements(roomLayout) {
-        console.log('Adding atmospheric elements...');
-        
-        Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomAtmosphere(room);
+        outerWalls.forEach(wall => {
+            this.createWallSection(wall.x, wall.z, wall.width, wall.depth);
         });
     }
     
-    addRoomAtmosphere(room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
+    createFloorSection(x, z, width, depth) {
+        const floorMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(width, 0.2, depth),
+            this.materials[this.currentTheme].floor
+        );
         
-        // Add entry/exit portals to center room
-        if (room.type === 'center') {
-            this.addCenterRoomPortals(worldX, worldZ, roomSize);
-        }
+        floorMesh.position.set(x, -0.1, z);
+        floorMesh.receiveShadow = true;
+        floorMesh.userData.type = 'floor';
         
-        // Add consistent atmospheric elements
-        this.addDungeonAtmosphere(worldX, worldZ, roomSize, room.type);
+        this.currentDungeonGroup.add(floorMesh);
         
-        // Add floating orbs to all rooms
-        this.addFloatingOrbs(worldX, worldZ, roomSize);
+        // Mark as walkable in collision grid
+        this.markCollisionArea(x - width/2, z - depth/2, width, depth, 0);
     }
     
-    addDungeonAtmosphere(worldX, worldZ, roomSize, roomType) {
-        // Enhanced glowing pillars with room-specific materials and bright lighting
-        for (let i = 0; i < 4; i++) {
-            const angle = (i / 4) * Math.PI * 2;
-            const radius = roomSize * 0.3;
-            
-            const pillarX = worldX + Math.cos(angle) * radius;
-            const pillarZ = worldZ + Math.sin(angle) * radius;
-            
-            const pillarGeometry = new THREE.CylinderGeometry(0.6, 0.8, 4, 8);
-            
-            // Use room-specific pillar materials
-            let pillarMaterial;
-            if (roomType === 'center') {
-                pillarMaterial = this.materials.get('golden_pillar').clone();
-            } else if (roomType === 'orbital') {
-                pillarMaterial = this.materials.get('silver_pillar').clone();
-            } else if (roomType === 'cardinal') {
-                pillarMaterial = this.materials.get('star_pillar').clone();
-            } else {
-                pillarMaterial = this.materials.get('glowing_pillar').clone();
-            }
-            
-            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-            pillar.position.set(pillarX, this.floorHeight + 2, pillarZ);
-            pillar.castShadow = true;
-            pillar.receiveShadow = true;
-            
-            // Store reference for animated glow
-            pillar.userData = {
-                isPillar: true,
-                glowPhase: Math.random() * Math.PI * 2,
-                glowSpeed: 0.5 + Math.random() * 1.0,
-                baseEmissiveIntensity: 0.4 // Increased base intensity
-            };
-            
-            this.currentDungeonGroup.add(pillar);
-            this.glowingPillars.push(pillar);
-            
-            // Enhanced torch light on pillar - much brighter
-            const torchLight = new THREE.PointLight(0xff6644, 0.8, 15);
-            torchLight.position.set(pillarX, this.floorHeight + 3.5, pillarZ);
-            this.currentDungeonGroup.add(torchLight);
-            this.lightSources.push(torchLight);
-            
-            // Enhanced pillar glow light - room-specific colors
-            let glowColor = 0x6080ff;
-            if (roomType === 'center') glowColor = 0xFFD700;
-            else if (roomType === 'orbital') glowColor = 0xC0C0C0;
-            else if (roomType === 'cardinal') glowColor = 0x87CEEB;
-            
-            const pillarGlowLight = new THREE.PointLight(glowColor, 1.2, 18);
-            pillarGlowLight.position.set(pillarX, this.floorHeight + 2, pillarZ);
-            pillarGlowLight.userData = {
-                isPillarGlow: true,
-                pillar: pillar
-            };
-            this.currentDungeonGroup.add(pillarGlowLight);
-            this.lightSources.push(pillarGlowLight);
-        }
+    createWallSection(x, z, width, depth) {
+        const wallMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(width, this.wallHeight, depth),
+            this.materials[this.currentTheme].wall
+        );
+        
+        wallMesh.position.set(x, this.wallHeight/2, z);
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        wallMesh.userData.type = 'wall';
+        
+        this.currentDungeonGroup.add(wallMesh);
+        
+        // Mark as solid in collision grid
+        this.markCollisionArea(x - width/2, z - depth/2, width, depth, 1);
     }
     
-    addProgressivePortals(roomLayout) {
-        console.log('Adding progressive billboard portal system...');
+    removeWallsInArea(x, z, width, depth) {
+        // Remove walls from the collision grid in this area
+        this.markCollisionArea(x, z, width, depth, 0);
         
-        // Find center room position
-        const centerRoom = roomLayout.rooms.center;
-        const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
-        const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = centerRoom.size * this.gridSize;
-        
-        // Calculate portal positions for each direction (in the hallways leading to orbital rooms)
-        const portalDistance = roomSize * 0.6; // Further from center, in the hallways
-        const portalPositions = {
-            // Only add portals for rooms that should be locked initially
-            east: { x: centerWorldX + portalDistance, z: centerWorldZ, rotation: Math.PI/2 },
-            west: { x: centerWorldX - portalDistance, z: centerWorldZ, rotation: -Math.PI/2 },
-            south: { x: centerWorldX, z: centerWorldZ + portalDistance, rotation: Math.PI }
-            // Note: No north portal since north is always unlocked
-        };
-        
-        // Add room entrance portals (initially blocked except north)
-        Object.entries(portalPositions).forEach(([direction, pos]) => {
-            const isUnlocked = this.roomProgression[direction].unlocked;
-            const portal = this.createBillboardPortal(direction, isUnlocked);
-            portal.position.set(pos.x, this.floorHeight + 3, pos.z); // Higher up, in the hallway
-            portal.name = `${direction}_room_portal`;
-            this.currentDungeonGroup.add(portal);
-            
-            console.log(`Added ${direction} room portal at (${pos.x}, ${pos.z}) - ${isUnlocked ? 'UNLOCKED' : 'LOCKED'}`);
-        });
-    }
-    
-    createBillboardPortal(direction, isUnlocked) {
-        const portalGroup = new THREE.Group();
-        
-        // Create simple geometric mask with opacity-based state
-        const mask = this.createGeometricMask(isUnlocked);
-        portalGroup.add(mask);
-        
-        // Add particle effects around the portal
-        this.addPortalParticleEffects(portalGroup, isUnlocked);
-        
-        // Add portal data
-        portalGroup.userData = {
-            portalType: `room_entrance_${direction}`,
-            direction: direction,
-            isBlocking: !isUnlocked,
-            originalY: this.floorHeight + 3,
-            pulseSpeed: 0.5 + Math.random() * 0.5,
-            pulseAmount: 0.1,
-            maskMesh: mask // Store reference to the mask for opacity changes
-        };
-        
-        console.log(`Created geometric portal for ${direction}, unlocked: ${isUnlocked}`);
-        
-        return portalGroup;
-    }
-    
-    createGeometricMask(isUnlocked) {
-        const maskGroup = new THREE.Group();
-        
-        // Main mask face (oval) - MADE LARGER
-        const faceGeometry = new THREE.SphereGeometry(3, 16, 12); // Increased from 2 to 3
-        faceGeometry.scale(1, 1.2, 0.3); // Make it more mask-like
-        
-        // Use a neutral dark color for the mask face with slight emissive glow
-        const faceColor = 0x4a4a4a; // Slightly lighter gray for better visibility
-        const faceOpacity = isUnlocked ? 0.2 : 0.95; // Transparent when unlocked, solid when locked
-        
-        const faceMaterial = new THREE.MeshLambertMaterial({ 
-            color: faceColor,
-            transparent: true,
-            opacity: faceOpacity,
-            emissive: faceColor,
-            emissiveIntensity: 0.2 // Slight self-illumination so it's always visible
-        });
-        
-        const face = new THREE.Mesh(faceGeometry, faceMaterial);
-        maskGroup.add(face);
-        
-        // Add front-facing light to illuminate the mask
-        const maskLight = new THREE.PointLight(0xffffff, 0.1, 8); // Dimmed by 90% (was 1.0, now 0.1)
-        maskLight.position.set(0, 0, 4); // Position in front of the mask
-        maskGroup.add(maskLight);
-        
-        // Eye sockets (black holes) - MADE LARGER
-        const eyeGeometry = new THREE.SphereGeometry(0.45, 8, 8); // Increased from 0.3 to 0.45
-        const eyeOpacity = isUnlocked ? 0.1 : 1.0;
-        const eyeMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x000000,
-            transparent: true,
-            opacity: eyeOpacity
-        });
-        
-        // Left eye socket
-        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        leftEye.position.set(-0.9, 0.45, 0.3); // Adjusted positions for larger scale
-        leftEye.scale.set(1, 1.3, 0.8);
-        maskGroup.add(leftEye);
-        
-        // Right eye socket  
-        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-        rightEye.position.set(0.9, 0.45, 0.3); // Adjusted positions for larger scale
-        rightEye.scale.set(0.8, 1.1, 0.8);
-        maskGroup.add(rightEye);
-        
-        // Glowing eyes - with opacity-based intensity - BRIGHTER
-        const eyeColor = 0xaaaaff; // Neutral blue-white glow
-        const eyeGlowGeometry = new THREE.SphereGeometry(0.25, 8, 8); // Increased from 0.15 to 0.25
-        const eyeGlowOpacity = isUnlocked ? 0.3 : 1.0; // More visible when unlocked
-        const eyeGlowMaterial = new THREE.MeshBasicMaterial({ 
-            color: eyeColor,
-            transparent: true,
-            opacity: eyeGlowOpacity,
-            emissive: eyeColor,
-            emissiveIntensity: isUnlocked ? 0.5 : 1.5, // Brighter overall
-            blending: THREE.AdditiveBlending // Makes the glow more prominent
-        });
-        
-        // Left glowing eye
-        const leftGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial);
-        leftGlow.position.set(-0.9, 0.45, 0.35);
-        maskGroup.add(leftGlow);
-        
-        // Right glowing eye
-        const rightGlow = new THREE.Mesh(eyeGlowGeometry, eyeGlowMaterial.clone());
-        rightGlow.position.set(0.9, 0.45, 0.35);
-        rightGlow.scale.set(0.8, 0.8, 0.8);
-        maskGroup.add(rightGlow);
-        
-        // Mouth (dark opening) - MADE LARGER
-        const mouthGeometry = new THREE.SphereGeometry(0.6, 8, 8); // Increased from 0.4 to 0.6
-        mouthGeometry.scale(1, 0.5, 0.8);
-        const mouthOpacity = isUnlocked ? 0.1 : 1.0;
-        const mouthMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x000000,
-            transparent: true,
-            opacity: mouthOpacity
-        });
-        
-        const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-        mouth.position.set(0, -0.75, 0.2); // Adjusted for larger scale
-        maskGroup.add(mouth);
-        
-        // Add some teeth - MADE LARGER AND BRIGHTER
-        const toothGeometry = new THREE.BoxGeometry(0.08, 0.3, 0.08); // Increased size
-        const toothOpacity = isUnlocked ? 0.3 : 0.95; // More visible
-        const toothMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0xFFFACD,
-            transparent: true,
-            opacity: toothOpacity,
-            emissive: 0xFFFACD,
-            emissiveIntensity: 0.1 // Slight glow for visibility
-        });
-        
-        for (let i = 0; i < 4; i++) {
-            const tooth = new THREE.Mesh(toothGeometry, toothMaterial.clone());
-            tooth.position.set(-0.22 + i * 0.15, -0.6, 0.3); // Adjusted for larger scale
-            maskGroup.add(tooth);
-        }
-        
-        // Add cracks/weathering marks - MADE LARGER
-        const crackGeometry = new THREE.BoxGeometry(0.03, 1.2, 0.03); // Increased size
-        const crackOpacity = isUnlocked ? 0.1 : 0.8;
-        const crackMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x2a1a1a,
-            transparent: true,
-            opacity: crackOpacity
-        });
-        
-        const crack1 = new THREE.Mesh(crackGeometry, crackMaterial);
-        crack1.position.set(-1.2, 0, 0.35); // Adjusted for larger scale
-        crack1.rotation.z = Math.PI / 6;
-        maskGroup.add(crack1);
-        
-        const crack2 = new THREE.Mesh(crackGeometry, crackMaterial.clone());
-        crack2.position.set(1.05, -0.45, 0.35); // Adjusted for larger scale
-        crack2.rotation.z = -Math.PI / 4;
-        crack2.scale.set(1, 0.6, 1);
-        maskGroup.add(crack2);
-        
-        // Store references for opacity changes
-        maskGroup.userData = {
-            face: face,
-            leftEye: leftEye,
-            rightEye: rightEye,
-            leftGlow: leftGlow,
-            rightGlow: rightGlow,
-            mouth: mouth,
-            teeth: maskGroup.children.filter(child => child.geometry === toothGeometry),
-            cracks: [crack1, crack2],
-            isUnlocked: isUnlocked
-        };
-        
-        return maskGroup;
-    }
-    
-    addPortalParticleEffects(portalGroup, isUnlocked) {
-        const particleCount = 12;
-        const particleColor = 0x8888ff; // Neutral blue color for particles
-        const particleOpacity = isUnlocked ? 0.2 : 0.7;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.05, 6, 6);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: particleColor,
-                transparent: true,
-                opacity: particleOpacity,
-                emissive: particleColor,
-                emissiveIntensity: isUnlocked ? 0.1 : 0.5
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position particles in a circle around the portal
-            const angle = (i / particleCount) * Math.PI * 2;
-            const radius = 3;
-            particle.position.set(
-                Math.cos(angle) * radius,
-                -1 + Math.random() * 2,
-                Math.sin(angle) * radius
-            );
-            
-            // Add animation data
-            particle.userData = {
-                originalAngle: angle,
-                originalRadius: radius,
-                swirSpeed: 0.5 + Math.random() * 0.5,
-                bobSpeed: 0.8 + Math.random() * 0.4,
-                bobAmount: 0.3,
-                particleMaterial: particleMaterial // Store reference for opacity updates
-            };
-            
-            portalGroup.add(particle);
-        }
-    }
-    
-    addCenterRoomPortals(worldX, worldZ, roomSize) {
-        console.log('Center room ready - entry/exit portals will be handled separately...');
-        
-        // For now, we're not adding entry/exit portals here
-        // They will be added later when the system is refined
-        // This just ensures the center room atmosphere is set up
-    }
-    
-    updateRoomPortals(direction, shouldOpen) {
-        if (!this.currentDungeonGroup) return;
-        
-        console.log(`Updating ${direction} portal to ${shouldOpen ? 'OPEN' : 'CLOSED'}`);
-        
+        // Remove wall meshes that intersect with this area
+        const wallsToRemove = [];
         this.currentDungeonGroup.traverse((child) => {
-            if (child.userData.direction === direction) {
-                console.log(`Found portal for ${direction}, updating...`);
-                
-                child.userData.isBlocking = !shouldOpen;
-                
-                // Update geometric mask opacity
-                if (child.userData.maskMesh && child.userData.maskMesh.userData) {
-                    const maskData = child.userData.maskMesh.userData;
-                    
-                    try {
-                        // Update face opacity and emissive
-                        const newOpacity = shouldOpen ? 0.2 : 0.95;
-                        if (maskData.face && maskData.face.material) {
-                            maskData.face.material.opacity = newOpacity;
-                            maskData.face.material.emissiveIntensity = 0.2; // Keep slight glow
-                        }
-                        
-                        // Update eye socket opacity
-                        const eyeOpacity = shouldOpen ? 0.1 : 1.0;
-                        if (maskData.leftEye && maskData.leftEye.material) {
-                            maskData.leftEye.material.opacity = eyeOpacity;
-                        }
-                        if (maskData.rightEye && maskData.rightEye.material) {
-                            maskData.rightEye.material.opacity = eyeOpacity;
-                        }
-                        
-                        // Update eye glow opacity and intensity
-                        const glowOpacity = shouldOpen ? 0.3 : 1.0; // More visible when unlocked
-                        const glowIntensity = shouldOpen ? 0.5 : 1.5; // Brighter overall
-                        if (maskData.leftGlow && maskData.leftGlow.material) {
-                            maskData.leftGlow.material.opacity = glowOpacity;
-                            maskData.leftGlow.material.emissiveIntensity = glowIntensity;
-                        }
-                        if (maskData.rightGlow && maskData.rightGlow.material) {
-                            maskData.rightGlow.material.opacity = glowOpacity;
-                            maskData.rightGlow.material.emissiveIntensity = glowIntensity;
-                        }
-                        
-                        // Update mouth opacity
-                        const mouthOpacity = shouldOpen ? 0.1 : 1.0;
-                        if (maskData.mouth && maskData.mouth.material) {
-                            maskData.mouth.material.opacity = mouthOpacity;
-                        }
-                        
-                        // Update teeth opacity
-                        const toothOpacity = shouldOpen ? 0.3 : 0.95; // More visible
-                        if (maskData.teeth && maskData.teeth.length > 0) {
-                            maskData.teeth.forEach(tooth => {
-                                if (tooth.material) {
-                                    tooth.material.opacity = toothOpacity;
-                                    tooth.material.emissiveIntensity = 0.1; // Keep slight glow
-                                }
-                            });
-                        }
-                        
-                        // Update cracks opacity
-                        const crackOpacity = shouldOpen ? 0.1 : 0.8;
-                        if (maskData.cracks && maskData.cracks.length > 0) {
-                            maskData.cracks.forEach(crack => {
-                                if (crack.material) {
-                                    crack.material.opacity = crackOpacity;
-                                }
-                            });
-                        }
-                        
-                        maskData.isUnlocked = shouldOpen;
-                        console.log(`Updated mask opacity for ${direction}`);
-                    } catch (error) {
-                        console.error('Error updating mask opacity:', error);
-                    }
-                } else {
-                    console.warn(`No maskMesh found for ${direction} portal`);
+            if (child.userData.type === 'wall') {
+                const wallPos = child.position;
+                if (wallPos.x >= x && wallPos.x <= x + width &&
+                    wallPos.z >= z && wallPos.z <= z + depth) {
+                    wallsToRemove.push(child);
                 }
-                
-                // Update particle opacity
-                child.traverse((subChild) => {
-                    if (subChild.userData.particleMaterial) {
-                        try {
-                            const newParticleOpacity = shouldOpen ? 0.2 : 0.7;
-                            const newParticleIntensity = shouldOpen ? 0.1 : 0.5;
-                            subChild.userData.particleMaterial.opacity = newParticleOpacity;
-                            subChild.userData.particleMaterial.emissiveIntensity = newParticleIntensity;
-                        } catch (error) {
-                            console.error('Error updating particle opacity:', error);
-                        }
-                    }
-                });
-                
-                console.log(`${direction} room portal ${shouldOpen ? 'opened (transparent)' : 'closed (solid)'}`);
             }
+        });
+        
+        wallsToRemove.forEach(wall => {
+            this.currentDungeonGroup.remove(wall);
+            if (wall.geometry) wall.geometry.dispose();
+            if (wall.material) wall.material.dispose();
         });
     }
     
-    // For testing - cycles through the progression
-    testProgressionAdvance() {
-        console.log('Testing progression advance...');
+    markCollisionArea(x, z, width, depth, value) {
+        const startX = Math.max(0, Math.floor((x + this.dungeonSize/2) / this.cellSize));
+        const endX = Math.min(this.gridSize - 1, Math.floor((x + width + this.dungeonSize/2) / this.cellSize));
+        const startZ = Math.max(0, Math.floor((z + this.dungeonSize/2) / this.cellSize));
+        const endZ = Math.min(this.gridSize - 1, Math.floor((z + depth + this.dungeonSize/2) / this.cellSize));
         
-        try {
-            if (this.currentProgressionIndex < this.progressionOrder.length) {
-                const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-                console.log(`Defeating enemies in ${currentRoom} room...`);
-                
-                this.defeatEnemiesInRoom(currentRoom);
-            } else {
-                console.log('All rooms already completed!');
+        for (let gx = startX; gx <= endX; gx++) {
+            for (let gz = startZ; gz <= endZ; gz++) {
+                this.collisionGrid[gx][gz] = value;
             }
-        } catch (error) {
-            console.error('Error in progression advance:', error);
         }
     }
     
-    openExitPortal() {
-        console.log('All rooms completed - adding exit portal!');
+    placePortals() {
+        const portalPositions = [
+            { x: 0, z: -18, direction: 'north', type: 'room_entrance' },
+            { x: 18, z: 0, direction: 'east', type: 'room_entrance' },
+            { x: -18, z: 0, direction: 'west', type: 'room_entrance' },
+            { x: 0, z: 18, direction: 'south', type: 'room_entrance' },
+            { x: 0, z: -35, direction: 'north', type: 'exit' }, // North room exit
+            { x: 35, z: 0, direction: 'east', type: 'exit' },   // East room exit
+            { x: -35, z: 0, direction: 'west', type: 'exit' },  // West room exit
+            { x: 0, z: 35, direction: 'south', type: 'exit' }   // South room exit
+        ];
         
-        // Find center room
-        if (this.currentDungeon && this.currentDungeon.roomLayout.rooms.center) {
-            const centerRoom = this.currentDungeon.roomLayout.rooms.center;
-            const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
-            const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
-            const roomSize = centerRoom.size * this.gridSize;
-            
-            // Create and add exit portal using geometric approach - always transparent/passable
-            const exitPortal = this.createBillboardPortal('exit', true);
-            exitPortal.position.set(centerWorldX, this.floorHeight + 3, centerWorldZ + roomSize * 0.3);
-            exitPortal.name = 'exit_portal';
-            exitPortal.userData.isBlocking = false; // Exit is immediately usable
-            exitPortal.userData.portalType = 'exit';
-            exitPortal.userData.direction = 'exit';
-            
-            // Make exit portal extra transparent/ghostly
-            if (exitPortal.userData.maskMesh && exitPortal.userData.maskMesh.userData) {
-                const maskData = exitPortal.userData.maskMesh.userData;
-                
-                // Make it even more transparent than regular unlocked portals
-                if (maskData.face && maskData.face.material) {
-                    maskData.face.material.opacity = 0.1;
-                    maskData.face.material.color.setHex(0x88ff88); // Greenish tint for exit
-                }
-                
-                if (maskData.leftGlow && maskData.leftGlow.material) {
-                    maskData.leftGlow.material.color.setHex(0x00ff00);
-                    maskData.leftGlow.material.emissive.setHex(0x00ff00);
-                }
-                if (maskData.rightGlow && maskData.rightGlow.material) {
-                    maskData.rightGlow.material.color.setHex(0x00ff00);
-                    maskData.rightGlow.material.emissive.setHex(0x00ff00);
-                }
-            }
-            
-            this.currentDungeonGroup.add(exitPortal);
-            console.log('Exit portal added and opened with transparent geometric design!');
+        portalPositions.forEach(portalData => {
+            this.createPortal(portalData.x, portalData.z, portalData.direction, portalData.type);
+        });
+    }
+    
+    createPortal(x, z, direction, type) {
+        // Create portal frame
+        const portalFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(4, 5, 0.5),
+            this.materials[this.currentTheme].portal
+        );
+        portalFrame.position.set(x, 2.5, z);
+        
+        // Create blocking mask (visible when room is locked)
+        const maskGeometry = new THREE.BoxGeometry(3, 4, 0.3);
+        const maskMaterial = this.materials[this.currentTheme].portalMask.clone();
+        
+        const portalMask = new THREE.Mesh(maskGeometry, maskMaterial);
+        portalMask.position.set(x, 2, z);
+        
+        // Add eerie face texture to the mask
+        this.addMaskTexture(portalMask, direction);
+        
+        // Set portal data
+        portalFrame.userData = {
+            portalType: type,
+            direction: direction,
+            isBlocking: this.shouldPortalBlock(direction, type)
+        };
+        
+        portalMask.userData = {
+            portalType: type,
+            direction: direction,
+            isBlocking: this.shouldPortalBlock(direction, type),
+            isMask: true
+        };
+        
+        this.currentDungeonGroup.add(portalFrame);
+        this.currentDungeonGroup.add(portalMask);
+        
+        this.portals.push(portalFrame);
+        this.portalMasks.push(portalMask);
+        
+        // Update mask visibility
+        this.updatePortalMaskVisibility(portalMask, direction, type);
+    }
+    
+    shouldPortalBlock(direction, type) {
+        if (type === 'room_entrance') {
+            return !this.roomProgression[direction].unlocked;
+        } else if (type === 'exit') {
+            return !this.roomProgression[direction].enemiesDefeated;
+        }
+        return false;
+    }
+    
+    updatePortalMaskVisibility(mask, direction, type) {
+        const shouldBlock = this.shouldPortalBlock(direction, type);
+        mask.visible = shouldBlock;
+        mask.userData.isBlocking = shouldBlock;
+        
+        // Update mask color based on room status
+        if (this.roomProgression[direction].enemiesDefeated) {
+            mask.material.color.setHex(0x00ff00); // Green for completed
+        } else if (this.roomProgression[direction].unlocked) {
+            mask.material.color.setHex(0xffff00); // Yellow for accessible
+        } else {
+            mask.material.color.setHex(0xff0000); // Red for locked
         }
     }
     
-    addFloatingOrbs(worldX, worldZ, roomSize) {
-        const numOrbs = 3 + Math.floor(Math.random() * 4); // More orbs
-        const orbColor = 0xffaa44; // Consistent golden color
+    addMaskTexture(mask, direction) {
+        // Create a simple face pattern on the mask material
+        const faceEmojis = {
+            north: '😤',
+            east: '😠', 
+            west: '😡',
+            south: '👹'
+        };
         
-        for (let i = 0; i < numOrbs; i++) {
-            const orbGeometry = new THREE.SphereGeometry(0.18, 12, 8); // Slightly larger
-            const orbMaterial = new THREE.MeshBasicMaterial({
-                color: orbColor,
-                transparent: true,
-                opacity: 0.9, // More opaque
-                emissive: orbColor,
-                emissiveIntensity: 0.8 // Much brighter
-            });
-            
-            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-            orb.position.set(
-                worldX + (Math.random() - 0.5) * roomSize * 0.6,
-                this.floorHeight + 4 + Math.random() * 2,
-                worldZ + (Math.random() - 0.5) * roomSize * 0.6
-            );
-            
-            // Add floating animation
-            orb.userData = {
-                originalY: orb.position.y,
-                floatSpeed: 0.5 + Math.random() * 1.5,
-                floatAmount: 0.3 + Math.random() * 0.4
-            };
-            
-            this.currentDungeonGroup.add(orb);
-            
-            // Much brighter orb light
-            const orbLight = new THREE.PointLight(orbColor, 0.6, 12); // Was 0.03, now 0.6
-            orbLight.position.copy(orb.position);
-            this.currentDungeonGroup.add(orbLight);
-            this.lightSources.push(orbLight);
+        // For now, just change the color slightly to differentiate
+        const colors = {
+            north: 0x660000,
+            east: 0x006600,
+            west: 0x000066,
+            south: 0x660066
+        };
+        
+        mask.material.color.setHex(colors[direction] || 0x660000);
+    }
+    
+    addRoomDecorations(centerX, centerZ, roomType) {
+        const theme = this.themes[this.currentTheme];
+        const decorations = theme.decorations;
+        
+        // Add corner pillars
+        const pillarPositions = [
+            { x: centerX - 10, z: centerZ - 10 },
+            { x: centerX + 10, z: centerZ - 10 },
+            { x: centerX - 10, z: centerZ + 10 },
+            { x: centerX + 10, z: centerZ + 10 }
+        ];
+        
+        pillarPositions.forEach(pos => {
+            this.createPillar(pos.x, pos.z);
+        });
+        
+        // Add themed decorations
+        if (roomType !== 'center') {
+            this.addThemedDecorations(centerX, centerZ, decorations);
         }
+    }
+    
+    createPillar(x, z) {
+        const pillar = new THREE.Mesh(
+            this.geometries.pillar,
+            this.materials[this.currentTheme].pillar
+        );
+        
+        pillar.position.set(x, this.wallHeight/2, z);
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        pillar.userData.type = 'pillar';
+        
+        this.currentDungeonGroup.add(pillar);
+        
+        // Mark pillar area as solid
+        this.markCollisionArea(x - 0.5, z - 0.5, 1, 1, 1);
+    }
+    
+    addThemedDecorations(centerX, centerZ, decorations) {
+        // Add random decorations around the room
+        const decorationCount = 3 + Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < decorationCount; i++) {
+            const angle = (i / decorationCount) * Math.PI * 2;
+            const radius = 5 + Math.random() * 8;
+            
+            const x = centerX + Math.cos(angle) * radius;
+            const z = centerZ + Math.sin(angle) * radius;
+            
+            if (this.isPositionWalkable(x, z)) {
+                this.createDecoration(x, z, decorations[Math.floor(Math.random() * decorations.length)]);
+            }
+        }
+    }
+    
+    createDecoration(x, z, decorationType) {
+        const decoration = new THREE.Mesh(
+            this.geometries.decoration,
+            this.materials[this.currentTheme].decoration
+        );
+        
+        decoration.position.set(x, 0.5, z);
+        decoration.userData.type = 'decoration';
+        decoration.userData.decorationType = decorationType;
+        
+        this.currentDungeonGroup.add(decoration);
+    }
+    
+    addEnemySpawnPoints(centerX, centerZ, roomType) {
+        // Add invisible enemy spawn markers
+        const spawnCount = 2 + Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < spawnCount; i++) {
+            const angle = (i / spawnCount) * Math.PI * 2;
+            const radius = 3 + Math.random() * 5;
+            
+            const x = centerX + Math.cos(angle) * radius;
+            const z = centerZ + Math.sin(angle) * radius;
+            
+            if (this.isPositionWalkable(x, z)) {
+                // Create invisible spawn point marker
+                const spawnMarker = new THREE.Object3D();
+                spawnMarker.position.set(x, 0, z);
+                spawnMarker.userData = {
+                    type: 'enemySpawn',
+                    roomType: roomType,
+                    spawned: false
+                };
+                
+                this.currentDungeonGroup.add(spawnMarker);
+            }
+        }
+    }
+    
+    addAtmosphere() {
+        const theme = this.themes[this.currentTheme];
+        
+        // Update scene fog
+        this.scene.fog.color.setHex(theme.fogColor);
+        this.scene.fog.density = 0.015 + (this.currentFloor * 0.002);
+        
+        // Add atmospheric lighting
+        this.addAtmosphericLights(theme);
+    }
+    
+    addAtmosphericLights(theme) {
+        // Add point lights around the dungeon
+        const lightPositions = [
+            { x: 0, y: 4, z: 0 },      // Center
+            { x: 0, y: 4, z: -25 },    // North room
+            { x: 25, y: 4, z: 0 },     // East room
+            { x: -25, y: 4, z: 0 },    // West room
+            { x: 0, y: 4, z: 25 }      // South room
+        ];
+        
+        lightPositions.forEach(pos => {
+            const light = new THREE.PointLight(theme.lightColor, theme.lightIntensity, 20);
+            light.position.set(pos.x, pos.y, pos.z);
+            light.castShadow = true;
+            light.shadow.mapSize.width = 512;
+            light.shadow.mapSize.height = 512;
+            
+            this.currentDungeonGroup.add(light);
+        });
+    }
+    
+    // Collision detection methods
+    isPositionWalkable(x, z) {
+        const gridX = Math.floor((x + this.dungeonSize/2) / this.cellSize);
+        const gridZ = Math.floor((z + this.dungeonSize/2) / this.cellSize);
+        
+        if (gridX < 0 || gridX >= this.gridSize || gridZ < 0 || gridZ >= this.gridSize) {
+            return false; // Outside bounds
+        }
+        
+        return this.collisionGrid[gridX][gridZ] === 0;
+    }
+    
+    isPositionSolid(x, z) {
+        return !this.isPositionWalkable(x, z);
+    }
+    
+    getFloorHeight(x, z) {
+        // All floors are at Y = 0 in this castle system
+        return 0;
+    }
+    
+    getCeilingHeight(x, z) {
+        // Ceiling height is consistent throughout the castle
+        return this.wallHeight + 1;
+    }
+    
+    getCurrentTheme() {
+        return this.currentTheme;
+    }
+    
+    // Room progression methods
+    togglePortals() {
+        // Simulate enemy defeat and room progression
+        const directions = ['north', 'east', 'west', 'south'];
+        
+        // Find next room to unlock
+        let nextToUnlock = null;
+        let nextToComplete = null;
+        
+        for (const dir of directions) {
+            if (!this.roomProgression[dir].unlocked) {
+                nextToUnlock = dir;
+                break;
+            } else if (!this.roomProgression[dir].enemiesDefeated) {
+                nextToComplete = dir;
+                break;
+            }
+        }
+        
+        if (nextToComplete) {
+            // Complete current room
+            this.roomProgression[nextToComplete].enemiesDefeated = true;
+            console.log(`${nextToComplete} room completed! Enemies defeated.`);
+            
+            // Update all portal masks
+            this.updateAllPortalMasks();
+            
+        } else if (nextToUnlock) {
+            // Unlock next room
+            this.roomProgression[nextToUnlock].unlocked = true;
+            console.log(`${nextToUnlock} room unlocked! You can now enter.`);
+            
+            // Update all portal masks
+            this.updateAllPortalMasks();
+        } else {
+            console.log('All rooms completed! Floor finished.');
+        }
+    }
+    
+    updateAllPortalMasks() {
+        this.portalMasks.forEach(mask => {
+            const direction = mask.userData.direction;
+            const type = mask.userData.portalType;
+            this.updatePortalMaskVisibility(mask, direction, type);
+        });
     }
     
     update(deltaTime) {
-        // Update floating orbs and animated elements
+        // Update any animated elements
         if (this.currentDungeonGroup) {
+            // Rotate decorative elements slightly
             this.currentDungeonGroup.traverse((child) => {
-                if (child.userData.floatSpeed && child.userData.originalY !== undefined) {
-                    child.position.y = child.userData.originalY + 
-                        Math.sin(Date.now() * 0.001 * child.userData.floatSpeed) * child.userData.floatAmount;
+                if (child.userData.type === 'decoration') {
+                    child.rotation.y += deltaTime * 0.5;
                 }
-                
-                // Rotate constellation stars
-                if (child.userData.rotationSpeed) {
-                    child.rotation.x += child.userData.rotationSpeed;
-                    child.rotation.y += child.userData.rotationSpeed * 1.5;
-                }
-                
-                // Update geometric portal animations
-                if (child.userData.portalType && child.userData.portalType.includes('room_entrance')) {
-                    this.updateBillboardPortalAnimations(child, deltaTime);
-                }
-                
-                // Update portal particles
-                if (child.userData.swirSpeed !== undefined) {
-                    this.updatePortalParticles(child, deltaTime);
-                }
-                
-                // RE-ENABLED: Make mask faces lock onto player
-                if (child.userData.maskMesh && window.game && window.game.camera) {
-                    child.userData.maskMesh.lookAt(window.game.camera.position);
+            });
+            
+            // Pulse portal masks
+            this.portalMasks.forEach(mask => {
+                if (mask.visible) {
+                    const pulseFactor = Math.sin(Date.now() * 0.003) * 0.1 + 0.9;
+                    mask.scale.setScalar(pulseFactor);
+                    
+                    // Update transparency based on room status
+                    const direction = mask.userData.direction;
+                    if (this.roomProgression[direction].unlocked) {
+                        mask.material.opacity = 0.3 + Math.sin(Date.now() * 0.005) * 0.2;
+                    } else {
+                        mask.material.opacity = 0.8 + Math.sin(Date.now() * 0.002) * 0.1;
+                    }
                 }
             });
         }
-        
-        // Update glowing pillars with room-specific effects
-        this.glowingPillars.forEach(pillar => {
-            if (pillar && pillar.userData.isPillar) {
-                const time = Date.now() * 0.001;
-                const glowIntensity = pillar.userData.baseEmissiveIntensity + 
-                    Math.sin(time * pillar.userData.glowSpeed + pillar.userData.glowPhase) * 0.2;
-                
-                if (pillar.material) {
-                    pillar.material.emissiveIntensity = Math.max(0.1, glowIntensity);
-                }
-                
-                // Rotate crystal pillars
-                if (pillar.userData.rotation) {
-                    pillar.rotation.y += pillar.userData.rotation;
-                }
-            }
-        });
-        
-        // Animate light intensities with more subtle flicker in dark dungeon
-        this.lightSources.forEach(light => {
-            if (light.userData.originalIntensity === undefined) {
-                light.userData.originalIntensity = light.intensity;
-                light.userData.flickerSpeed = 0.5 + Math.random() * 2;
-            }
-            
-            // More subtle flicker for atmospheric effect
-            const flicker = Math.sin(Date.now() * 0.001 * light.userData.flickerSpeed) * 0.05 + 1;
-            light.intensity = light.userData.originalIntensity * flicker;
-            
-            // Sync pillar glow lights with their pillars
-            if (light.userData.isPillarGlow && light.userData.pillar) {
-                const pillar = light.userData.pillar;
-                if (pillar.material) {
-                    // Sync light intensity with pillar glow
-                    light.intensity = light.userData.originalIntensity * (pillar.material.emissiveIntensity / pillar.userData.baseEmissiveIntensity);
-                }
-            }
-        });
-    }
-    
-    updateBillboardPortalAnimations(portalGroup, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        // Gentle breathing/pulsing animation
-        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
-        
-        // Apply pulse to the mask mesh specifically
-        if (portalGroup.userData.maskMesh) {
-            portalGroup.userData.maskMesh.scale.setScalar(pulseScale);
-        }
-        
-        // Very subtle floating motion - keep it within bounds
-        const originalY = portalGroup.userData.originalY;
-        const floatOffset = Math.sin(time * 0.6) * 0.2; // Only 0.2 units up/down
-        portalGroup.position.y = originalY + floatOffset;
-        
-        // Update particle effects around portal
-        portalGroup.traverse((child) => {
-            if (child.userData.swirSpeed !== undefined) {
-                this.updatePortalParticles(child, deltaTime);
-            }
-        });
-        
-        // Subtle eye glow pulsing - only if mask data exists
-        if (portalGroup.userData.maskMesh && portalGroup.userData.maskMesh.userData) {
-            const maskData = portalGroup.userData.maskMesh.userData;
-            const baseIntensity = maskData.isUnlocked ? 0.2 : 1.2;
-            const glowIntensity = baseIntensity + Math.sin(time * 3) * 0.3;
-            
-            if (maskData.leftGlow && maskData.leftGlow.material) {
-                maskData.leftGlow.material.emissiveIntensity = glowIntensity;
-            }
-            if (maskData.rightGlow && maskData.rightGlow.material) {
-                maskData.rightGlow.material.emissiveIntensity = glowIntensity;
-            }
-        }
-    }
-    
-    updatePortalParticles(particle, deltaTime) {
-        const time = Date.now() * 0.001;
-        
-        // Swirling motion around portal
-        if (particle.userData.originalAngle !== undefined) {
-            particle.userData.originalAngle += particle.userData.swirSpeed * deltaTime;
-            const angle = particle.userData.originalAngle;
-            const radius = particle.userData.originalRadius || 3;
-            
-            particle.position.x = Math.cos(angle) * radius;
-            particle.position.z = Math.sin(angle) * radius;
-            
-            // Gentle bobbing motion
-            particle.position.y += Math.sin(time * particle.userData.bobSpeed) * particle.userData.bobAmount * deltaTime;
-        }
-    }
-    
-    clearCurrentDungeon() {
-        if (this.currentDungeonGroup) {
-            this.scene.remove(this.currentDungeonGroup);
-        }
-        
-        this.lightSources.length = 0;
-        this.billboardSprites.length = 0;
-        this.glowingPillars.length = 0;
-        this.currentFloorMap = null;
-        
-        console.log('Previous dungeon cleared');
-    }
-    
-    // Portal Management Methods (for testing - will be replaced by enemy system)
-    togglePortals() {
-        // Test the progression system
-        this.testProgressionAdvance();
-    }
-    
-    getRoomAt(position) {
-        if (!this.currentDungeon) return null;
-        
-        // Convert world position to grid position
-        const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
-        const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
-        
-        // Find which room contains this grid position
-        for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
-            const halfSize = Math.floor(room.size / 2);
-            if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
-                gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
-                return room;
-            }
-        }
-        
-        return null;
     }
 }
 
