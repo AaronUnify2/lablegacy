@@ -1,9 +1,9 @@
-// Gothic Cathedral Dungeon Generation System
-// Inspired by sacred architecture with deep blues, golds, and soaring spaces
+// Gothic Cathedral Ruins - Combat-Oriented Dungeon System
+// Ancient cathedral ruins perfect for tactical combat encounters
 
 class DungeonSystem {
     constructor(scene, player) {
-        console.log('Initializing Gothic Cathedral Dungeon System...');
+        console.log('Initializing Gothic Cathedral Ruins Combat System...');
         
         this.scene = scene;
         this.player = player;
@@ -25,50 +25,48 @@ class DungeonSystem {
         
         // Grid-based floor planning
         this.gridSize = 2; // 2 units per grid cell
-        this.dungeonWidth = 180; // Increased to 180 for cardinal rooms
-        this.dungeonDepth = 180; // Increased to 180 for cardinal rooms
+        this.dungeonWidth = 180;
+        this.dungeonDepth = 180;
         this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
         this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
         
-        // Room templates
+        // Room templates - sized for combat encounters
         this.roomTemplates = {
-            CENTER: { size: 13, type: 'center' },    // 26x26 units - Main cathedral nave
-            ORBITAL: { size: 10, type: 'orbital' },  // 20x20 units - Side chapels
-            CARDINAL: { size: 12, type: 'cardinal' } // 24x24 units - Transepts
+            CENTER: { size: 13, type: 'center' },    // Large combat arena
+            ORBITAL: { size: 10, type: 'orbital' },  // Medium tactical spaces
+            CARDINAL: { size: 12, type: 'cardinal' } // Multi-level combat zones
         };
         
-        // Corridor width in grid cells
-        this.corridorWidth = 3; // Gothic cloister corridors
+        // Corridor width
+        this.corridorWidth = 3;
         
         // Collision and height data
-        this.floorHeight = 0; // Base floor height
-        this.ceilingHeight = 12; // Much taller for cathedral effect
-        this.currentFloorMap = null; // For collision detection
+        this.floorHeight = 0;
+        this.ceilingHeight = 12; // High ceilings for dramatic combat
+        this.currentFloorMap = null;
         
-        // Materials and lighting (gothic cathedral theme)
+        // Materials and lighting
         this.materials = new Map();
         this.lightSources = [];
         this.billboardSprites = [];
-        this.glowingPillars = []; // Track pillars for glow animation
-        this.architecturalElements = []; // Track gothic elements
+        this.combatElements = []; // Track combat-oriented elements
+        this.environmentalHazards = []; // Collapsing pillars, etc.
         
-        // Initialize synchronously now
         this.init();
     }
     
     init() {
-        this.setupGothicMaterials();
+        this.setupRuinsMaterials();
         this.setupBillboardSystem();
         
-        // Connect player to this dungeon system for collision detection
         if (this.player) {
             this.player.setDungeonSystem(this);
         }
         
-        console.log('Gothic Cathedral Dungeon System initialized');
+        console.log('Gothic Cathedral Ruins Combat System initialized');
     }
     
-    // Progressive Unlock System
+    // Progressive Unlock System (unchanged)
     resetProgression() {
         this.roomProgression = {
             center: { unlocked: true, enemiesDefeated: false },
@@ -78,98 +76,74 @@ class DungeonSystem {
             south: { unlocked: false, enemiesDefeated: false }
         };
         this.currentProgressionIndex = 0;
-        console.log('Room progression reset - only center and north rooms accessible');
+        console.log('Room progression reset - only center and north accessible');
     }
     
     defeatEnemiesInRoom(roomDirection) {
-        console.log(`Attempting to defeat enemies in ${roomDirection} room...`);
+        console.log(`Combat completed in ${roomDirection} ruins...`);
         
         if (this.roomProgression[roomDirection]) {
             this.roomProgression[roomDirection].enemiesDefeated = true;
-            console.log(`Enemies defeated in ${roomDirection} room`);
-            
-            // Check if this unlocks the next room
+            console.log(`Enemies defeated in ${roomDirection} chamber`);
             this.checkProgressionUnlock();
-        } else {
-            console.error(`Room ${roomDirection} not found in progression!`);
         }
     }
     
     checkProgressionUnlock() {
-        console.log('Checking progression unlock...');
-        
         try {
             if (this.currentProgressionIndex >= this.progressionOrder.length) {
-                console.log('Already at max progression');
                 return;
             }
             
             const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-            console.log(`Checking if ${currentRoom} room is completed...`);
             
             if (this.roomProgression[currentRoom] && this.roomProgression[currentRoom].enemiesDefeated) {
-                // Unlock next room in sequence
                 this.currentProgressionIndex++;
-                console.log(`Moving to progression index ${this.currentProgressionIndex}`);
                 
                 if (this.currentProgressionIndex < this.progressionOrder.length) {
                     const nextRoom = this.progressionOrder[this.currentProgressionIndex];
-                    console.log(`Unlocking ${nextRoom} room...`);
-                    
                     this.roomProgression[nextRoom].unlocked = true;
-                    this.updateRoomPortals(nextRoom, true); // Open entrance to next room
-                    console.log(`${nextRoom} room unlocked!`);
+                    this.updateRoomPortals(nextRoom, true);
+                    console.log(`${nextRoom} chamber unlocked!`);
                 } else {
-                    // All orbital rooms completed - open exit portal
-                    console.log('All orbital rooms completed!');
                     this.openExitPortal();
-                    console.log('All rooms completed - exit portal opened!');
+                    console.log('All chambers cleared - exit revealed!');
                 }
-            } else {
-                console.log(`${currentRoom} room not yet completed`);
             }
         } catch (error) {
-            console.error('Error in checkProgressionUnlock:', error);
+            console.error('Error in progression unlock:', error);
         }
     }
     
-    // For testing - cycles through the progression
     testProgressionAdvance() {
         const currentRoom = this.progressionOrder[this.currentProgressionIndex];
         this.defeatEnemiesInRoom(currentRoom);
     }
     
-    // Collision Detection Methods
+    // Collision Detection Methods (unchanged)
     isPositionWalkable(worldX, worldZ) {
         if (!this.currentFloorMap) return true;
         
-        // Convert world coordinates to grid coordinates with symmetric rounding
         const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
         const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
         
-        // Check bounds
         if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-            return false; // Outside dungeon bounds
+            return false;
         }
         
-        // Return walkable state from floor map
         return this.currentFloorMap[gridZ][gridX];
     }
     
-    // More precise position checking for collision detection
     isPositionSolid(worldX, worldZ) {
         if (!this.currentFloorMap) return false;
         
-        // Use symmetric coordinate conversion
         const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
         const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
         
-        // Check bounds - treat out of bounds as solid
         if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-            return true; // Outside dungeon bounds = solid
+            return true;
         }
         
-        // Return solid state (inverse of walkable)
         return !this.currentFloorMap[gridZ][gridX];
     }
     
@@ -178,20 +152,18 @@ class DungeonSystem {
     }
     
     getCeilingHeight(worldX, worldZ) {
-        // Check if position is inside dungeon
         if (!this.isPositionWalkable(worldX, worldZ)) {
-            return this.floorHeight; // No ceiling if not in walkable area
+            return this.floorHeight;
         }
         
-        // Variable ceiling heights for cathedral effect
         const room = this.getRoomAt({x: worldX, z: worldZ});
         if (room) {
             if (room.type === 'center') {
-                return this.floorHeight + this.ceilingHeight * 1.5; // Soaring nave
+                return this.floorHeight + this.ceilingHeight * 1.5; // High arena ceiling
             } else if (room.type === 'cardinal') {
-                return this.floorHeight + this.ceilingHeight * 1.3; // High transepts
+                return this.floorHeight + this.ceilingHeight * 1.3; // Multi-level chambers
             } else if (room.type === 'orbital') {
-                return this.floorHeight + this.ceilingHeight * 1.1; // Chapel vaults
+                return this.floorHeight + this.ceilingHeight * 1.1; // Tactical spaces
             }
         }
         
@@ -212,143 +184,128 @@ class DungeonSystem {
         };
     }
     
-    setupGothicMaterials() {
-        console.log('Setting up Gothic Cathedral materials...');
-        
-        // Gothic cathedral color palette inspired by the image
-        this.createCathedralMaterials();
-        
-        console.log(`Gothic materials setup complete. Created ${this.materials.size} cathedral materials.`);
-        console.log('Material types:', Array.from(this.materials.keys()));
+    setupRuinsMaterials() {
+        console.log('Setting up Gothic Ruins materials...');
+        this.createRuinsMaterials();
+        console.log(`Ruins materials setup complete. Created ${this.materials.size} materials.`);
     }
     
-    createCathedralMaterials() {
-        console.log('Creating Gothic Cathedral materials...');
+    createRuinsMaterials() {
+        console.log('Creating Gothic Cathedral Ruins materials...');
         
-        // MAIN CATHEDRAL NAVE (Center Room) - Deep blues with gold accents
-        const naveFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x2C3E50  // Dark blue-grey stone floor
+        // MAIN COMBAT ARENA (Center) - Weathered stone with dramatic shadows
+        const arenaFloor = new THREE.MeshLambertMaterial({ 
+            color: 0x2C3E50  // Dark weathered stone
         });
-        this.materials.set('nave_floor', naveFloor);
+        this.materials.set('arena_floor', arenaFloor);
         
-        const naveWall = new THREE.MeshLambertMaterial({ 
-            color: 0x34495E  // Sophisticated blue-grey walls
+        const arenaWall = new THREE.MeshLambertMaterial({ 
+            color: 0x34495E  // Battle-scarred walls
         });
-        this.materials.set('nave_wall', naveWall);
+        this.materials.set('arena_wall', arenaWall);
         
-        const naveCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x1B2631  // Darker blue for vaulted ceiling
+        const arenaCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x1B2631  // Shadowy vaulted ceiling
         });
-        this.materials.set('nave_ceiling', naveCeiling);
+        this.materials.set('arena_ceiling', arenaCeiling);
         
-        // SIDE CHAPELS (Orbital Rooms) - Warmer stone tones
-        const chapelFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x5D4E37  // Warm brown stone
+        // TACTICAL CHAMBERS (Orbital) - Ruined stone with cover elements
+        const chamberFloor = new THREE.MeshLambertMaterial({ 
+            color: 0x5D4E37  // Dusty brown stone
         });
-        this.materials.set('chapel_floor', chapelFloor);
+        this.materials.set('chamber_floor', chamberFloor);
         
-        const chapelWall = new THREE.MeshLambertMaterial({ 
-            color: 0x6B5B73  // Muted purple-grey
+        const chamberWall = new THREE.MeshLambertMaterial({ 
+            color: 0x6B5B73  // Cracked purple-grey walls
         });
-        this.materials.set('chapel_wall', chapelWall);
+        this.materials.set('chamber_wall', chamberWall);
         
-        const chapelCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x483D54  // Darker purple for intimate ceiling
+        const chamberCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x483D54  // Partially collapsed ceiling
         });
-        this.materials.set('chapel_ceiling', chapelCeiling);
+        this.materials.set('chamber_ceiling', chamberCeiling);
         
-        // TRANSEPTS (Cardinal Rooms) - Celestial blue tones
-        const transeptFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x1F3A93  // Deep royal blue
+        // MULTI-LEVEL ZONES (Cardinal) - Ancient blue stone with platforms
+        const platformFloor = new THREE.MeshLambertMaterial({ 
+            color: 0x1F3A93  // Deep blue ancient stone
         });
-        this.materials.set('transept_floor', transeptFloor);
+        this.materials.set('platform_floor', platformFloor);
         
-        const transeptWall = new THREE.MeshLambertMaterial({ 
-            color: 0x2E4BC6  // Rich blue walls
+        const platformWall = new THREE.MeshLambertMaterial({ 
+            color: 0x2E4BC6  // Rich blue ruined walls
         });
-        this.materials.set('transept_wall', transeptWall);
+        this.materials.set('platform_wall', platformWall);
         
-        const transeptCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x1A237E  // Deep navy ceiling
+        const platformCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x1A237E  // High vaulted ruins
         });
-        this.materials.set('transept_ceiling', transeptCeiling);
+        this.materials.set('platform_ceiling', platformCeiling);
         
-        // CLOISTERS (Corridors) - Connecting walkways
-        const cloisterFloor = new THREE.MeshLambertMaterial({ 
-            color: 0x566573  // Medium grey stone
+        // CORRIDORS - Connecting passages
+        const passageFloor = new THREE.MeshLambertMaterial({ 
+            color: 0x566573  // Medium grey passage stone
         });
-        this.materials.set('cloister_floor', cloisterFloor);
+        this.materials.set('passage_floor', passageFloor);
         
-        const cloisterWall = new THREE.MeshLambertMaterial({ 
-            color: 0x626567  // Slightly lighter grey
+        const passageWall = new THREE.MeshLambertMaterial({ 
+            color: 0x626567  // Worn passage walls
         });
-        this.materials.set('cloister_wall', cloisterWall);
+        this.materials.set('passage_wall', passageWall);
         
-        const cloisterCeiling = new THREE.MeshLambertMaterial({ 
-            color: 0x455A64  // Darker grey ceiling
+        const passageCeiling = new THREE.MeshLambertMaterial({ 
+            color: 0x455A64  // Lower passage ceiling
         });
-        this.materials.set('cloister_ceiling', cloisterCeiling);
+        this.materials.set('passage_ceiling', passageCeiling);
         
-        // ARCHITECTURAL ELEMENTS - Gothic details
-        const goldAccent = new THREE.MeshLambertMaterial({
-            color: 0xD4AF37,  // Rich gold
-            emissive: 0xD4AF37,
-            emissiveIntensity: 0.2
-        });
-        this.materials.set('gold_accent', goldAccent);
-        
-        const silverAccent = new THREE.MeshLambertMaterial({
-            color: 0xC0C0C0,  // Silver
-            emissive: 0xC0C0C0,
-            emissiveIntensity: 0.15
-        });
-        this.materials.set('silver_accent', silverAccent);
-        
-        const bronzeAccent = new THREE.MeshLambertMaterial({
-            color: 0xCD7F32,  // Bronze
-            emissive: 0xCD7F32,
+        // COMBAT ELEMENTS - Cover, platforms, hazards
+        const brokenStone = new THREE.MeshLambertMaterial({
+            color: 0x8B7355,  // Weathered brown stone
+            emissive: 0x2C1810,
             emissiveIntensity: 0.1
         });
-        this.materials.set('bronze_accent', bronzeAccent);
+        this.materials.set('broken_stone', brokenStone);
         
-        // STAINED GLASS COLORS - For window effects
-        const stainedRed = new THREE.MeshBasicMaterial({
-            color: 0xDC143C,
-            transparent: true,
-            opacity: 0.8,
-            emissive: 0xDC143C,
-            emissiveIntensity: 0.5
+        const rustedMetal = new THREE.MeshLambertMaterial({
+            color: 0x8B4513,  // Rusty metal elements
+            emissive: 0x4A1810,
+            emissiveIntensity: 0.15
         });
-        this.materials.set('stained_red', stainedRed);
+        this.materials.set('rusted_metal', rustedMetal);
         
-        const stainedBlue = new THREE.MeshBasicMaterial({
-            color: 0x0047AB,
-            transparent: true,
-            opacity: 0.8,
-            emissive: 0x0047AB,
-            emissiveIntensity: 0.5
+        const ancientGold = new THREE.MeshLambertMaterial({
+            color: 0xB8860B,  // Tarnished gold details
+            emissive: 0xB8860B,
+            emissiveIntensity: 0.2
         });
-        this.materials.set('stained_blue', stainedBlue);
+        this.materials.set('ancient_gold', ancientGold);
         
-        const stainedGold = new THREE.MeshBasicMaterial({
-            color: 0xFFD700,
-            transparent: true,
-            opacity: 0.8,
-            emissive: 0xFFD700,
-            emissiveIntensity: 0.5
+        const crystalFormation = new THREE.MeshLambertMaterial({
+            color: 0x4169E1,  // Mysterious crystal formations
+            emissive: 0x4169E1,
+            emissiveIntensity: 0.3
         });
-        this.materials.set('stained_gold', stainedGold);
+        this.materials.set('crystal_formation', crystalFormation);
         
-        const stainedPurple = new THREE.MeshBasicMaterial({
-            color: 0x6A0DAD,
+        // ATMOSPHERIC EFFECTS
+        const dustMote = new THREE.MeshBasicMaterial({
+            color: 0xDDD8C7,
             transparent: true,
-            opacity: 0.8,
-            emissive: 0x6A0DAD,
-            emissiveIntensity: 0.5
+            opacity: 0.4,
+            emissive: 0xDDD8C7,
+            emissiveIntensity: 0.2
         });
-        this.materials.set('stained_purple', stainedPurple);
+        this.materials.set('dust_mote', dustMote);
         
-        console.log(`Created ${this.materials.size} Gothic Cathedral materials!`);
+        const magicalResidue = new THREE.MeshBasicMaterial({
+            color: 0x9370DB,
+            transparent: true,
+            opacity: 0.6,
+            emissive: 0x9370DB,
+            emissiveIntensity: 0.4
+        });
+        this.materials.set('magical_residue', magicalResidue);
+        
+        console.log(`Created ${this.materials.size} Gothic Ruins materials!`);
     }
     
     setupBillboardSystem() {
@@ -357,87 +314,60 @@ class DungeonSystem {
     }
     
     createBillboardMaterials() {
-        // Sacred atmospheric elements
-        const candleFlame = new THREE.MeshBasicMaterial({ 
-            color: 0xFFE135, 
+        // Atmospheric ruins effects
+        const emberGlow = new THREE.MeshBasicMaterial({ 
+            color: 0xFF4500, 
             transparent: true, 
-            opacity: 0.8, 
+            opacity: 0.7, 
             side: THREE.DoubleSide, 
             blending: THREE.AdditiveBlending,
-            emissive: 0xFFE135,
-            emissiveIntensity: 0.6
+            emissive: 0xFF4500,
+            emissiveIntensity: 0.5
         });
-        
-        this.materials.set('candle_flame', candleFlame);
-        
-        const incenseSmoke = new THREE.MeshBasicMaterial({ 
-            color: 0xF8F8FF, 
-            transparent: true, 
-            opacity: 0.4, 
-            side: THREE.DoubleSide
-        });
-        
-        this.materials.set('incense_smoke', incenseSmoke);
+        this.materials.set('ember_glow', emberGlow);
     }
     
     getCurrentTheme() {
-        return 'gothic_cathedral';
+        return 'gothic_ruins';
     }
     
     generateDungeon(floorNumber) {
-        console.log(`Generating Gothic Cathedral for floor ${floorNumber}...`);
+        console.log(`Generating Gothic Cathedral Ruins for floor ${floorNumber}...`);
         
         this.currentFloor = floorNumber;
         this.clearCurrentDungeon();
-        
-        // Reset progression for new floor
         this.resetProgression();
         
-        console.log('Using Gothic Cathedral theme');
-        
-        // Phase 1: Plan room layout
         const roomLayout = this.planRoomLayout();
-        
-        // Phase 2: Create unified floor map
         const floorMap = this.createFloorMap(roomLayout);
         
-        // Store floor map for collision detection
         this.currentFloorMap = floorMap;
-        
-        // Store dungeon data BEFORE generating geometry so it's available for room type checks
         this.currentDungeon = {
             floor: floorNumber,
-            theme: 'gothic_cathedral',
+            theme: 'gothic_ruins',
             roomLayout: roomLayout,
             floorMap: floorMap
         };
         
-        // Generate cathedral with short delay for atmosphere
         setTimeout(() => {
             try {
-                // Phase 3: Generate Gothic architecture
-                this.generateGothicArchitecture(floorMap, roomLayout);
-                
-                // Phase 4: Add cathedral lighting and atmosphere
-                this.addCathedralLighting(roomLayout);
-                this.addSacredAtmosphere(roomLayout);
-                
-                // Phase 5: Add progressive portal system
+                this.generateRuinsArchitecture(floorMap, roomLayout);
+                this.addCombatLighting(roomLayout);
+                this.addCombatEnvironment(roomLayout);
                 this.addProgressivePortals(roomLayout);
                 
-                console.log(`Gothic Cathedral floor ${floorNumber} generated successfully!`);
+                console.log(`Gothic Cathedral Ruins floor ${floorNumber} generated for combat!`);
             } catch (error) {
-                console.error('Failed to generate cathedral:', error);
-                // Try again after a short delay
+                console.error('Failed to generate ruins:', error);
                 setTimeout(() => {
                     try {
-                        this.generateGothicArchitecture(floorMap, roomLayout);
-                        this.addCathedralLighting(roomLayout);
-                        this.addSacredAtmosphere(roomLayout);
+                        this.generateRuinsArchitecture(floorMap, roomLayout);
+                        this.addCombatLighting(roomLayout);
+                        this.addCombatEnvironment(roomLayout);
                         this.addProgressivePortals(roomLayout);
-                        console.log(`Gothic Cathedral floor ${floorNumber} generated successfully on retry`);
+                        console.log(`Gothic Cathedral Ruins generated on retry`);
                     } catch (retryError) {
-                        console.error('Failed to generate cathedral on retry:', retryError);
+                        console.error('Failed to generate ruins on retry:', retryError);
                     }
                 }, 500);
             }
@@ -447,14 +377,14 @@ class DungeonSystem {
     }
     
     planRoomLayout() {
-        console.log('Planning cathedral layout...');
+        console.log('Planning cathedral ruins layout...');
         
         const layout = {
             rooms: {},
             connections: []
         };
         
-        // Central nave at origin
+        // Central combat arena
         layout.rooms.center = {
             id: 'center',
             type: 'center',
@@ -463,119 +393,110 @@ class DungeonSystem {
             size: this.roomTemplates.CENTER.size
         };
         
-        // Four side chapels in cardinal directions
-        const chapelDistance = 20; // Distance in grid cells
-        const chapels = [
-            { id: 'chapel_north', dir: 'north', offsetX: 0, offsetZ: -chapelDistance },
-            { id: 'chapel_south', dir: 'south', offsetX: 0, offsetZ: chapelDistance },
-            { id: 'chapel_east', dir: 'east', offsetX: chapelDistance, offsetZ: 0 },
-            { id: 'chapel_west', dir: 'west', offsetX: -chapelDistance, offsetZ: 0 }
+        // Four tactical chambers
+        const chamberDistance = 20;
+        const chambers = [
+            { id: 'chamber_north', dir: 'north', offsetX: 0, offsetZ: -chamberDistance },
+            { id: 'chamber_south', dir: 'south', offsetX: 0, offsetZ: chamberDistance },
+            { id: 'chamber_east', dir: 'east', offsetX: chamberDistance, offsetZ: 0 },
+            { id: 'chamber_west', dir: 'west', offsetX: -chamberDistance, offsetZ: 0 }
         ];
         
-        chapels.forEach(chapel => {
-            layout.rooms[chapel.id] = {
-                id: chapel.id,
+        chambers.forEach(chamber => {
+            layout.rooms[chamber.id] = {
+                id: chamber.id,
                 type: 'orbital',
-                direction: chapel.dir,
-                gridX: layout.rooms.center.gridX + chapel.offsetX,
-                gridZ: layout.rooms.center.gridZ + chapel.offsetZ,
+                direction: chamber.dir,
+                gridX: layout.rooms.center.gridX + chamber.offsetX,
+                gridZ: layout.rooms.center.gridZ + chamber.offsetZ,
                 size: this.roomTemplates.ORBITAL.size
             };
             
-            // Connect to center nave
             layout.connections.push({
                 from: 'center',
-                to: chapel.id,
-                type: 'nave_to_chapel'
+                to: chamber.id,
+                type: 'arena_to_chamber'
             });
         });
         
-        // Transepts (cardinal rooms) extending from chapels
-        const transeptChance = Math.min(0.6 + (this.currentFloor * 0.02), 0.95);
-        const transeptDistance = 15;
+        // Multi-level combat zones (cardinal rooms)
+        const platformChance = Math.min(0.6 + (this.currentFloor * 0.02), 0.95);
+        const platformDistance = 15;
         
-        chapels.forEach(chapel => {
-            if (Math.random() < transeptChance) {
-                const transeptId = `transept_${chapel.dir}`;
-                const chapelRoom = layout.rooms[chapel.id];
+        chambers.forEach(chamber => {
+            if (Math.random() < platformChance) {
+                const platformId = `platform_${chamber.dir}`;
+                const chamberRoom = layout.rooms[chamber.id];
                 
-                // Calculate transept position relative to the chapel
-                let transeptGridX, transeptGridZ;
+                let platformGridX, platformGridZ;
                 
-                switch(chapel.dir) {
+                switch(chamber.dir) {
                     case 'north':
-                        transeptGridX = chapelRoom.gridX;
-                        transeptGridZ = chapelRoom.gridZ - transeptDistance;
+                        platformGridX = chamberRoom.gridX;
+                        platformGridZ = chamberRoom.gridZ - platformDistance;
                         break;
                     case 'south':
-                        transeptGridX = chapelRoom.gridX;
-                        transeptGridZ = chapelRoom.gridZ + transeptDistance;
+                        platformGridX = chamberRoom.gridX;
+                        platformGridZ = chamberRoom.gridZ + platformDistance;
                         break;
                     case 'east':
-                        transeptGridX = chapelRoom.gridX + transeptDistance;
-                        transeptGridZ = chapelRoom.gridZ;
+                        platformGridX = chamberRoom.gridX + platformDistance;
+                        platformGridZ = chamberRoom.gridZ;
                         break;
                     case 'west':
-                        transeptGridX = chapelRoom.gridX - transeptDistance;
-                        transeptGridZ = chapelRoom.gridZ;
+                        platformGridX = chamberRoom.gridX - platformDistance;
+                        platformGridZ = chamberRoom.gridZ;
                         break;
                 }
                 
-                // Check bounds
                 const roomSize = this.roomTemplates.CARDINAL.size;
                 const halfSize = Math.floor(roomSize / 2);
-                const minX = transeptGridX - halfSize;
-                const maxX = transeptGridX + halfSize;
-                const minZ = transeptGridZ - halfSize;
-                const maxZ = transeptGridZ + halfSize;
+                const minX = platformGridX - halfSize;
+                const maxX = platformGridX + halfSize;
+                const minZ = platformGridZ - halfSize;
+                const maxZ = platformGridZ + halfSize;
                 
                 if (minX >= 2 && maxX < this.gridWidth - 2 && 
                     minZ >= 2 && maxZ < this.gridDepth - 2) {
                     
-                    layout.rooms[transeptId] = {
-                        id: transeptId,
+                    layout.rooms[platformId] = {
+                        id: platformId,
                         type: 'cardinal',
-                        direction: chapel.dir,
-                        gridX: transeptGridX,
-                        gridZ: transeptGridZ,
+                        direction: chamber.dir,
+                        gridX: platformGridX,
+                        gridZ: platformGridZ,
                         size: roomSize
                     };
                     
-                    // Connect to chapel
                     layout.connections.push({
-                        from: chapel.id,
-                        to: transeptId,
-                        type: 'chapel_to_transept'
+                        from: chamber.id,
+                        to: platformId,
+                        type: 'chamber_to_platform'
                     });
                     
-                    console.log(`Added transept ${transeptId} at grid (${transeptGridX}, ${transeptGridZ})`);
-                } else {
-                    console.log(`Skipped transept ${transeptId} - would be outside bounds`);
+                    console.log(`Added platform zone ${platformId} at grid (${platformGridX}, ${platformGridZ})`);
                 }
             }
         });
         
-        console.log(`Planned cathedral with ${Object.keys(layout.rooms).length} rooms and ${layout.connections.length} connections`);
+        console.log(`Planned combat ruins with ${Object.keys(layout.rooms).length} rooms`);
         return layout;
     }
     
     createFloorMap(roomLayout) {
-        console.log('Creating cathedral floor map...');
+        console.log('Creating ruins floor map...');
         
-        // Initialize grid (false = wall/solid, true = walkable)
         const floorMap = Array(this.gridDepth).fill().map(() => Array(this.gridWidth).fill(false));
         
-        // Phase 1: Carve out room areas
         Object.values(roomLayout.rooms).forEach(room => {
             this.carveRoomArea(floorMap, room);
         });
         
-        // Phase 2: Carve cloister paths (corridors)
         roomLayout.connections.forEach(connection => {
             this.carveImprovedCorridorPath(floorMap, roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
         
-        console.log('Cathedral floor map created');
+        console.log('Ruins floor map created');
         return floorMap;
     }
     
@@ -585,35 +506,29 @@ class DungeonSystem {
         for (let z = room.gridZ - halfSize; z <= room.gridZ + halfSize; z++) {
             for (let x = room.gridX - halfSize; x <= room.gridX + halfSize; x++) {
                 if (this.isValidGridPos(x, z)) {
-                    floorMap[z][x] = true; // Mark as walkable
+                    floorMap[z][x] = true;
                 }
             }
         }
         
-        console.log(`Carved ${room.type} at grid (${room.gridX}, ${room.gridZ}) size ${room.size}`);
+        console.log(`Carved ${room.type} combat space at grid (${room.gridX}, ${room.gridZ})`);
     }
     
     carveImprovedCorridorPath(floorMap, roomA, roomB) {
-        console.log(`Carving cloister from ${roomA.id} to ${roomB.id}...`);
-        
-        // Calculate room edges for better connection points
         const roomAHalfSize = Math.floor(roomA.size / 2);
         const roomBHalfSize = Math.floor(roomB.size / 2);
         
-        // Determine connection points at room edges
         let startX = roomA.gridX;
         let startZ = roomA.gridZ;
         let endX = roomB.gridX;
         let endZ = roomB.gridZ;
         
-        // Adjust start point to edge of room A
         if (endX > startX) startX += roomAHalfSize - 1;
         else if (endX < startX) startX -= roomAHalfSize - 1;
         
         if (endZ > startZ) startZ += roomAHalfSize - 1;
         else if (endZ < startZ) startZ -= roomAHalfSize - 1;
         
-        // Adjust end point to edge of room B
         if (startX > endX) endX += roomBHalfSize - 1;
         else if (startX < endX) endX -= roomBHalfSize - 1;
         
@@ -622,19 +537,13 @@ class DungeonSystem {
         
         const corridorHalfWidth = Math.floor(this.corridorWidth / 2);
         
-        // Create L-shaped cloister paths
         this.carveHorizontalCorridor(floorMap, startX, endX, startZ, corridorHalfWidth);
         this.carveVerticalCorridor(floorMap, endX, startZ, endZ, corridorHalfWidth);
-        
-        // Additional path for redundancy
         this.carveVerticalCorridor(floorMap, startX, startZ, endZ, corridorHalfWidth);
         this.carveHorizontalCorridor(floorMap, startX, endX, endZ, corridorHalfWidth);
         
-        // Carve junction areas
         this.carveJunction(floorMap, endX, startZ, corridorHalfWidth + 1);
         this.carveJunction(floorMap, startX, endZ, corridorHalfWidth + 1);
-        
-        console.log(`Carved cloister between ${roomA.id} and ${roomB.id}`);
     }
     
     carveJunction(floorMap, centerX, centerZ, radius) {
@@ -682,75 +591,67 @@ class DungeonSystem {
         return x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth;
     }
     
-    generateGothicArchitecture(floorMap, roomLayout) {
-        console.log('Generating Gothic Cathedral architecture...');
+    generateRuinsArchitecture(floorMap, roomLayout) {
+        console.log('Generating Gothic Ruins architecture for combat...');
         
-        const cathedralGroup = new THREE.Group();
-        cathedralGroup.name = 'gothic_cathedral';
+        const ruinsGroup = new THREE.Group();
+        ruinsGroup.name = 'gothic_ruins';
         
-        // Generate cathedral floors
-        this.generateCathedralFloors(cathedralGroup, floorMap, roomLayout);
+        this.generateRuinsFloors(ruinsGroup, floorMap, roomLayout);
+        this.generateRuinsWalls(ruinsGroup, floorMap, roomLayout);
+        this.generateRuinsCeilings(ruinsGroup, floorMap, roomLayout);
+        this.addCombatArchitecture(ruinsGroup, roomLayout);
         
-        // Generate Gothic walls with arches
-        this.generateGothicWalls(cathedralGroup, floorMap, roomLayout);
-        
-        // Generate ribbed vaulting (ceilings)
-        this.generateRibbedVaulting(cathedralGroup, floorMap, roomLayout);
-        
-        // Add Gothic architectural details
-        this.addGothicArchitecturalDetails(cathedralGroup, roomLayout);
-        
-        this.scene.add(cathedralGroup);
-        this.currentDungeonGroup = cathedralGroup;
+        this.scene.add(ruinsGroup);
+        this.currentDungeonGroup = ruinsGroup;
     }
     
     getRoomTypeAtGrid(gridX, gridZ, roomLayout) {
         if (!roomLayout) {
-            return 'cloister'; // Corridor = cloister
+            return 'passage';
         }
         
-        // Check each room to see if this grid position is inside it
         for (const room of Object.values(roomLayout.rooms)) {
             const halfSize = Math.floor(room.size / 2);
             if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
                 gridZ >= room.gridZ - halfSize && gridZ <= room.gridZ + halfSize) {
-                return room.type; // 'center', 'orbital', or 'cardinal'
+                return room.type;
             }
         }
         
-        return 'cloister'; // Default to cloister if not in any room
+        return 'passage';
     }
     
     getMaterialsForRoomType(roomType) {
         switch(roomType) {
-            case 'center': // Main nave
+            case 'center': // Combat arena
                 return {
-                    floor: this.materials.get('nave_floor'),
-                    wall: this.materials.get('nave_wall'),
-                    ceiling: this.materials.get('nave_ceiling')
+                    floor: this.materials.get('arena_floor'),
+                    wall: this.materials.get('arena_wall'),
+                    ceiling: this.materials.get('arena_ceiling')
                 };
-            case 'orbital': // Side chapels
+            case 'orbital': // Tactical chambers
                 return {
-                    floor: this.materials.get('chapel_floor'),
-                    wall: this.materials.get('chapel_wall'),
-                    ceiling: this.materials.get('chapel_ceiling')
+                    floor: this.materials.get('chamber_floor'),
+                    wall: this.materials.get('chamber_wall'),
+                    ceiling: this.materials.get('chamber_ceiling')
                 };
-            case 'cardinal': // Transepts
+            case 'cardinal': // Multi-level platforms
                 return {
-                    floor: this.materials.get('transept_floor'),
-                    wall: this.materials.get('transept_wall'),
-                    ceiling: this.materials.get('transept_ceiling')
+                    floor: this.materials.get('platform_floor'),
+                    wall: this.materials.get('platform_wall'),
+                    ceiling: this.materials.get('platform_ceiling')
                 };
-            default: // Cloisters
+            default: // Passages
                 return {
-                    floor: this.materials.get('cloister_floor'),
-                    wall: this.materials.get('cloister_wall'),
-                    ceiling: this.materials.get('cloister_ceiling')
+                    floor: this.materials.get('passage_floor'),
+                    wall: this.materials.get('passage_wall'),
+                    ceiling: this.materials.get('passage_ceiling')
                 };
         }
     }
     
-    generateCathedralFloors(cathedralGroup, floorMap, roomLayout) {
+    generateRuinsFloors(ruinsGroup, floorMap, roomLayout) {
         let floorCount = 0;
         
         for (let z = 0; z < this.gridDepth; z++) {
@@ -768,26 +669,24 @@ class DungeonSystem {
                     floorSegment.position.set(worldX, this.floorHeight, worldZ);
                     floorSegment.receiveShadow = true;
                     
-                    // Add stone pattern with raised sections
-                    if (roomType === 'center' && Math.random() < 0.3) {
-                        const raisedStone = new THREE.Mesh(
-                            new THREE.BoxGeometry(this.gridSize * 0.8, 0.1, this.gridSize * 0.8),
-                            materials.floor
-                        );
-                        raisedStone.position.set(worldX, this.floorHeight + 0.05, worldZ);
-                        cathedralGroup.add(raisedStone);
+                    // Add cracked stone details to arena
+                    if (roomType === 'center' && Math.random() < 0.25) {
+                        const crackGeometry = new THREE.BoxGeometry(this.gridSize * 0.9, 0.08, this.gridSize * 0.9);
+                        const crack = new THREE.Mesh(crackGeometry, this.materials.get('broken_stone'));
+                        crack.position.set(worldX, this.floorHeight + 0.04, worldZ);
+                        ruinsGroup.add(crack);
                     }
                     
-                    cathedralGroup.add(floorSegment);
+                    ruinsGroup.add(floorSegment);
                     floorCount++;
                 }
             }
         }
         
-        console.log(`Generated ${floorCount} cathedral floor segments`);
+        console.log(`Generated ${floorCount} ruined floor segments`);
     }
     
-    generateGothicWalls(cathedralGroup, floorMap, roomLayout) {
+    generateRuinsWalls(ruinsGroup, floorMap, roomLayout) {
         const wallHeight = this.ceilingHeight;
         
         for (let z = 0; z < this.gridDepth; z++) {
@@ -811,27 +710,25 @@ class DungeonSystem {
                             const worldX = (x - this.gridWidth/2) * this.gridSize + dir.wallX;
                             const worldZ = (z - this.gridDepth/2) * this.gridSize + dir.wallZ;
                             
-                            // Create Gothic wall with varying heights and arches
-                            this.createGothicWall(cathedralGroup, worldX, worldZ, dir.rotY, roomType, materials);
+                            this.createRuinedWall(ruinsGroup, worldX, worldZ, dir.rotY, roomType, materials);
                         }
                     });
                 }
             }
         }
         
-        console.log('Generated Gothic wall architecture');
+        console.log('Generated ruined wall architecture');
     }
     
-    createGothicWall(cathedralGroup, worldX, worldZ, rotY, roomType, materials) {
+    createRuinedWall(ruinsGroup, worldX, worldZ, rotY, roomType, materials) {
         let wallHeight = this.ceilingHeight;
         
-        // Adjust wall height based on room type for cathedral effect
         if (roomType === 'center') {
-            wallHeight = this.ceilingHeight * 1.5; // Soaring nave walls
+            wallHeight = this.ceilingHeight * 1.5; // High arena walls
         } else if (roomType === 'cardinal') {
-            wallHeight = this.ceilingHeight * 1.3; // High transept walls
+            wallHeight = this.ceilingHeight * 1.3; // Platform chamber walls
         } else if (roomType === 'orbital') {
-            wallHeight = this.ceilingHeight * 1.1; // Chapel walls
+            wallHeight = this.ceilingHeight * 1.1; // Tactical chamber walls
         }
         
         // Main wall structure
@@ -841,72 +738,36 @@ class DungeonSystem {
         wall.rotation.y = rotY;
         wall.castShadow = true;
         wall.receiveShadow = true;
-        cathedralGroup.add(wall);
+        ruinsGroup.add(wall);
         
-        // Add Gothic architectural details based on room type
-        if (roomType === 'center') {
-            this.addNaveArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight);
-        } else if (roomType === 'orbital') {
-            this.addChapelArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight);
-        } else if (roomType === 'cardinal') {
-            this.addTranseptArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight);
+        // Add ruined architectural details
+        if (Math.random() < 0.3) {
+            this.addRuinedArchDetails(ruinsGroup, worldX, worldZ, rotY, wallHeight, roomType);
         }
     }
     
-    addNaveArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight) {
-        // Gothic pointed arch details for the main nave
-        if (Math.random() < 0.4) {
-            const archGeometry = new THREE.RingGeometry(0.8, 1.2, 8, 1, 0, Math.PI);
-            const archMaterial = this.materials.get('gold_accent');
-            const arch = new THREE.Mesh(archGeometry, archMaterial);
-            arch.position.set(worldX, this.floorHeight + wallHeight * 0.7, worldZ + 0.3);
+    addRuinedArchDetails(ruinsGroup, worldX, worldZ, rotY, wallHeight, roomType) {
+        // Broken arches and architectural remnants
+        if (roomType === 'center') {
+            // Partially collapsed arch for arena drama
+            const archGeometry = new THREE.RingGeometry(0.8, 1.2, 8, 1, 0, Math.PI * 0.75);
+            const arch = new THREE.Mesh(archGeometry, this.materials.get('broken_stone'));
+            arch.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
             arch.rotation.y = rotY;
             arch.rotation.x = Math.PI / 2;
-            cathedralGroup.add(arch);
-        }
-        
-        // Buttress supports
-        if (Math.random() < 0.3) {
-            const buttressGeometry = new THREE.BoxGeometry(0.3, wallHeight * 0.8, 0.8);
-            const buttress = new THREE.Mesh(buttressGeometry, this.materials.get('nave_wall'));
-            buttress.position.set(worldX, this.floorHeight + wallHeight * 0.4, worldZ + 0.6);
-            buttress.rotation.y = rotY;
-            cathedralGroup.add(buttress);
-        }
-    }
-    
-    addChapelArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight) {
-        // Intimate chapel details
-        if (Math.random() < 0.5) {
-            const nicheGeometry = new THREE.BoxGeometry(0.6, 1.5, 0.3);
-            const niche = new THREE.Mesh(nicheGeometry, this.materials.get('silver_accent'));
-            niche.position.set(worldX, this.floorHeight + wallHeight * 0.5, worldZ + 0.2);
-            niche.rotation.y = rotY;
-            cathedralGroup.add(niche);
+            arch.rotation.z = Math.random() * 0.3 - 0.15; // Slight random tilt
+            ruinsGroup.add(arch);
+        } else if (roomType === 'orbital') {
+            // Tactical wall damage
+            const damageGeometry = new THREE.BoxGeometry(0.8, 2, 0.4);
+            const damage = new THREE.Mesh(damageGeometry, this.materials.get('rusted_metal'));
+            damage.position.set(worldX, this.floorHeight + wallHeight * 0.4, worldZ + 0.2);
+            damage.rotation.y = rotY + (Math.random() - 0.5) * 0.5;
+            ruinsGroup.add(damage);
         }
     }
     
-    addTranseptArchitecture(cathedralGroup, worldX, worldZ, rotY, wallHeight) {
-        // Transept crossing details
-        if (Math.random() < 0.4) {
-            const crossGeometry = new THREE.BoxGeometry(0.2, 2, 0.2);
-            const crossMaterial = this.materials.get('bronze_accent');
-            const crossVertical = new THREE.Mesh(crossGeometry, crossMaterial);
-            crossVertical.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
-            crossVertical.rotation.y = rotY;
-            cathedralGroup.add(crossVertical);
-            
-            const crossHorizontal = new THREE.Mesh(
-                new THREE.BoxGeometry(1.2, 0.2, 0.2),
-                crossMaterial
-            );
-            crossHorizontal.position.set(worldX, this.floorHeight + wallHeight * 0.6, worldZ + 0.3);
-            crossHorizontal.rotation.y = rotY;
-            cathedralGroup.add(crossHorizontal);
-        }
-    }
-    
-    generateRibbedVaulting(cathedralGroup, floorMap, roomLayout) {
+    generateRuinsCeilings(ruinsGroup, floorMap, roomLayout) {
         for (let z = 0; z < this.gridDepth; z++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 if (floorMap[z][x]) {
@@ -916,416 +777,506 @@ class DungeonSystem {
                     const worldX = (x - this.gridWidth/2) * this.gridSize;
                     const worldZ = (z - this.gridDepth/2) * this.gridSize;
                     
-                    // Variable ceiling heights for cathedral effect
                     let ceilingHeight = this.ceilingHeight;
                     if (roomType === 'center') {
-                        ceilingHeight = this.ceilingHeight * 1.5; // Soaring nave vault
+                        ceilingHeight = this.ceilingHeight * 1.5; // High arena vault
                     } else if (roomType === 'cardinal') {
-                        ceilingHeight = this.ceilingHeight * 1.3; // High transept vault
+                        ceilingHeight = this.ceilingHeight * 1.3; // Platform chamber height
                     } else if (roomType === 'orbital') {
-                        ceilingHeight = this.ceilingHeight * 1.1; // Chapel vault
+                        ceilingHeight = this.ceilingHeight * 1.1; // Tactical chamber height
                     }
                     
-                    const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                    const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
-                    ceilingSegment.rotation.x = Math.PI / 2;
-                    ceilingSegment.position.set(worldX, this.floorHeight + ceilingHeight, worldZ);
-                    ceilingSegment.receiveShadow = true;
-                    
-                    cathedralGroup.add(ceilingSegment);
-                    
-                    // Add ribbed vaulting details
-                    if (roomType === 'center' && Math.random() < 0.2) {
-                        this.addRibbedVaultDetails(cathedralGroup, worldX, worldZ, ceilingHeight);
+                    // Only generate ceiling if it's not too damaged
+                    if (Math.random() < 0.85) { // 15% chance of open sky/collapsed ceiling
+                        const ceilingGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
+                        const ceilingSegment = new THREE.Mesh(ceilingGeometry, materials.ceiling);
+                        ceilingSegment.rotation.x = Math.PI / 2;
+                        ceilingSegment.position.set(worldX, this.floorHeight + ceilingHeight, worldZ);
+                        ceilingSegment.receiveShadow = true;
+                        
+                        ruinsGroup.add(ceilingSegment);
                     }
                     
-                    // Add stained glass window effects to transepts
-                    if (roomType === 'cardinal' && Math.random() < 0.15) {
-                        this.addStainedGlassWindow(cathedralGroup, worldX, worldZ, ceilingHeight);
+                    // Add hanging debris for atmosphere
+                    if (roomType === 'center' && Math.random() < 0.15) {
+                        this.addHangingDebris(ruinsGroup, worldX, worldZ, ceilingHeight);
                     }
                 }
             }
         }
         
-        console.log('Generated ribbed vaulting');
+        console.log('Generated ruined ceiling architecture');
     }
     
-    addRibbedVaultDetails(cathedralGroup, x, z, height) {
-        // Add ribs to the vaulting
-        const ribGeometry = new THREE.BoxGeometry(0.1, 0.2, this.gridSize);
-        const ribMaterial = this.materials.get('gold_accent');
-        
-        const rib1 = new THREE.Mesh(ribGeometry, ribMaterial);
-        rib1.position.set(x, this.floorHeight + height - 0.1, z);
-        cathedralGroup.add(rib1);
-        
-        const rib2 = new THREE.Mesh(
-            new THREE.BoxGeometry(this.gridSize, 0.2, 0.1),
-            ribMaterial
+    addHangingDebris(ruinsGroup, x, z, height) {
+        const debrisGeometry = new THREE.BoxGeometry(0.3, 1.5, 0.3);
+        const debris = new THREE.Mesh(debrisGeometry, this.materials.get('broken_stone'));
+        debris.position.set(
+            x + (Math.random() - 0.5) * this.gridSize * 0.8,
+            this.floorHeight + height - 0.75,
+            z + (Math.random() - 0.5) * this.gridSize * 0.8
         );
-        rib2.position.set(x, this.floorHeight + height - 0.1, z);
-        cathedralGroup.add(rib2);
-    }
-    
-    addStainedGlassWindow(cathedralGroup, x, z, height) {
-        // Create stained glass window effect with colored geometric shapes
-        const windowHeight = height * 0.6;
-        const colors = ['stained_red', 'stained_blue', 'stained_gold', 'stained_purple'];
+        debris.rotation.z = (Math.random() - 0.5) * 0.5;
         
-        for (let i = 0; i < 4; i++) {
-            const panelGeometry = new THREE.PlaneGeometry(0.4, 0.8);
-            const panelMaterial = this.materials.get(colors[i % colors.length]);
-            const panel = new THREE.Mesh(panelGeometry, panelMaterial);
-            
-            panel.position.set(
-                x + (i - 1.5) * 0.5,
-                this.floorHeight + windowHeight,
-                z + 0.4
-            );
-            
-            cathedralGroup.add(panel);
-        }
+        // Add swaying animation
+        debris.userData = {
+            originalRotation: debris.rotation.z,
+            swaySpeed: 0.5 + Math.random() * 0.5,
+            swayAmount: 0.1
+        };
+        
+        ruinsGroup.add(debris);
+        this.combatElements.push(debris);
     }
     
-    addGothicArchitecturalDetails(cathedralGroup, roomLayout) {
-        console.log('Adding Gothic architectural details...');
+    addCombatArchitecture(ruinsGroup, roomLayout) {
+        console.log('Adding combat-oriented architecture...');
         
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomSpecificDetails(cathedralGroup, room);
+            this.addCombatElements(ruinsGroup, room);
         });
     }
     
-    addRoomSpecificDetails(cathedralGroup, room) {
+    addCombatElements(ruinsGroup, room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
         if (room.type === 'center') {
-            // Main nave altar and columns
-            this.addMainAltar(cathedralGroup, worldX, worldZ);
-            this.addNaveColumns(cathedralGroup, worldX, worldZ, roomSize);
+            // Large combat arena with cover and elevation
+            this.addArenaCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
         } else if (room.type === 'orbital') {
-            // Chapel altar and pews
-            this.addChapelAltar(cathedralGroup, worldX, worldZ);
-            this.addChapelPews(cathedralGroup, worldX, worldZ, roomSize);
+            // Tactical chamber with cover objects
+            this.addChamberCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
         } else if (room.type === 'cardinal') {
-            // Transept crossing and rose window
-            this.addTranseptCrossing(cathedralGroup, worldX, worldZ);
-            this.addRoseWindow(cathedralGroup, worldX, worldZ, room.direction);
+            // Multi-level platform combat zone
+            this.addPlatformCombatFeatures(ruinsGroup, worldX, worldZ, roomSize);
         }
     }
     
-    addMainAltar(cathedralGroup, worldX, worldZ) {
-        // Gothic altar in the center of the nave
-        const altarGeometry = new THREE.BoxGeometry(3, 1.5, 1.5);
-        const altar = new THREE.Mesh(altarGeometry, this.materials.get('gold_accent'));
-        altar.position.set(worldX, this.floorHeight + 0.75, worldZ + 8);
-        altar.castShadow = true;
-        cathedralGroup.add(altar);
-        
-        // Altar cross
-        const crossGeometry = new THREE.BoxGeometry(0.2, 2, 0.2);
-        const cross = new THREE.Mesh(crossGeometry, this.materials.get('silver_accent'));
-        cross.position.set(worldX, this.floorHeight + 2.5, worldZ + 8);
-        cathedralGroup.add(cross);
-        
-        const crossbeam = new THREE.Mesh(
-            new THREE.BoxGeometry(1, 0.2, 0.2),
-            this.materials.get('silver_accent')
-        );
-        crossbeam.position.set(worldX, this.floorHeight + 2.8, worldZ + 8);
-        cathedralGroup.add(crossbeam);
-    }
-    
-    addNaveColumns(cathedralGroup, worldX, worldZ, roomSize) {
-        // Gothic columns along the nave
-        for (let i = 0; i < 4; i++) {
-            const angle = (i / 4) * Math.PI * 2;
+    addArenaCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
+        // Broken columns for cover
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
             const radius = roomSize * 0.35;
             
             const columnX = worldX + Math.cos(angle) * radius;
             const columnZ = worldZ + Math.sin(angle) * radius;
             
-            // Main column shaft
-            const columnGeometry = new THREE.CylinderGeometry(0.8, 1.0, this.ceilingHeight * 1.4, 12);
-            const column = new THREE.Mesh(columnGeometry, this.materials.get('nave_wall'));
-            column.position.set(columnX, this.floorHeight + this.ceilingHeight * 0.7, columnZ);
+            // Broken column shaft (varying heights for tactical cover)
+            const columnHeight = 3 + Math.random() * 4; // 3-7 units tall
+            const columnGeometry = new THREE.CylinderGeometry(0.8, 1.0, columnHeight, 8);
+            const column = new THREE.Mesh(columnGeometry, this.materials.get('broken_stone'));
+            column.position.set(columnX, this.floorHeight + columnHeight/2, columnZ);
             column.castShadow = true;
             column.receiveShadow = true;
-            cathedralGroup.add(column);
             
-            // Gothic capital
-            const capitalGeometry = new THREE.CylinderGeometry(1.2, 0.8, 0.8, 8);
-            const capital = new THREE.Mesh(capitalGeometry, this.materials.get('gold_accent'));
-            capital.position.set(columnX, this.floorHeight + this.ceilingHeight * 1.35, columnZ);
-            cathedralGroup.add(capital);
+            // Add battle damage
+            column.rotation.z = (Math.random() - 0.5) * 0.3; // Slight lean
             
-            // Base
-            const baseGeometry = new THREE.CylinderGeometry(1.0, 1.3, 0.5, 8);
-            const base = new THREE.Mesh(baseGeometry, this.materials.get('bronze_accent'));
-            base.position.set(columnX, this.floorHeight + 0.25, columnZ);
-            cathedralGroup.add(base);
+            ruinsGroup.add(column);
+            this.combatElements.push(column);
             
-            this.glowingPillars.push(column);
+            // Rubble around the base
+            for (let j = 0; j < 3; j++) {
+                const rubbleGeometry = new THREE.BoxGeometry(
+                    0.3 + Math.random() * 0.4,
+                    0.2 + Math.random() * 0.3,
+                    0.3 + Math.random() * 0.4
+                );
+                const rubble = new THREE.Mesh(rubbleGeometry, this.materials.get('broken_stone'));
+                rubble.position.set(
+                    columnX + (Math.random() - 0.5) * 2,
+                    this.floorHeight + rubble.geometry.parameters.height/2,
+                    columnZ + (Math.random() - 0.5) * 2
+                );
+                rubble.rotation.set(
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI,
+                    Math.random() * Math.PI
+                );
+                ruinsGroup.add(rubble);
+            }
+        }
+        
+        // Central raised platform for dramatic encounters
+        const platformGeometry = new THREE.CylinderGeometry(4, 5, 1, 12);
+        const platform = new THREE.Mesh(platformGeometry, this.materials.get('ancient_gold'));
+        platform.position.set(worldX, this.floorHeight + 0.5, worldZ);
+        platform.castShadow = true;
+        platform.receiveShadow = true;
+        ruinsGroup.add(platform);
+        
+        // Mysterious crystal formations for light and atmosphere
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2 + Math.PI/4; // Offset from columns
+            const radius = roomSize * 0.25;
+            
+            const crystalX = worldX + Math.cos(angle) * radius;
+            const crystalZ = worldZ + Math.sin(angle) * radius;
+            
+            const crystalGeometry = new THREE.ConeGeometry(0.4, 2 + Math.random(), 6);
+            const crystal = new THREE.Mesh(crystalGeometry, this.materials.get('crystal_formation'));
+            crystal.position.set(crystalX, this.floorHeight + 1, crystalZ);
+            crystal.rotation.z = (Math.random() - 0.5) * 0.5;
+            
+            // Add glowing effect
+            crystal.userData = {
+                originalEmissiveIntensity: 0.3,
+                pulseSpeed: 0.8 + Math.random() * 0.4
+            };
+            
+            ruinsGroup.add(crystal);
+            this.combatElements.push(crystal);
         }
     }
     
-    addChapelAltar(cathedralGroup, worldX, worldZ) {
-        // Small chapel altar
-        const altarGeometry = new THREE.BoxGeometry(1.5, 1, 1);
-        const altar = new THREE.Mesh(altarGeometry, this.materials.get('silver_accent'));
-        altar.position.set(worldX, this.floorHeight + 0.5, worldZ + 3);
-        cathedralGroup.add(altar);
-    }
-    
-    addChapelPews(cathedralGroup, worldX, worldZ, roomSize) {
-        // Simple pews for the chapel
-        for (let i = 0; i < 3; i++) {
-            const pewGeometry = new THREE.BoxGeometry(4, 0.8, 0.4);
-            const pew = new THREE.Mesh(pewGeometry, this.materials.get('chapel_floor'));
-            pew.position.set(worldX, this.floorHeight + 0.4, worldZ - 2 + i * 1.5);
-            cathedralGroup.add(pew);
+    addChamberCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
+        // Tactical cover objects scattered around
+        const coverCount = 4 + Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < coverCount; i++) {
+            const coverX = worldX + (Math.random() - 0.5) * roomSize * 0.7;
+            const coverZ = worldZ + (Math.random() - 0.5) * roomSize * 0.7;
+            
+            // Variety of cover types
+            const coverType = Math.random();
+            
+            if (coverType < 0.4) {
+                // Stone blocks
+                const blockGeometry = new THREE.BoxGeometry(
+                    1.5 + Math.random(),
+                    1 + Math.random() * 1.5,
+                    1 + Math.random()
+                );
+                const block = new THREE.Mesh(blockGeometry, this.materials.get('broken_stone'));
+                block.position.set(coverX, this.floorHeight + block.geometry.parameters.height/2, coverZ);
+                block.rotation.y = Math.random() * Math.PI;
+                block.castShadow = true;
+                block.receiveShadow = true;
+                ruinsGroup.add(block);
+            } else if (coverType < 0.7) {
+                // Fallen pillar segments
+                const segmentGeometry = new THREE.CylinderGeometry(0.5, 0.5, 3, 8);
+                const segment = new THREE.Mesh(segmentGeometry, this.materials.get('broken_stone'));
+                segment.position.set(coverX, this.floorHeight + 0.5, coverZ);
+                segment.rotation.z = Math.PI/2; // Fallen over
+                segment.rotation.y = Math.random() * Math.PI;
+                segment.castShadow = true;
+                ruinsGroup.add(segment);
+            } else {
+                // Rusted metal debris
+                const debrisGeometry = new THREE.BoxGeometry(1.2, 0.8, 2);
+                const debris = new THREE.Mesh(debrisGeometry, this.materials.get('rusted_metal'));
+                debris.position.set(coverX, this.floorHeight + 0.4, coverZ);
+                debris.rotation.y = Math.random() * Math.PI;
+                debris.rotation.z = (Math.random() - 0.5) * 0.4;
+                debris.castShadow = true;
+                ruinsGroup.add(debris);
+            }
         }
+        
+        // Small altar or shrine (now broken and suitable for cover)
+        const altarGeometry = new THREE.BoxGeometry(2, 1.2, 1.2);
+        const altar = new THREE.Mesh(altarGeometry, this.materials.get('ancient_gold'));
+        altar.position.set(worldX, this.floorHeight + 0.6, worldZ + roomSize * 0.3);
+        altar.rotation.y = (Math.random() - 0.5) * 0.3; // Slightly askew
+        altar.castShadow = true;
+        ruinsGroup.add(altar);
     }
     
-    addTranseptCrossing(cathedralGroup, worldX, worldZ) {
-        // Crossing point decoration
-        const crossingGeometry = new THREE.CylinderGeometry(2, 2, 0.2, 16);
-        const crossing = new THREE.Mesh(crossingGeometry, this.materials.get('bronze_accent'));
-        crossing.position.set(worldX, this.floorHeight + 0.1, worldZ);
-        cathedralGroup.add(crossing);
+    addPlatformCombatFeatures(ruinsGroup, worldX, worldZ, roomSize) {
+        // Multi-level platforms for vertical combat
+        const platformCount = 3 + Math.floor(Math.random() * 2);
+        
+        for (let i = 0; i < platformCount; i++) {
+            const angle = (i / platformCount) * Math.PI * 2;
+            const radius = roomSize * (0.2 + Math.random() * 0.25);
+            
+            const platformX = worldX + Math.cos(angle) * radius;
+            const platformZ = worldZ + Math.sin(angle) * radius;
+            const platformHeight = 1.5 + Math.random() * 2; // Varying heights
+            
+            // Platform structure
+            const platformGeometry = new THREE.BoxGeometry(3, platformHeight, 3);
+            const platform = new THREE.Mesh(platformGeometry, this.materials.get('platform_floor'));
+            platform.position.set(platformX, this.floorHeight + platformHeight/2, platformZ);
+            platform.castShadow = true;
+            platform.receiveShadow = true;
+            ruinsGroup.add(platform);
+            
+            // Platform top
+            const topGeometry = new THREE.BoxGeometry(3.2, 0.2, 3.2);
+            const top = new THREE.Mesh(topGeometry, this.materials.get('ancient_gold'));
+            top.position.set(platformX, this.floorHeight + platformHeight + 0.1, platformZ);
+            top.receiveShadow = true;
+            ruinsGroup.add(top);
+            
+            // Connecting bridge elements (partial)
+            if (i < platformCount - 1 && Math.random() < 0.6) {
+                const nextAngle = ((i + 1) / platformCount) * Math.PI * 2;
+                const nextRadius = roomSize * (0.2 + Math.random() * 0.25);
+                const nextX = worldX + Math.cos(nextAngle) * nextRadius;
+                const nextZ = worldZ + Math.sin(nextAngle) * nextRadius;
+                
+                const bridgeLength = Math.sqrt(Math.pow(nextX - platformX, 2) + Math.pow(nextZ - platformZ, 2));
+                const bridgeGeometry = new THREE.BoxGeometry(bridgeLength, 0.3, 0.8);
+                const bridge = new THREE.Mesh(bridgeGeometry, this.materials.get('broken_stone'));
+                
+                bridge.position.set(
+                    (platformX + nextX) / 2,
+                    this.floorHeight + platformHeight + 0.2,
+                    (platformZ + nextZ) / 2
+                );
+                bridge.rotation.y = Math.atan2(nextZ - platformZ, nextX - platformX);
+                bridge.castShadow = true;
+                ruinsGroup.add(bridge);
+            }
+        }
+        
+        // Central elevated structure
+        const centralHeight = 2.5;
+        const centralGeometry = new THREE.CylinderGeometry(2, 2.5, centralHeight, 8);
+        const central = new THREE.Mesh(centralGeometry, this.materials.get('platform_floor'));
+        central.position.set(worldX, this.floorHeight + centralHeight/2, worldZ);
+        central.castShadow = true;
+        ruinsGroup.add(central);
+        
+        // Mysterious artifact on top (objective or decoration)
+        const artifactGeometry = new THREE.SphereGeometry(0.5, 12, 8);
+        const artifact = new THREE.Mesh(artifactGeometry, this.materials.get('crystal_formation'));
+        artifact.position.set(worldX, this.floorHeight + centralHeight + 0.7, worldZ);
+        
+        artifact.userData = {
+            originalEmissiveIntensity: 0.4,
+            pulseSpeed: 1.2,
+            rotationSpeed: 0.01
+        };
+        
+        ruinsGroup.add(artifact);
+        this.combatElements.push(artifact);
     }
     
-    addRoseWindow(cathedralGroup, worldX, worldZ, direction) {
-        // Large rose window with stained glass effect
-        const windowGeometry = new THREE.RingGeometry(1, 2.5, 12);
-        const windowMaterial = this.materials.get('stained_blue');
-        const roseWindow = new THREE.Mesh(windowGeometry, windowMaterial);
+    addCombatLighting(roomLayout) {
+        console.log('Adding dramatic combat lighting...');
         
-        // Position based on direction
-        let posX = worldX, posZ = worldZ;
-        if (direction === 'north') posZ -= 8;
-        else if (direction === 'south') posZ += 8;
-        else if (direction === 'east') posX += 8;
-        else if (direction === 'west') posX -= 8;
-        
-        roseWindow.position.set(posX, this.floorHeight + this.ceilingHeight, posZ);
-        roseWindow.rotation.x = Math.PI / 2;
-        cathedralGroup.add(roseWindow);
-        
-        // Add colored light for stained glass effect
-        const stainedLight = new THREE.PointLight(0x4169E1, 0.8, 25);
-        stainedLight.position.set(posX, this.floorHeight + this.ceilingHeight - 2, posZ);
-        cathedralGroup.add(stainedLight);
-        this.lightSources.push(stainedLight);
-    }
-    
-    addCathedralLighting(roomLayout) {
-        console.log('Adding cathedral lighting...');
-        
-        // Add sacred lighting to each room
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addSacredLighting(room);
+            this.addDramaticLighting(room);
         });
         
-        // Add cloister lighting
         roomLayout.connections.forEach(connection => {
-            this.addCloisterLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
+            this.addPassageLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
     }
     
-    addSacredLighting(room) {
+    addDramaticLighting(room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
         if (room.type === 'center') {
-            // Main nave lighting - warm golden light
-            const naveLight = new THREE.PointLight(0xFFE135, 2.5, 100);
-            naveLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.4, worldZ);
-            this.currentDungeonGroup.add(naveLight);
-            this.lightSources.push(naveLight);
+            // Arena lighting - dramatic and contrasty
+            const mainLight = new THREE.PointLight(0xFFE135, 3.0, 120);
+            mainLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.3, worldZ);
+            mainLight.castShadow = true;
+            this.currentDungeonGroup.add(mainLight);
+            this.lightSources.push(mainLight);
             
-            // Altar lighting
-            const altarLight = new THREE.SpotLight(0xFFD700, 1.5, 50, Math.PI/6, 0.2);
-            altarLight.position.set(worldX, this.floorHeight + this.ceilingHeight, worldZ + 8);
-            altarLight.target.position.set(worldX, this.floorHeight, worldZ + 8);
-            this.currentDungeonGroup.add(altarLight);
-            this.currentDungeonGroup.add(altarLight.target);
-            this.lightSources.push(altarLight);
-            
-            // Candle lighting around nave
+            // Rim lighting around arena for dramatic shadows
             for (let i = 0; i < 8; i++) {
                 const angle = (i / 8) * Math.PI * 2;
-                const radius = roomSize * 0.4;
-                const candleLight = new THREE.PointLight(0xFF6B35, 0.8, 15);
-                candleLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 3,
-                    worldZ + Math.sin(angle) * radius
-                );
-                this.currentDungeonGroup.add(candleLight);
-                this.lightSources.push(candleLight);
-            }
-            
-        } else if (room.type === 'orbital') {
-            // Chapel lighting - intimate and warm
-            const chapelLight = new THREE.PointLight(0xFFE4B5, 1.2, 60);
-            chapelLight.position.set(worldX, this.floorHeight + this.ceilingHeight, worldZ);
-            this.currentDungeonGroup.add(chapelLight);
-            this.lightSources.push(chapelLight);
-            
-            // Prayer candles
-            for (let i = 0; i < 4; i++) {
-                const candleLight = new THREE.PointLight(0xFF4500, 0.6, 12);
-                candleLight.position.set(
-                    worldX + (i - 1.5) * 2,
-                    this.floorHeight + 2,
-                    worldZ + 4
-                );
-                this.currentDungeonGroup.add(candleLight);
-                this.lightSources.push(candleLight);
-            }
-            
-        } else if (room.type === 'cardinal') {
-            // Transept lighting - mystical blue-white
-            const transeptLight = new THREE.PointLight(0x87CEEB, 2.0, 80);
-            transeptLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.2, worldZ);
-            this.currentDungeonGroup.add(transeptLight);
-            this.lightSources.push(transeptLight);
-            
-            // Stained glass lighting effect
-            const stainedColors = [0xFF0000, 0x0000FF, 0xFFD700, 0x8A2BE2];
-            stainedColors.forEach((color, i) => {
-                const stainedLight = new THREE.PointLight(color, 0.8, 30);
-                const angle = (i / 4) * Math.PI * 2;
-                const radius = roomSize * 0.3;
-                stainedLight.position.set(
+                const radius = roomSize * 0.45;
+                const rimLight = new THREE.SpotLight(0xFF6B35, 1.2, 60, Math.PI/4, 0.3);
+                rimLight.position.set(
                     worldX + Math.cos(angle) * radius,
                     this.floorHeight + this.ceilingHeight,
                     worldZ + Math.sin(angle) * radius
                 );
-                this.currentDungeonGroup.add(stainedLight);
-                this.lightSources.push(stainedLight);
+                rimLight.target.position.set(worldX, this.floorHeight, worldZ);
+                rimLight.castShadow = true;
+                this.currentDungeonGroup.add(rimLight);
+                this.currentDungeonGroup.add(rimLight.target);
+                this.lightSources.push(rimLight);
+            }
+            
+        } else if (room.type === 'orbital') {
+            // Chamber lighting - tactical and focused
+            const chamberLight = new THREE.PointLight(0xFFE4B5, 1.8, 80);
+            chamberLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.9, worldZ);
+            chamberLight.castShadow = true;
+            this.currentDungeonGroup.add(chamberLight);
+            this.lightSources.push(chamberLight);
+            
+            // Corner shadows for tactical advantage
+            for (let i = 0; i < 4; i++) {
+                const shadowLight = new THREE.PointLight(0xCD853F, 0.6, 25);
+                const angle = (i / 4) * Math.PI * 2;
+                const radius = roomSize * 0.3;
+                shadowLight.position.set(
+                    worldX + Math.cos(angle) * radius,
+                    this.floorHeight + 3,
+                    worldZ + Math.sin(angle) * radius
+                );
+                this.currentDungeonGroup.add(shadowLight);
+                this.lightSources.push(shadowLight);
+            }
+            
+        } else if (room.type === 'cardinal') {
+            // Platform lighting - multi-level illumination
+            const platformLight = new THREE.PointLight(0x87CEEB, 2.2, 100);
+            platformLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.1, worldZ);
+            platformLight.castShadow = true;
+            this.currentDungeonGroup.add(platformLight);
+            this.lightSources.push(platformLight);
+            
+            // Platform-specific lighting for each level
+            const platformColors = [0x4169E1, 0x6495ED, 0x00BFFF, 0x1E90FF];
+            platformColors.forEach((color, i) => {
+                const levelLight = new THREE.PointLight(color, 1.0, 40);
+                const angle = (i / 4) * Math.PI * 2;
+                const radius = roomSize * 0.25;
+                levelLight.position.set(
+                    worldX + Math.cos(angle) * radius,
+                    this.floorHeight + 3 + i * 0.5,
+                    worldZ + Math.sin(angle) * radius
+                );
+                this.currentDungeonGroup.add(levelLight);
+                this.lightSources.push(levelLight);
             });
         }
         
-        console.log(`Added sacred lighting to ${room.type} at (${worldX}, ${worldZ})`);
+        console.log(`Added dramatic lighting to ${room.type} combat area`);
     }
     
-    addCloisterLighting(roomA, roomB) {
+    addPassageLighting(roomA, roomB) {
         const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
         const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
         const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
         const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Cloister path lighting - soft and guiding
-        const pathLight = new THREE.PointLight(0xF0E68C, 1.0, 40);
-        pathLight.position.set(endWorldX, this.floorHeight + 5, startWorldZ);
-        this.currentDungeonGroup.add(pathLight);
-        this.lightSources.push(pathLight);
+        // Passage lighting - dim and atmospheric
+        const passageLight = new THREE.PointLight(0xDEB887, 0.8, 35);
+        passageLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ);
+        this.currentDungeonGroup.add(passageLight);
+        this.lightSources.push(passageLight);
         
-        // Additional path markers
+        // Mid-passage emergency lighting
         const midWorldX = (startWorldX + endWorldX) / 2;
         const midWorldZ = (startWorldZ + endWorldZ) / 2;
         
-        const midLight = new THREE.PointLight(0xDEB887, 0.7, 25);
-        midLight.position.set(midWorldX, this.floorHeight + 4, midWorldZ);
-        this.currentDungeonGroup.add(midLight);
-        this.lightSources.push(midLight);
+        const emergencyLight = new THREE.PointLight(0xFF4500, 0.5, 20);
+        emergencyLight.position.set(midWorldX, this.floorHeight + 3, midWorldZ);
+        this.currentDungeonGroup.add(emergencyLight);
+        this.lightSources.push(emergencyLight);
     }
     
-    addSacredAtmosphere(roomLayout) {
-        console.log('Adding sacred atmospheric elements...');
+    addCombatEnvironment(roomLayout) {
+        console.log('Adding combat environmental elements...');
         
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomAtmosphere(room);
+            this.addEnvironmentalAtmosphere(room);
         });
     }
     
-    addRoomAtmosphere(room) {
+    addEnvironmentalAtmosphere(room) {
         const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
         const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = room.size * this.gridSize;
         
-        // Add candles and incense
-        this.addCandles(worldX, worldZ, roomSize, room.type);
-        this.addFloatingIncense(worldX, worldZ, roomSize);
+        // Floating dust motes and particles
+        this.addFloatingDust(worldX, worldZ, roomSize);
         
-        // Entry/exit portals to center room
+        // Magical residue from ancient battles
+        this.addMagicalResidue(worldX, worldZ, roomSize, room.type);
+        
+        // Environmental hazards and atmosphere
         if (room.type === 'center') {
-            this.addCenterRoomPortals(worldX, worldZ, roomSize);
+            this.addArenaAtmosphere(worldX, worldZ, roomSize);
         }
     }
     
-    addCandles(worldX, worldZ, roomSize, roomType) {
-        const numCandles = roomType === 'center' ? 8 : 4;
+    addFloatingDust(worldX, worldZ, roomSize) {
+        const dustCount = 8 + Math.floor(Math.random() * 4);
         
-        for (let i = 0; i < numCandles; i++) {
-            const angle = (i / numCandles) * Math.PI * 2;
-            const radius = roomSize * 0.25;
-            
-            const candleX = worldX + Math.cos(angle) * radius;
-            const candleZ = worldZ + Math.sin(angle) * radius;
-            
-            // Candle base
-            const candleGeometry = new THREE.CylinderGeometry(0.1, 0.12, 1.5, 8);
-            const candleMaterial = this.materials.get('bronze_accent');
-            const candle = new THREE.Mesh(candleGeometry, candleMaterial);
-            candle.position.set(candleX, this.floorHeight + 0.75, candleZ);
-            this.currentDungeonGroup.add(candle);
-            
-            // Flame effect
-            const flameGeometry = new THREE.SphereGeometry(0.15, 6, 6);
-            const flame = new THREE.Mesh(flameGeometry, this.materials.get('candle_flame'));
-            flame.position.set(candleX, this.floorHeight + 1.6, candleZ);
-            flame.scale.set(1, 1.5, 1);
-            
-            // Animate flame
-            flame.userData = {
-                originalY: flame.position.y,
-                flickerSpeed: 4 + Math.random() * 2,
-                flickerAmount: 0.1
-            };
-            
-            this.currentDungeonGroup.add(flame);
-        }
-    }
-    
-    addFloatingIncense(worldX, worldZ, roomSize) {
-        // Mystical floating incense smoke
-        for (let i = 0; i < 3; i++) {
-            const smokeGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-            const smoke = new THREE.Mesh(smokeGeometry, this.materials.get('incense_smoke'));
-            smoke.position.set(
-                worldX + (Math.random() - 0.5) * roomSize * 0.4,
-                this.floorHeight + 3 + Math.random() * 2,
-                worldZ + (Math.random() - 0.5) * roomSize * 0.4
+        for (let i = 0; i < dustCount; i++) {
+            const dustGeometry = new THREE.SphereGeometry(0.05, 6, 6);
+            const dust = new THREE.Mesh(dustGeometry, this.materials.get('dust_mote'));
+            dust.position.set(
+                worldX + (Math.random() - 0.5) * roomSize * 0.8,
+                this.floorHeight + 2 + Math.random() * 4,
+                worldZ + (Math.random() - 0.5) * roomSize * 0.8
             );
             
-            // Add floating animation
-            smoke.userData = {
-                originalY: smoke.position.y,
-                floatSpeed: 0.3 + Math.random() * 0.7,
-                floatAmount: 0.5,
-                driftX: (Math.random() - 0.5) * 0.01,
-                driftZ: (Math.random() - 0.5) * 0.01
+            dust.userData = {
+                originalY: dust.position.y,
+                floatSpeed: 0.2 + Math.random() * 0.4,
+                floatAmount: 0.3,
+                driftX: (Math.random() - 0.5) * 0.005,
+                driftZ: (Math.random() - 0.5) * 0.005
             };
             
-            this.currentDungeonGroup.add(smoke);
+            this.currentDungeonGroup.add(dust);
+        }
+    }
+    
+    addMagicalResidue(worldX, worldZ, roomSize, roomType) {
+        // Ancient magical energy still lingers from past battles
+        const residueCount = roomType === 'center' ? 6 : 3;
+        
+        for (let i = 0; i < residueCount; i++) {
+            const residueGeometry = new THREE.SphereGeometry(0.12, 8, 8);
+            const residue = new THREE.Mesh(residueGeometry, this.materials.get('magical_residue'));
+            residue.position.set(
+                worldX + (Math.random() - 0.5) * roomSize * 0.6,
+                this.floorHeight + 1.5 + Math.random() * 2,
+                worldZ + (Math.random() - 0.5) * roomSize * 0.6
+            );
+            
+            residue.userData = {
+                originalY: residue.position.y,
+                pulseSpeed: 1.5 + Math.random(),
+                pulseAmount: 0.4,
+                orbitSpeed: 0.3 + Math.random() * 0.2,
+                orbitRadius: 0.5 + Math.random() * 0.3
+            };
+            
+            this.currentDungeonGroup.add(residue);
+        }
+    }
+    
+    addArenaAtmosphere(worldX, worldZ, roomSize) {
+        // Ember effects around the arena perimeter
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const radius = roomSize * 0.4;
+            
+            const emberGeometry = new THREE.SphereGeometry(0.08, 6, 6);
+            const ember = new THREE.Mesh(emberGeometry, this.materials.get('ember_glow'));
+            ember.position.set(
+                worldX + Math.cos(angle) * radius,
+                this.floorHeight + 0.5 + Math.random() * 2,
+                worldZ + Math.sin(angle) * radius
+            );
+            
+            ember.userData = {
+                originalY: ember.position.y,
+                flickerSpeed: 3 + Math.random() * 2,
+                flickerAmount: 0.2,
+                driftY: 0.01 + Math.random() * 0.01
+            };
+            
+            this.currentDungeonGroup.add(ember);
         }
     }
     
     addProgressivePortals(roomLayout) {
-        console.log('Adding progressive portal system...');
+        console.log('Adding battle-worn portal system...');
         
-        // Find center room position
         const centerRoom = roomLayout.rooms.center;
         const centerWorldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
         const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
         const roomSize = centerRoom.size * this.gridSize;
         
-        // Calculate portal positions for each direction
         const portalDistance = roomSize * 0.6;
         const portalPositions = {
             east: { x: centerWorldX + portalDistance, z: centerWorldZ, rotation: Math.PI/2 },
@@ -1333,64 +1284,63 @@ class DungeonSystem {
             south: { x: centerWorldX, z: centerWorldZ + portalDistance, rotation: Math.PI }
         };
         
-        // Add room entrance portals (initially blocked except north)
         Object.entries(portalPositions).forEach(([direction, pos]) => {
             const isUnlocked = this.roomProgression[direction].unlocked;
-            const portal = this.createSacredPortal(direction, isUnlocked);
+            const portal = this.createBattlePortal(direction, isUnlocked);
             portal.position.set(pos.x, this.floorHeight + 4, pos.z);
             portal.name = `${direction}_room_portal`;
             this.currentDungeonGroup.add(portal);
             
-            console.log(`Added ${direction} sacred portal - ${isUnlocked ? 'OPEN' : 'SEALED'}`);
+            console.log(`Added ${direction} battle portal - ${isUnlocked ? 'OPEN' : 'SEALED'}`);
         });
     }
     
-    createSacredPortal(direction, isUnlocked) {
+    createBattlePortal(direction, isUnlocked) {
         const portalGroup = new THREE.Group();
         
-        // Create sacred archway
-        const archway = this.createSacredArchway(isUnlocked);
+        // Create ruined archway
+        const archway = this.createBattleArchway(isUnlocked);
         portalGroup.add(archway);
         
-        // Add mystical effects
-        this.addPortalMysticalEffects(portalGroup, isUnlocked);
+        // Add combat-themed effects
+        this.addBattlePortalEffects(portalGroup, isUnlocked);
         
-        // Add portal data
         portalGroup.userData = {
             portalType: `room_entrance_${direction}`,
             direction: direction,
             isBlocking: !isUnlocked,
             originalY: this.floorHeight + 4,
-            pulseSpeed: 0.3,
-            pulseAmount: 0.05,
+            pulseSpeed: 0.4,
+            pulseAmount: 0.08,
             archway: archway
         };
         
         return portalGroup;
     }
     
-    createSacredArchway(isUnlocked) {
+    createBattleArchway(isUnlocked) {
         const archGroup = new THREE.Group();
         
-        // Gothic pointed arch frame
-        const archGeometry = new THREE.RingGeometry(2, 2.5, 16, 1, 0, Math.PI);
+        // Battle-damaged Gothic arch
+        const archGeometry = new THREE.RingGeometry(2, 2.8, 12, 1, 0, Math.PI * 0.8);
         const archMaterial = isUnlocked ? 
-            this.materials.get('gold_accent') : 
-            this.materials.get('bronze_accent');
+            this.materials.get('ancient_gold') : 
+            this.materials.get('rusted_metal');
         
         const arch = new THREE.Mesh(archGeometry, archMaterial);
         arch.rotation.x = Math.PI / 2;
+        arch.rotation.z = (Math.random() - 0.5) * 0.2; // Battle damage tilt
         archGroup.add(arch);
         
-        // Mystical barrier (when locked)
+        // Energy barrier when locked
         if (!isUnlocked) {
-            const barrierGeometry = new THREE.PlaneGeometry(4, 5);
+            const barrierGeometry = new THREE.PlaneGeometry(4.5, 5.5);
             const barrierMaterial = new THREE.MeshBasicMaterial({
-                color: 0x4B0082,
+                color: 0x8B0000,
                 transparent: true,
-                opacity: 0.6,
-                emissive: 0x4B0082,
-                emissiveIntensity: 0.3
+                opacity: 0.7,
+                emissive: 0x8B0000,
+                emissiveIntensity: 0.4
             });
             const barrier = new THREE.Mesh(barrierGeometry, barrierMaterial);
             barrier.rotation.x = Math.PI / 2;
@@ -1399,53 +1349,53 @@ class DungeonSystem {
             archGroup.userData.barrier = barrier;
         }
         
-        // Pillars
-        const pillarGeometry = new THREE.CylinderGeometry(0.3, 0.4, 5, 8);
-        const pillarMaterial = this.materials.get('silver_accent');
+        // Battle-scarred pillars
+        const pillarGeometry = new THREE.CylinderGeometry(0.4, 0.5, 5.5, 8);
+        const pillarMaterial = this.materials.get('broken_stone');
         
         const leftPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        leftPillar.position.set(-2.5, -2.5, 0);
+        leftPillar.position.set(-2.8, -2.75, 0);
+        leftPillar.rotation.z = (Math.random() - 0.5) * 0.15; // Slight damage lean
         archGroup.add(leftPillar);
         
         const rightPillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        rightPillar.position.set(2.5, -2.5, 0);
+        rightPillar.position.set(2.8, -2.75, 0);
+        rightPillar.rotation.z = (Math.random() - 0.5) * 0.15;
         archGroup.add(rightPillar);
         
         return archGroup;
     }
     
-    addPortalMysticalEffects(portalGroup, isUnlocked) {
-        const effectColor = isUnlocked ? 0xFFD700 : 0x8A2BE2;
-        const effectCount = 8;
+    addBattlePortalEffects(portalGroup, isUnlocked) {
+        const effectColor = isUnlocked ? 0xFFD700 : 0x8B0000;
+        const effectCount = 10;
         
         for (let i = 0; i < effectCount; i++) {
-            const effectGeometry = new THREE.SphereGeometry(0.08, 6, 6);
+            const effectGeometry = new THREE.SphereGeometry(0.06, 6, 6);
             const effectMaterial = new THREE.MeshBasicMaterial({
                 color: effectColor,
                 transparent: true,
-                opacity: isUnlocked ? 0.7 : 0.9,
+                opacity: isUnlocked ? 0.8 : 1.0,
                 emissive: effectColor,
-                emissiveIntensity: 0.8
+                emissiveIntensity: 1.0
             });
             
             const effect = new THREE.Mesh(effectGeometry, effectMaterial);
             
-            // Position effects in a circle around the portal
             const angle = (i / effectCount) * Math.PI * 2;
-            const radius = 3;
+            const radius = 3.5;
             effect.position.set(
                 Math.cos(angle) * radius,
-                -1 + Math.random() * 2,
+                -1.5 + Math.random() * 3,
                 Math.sin(angle) * radius
             );
             
-            // Add animation data
             effect.userData = {
                 originalAngle: angle,
                 originalRadius: radius,
-                swirSpeed: 0.3 + Math.random() * 0.3,
-                bobSpeed: 0.5 + Math.random() * 0.3,
-                bobAmount: 0.2,
+                swirSpeed: 0.4 + Math.random() * 0.3,
+                bobSpeed: 0.6 + Math.random() * 0.4,
+                bobAmount: 0.3,
                 effectMaterial: effectMaterial
             };
             
@@ -1453,25 +1403,19 @@ class DungeonSystem {
         }
     }
     
-    addCenterRoomPortals(worldX, worldZ, roomSize) {
-        console.log('Center nave ready for sacred portals...');
-        // Entry/exit portals will be handled separately when needed
-    }
-    
     updateRoomPortals(direction, shouldOpen) {
         if (!this.currentDungeonGroup) return;
         
-        console.log(`Updating ${direction} sacred portal to ${shouldOpen ? 'OPEN' : 'SEALED'}`);
+        console.log(`Updating ${direction} battle portal to ${shouldOpen ? 'OPEN' : 'SEALED'}`);
         
         this.currentDungeonGroup.traverse((child) => {
             if (child.userData.direction === direction) {
                 child.userData.isBlocking = !shouldOpen;
                 
-                // Update archway materials
                 if (child.userData.archway) {
                     const newMaterial = shouldOpen ? 
-                        this.materials.get('gold_accent') : 
-                        this.materials.get('bronze_accent');
+                        this.materials.get('ancient_gold') : 
+                        this.materials.get('rusted_metal');
                     
                     child.userData.archway.traverse((archChild) => {
                         if (archChild.material && archChild.geometry.type === 'RingGeometry') {
@@ -1479,47 +1423,28 @@ class DungeonSystem {
                         }
                     });
                     
-                    // Handle barrier
                     if (child.userData.archway.userData.barrier) {
                         child.userData.archway.userData.barrier.visible = !shouldOpen;
                     }
                 }
                 
-                // Update mystical effects
                 child.traverse((subChild) => {
                     if (subChild.userData.effectMaterial) {
-                        const newColor = shouldOpen ? 0xFFD700 : 0x8A2BE2;
-                        const newOpacity = shouldOpen ? 0.7 : 0.9;
+                        const newColor = shouldOpen ? 0xFFD700 : 0x8B0000;
+                        const newOpacity = shouldOpen ? 0.8 : 1.0;
                         subChild.userData.effectMaterial.color.setHex(newColor);
                         subChild.userData.effectMaterial.emissive.setHex(newColor);
                         subChild.userData.effectMaterial.opacity = newOpacity;
                     }
                 });
                 
-                console.log(`${direction} sacred portal ${shouldOpen ? 'opened' : 'sealed'}`);
+                console.log(`${direction} battle portal ${shouldOpen ? 'opened' : 'sealed'}`);
             }
         });
     }
     
-    testProgressionAdvance() {
-        console.log('Testing progression advance...');
-        
-        try {
-            if (this.currentProgressionIndex < this.progressionOrder.length) {
-                const currentRoom = this.progressionOrder[this.currentProgressionIndex];
-                console.log(`Defeating enemies in ${currentRoom} room...`);
-                
-                this.defeatEnemiesInRoom(currentRoom);
-            } else {
-                console.log('All rooms already completed!');
-            }
-        } catch (error) {
-            console.error('Error in progression advance:', error);
-        }
-    }
-    
     openExitPortal() {
-        console.log('All rooms completed - opening sacred exit portal!');
+        console.log('All chambers cleared - opening victory portal!');
         
         if (this.currentDungeon && this.currentDungeon.roomLayout.rooms.center) {
             const centerRoom = this.currentDungeon.roomLayout.rooms.center;
@@ -1527,51 +1452,77 @@ class DungeonSystem {
             const centerWorldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
             const roomSize = centerRoom.size * this.gridSize;
             
-            // Create golden exit portal
-            const exitPortal = this.createSacredPortal('exit', true);
+            const exitPortal = this.createBattlePortal('exit', true);
             exitPortal.position.set(centerWorldX, this.floorHeight + 4, centerWorldZ + roomSize * 0.3);
             exitPortal.name = 'exit_portal';
             exitPortal.userData.isBlocking = false;
             exitPortal.userData.portalType = 'exit';
             exitPortal.userData.direction = 'exit';
             
-            // Make it extra golden and radiant
+            // Make it golden and triumphant
             exitPortal.traverse((child) => {
                 if (child.userData.effectMaterial) {
                     child.userData.effectMaterial.color.setHex(0xFFFFAA);
                     child.userData.effectMaterial.emissive.setHex(0xFFFFAA);
-                    child.userData.effectMaterial.opacity = 0.9;
+                    child.userData.effectMaterial.opacity = 1.0;
+                    child.userData.effectMaterial.emissiveIntensity = 1.5;
                 }
             });
             
             this.currentDungeonGroup.add(exitPortal);
-            console.log('Sacred exit portal opened with golden radiance!');
+            console.log('Victory portal opened with golden radiance!');
         }
     }
     
     update(deltaTime) {
-        // Update atmospheric elements
         if (this.currentDungeonGroup) {
             this.currentDungeonGroup.traverse((child) => {
-                // Floating incense and candle flames
+                // Floating atmospheric elements
                 if (child.userData.floatSpeed && child.userData.originalY !== undefined) {
                     const time = Date.now() * 0.001;
                     child.position.y = child.userData.originalY + 
                         Math.sin(time * child.userData.floatSpeed) * child.userData.floatAmount;
                     
-                    // Drift for incense
                     if (child.userData.driftX) {
                         child.position.x += child.userData.driftX;
                         child.position.z += child.userData.driftZ;
                     }
+                    
+                    if (child.userData.driftY) {
+                        child.position.y += child.userData.driftY;
+                    }
                 }
                 
-                // Candle flame flicker
+                // Ember and magical effects
                 if (child.userData.flickerSpeed) {
                     const time = Date.now() * 0.001;
                     child.position.y = child.userData.originalY + 
                         Math.sin(time * child.userData.flickerSpeed) * child.userData.flickerAmount;
-                    child.scale.setScalar(1 + Math.sin(time * child.userData.flickerSpeed * 2) * 0.1);
+                    child.scale.setScalar(1 + Math.sin(time * child.userData.flickerSpeed * 2) * 0.15);
+                }
+                
+                // Magical residue pulsing and orbiting
+                if (child.userData.pulseSpeed && child.userData.orbitSpeed) {
+                    const time = Date.now() * 0.001;
+                    const pulse = 1 + Math.sin(time * child.userData.pulseSpeed) * child.userData.pulseAmount;
+                    child.scale.setScalar(pulse);
+                    
+                    const orbitX = Math.cos(time * child.userData.orbitSpeed) * child.userData.orbitRadius;
+                    const orbitZ = Math.sin(time * child.userData.orbitSpeed) * child.userData.orbitRadius;
+                    child.position.x += orbitX * deltaTime;
+                    child.position.z += orbitZ * deltaTime;
+                }
+                
+                // Crystal and artifact rotation
+                if (child.userData.rotationSpeed) {
+                    child.rotation.y += child.userData.rotationSpeed;
+                }
+                
+                // Hanging debris swaying
+                if (child.userData.swaySpeed) {
+                    const time = Date.now() * 0.001;
+                    child.rotation.z = child.userData.originalRotation + 
+                        Math.sin(time * child.userData.swaySpeed) * child.userData.swayAmount;
                 }
                 
                 // Portal animations
@@ -1579,39 +1530,40 @@ class DungeonSystem {
                     this.updatePortalAnimations(child, deltaTime);
                 }
                 
-                // Portal mystical effects
+                // Portal battle effects
                 if (child.userData.swirSpeed !== undefined) {
-                    this.updateMysticalEffects(child, deltaTime);
+                    this.updateBattleEffects(child, deltaTime);
                 }
                 
-                // Look at camera for billboards
+                // Billboard facing camera
                 if (child.userData.archway && window.game && window.game.camera) {
                     child.userData.archway.lookAt(window.game.camera.position);
                 }
             });
         }
         
-        // Update glowing architectural elements
-        this.glowingPillars.forEach(element => {
-            if (element && element.material) {
+        // Update combat elements with pulsing glow
+        this.combatElements.forEach(element => {
+            if (element && element.material && element.userData.pulseSpeed) {
                 const time = Date.now() * 0.001;
-                const glowIntensity = 0.2 + Math.sin(time * 0.5) * 0.1;
+                const pulse = element.userData.originalEmissiveIntensity + 
+                    Math.sin(time * element.userData.pulseSpeed) * 0.2;
                 
                 if (element.material.emissive) {
-                    element.material.emissiveIntensity = glowIntensity;
+                    element.material.emissiveIntensity = Math.max(0.1, pulse);
                 }
             }
         });
         
-        // Animate sacred lighting with gentle flicker
+        // Dramatic lighting flicker for combat atmosphere
         this.lightSources.forEach(light => {
             if (light.userData.originalIntensity === undefined) {
                 light.userData.originalIntensity = light.intensity;
-                light.userData.flickerSpeed = 0.3 + Math.random();
+                light.userData.flickerSpeed = 0.5 + Math.random() * 1.5;
             }
             
             const time = Date.now() * 0.001;
-            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.1 + 1;
+            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.15 + 1;
             light.intensity = light.userData.originalIntensity * flicker;
         });
     }
@@ -1619,31 +1571,27 @@ class DungeonSystem {
     updatePortalAnimations(portalGroup, deltaTime) {
         const time = Date.now() * 0.001;
         
-        // Gentle floating
         const originalY = portalGroup.userData.originalY;
         const floatOffset = Math.sin(time * portalGroup.userData.pulseSpeed) * portalGroup.userData.pulseAmount;
         portalGroup.position.y = originalY + floatOffset;
         
-        // Subtle scale pulsing
-        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed * 2) * 0.02;
+        const pulseScale = 1 + Math.sin(time * portalGroup.userData.pulseSpeed * 2.5) * 0.03;
         if (portalGroup.userData.archway) {
             portalGroup.userData.archway.scale.setScalar(pulseScale);
         }
     }
     
-    updateMysticalEffects(effect, deltaTime) {
+    updateBattleEffects(effect, deltaTime) {
         const time = Date.now() * 0.001;
         
-        // Swirling motion
         if (effect.userData.originalAngle !== undefined) {
             effect.userData.originalAngle += effect.userData.swirSpeed * deltaTime;
             const angle = effect.userData.originalAngle;
-            const radius = effect.userData.originalRadius || 3;
+            const radius = effect.userData.originalRadius || 3.5;
             
             effect.position.x = Math.cos(angle) * radius;
             effect.position.z = Math.sin(angle) * radius;
             
-            // Gentle bobbing
             effect.position.y += Math.sin(time * effect.userData.bobSpeed) * effect.userData.bobAmount * deltaTime;
         }
     }
@@ -1655,14 +1603,13 @@ class DungeonSystem {
         
         this.lightSources.length = 0;
         this.billboardSprites.length = 0;
-        this.glowingPillars.length = 0;
-        this.architecturalElements.length = 0;
+        this.combatElements.length = 0;
+        this.environmentalHazards.length = 0;
         this.currentFloorMap = null;
         
-        console.log('Previous cathedral cleared');
+        console.log('Previous battle ruins cleared');
     }
     
-    // Portal Management Methods
     togglePortals() {
         this.testProgressionAdvance();
     }
@@ -1670,11 +1617,9 @@ class DungeonSystem {
     getRoomAt(position) {
         if (!this.currentDungeon) return null;
         
-        // Convert world position to grid position
         const gridX = Math.floor((position.x + this.dungeonWidth/2) / this.gridSize);
         const gridZ = Math.floor((position.z + this.dungeonDepth/2) / this.gridSize);
         
-        // Find which room contains this grid position
         for (const room of Object.values(this.currentDungeon.roomLayout.rooms)) {
             const halfSize = Math.floor(room.size / 2);
             if (gridX >= room.gridX - halfSize && gridX <= room.gridX + halfSize &&
