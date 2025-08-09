@@ -494,281 +494,124 @@ class DungeonSystem {
     }
     
     addLighting(roomLayout) {
-        console.log('Adding atmospheric lighting...');
+        console.log('Adding comprehensive exploration lighting...');
         
-        // Enhanced lighting for each room type
+        // Add main lighting for each room
         Object.values(roomLayout.rooms).forEach(room => {
-            this.addRoomAtmosphere(room);
+            const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+            const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
+            const roomSize = room.size * this.gridSize;
+            
+            if (room.type === 'center') {
+                // Central arena - dramatic overhead lighting
+                const mainLight = new THREE.PointLight(0xFFE135, 4.0, 100);
+                mainLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.9, worldZ);
+                mainLight.castShadow = true;
+                mainLight.shadow.mapSize.width = 1024;
+                mainLight.shadow.mapSize.height = 1024;
+                this.currentDungeonGroup.add(mainLight);
+                this.lightSources.push(mainLight);
+                
+                // Corner accent lights for the arena
+                const cornerPositions = [
+                    { x: worldX + roomSize * 0.3, z: worldZ + roomSize * 0.3 },
+                    { x: worldX - roomSize * 0.3, z: worldZ + roomSize * 0.3 },
+                    { x: worldX + roomSize * 0.3, z: worldZ - roomSize * 0.3 },
+                    { x: worldX - roomSize * 0.3, z: worldZ - roomSize * 0.3 }
+                ];
+                
+                cornerPositions.forEach((pos, i) => {
+                    const cornerLight = new THREE.PointLight(0xFF6B35, 1.8, 45);
+                    cornerLight.position.set(pos.x, this.floorHeight + 6, pos.z);
+                    cornerLight.castShadow = true;
+                    this.currentDungeonGroup.add(cornerLight);
+                    this.lightSources.push(cornerLight);
+                });
+                
+            } else if (room.type === 'orbital') {
+                // Chamber lighting - focused and tactical
+                const chamberLight = new THREE.PointLight(0xFFE4B5, 3.0, 70);
+                chamberLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.7, worldZ);
+                chamberLight.castShadow = true;
+                this.currentDungeonGroup.add(chamberLight);
+                this.lightSources.push(chamberLight);
+                
+                // Additional side lighting for chambers
+                const sidePositions = [
+                    { x: worldX + roomSize * 0.25, z: worldZ },
+                    { x: worldX - roomSize * 0.25, z: worldZ },
+                    { x: worldX, z: worldZ + roomSize * 0.25 },
+                    { x: worldX, z: worldZ - roomSize * 0.25 }
+                ];
+                
+                sidePositions.forEach(pos => {
+                    const sideLight = new THREE.PointLight(0xCD853F, 1.2, 35);
+                    sideLight.position.set(pos.x, this.floorHeight + 4, pos.z);
+                    this.currentDungeonGroup.add(sideLight);
+                    this.lightSources.push(sideLight);
+                });
+            }
         });
         
-        // Add corridor lighting
+        // Add corridor lighting between rooms
         roomLayout.connections.forEach(connection => {
             this.addCorridorLighting(roomLayout.rooms[connection.from], roomLayout.rooms[connection.to]);
         });
         
-        // Add dramatic ambient effects
-        this.addAmbientEffects(roomLayout.rooms.center);
+        // Add perimeter exploration lighting
+        this.addPerimeterLighting();
         
-        console.log(`Added ${this.lightSources.length} atmospheric lights`);
-    }
-    
-    addRoomAtmosphere(room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        const roomSize = room.size * this.gridSize;
-        
-        if (room.type === 'center') {
-            // ARENA - Dramatic cathedral lighting
-            // Main cathedral light - high and golden
-            const cathedralLight = new THREE.PointLight(0xFFD700, 4.0, 150);
-            cathedralLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 1.2, worldZ);
-            cathedralLight.castShadow = true;
-            cathedralLight.shadow.mapSize.width = 1024;
-            cathedralLight.shadow.mapSize.height = 1024;
-            this.currentDungeonGroup.add(cathedralLight);
-            this.lightSources.push(cathedralLight);
-            
-            // Rim lighting around the arena for drama
-            const rimColors = [0xFF6B35, 0xFF8C42, 0xFFA500, 0xFFD700];
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const radius = roomSize * 0.4;
-                const rimLight = new THREE.SpotLight(
-                    rimColors[i % rimColors.length], 
-                    2.5, 
-                    100, 
-                    Math.PI/3, 
-                    0.2
-                );
-                rimLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + this.ceilingHeight * 0.9,
-                    worldZ + Math.sin(angle) * radius
-                );
-                rimLight.target.position.set(worldX, this.floorHeight, worldZ);
-                rimLight.castShadow = true;
-                this.currentDungeonGroup.add(rimLight);
-                this.currentDungeonGroup.add(rimLight.target);
-                this.lightSources.push(rimLight);
-            }
-            
-            // Mysterious blue underglow
-            const mysticalLight = new THREE.PointLight(0x4169E1, 1.5, 60);
-            mysticalLight.position.set(worldX, this.floorHeight + 0.5, worldZ);
-            this.currentDungeonGroup.add(mysticalLight);
-            this.lightSources.push(mysticalLight);
-            
-        } else if (room.type === 'orbital') {
-            // CHAMBERS - Tactical colored lighting
-            const chamberColors = {
-                'north': 0x87CEEB,  // Sky blue
-                'east': 0xFF6347,   // Tomato red  
-                'west': 0x9370DB,   // Medium purple
-                'south': 0x32CD32   // Lime green
-            };
-            
-            const color = chamberColors[room.direction] || 0xFFE4B5;
-            
-            // Main chamber light
-            const chamberLight = new THREE.PointLight(color, 2.5, 100);
-            chamberLight.position.set(worldX, this.floorHeight + this.ceilingHeight * 0.8, worldZ);
-            chamberLight.castShadow = true;
-            this.currentDungeonGroup.add(chamberLight);
-            this.lightSources.push(chamberLight);
-            
-            // Corner mood lighting
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2 + Math.PI/4; // Offset for corners
-                const radius = roomSize * 0.35;
-                const cornerLight = new THREE.PointLight(color, 1.0, 40);
-                cornerLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 2,
-                    worldZ + Math.sin(angle) * radius
-                );
-                // Add flickering animation data
-                cornerLight.userData = {
-                    originalIntensity: 1.0,
-                    flickerSpeed: 0.8 + Math.random() * 0.6,
-                    flickerAmount: 0.3
-                };
-                this.currentDungeonGroup.add(cornerLight);
-                this.lightSources.push(cornerLight);
-            }
-            
-            // Floating particles effect
-            this.addFloatingParticles(worldX, worldZ, roomSize, color);
-            
-        } else if (room.type === 'cardinal') {
-            // PLATFORMS - Multi-level mystical lighting
-            const platformColors = [0x1E90FF, 0x00BFFF, 0x87CEFA, 0x4169E1];
-            
-            // Main platform light
-            const platformLight = new THREE.PointLight(0x4169E1, 3.0, 120);
-            platformLight.position.set(worldX, this.floorHeight + this.ceilingHeight, worldZ);
-            platformLight.castShadow = true;
-            this.currentDungeonGroup.add(platformLight);
-            this.lightSources.push(platformLight);
-            
-            // Multi-level lighting
-            platformColors.forEach((color, level) => {
-                const levelLight = new THREE.PointLight(color, 1.5, 50);
-                const angle = (level / 4) * Math.PI * 2;
-                const radius = roomSize * 0.3;
-                levelLight.position.set(
-                    worldX + Math.cos(angle) * radius,
-                    this.floorHeight + 3 + level * 1.5,
-                    worldZ + Math.sin(angle) * radius
-                );
-                levelLight.userData = {
-                    originalIntensity: 1.5,
-                    pulseSpeed: 0.5 + level * 0.2,
-                    pulseAmount: 0.4
-                };
-                this.currentDungeonGroup.add(levelLight);
-                this.lightSources.push(levelLight);
-            });
-        }
+        console.log(`Added ${this.lightSources.length} exploration lights`);
     }
     
     addCorridorLighting(roomA, roomB) {
-        const startX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
-        const startZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
-        const endX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
-        const endZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
+        const startWorldX = (roomA.gridX - this.gridWidth/2) * this.gridSize;
+        const startWorldZ = (roomA.gridZ - this.gridDepth/2) * this.gridSize;
+        const endWorldX = (roomB.gridX - this.gridWidth/2) * this.gridSize;
+        const endWorldZ = (roomB.gridZ - this.gridDepth/2) * this.gridSize;
         
-        // Corridor pathway lights
-        const steps = 5;
-        for (let i = 0; i <= steps; i++) {
-            const progress = i / steps;
-            const x = startX + (endX - startX) * progress;
-            const z = startZ + (endZ - startZ) * progress;
+        // Calculate corridor path and add lights along it
+        const distance = Math.sqrt(Math.pow(endWorldX - startWorldX, 2) + Math.pow(endWorldZ - startWorldZ, 2));
+        const numLights = Math.max(2, Math.floor(distance / 15)); // Light every 15 units
+        
+        for (let i = 1; i < numLights; i++) {
+            const t = i / numLights;
+            const lightX = startWorldX + (endWorldX - startWorldX) * t;
+            const lightZ = startWorldZ + (endWorldZ - startWorldZ) * t;
             
-            // Alternating warm and cool corridor lights
-            const color = i % 2 === 0 ? 0xDEB887 : 0x708090;
-            const corridorLight = new THREE.PointLight(color, 0.8, 25);
-            corridorLight.position.set(x, this.floorHeight + 4, z);
-            corridorLight.userData = {
-                originalIntensity: 0.8,
-                flickerSpeed: 0.3 + Math.random() * 0.4,
-                flickerAmount: 0.2
-            };
+            // Corridor light - warm and guiding
+            const corridorLight = new THREE.PointLight(0xDEB887, 2.0, 40);
+            corridorLight.position.set(lightX, this.floorHeight + 5, lightZ);
+            corridorLight.castShadow = true;
             this.currentDungeonGroup.add(corridorLight);
             this.lightSources.push(corridorLight);
         }
         
-        // Emergency red lights at critical points
-        const midX = (startX + endX) / 2;
-        const midZ = (startZ + endZ) / 2;
-        const emergencyLight = new THREE.PointLight(0xFF4500, 0.6, 20);
-        emergencyLight.position.set(midX, this.floorHeight + 2.5, midZ);
-        emergencyLight.userData = {
-            originalIntensity: 0.6,
-            flickerSpeed: 2.0,
-            flickerAmount: 0.5,
-            isEmergency: true
-        };
-        this.currentDungeonGroup.add(emergencyLight);
-        this.lightSources.push(emergencyLight);
+        // Junction lighting where corridors meet
+        const junctionLight = new THREE.PointLight(0xF0E68C, 1.5, 30);
+        junctionLight.position.set(endWorldX, this.floorHeight + 4, startWorldZ);
+        this.currentDungeonGroup.add(junctionLight);
+        this.lightSources.push(junctionLight);
     }
     
-    addAmbientEffects(centerRoom) {
-        const worldX = (centerRoom.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (centerRoom.gridZ - this.gridDepth/2) * this.gridSize;
+    addPerimeterLighting() {
+        // Add subtle perimeter lights around the dungeon edges for atmosphere
+        const centerX = 0;
+        const centerZ = 0;
+        const radius = Math.min(this.dungeonWidth, this.dungeonDepth) * 0.4;
         
-        // Floating mystical orbs around the arena
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
-            const radius = 25 + Math.random() * 15;
-            const height = this.floorHeight + 8 + Math.random() * 6;
+            const x = centerX + Math.cos(angle) * radius;
+            const z = centerZ + Math.sin(angle) * radius;
             
-            // Create glowing orb
-            const orbGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-            const orbMaterial = new THREE.MeshBasicMaterial({
-                color: [0xFFD700, 0x4169E1, 0xFF6347, 0x9370DB, 0x32CD32][i % 5],
-                emissive: [0xFFD700, 0x4169E1, 0xFF6347, 0x9370DB, 0x32CD32][i % 5],
-                emissiveIntensity: 0.8,
-                transparent: true,
-                opacity: 0.7
-            });
-            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
-            orb.position.set(
-                worldX + Math.cos(angle) * radius,
-                height,
-                worldZ + Math.sin(angle) * radius
-            );
-            
-            // Add floating animation
-            orb.userData = {
-                originalY: height,
-                originalAngle: angle,
-                originalRadius: radius,
-                floatSpeed: 0.3 + Math.random() * 0.4,
-                orbitSpeed: 0.1 + Math.random() * 0.15,
-                bobAmount: 1.5
-            };
-            
-            this.currentDungeonGroup.add(orb);
-            this.combatElements.push(orb);
-            
-            // Add light to each orb
-            const orbLight = new THREE.PointLight(
-                [0xFFD700, 0x4169E1, 0xFF6347, 0x9370DB, 0x32CD32][i % 5],
-                1.2,
-                35
-            );
-            orbLight.position.copy(orb.position);
-            orbLight.userData = { followOrb: orb };
-            this.currentDungeonGroup.add(orbLight);
-            this.lightSources.push(orbLight);
-        }
-        
-        // Atmospheric fog lights
-        for (let i = 0; i < 6; i++) {
-            const fogLight = new THREE.PointLight(0xDDDDDD, 0.4, 80);
-            fogLight.position.set(
-                worldX + (Math.random() - 0.5) * 60,
-                this.floorHeight + Math.random() * 3,
-                worldZ + (Math.random() - 0.5) * 60
-            );
-            fogLight.userData = {
-                originalIntensity: 0.4,
-                pulseSpeed: 0.2 + Math.random() * 0.3,
-                pulseAmount: 0.2
-            };
-            this.currentDungeonGroup.add(fogLight);
-            this.lightSources.push(fogLight);
-        }
-    }
-    
-    addFloatingParticles(centerX, centerZ, roomSize, color) {
-        // Create simple floating particle effects
-        for (let i = 0; i < 8; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.1, 6, 6);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                emissive: color,
-                emissiveIntensity: 0.6,
-                transparent: true,
-                opacity: 0.4
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.set(
-                centerX + (Math.random() - 0.5) * roomSize * 0.8,
-                this.floorHeight + 2 + Math.random() * 4,
-                centerZ + (Math.random() - 0.5) * roomSize * 0.8
-            );
-            
-            particle.userData = {
-                originalY: particle.position.y,
-                floatSpeed: 0.4 + Math.random() * 0.6,
-                bobAmount: 0.8,
-                driftSpeed: 0.02 + Math.random() * 0.03
-            };
-            
-            this.currentDungeonGroup.add(particle);
-            this.combatElements.push(particle);
+            // Only add if it's in a walkable area
+            if (this.isPositionWalkable(x, z)) {
+                const perimeterLight = new THREE.PointLight(0x8B4513, 0.8, 25);
+                perimeterLight.position.set(x, this.floorHeight + 8, z);
+                this.currentDungeonGroup.add(perimeterLight);
+                this.lightSources.push(perimeterLight);
+            }
         }
     }
     
@@ -850,72 +693,23 @@ class DungeonSystem {
     }
     
     update(deltaTime) {
-        const time = Date.now() * 0.001;
-        
         // Animate orb rotation
         this.combatElements.forEach(element => {
             if (element.userData.rotationSpeed) {
                 element.rotation.y += element.userData.rotationSpeed;
             }
-            
-            // Floating orbs animation
-            if (element.userData.floatSpeed && element.userData.originalY !== undefined) {
-                // Vertical bobbing
-                const bobOffset = Math.sin(time * element.userData.floatSpeed) * element.userData.bobAmount;
-                element.position.y = element.userData.originalY + bobOffset;
-                
-                // Orbital movement for mystical orbs
-                if (element.userData.orbitSpeed && element.userData.originalAngle !== undefined) {
-                    element.userData.originalAngle += element.userData.orbitSpeed * deltaTime;
-                    const newX = element.position.x + Math.cos(element.userData.originalAngle) * element.userData.orbitSpeed * 10;
-                    const newZ = element.position.z + Math.sin(element.userData.originalAngle) * element.userData.orbitSpeed * 10;
-                    element.position.x = newX;
-                    element.position.z = newZ;
-                }
-                
-                // Gentle drifting for particles
-                if (element.userData.driftSpeed) {
-                    element.position.x += Math.sin(time * element.userData.driftSpeed) * 0.1;
-                    element.position.z += Math.cos(time * element.userData.driftSpeed * 0.7) * 0.1;
-                }
-            }
         });
         
-        // Animate lights with various effects
+        // Animate lights
         this.lightSources.forEach(light => {
             if (!light.userData.originalIntensity) {
                 light.userData.originalIntensity = light.intensity;
-                light.userData.flickerSpeed = light.userData.flickerSpeed || (0.5 + Math.random());
+                light.userData.flickerSpeed = 0.5 + Math.random();
             }
             
-            // Follow orb movement
-            if (light.userData.followOrb) {
-                light.position.copy(light.userData.followOrb.position);
-            }
-            
-            // Flickering effect
-            if (light.userData.flickerAmount) {
-                const flicker = Math.sin(time * light.userData.flickerSpeed) * light.userData.flickerAmount + 1;
-                light.intensity = light.userData.originalIntensity * flicker;
-            }
-            
-            // Pulsing effect
-            if (light.userData.pulseSpeed && light.userData.pulseAmount) {
-                const pulse = Math.sin(time * light.userData.pulseSpeed) * light.userData.pulseAmount + 1;
-                light.intensity = light.userData.originalIntensity * pulse;
-            }
-            
-            // Emergency light strobe effect
-            if (light.userData.isEmergency) {
-                const strobe = Math.sin(time * 4) > 0.5 ? 1 : 0.3;
-                light.intensity = light.userData.originalIntensity * strobe;
-            }
-            
-            // General subtle flicker for atmospheric effect
-            if (!light.userData.flickerAmount && !light.userData.pulseSpeed && !light.userData.isEmergency) {
-                const subtleFlicker = Math.sin(time * light.userData.flickerSpeed) * 0.1 + 1;
-                light.intensity = light.userData.originalIntensity * subtleFlicker;
-            }
+            const time = Date.now() * 0.001;
+            const flicker = Math.sin(time * light.userData.flickerSpeed) * 0.1 + 1;
+            light.intensity = light.userData.originalIntensity * flicker;
         });
     }
     
