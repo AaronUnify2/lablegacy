@@ -407,12 +407,12 @@
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div style="font-size: 32px; margin-bottom: 10px;">🏰 Labyrinth Legacy</div>
-        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.8.2 - Gothic Ruins Edition</div>
+        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.9.0 - Modular Systems Edition</div>
         <div id="loadingProgress">Initializing...</div>
         <div class="loading-bar">
             <div class="loading-fill" id="loadingFill"></div>
         </div>
-        <div id="loadingStatus">Preparing game engine...</div>
+        <div id="loadingStatus">Preparing modular game systems...</div>
     </div>
 
     <!-- Error Display -->
@@ -464,7 +464,7 @@
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
                 <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, ⚔️ = Defeat Enemies (Progress)</small><br>
                 <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
-                <small>Creepy mask portals block paths - defeat enemies to unlock new areas!</small>
+                <small>Modular Systems: Separate files for dungeon, materials, lighting, and portals!</small>
             </div>
         </div>
         
@@ -502,10 +502,10 @@
         </div>
     </div>
 
-    <!-- SIMPLIFIED SCRIPT LOADING SYSTEM -->
+    <!-- MODULAR SCRIPT LOADING SYSTEM -->
     <script>
-        // Simplified Script Loader
-        class SimplifiedLoader {
+        // Modular Script Loader for Dungeon Systems
+        class ModularDungeonLoader {
             constructor() {
                 this.scripts = [
                     { 
@@ -519,14 +519,29 @@
                         check: () => window.setupInput && window.getInput
                     },
                     { 
-                        url: 'src/systems/player.js', 
-                        name: 'Player System', 
-                        check: () => window.Player
+                        url: 'src/systems/materials.js', 
+                        name: 'Material System', 
+                        check: () => window.DungeonMaterialSystem
+                    },
+                    { 
+                        url: 'src/systems/lighting.js', 
+                        name: 'Lighting System', 
+                        check: () => window.DungeonLightingSystem
+                    },
+                    { 
+                        url: 'src/systems/portals.js', 
+                        name: 'Portal System', 
+                        check: () => window.DungeonPortalSystem
                     },
                     { 
                         url: 'src/systems/dungeon.js', 
-                        name: 'Dungeon System', 
+                        name: 'Core Dungeon System', 
                         check: () => window.DungeonSystem
+                    },
+                    { 
+                        url: 'src/systems/player.js', 
+                        name: 'Player System', 
+                        check: () => window.Player
                     }
                 ];
                 
@@ -540,7 +555,7 @@
 
             showError(message) {
                 console.error('LOADING ERROR:', message);
-                this.errorMessage.innerHTML = message; // Use innerHTML to preserve formatting
+                this.errorMessage.innerHTML = message;
                 this.errorDisplay.style.display = 'block';
                 this.loadingScreen.style.display = 'none';
             }
@@ -564,86 +579,14 @@
                     script.onload = () => {
                         console.log(`[LOADER] ${scriptInfo.name} loaded, verifying...`);
                         
-                        // Give time for script to initialize
                         setTimeout(() => {
                             if (scriptInfo.check()) {
                                 console.log(`[LOADER] ✓ ${scriptInfo.name} verified`);
                                 resolve();
                             } else {
-                                // THIS IS WHERE WE ADD THE DETAILED ERROR CHECK
-                                let errorMessage = `${scriptInfo.name} verification failed`;
-                                
-                                // If this is the Dungeon System, get detailed error info
-                                if (scriptInfo.name === 'Dungeon System') {
-                                    console.log('[LOADER] Dungeon System failed, checking error details...');
-                                    
-                                    // Check if error function exists
-                                    if (typeof window.getDungeonSystemError === 'function') {
-                                        try {
-                                            console.log('[LOADER] getDungeonSystemError function found, calling...');
-                                            const detailedError = window.getDungeonSystemError();
-                                            console.log('[LOADER] Detailed error:', detailedError);
-                                            errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
-                                        } catch (e) {
-                                            console.log('[LOADER] Error calling getDungeonSystemError:', e);
-                                            errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
-                                        }
-                                    } else {
-                                        console.log('[LOADER] getDungeonSystemError function not found');
-                                        errorMessage += `<br><br>Error function not available`;
-                                    }
-                                    
-                                    // Check for global error variables directly
-                                    if (window.DUNGEON_SYSTEM_STATUS) {
-                                        console.log('[LOADER] Found DUNGEON_SYSTEM_STATUS:', window.DUNGEON_SYSTEM_STATUS);
-                                        errorMessage += `<br><br><strong>Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
-                                    } else {
-                                        console.log('[LOADER] DUNGEON_SYSTEM_STATUS not found');
-                                        errorMessage += `<br><br>No status information available`;
-                                    }
-                                    
-                                    if (window.DUNGEON_SYSTEM_ERROR) {
-                                        console.log('[LOADER] Found DUNGEON_SYSTEM_ERROR:', window.DUNGEON_SYSTEM_ERROR);
-                                        errorMessage += `<br><br><strong>Error:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
-                                    } else {
-                                        console.log('[LOADER] DUNGEON_SYSTEM_ERROR not found');
-                                        errorMessage += `<br><br>No error details available`;
-                                    }
-                                    
-                                    // Check if DungeonSystem class exists but verification failed
-                                    if (window.DungeonSystem) {
-                                        console.log('[LOADER] DungeonSystem class exists, checking verification methods...');
-                                        
-                                        try {
-                                            // Try to create a test instance
-                                            const testScene = { add: () => {}, remove: () => {} };
-                                            const testInstance = new window.DungeonSystem(testScene, null);
-                                            
-                                            // Check verification methods
-                                            const verifyMethods = ['verify', 'isReady', 'isValid', 'isInitialized'];
-                                            for (const method of verifyMethods) {
-                                                if (typeof testInstance[method] === 'function') {
-                                                    const result = testInstance[method]();
-                                                    console.log(`[LOADER] ${method}() returned:`, result);
-                                                    errorMessage += `<br>${method}(): ${result}`;
-                                                } else {
-                                                    console.log(`[LOADER] ${method} method not found`);
-                                                    errorMessage += `<br>${method}: NOT FOUND`;
-                                                }
-                                            }
-                                        } catch (constructorError) {
-                                            console.log('[LOADER] Error creating test instance:', constructorError);
-                                            errorMessage += `<br><br><strong>Constructor Error:</strong><br>${constructorError.message}`;
-                                        }
-                                    } else {
-                                        console.log('[LOADER] DungeonSystem class not found at all');
-                                        errorMessage += `<br><br>DungeonSystem class not found in window object`;
-                                    }
-                                }
-                                
-                                reject(new Error(errorMessage));
+                                reject(new Error(`${scriptInfo.name} verification failed`));
                             }
-                        }, 200);
+                        }, 300);
                     };
                     
                     script.onerror = () => {
@@ -655,38 +598,42 @@
             }
 
             async loadAllScripts() {
-                console.log('[LOADER] Starting simplified script loading...');
+                console.log('[LOADER] Starting modular dungeon system loading...');
                 
                 try {
-                    // Load all scripts
+                    // Load all systems
                     for (let i = 0; i < this.scripts.length; i++) {
                         const script = this.scripts[i];
-                        this.updateProgress(i, this.scripts.length + 2, `Loading ${script.name}...`);
+                        this.updateProgress(i, this.scripts.length + 3, `Loading ${script.name}...`);
                         
                         await this.loadScript(script);
-                        await new Promise(resolve => setTimeout(resolve, 300));
+                        await new Promise(resolve => setTimeout(resolve, 200));
                     }
                     
                     // Initialize input
-                    this.updateProgress(this.scripts.length, this.scripts.length + 2, 'Initializing input...');
+                    this.updateProgress(this.scripts.length, this.scripts.length + 3, 'Initializing input...');
                     if (window.setupInput) {
                         setupInput();
                         await new Promise(resolve => setTimeout(resolve, 200));
                     }
                     
+                    // Initialize modular systems
+                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 3, 'Connecting systems...');
+                    await this.initializeSystems();
+                    
                     // Initialize game
-                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 2, 'Starting game...');
+                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 3, 'Starting game...');
                     await this.initializeGame();
                     
                     // Complete
-                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 2, 'Game ready!');
+                    this.updateProgress(this.scripts.length + 3, this.scripts.length + 3, 'Modular systems ready!');
                     
                     // Hide loading screen
                     this.loadingScreen.style.opacity = '0';
                     this.loadingScreen.style.transition = 'opacity 0.5s ease';
                     setTimeout(() => {
                         this.loadingScreen.style.display = 'none';
-                        console.log('[LOADER] ✓ Game ready to play!');
+                        console.log('[LOADER] ✓ Modular dungeon game ready!');
                     }, 500);
                     
                 } catch (error) {
@@ -695,9 +642,23 @@
                 }
             }
 
+            async initializeSystems() {
+                console.log('[LOADER] Initializing modular systems...');
+                
+                // Create and connect all sub-systems
+                window.materialSystem = new DungeonMaterialSystem();
+                window.lightingSystem = new DungeonLightingSystem(null); // Scene will be set later
+                window.portalSystem = new DungeonPortalSystem();
+                
+                // Connect portal system to material system
+                window.portalSystem.setMaterialSystem(window.materialSystem);
+                
+                console.log('[LOADER] ✓ Modular systems connected');
+            }
+
             async initializeGame() {
                 // Create game engine
-                window.game = new LabyrinthGame();
+                window.game = new ModularLabyrinthGame();
                 
                 // Wait for initialization
                 let attempts = 0;
@@ -707,17 +668,17 @@
                 }
                 
                 if (!window.game || window.game.gameState !== 'playing') {
-                    throw new Error('Game failed to initialize properly');
+                    throw new Error('Modular game failed to initialize properly');
                 }
                 
-                console.log('[LOADER] ✓ Game initialized successfully');
+                console.log('[LOADER] ✓ Modular game initialized successfully');
             }
         }
 
-        // Main Game Engine - Enhanced Lighting Version
-        class LabyrinthGame {
+        // Enhanced Game Engine with Modular Systems
+        class ModularLabyrinthGame {
             constructor() {
-                console.log('[GAME] Initializing Enhanced Labyrinth Game with improved lighting...');
+                console.log('[GAME] Initializing Modular Labyrinth Game...');
                 
                 this.scene = null;
                 this.camera = null;
@@ -736,30 +697,24 @@
             
             init() {
                 try {
-                    console.log('[GAME] Setting up core systems with enhanced lighting...');
+                    console.log('[GAME] Setting up modular core systems...');
                     
-                    // Setup scene with lighter fog for better exploration
+                    // Setup scene
                     this.scene = new THREE.Scene();
-                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.008); // Reduced fog density from 0.02 to 0.008
+                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.008);
                     this.scene.background = new THREE.Color(0x0f0f1f);
                     
-                    // Setup renderer with enhanced shadow settings
+                    // Setup renderer
                     this.renderer = new THREE.WebGLRenderer({ 
                         antialias: true,
                         powerPreference: "high-performance"
                     });
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                    
-                    // Enhanced shadow settings for better exploration
                     this.renderer.shadowMap.enabled = true;
-                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
-                    
-                    // Better tone mapping for more realistic lighting
+                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
                     this.renderer.toneMappingExposure = 1.0;
-                    
-                    // Enable gamma correction for more realistic colors
                     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                     
                     const gameContainer = document.getElementById('gameContainer');
@@ -769,51 +724,24 @@
                     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                     this.camera.position.set(0, 1.8, 0);
                     
-                    // Setup enhanced lighting for exploration
-                    console.log('[GAME] Setting up enhanced exploration lighting...');
+                    // Setup enhanced lighting for the scene
+                    this.setupSceneLighting();
                     
-                    // Ambient light - provides base illumination so nothing is completely dark
-                    const ambientLight = new THREE.AmbientLight(0x404040, 0.25);
-                    this.scene.add(ambientLight);
-                    
-                    // Main directional light - simulates sunlight coming through cathedral ruins
-                    const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 2.0);
-                    directionalLight.position.set(30, 40, 20);
-                    directionalLight.castShadow = true;
-                    
-                    // Configure shadow settings for better quality
-                    directionalLight.shadow.mapSize.width = 2048;
-                    directionalLight.shadow.mapSize.height = 2048;
-                    directionalLight.shadow.camera.near = 0.5;
-                    directionalLight.shadow.camera.far = 200;
-                    directionalLight.shadow.camera.left = -100;
-                    directionalLight.shadow.camera.right = 100;
-                    directionalLight.shadow.camera.top = 100;
-                    directionalLight.shadow.camera.bottom = -100;
-                    directionalLight.shadow.bias = -0.0001;
-                    
-                    this.scene.add(directionalLight);
-                    
-                    // Secondary directional light for fill lighting
-                    const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.8);
-                    fillLight.position.set(-20, 25, -30);
-                    fillLight.castShadow = false; // No shadows for fill light to avoid conflicts
-                    this.scene.add(fillLight);
-                    
-                    // Hemisphere light for realistic sky/ground lighting
-                    const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
-                    hemisphereLight.position.set(0, 50, 0);
-                    this.scene.add(hemisphereLight);
-                    
-                    console.log('[GAME] ✓ Enhanced lighting setup complete');
+                    // Connect lighting system to scene
+                    window.lightingSystem.scene = this.scene;
                     
                     // Setup player
                     this.player = new Player(this.scene, this.camera);
                     
-                    // Setup dungeon - NO ASYNC
+                    // Setup modular dungeon system
                     this.dungeonSystem = new DungeonSystem(this.scene, this.player);
                     
-                    // Generate first floor immediately
+                    // Connect all sub-systems to main dungeon
+                    this.dungeonSystem.setMaterialSystem(window.materialSystem);
+                    this.dungeonSystem.setLightingSystem(window.lightingSystem);
+                    this.dungeonSystem.setPortalSystem(window.portalSystem);
+                    
+                    // Generate first floor
                     this.dungeonSystem.generateDungeon(this.currentFloor);
                     
                     // Position player
@@ -847,12 +775,42 @@
                     this.gameState = 'playing';
                     this.gameLoop();
                     
-                    console.log('[GAME] ✓ Enhanced lighting game initialized successfully');
+                    console.log('[GAME] ✓ Modular game systems initialized successfully');
                     
                 } catch (error) {
                     console.error('[GAME] Initialization failed:', error);
                     this.gameState = 'error';
                 }
+            }
+            
+            setupSceneLighting() {
+                // Ambient light
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.25);
+                this.scene.add(ambientLight);
+                
+                // Main directional light
+                const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 2.0);
+                directionalLight.position.set(30, 40, 20);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                directionalLight.shadow.camera.near = 0.5;
+                directionalLight.shadow.camera.far = 200;
+                directionalLight.shadow.camera.left = -100;
+                directionalLight.shadow.camera.right = 100;
+                directionalLight.shadow.camera.top = 100;
+                directionalLight.shadow.camera.bottom = -100;
+                directionalLight.shadow.bias = -0.0001;
+                this.scene.add(directionalLight);
+                
+                // Fill light
+                const fillLight = new THREE.DirectionalLight(0x87CEEB, 0.8);
+                fillLight.position.set(-20, 25, -30);
+                this.scene.add(fillLight);
+                
+                // Hemisphere light
+                const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.6);
+                this.scene.add(hemisphereLight);
             }
             
             update(deltaTime) {
@@ -865,9 +823,13 @@
                     this.player.update(deltaTime, input);
                 }
                 
-                // Update dungeon system
+                // Update modular systems
                 if (this.dungeonSystem) {
                     this.dungeonSystem.update(deltaTime);
+                }
+                
+                if (window.materialSystem) {
+                    window.materialSystem.update(deltaTime);
                 }
                 
                 // Reset mouse delta
@@ -916,7 +878,7 @@
             updateFloorIndicator() {
                 const floorElement = document.getElementById('floorIndicator');
                 if (floorElement) {
-                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
+                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'gothic_ruins';
                     floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
                 }
             }
@@ -941,9 +903,9 @@
             }
             
             updateProgressionIndicator() {
-                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
+                if (!window.portalSystem || !window.portalSystem.roomProgression) return;
                 
-                const progression = this.dungeonSystem.roomProgression;
+                const progression = window.portalSystem.roomProgression;
                 const directions = ['north', 'east', 'west', 'south'];
                 
                 directions.forEach(dir => {
@@ -1002,9 +964,9 @@
 
         // Start loading when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('[MAIN] DOM loaded, starting enhanced lighting game...');
+            console.log('[MAIN] DOM loaded, starting modular dungeon game...');
             
-            const loader = new SimplifiedLoader();
+            const loader = new ModularDungeonLoader();
             loader.loadAllScripts();
         });
         
