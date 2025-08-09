@@ -56,14 +56,58 @@ class DungeonSystem {
     }
     
     init() {
-        this.setupRuinsMaterials();
-        this.setupBillboardSystem();
-        
-        if (this.player) {
-            this.player.setDungeonSystem(this);
+        try {
+            const materialsSuccess = this.setupRuinsMaterials();
+            if (!materialsSuccess) {
+                console.error('Failed to setup materials, but continuing...');
+            }
+            
+            this.setupBillboardSystem();
+            
+            // Connect player to this dungeon system for collision detection
+            if (this.player) {
+                this.player.setDungeonSystem(this);
+            }
+            
+            // Validate system state
+            const isValid = this.validateSystemState();
+            if (!isValid) {
+                console.warn('System validation failed, but proceeding anyway');
+            }
+            
+            console.log('Gothic Cathedral Ruins Combat System initialized');
+            return true;
+            
+        } catch (error) {
+            console.error('Error during initialization:', error);
+            return false;
         }
-        
-        console.log('Gothic Cathedral Ruins Combat System initialized');
+    }
+    
+    validateSystemState() {
+        try {
+            // Check if essential components exist
+            if (!this.materials || this.materials.size === 0) {
+                console.error('No materials available');
+                return false;
+            }
+            
+            // Check for essential materials
+            const essentials = ['arena_floor', 'ancient_gold', 'crystal_formation'];
+            for (const material of essentials) {
+                if (!this.materials.has(material)) {
+                    console.error(`Missing essential material: ${material}`);
+                    return false;
+                }
+            }
+            
+            console.log('System state validation passed');
+            return true;
+            
+        } catch (error) {
+            console.error('Error during system validation:', error);
+            return false;
+        }
     }
     
     // Progressive Unlock System (unchanged)
@@ -186,9 +230,57 @@ class DungeonSystem {
     
     setupRuinsMaterials() {
         console.log('Setting up Gothic Ruins materials with simple textures...');
-        this.createSimpleTextures();
-        this.createRuinsMaterials();
-        console.log(`Ruins materials setup complete. Created ${this.materials.size} materials.`);
+        
+        try {
+            // Clear any existing materials and textures
+            if (this.materials) {
+                this.materials.clear();
+            } else {
+                this.materials = new Map();
+            }
+            
+            if (this.textures) {
+                this.textures.forEach(texture => {
+                    try {
+                        texture.dispose();
+                    } catch (e) {
+                        // Ignore disposal errors
+                    }
+                });
+                this.textures.clear();
+            } else {
+                this.textures = new Map();
+            }
+            
+            // Create textures first
+            const textureSuccess = this.createSimpleTextures();
+            if (!textureSuccess) {
+                console.warn('Texture creation failed, proceeding with fallback materials');
+            }
+            
+            // Create materials (with fallbacks if textures failed)
+            const materialSuccess = this.createRuinsMaterials();
+            if (!materialSuccess) {
+                console.error('Material creation failed completely');
+                return false;
+            }
+            
+            // Validate that we have the essential materials
+            const essentialMaterials = ['arena_floor', 'arena_wall', 'arena_ceiling', 'ancient_gold', 'crystal_formation'];
+            const missingMaterials = essentialMaterials.filter(name => !this.materials.has(name));
+            
+            if (missingMaterials.length > 0) {
+                console.error('Missing essential materials:', missingMaterials);
+                return false;
+            }
+            
+            console.log(`Ruins materials setup complete. Created ${this.materials.size} materials successfully.`);
+            return true;
+            
+        } catch (error) {
+            console.error('Failed to setup materials:', error);
+            return false;
+        }
     }
     
     createSimpleTextures() {
@@ -379,211 +471,188 @@ class DungeonSystem {
         passageTexture.repeat.set(3, 3);
         this.textures.set('passage_floor', passageTexture);
         
-        
-        // Create additional textures for combat elements
-        
-        // Broken Stone Texture
-        const brokenCanvas = document.createElement('canvas');
-        brokenCanvas.width = 64;
-        brokenCanvas.height = 64;
-        const brokenCtx = brokenCanvas.getContext('2d');
-        
-        brokenCtx.fillStyle = '#8B7355';
-        brokenCtx.fillRect(0, 0, 64, 64);
-        
-        // Add cracks and weathering
-        brokenCtx.strokeStyle = '#6B5B45';
-        brokenCtx.lineWidth = 2;
-        brokenCtx.beginPath();
-        brokenCtx.moveTo(10, 0);
-        brokenCtx.lineTo(25, 64);
-        brokenCtx.moveTo(45, 0);
-        brokenCtx.lineTo(30, 64);
-        brokenCtx.moveTo(0, 20);
-        brokenCtx.lineTo(64, 35);
-        brokenCtx.stroke();
-        
-        // Add small debris spots
-        brokenCtx.fillStyle = '#5A4B35';
-        for (let i = 0; i < 12; i++) {
-            brokenCtx.beginPath();
-            brokenCtx.arc(Math.random() * 64, Math.random() * 64, 1 + Math.random() * 2, 0, Math.PI * 2);
-            brokenCtx.fill();
-        }
-        
-        const brokenTexture = new THREE.CanvasTexture(brokenCanvas);
-        brokenTexture.wrapS = THREE.RepeatWrapping;
-        brokenTexture.wrapT = THREE.RepeatWrapping;
-        brokenTexture.repeat.set(2, 2);
-        this.textures.set('broken_stone', brokenTexture);
-        
-        // Metal Rust Texture
-        const metalCanvas = document.createElement('canvas');
-        metalCanvas.width = 64;
-        metalCanvas.height = 64;
-        const metalCtx = metalCanvas.getContext('2d');
-        
-        metalCtx.fillStyle = '#8B4513';
-        metalCtx.fillRect(0, 0, 64, 64);
-        
-        // Add rust patches
-        metalCtx.fillStyle = '#A0522D';
-        for (let i = 0; i < 8; i++) {
-            metalCtx.beginPath();
-            metalCtx.arc(Math.random() * 64, Math.random() * 64, 3 + Math.random() * 5, 0, Math.PI * 2);
-            metalCtx.fill();
-        }
-        
-        // Add metal streaks
-        metalCtx.strokeStyle = '#654321';
-        metalCtx.lineWidth = 1;
-        for (let i = 0; i < 10; i++) {
-            metalCtx.beginPath();
-            metalCtx.moveTo(Math.random() * 64, 0);
-            metalCtx.lineTo(Math.random() * 64, 64);
-            metalCtx.stroke();
-        }
-        
-        const metalTexture = new THREE.CanvasTexture(metalCanvas);
-        metalTexture.wrapS = THREE.RepeatWrapping;
-        metalTexture.wrapT = THREE.RepeatWrapping;
-        metalTexture.repeat.set(1, 1);
-        this.textures.set('rusted_metal', metalTexture);
-        
-        console.log('Additional combat textures created!');
-    }
-    
     createRuinsMaterials() {
         console.log('Creating Gothic Cathedral Ruins materials with textures...');
         
-        // MAIN COMBAT ARENA (Center) - Weathered stone with dramatic shadows
-        const arenaFloor = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_floor'),
-            color: 0x2C3E50  // Dark weathered stone
-        });
-        this.materials.set('arena_floor', arenaFloor);
+        try {
+            // Validate textures exist before creating materials
+            if (!this.textures || this.textures.size === 0) {
+                console.warn('No textures available, creating fallback materials...');
+                return this.createFallbackMaterials();
+            }
+            
+            // MAIN COMBAT ARENA (Center) - Weathered stone with dramatic shadows
+            const arenaFloor = this.createMaterialSafe('arena_floor', {
+                map: this.textures.get('stone_floor'),
+                color: 0x2C3E50
+            });
+            
+            const arenaWall = this.createMaterialSafe('arena_wall', {
+                map: this.textures.get('stone_wall'),
+                color: 0x34495E
+            });
+            
+            const arenaCeiling = this.createMaterialSafe('arena_ceiling', {
+                map: this.textures.get('stone_wall'),
+                color: 0x1B2631
+            });
+            
+            // TACTICAL CHAMBERS (Orbital) - Ruined stone with cover elements
+            const chamberFloor = this.createMaterialSafe('chamber_floor', {
+                map: this.textures.get('chamber_floor'),
+                color: 0x5D4E37
+            });
+            
+            const chamberWall = this.createMaterialSafe('chamber_wall', {
+                map: this.textures.get('stone_wall'),
+                color: 0x6B5B73
+            });
+            
+            const chamberCeiling = this.createMaterialSafe('chamber_ceiling', {
+                map: this.textures.get('stone_wall'),
+                color: 0x483D54
+            });
+            
+            // MULTI-LEVEL ZONES (Cardinal) - Ancient blue stone with platforms
+            const platformFloor = this.createMaterialSafe('platform_floor', {
+                map: this.textures.get('platform_floor'),
+                color: 0x1F3A93
+            });
+            
+            const platformWall = this.createMaterialSafe('platform_wall', {
+                map: this.textures.get('stone_wall'),
+                color: 0x2E4BC6
+            });
+            
+            const platformCeiling = this.createMaterialSafe('platform_ceiling', {
+                map: this.textures.get('stone_wall'),
+                color: 0x1A237E
+            });
+            
+            // CORRIDORS - Connecting passages
+            const passageFloor = this.createMaterialSafe('passage_floor', {
+                map: this.textures.get('passage_floor'),
+                color: 0x566573
+            });
+            
+            const passageWall = this.createMaterialSafe('passage_wall', {
+                map: this.textures.get('stone_wall'),
+                color: 0x626567
+            });
+            
+            const passageCeiling = this.createMaterialSafe('passage_ceiling', {
+                map: this.textures.get('stone_wall'),
+                color: 0x455A64
+            });
+            
+            // COMBAT ELEMENTS - Cover, platforms, hazards with textures
+            const brokenStone = this.createMaterialSafe('broken_stone', {
+                map: this.textures.get('broken_stone'),
+                color: 0x8B7355,
+                emissive: 0x2C1810,
+                emissiveIntensity: 0.1
+            });
+            
+            const rustedMetal = this.createMaterialSafe('rusted_metal', {
+                map: this.textures.get('rusted_metal'),
+                color: 0x8B4513,
+                emissive: 0x4A1810,
+                emissiveIntensity: 0.15
+            });
+            
+            const ancientGold = this.createMaterialSafe('ancient_gold', {
+                color: 0xB8860B,
+                emissive: 0xB8860B,
+                emissiveIntensity: 0.2
+            });
+            
+            const crystalFormation = this.createMaterialSafe('crystal_formation', {
+                color: 0x4169E1,
+                emissive: 0x4169E1,
+                emissiveIntensity: 0.3
+            });
+            
+            // ATMOSPHERIC EFFECTS
+            const dustMote = this.createMaterialSafe('dust_mote', {
+                color: 0xDDD8C7,
+                transparent: true,
+                opacity: 0.4,
+                emissive: 0xDDD8C7,
+                emissiveIntensity: 0.2
+            }, true);
+            
+            const magicalResidue = this.createMaterialSafe('magical_residue', {
+                color: 0x9370DB,
+                transparent: true,
+                opacity: 0.6,
+                emissive: 0x9370DB,
+                emissiveIntensity: 0.4
+            }, true);
+            
+            console.log(`Created ${this.materials.size} Gothic Ruins materials with simple repeating textures!`);
+            console.log('Texture types created:', Array.from(this.textures.keys()));
+            return true;
+            
+        } catch (error) {
+            console.error('Error creating materials:', error);
+            return this.createFallbackMaterials();
+        }
+    }
+    
+    createMaterialSafe(name, properties, isBasic = false) {
+        try {
+            const MaterialClass = isBasic ? THREE.MeshBasicMaterial : THREE.MeshLambertMaterial;
+            const material = new MaterialClass(properties);
+            this.materials.set(name, material);
+            return material;
+        } catch (error) {
+            console.error(`Error creating material ${name}:`, error);
+            // Fallback to simple colored material
+            const fallbackColor = properties.color || 0x808080;
+            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: fallbackColor });
+            this.materials.set(name, fallbackMaterial);
+            return fallbackMaterial;
+        }
+    }
+    
+    createFallbackMaterials() {
+        console.log('Creating fallback materials without textures...');
         
-        const arenaWall = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x34495E  // Battle-scarred walls
-        });
-        this.materials.set('arena_wall', arenaWall);
-        
-        const arenaCeiling = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x1B2631  // Shadowy vaulted ceiling
-        });
-        this.materials.set('arena_ceiling', arenaCeiling);
-        
-        // TACTICAL CHAMBERS (Orbital) - Ruined stone with cover elements
-        const chamberFloor = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('chamber_floor'),
-            color: 0x5D4E37  // Dusty brown stone
-        });
-        this.materials.set('chamber_floor', chamberFloor);
-        
-        const chamberWall = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x6B5B73  // Cracked purple-grey walls
-        });
-        this.materials.set('chamber_wall', chamberWall);
-        
-        const chamberCeiling = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x483D54  // Partially collapsed ceiling
-        });
-        this.materials.set('chamber_ceiling', chamberCeiling);
-        
-        // MULTI-LEVEL ZONES (Cardinal) - Ancient blue stone with platforms
-        const platformFloor = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('platform_floor'),
-            color: 0x1F3A93  // Deep blue ancient stone
-        });
-        this.materials.set('platform_floor', platformFloor);
-        
-        const platformWall = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x2E4BC6  // Rich blue ruined walls
-        });
-        this.materials.set('platform_wall', platformWall);
-        
-        const platformCeiling = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x1A237E  // High vaulted ruins
-        });
-        this.materials.set('platform_ceiling', platformCeiling);
-        
-        // CORRIDORS - Connecting passages
-        const passageFloor = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('passage_floor'),
-            color: 0x566573  // Medium grey passage stone
-        });
-        this.materials.set('passage_floor', passageFloor);
-        
-        const passageWall = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x626567  // Worn passage walls
-        });
-        this.materials.set('passage_wall', passageWall);
-        
-        const passageCeiling = new THREE.MeshLambertMaterial({ 
-            map: this.textures.get('stone_wall'),
-            color: 0x455A64  // Lower passage ceiling
-        });
-        this.materials.set('passage_ceiling', passageCeiling);
-        
-        // COMBAT ELEMENTS - Cover, platforms, hazards with textures
-        const brokenStone = new THREE.MeshLambertMaterial({
-            map: this.textures.get('broken_stone'),
-            color: 0x8B7355,  // Weathered brown stone
-            emissive: 0x2C1810,
-            emissiveIntensity: 0.1
-        });
-        this.materials.set('broken_stone', brokenStone);
-        
-        const rustedMetal = new THREE.MeshLambertMaterial({
-            map: this.textures.get('rusted_metal'),
-            color: 0x8B4513,  // Rusty metal elements
-            emissive: 0x4A1810,
-            emissiveIntensity: 0.15
-        });
-        this.materials.set('rusted_metal', rustedMetal);
-        
-        const ancientGold = new THREE.MeshLambertMaterial({
-            color: 0xB8860B,  // Tarnished gold details
-            emissive: 0xB8860B,
-            emissiveIntensity: 0.2
-        });
-        this.materials.set('ancient_gold', ancientGold);
-        
-        const crystalFormation = new THREE.MeshLambertMaterial({
-            color: 0x4169E1,  // Mysterious crystal formations
-            emissive: 0x4169E1,
-            emissiveIntensity: 0.3
-        });
-        this.materials.set('crystal_formation', crystalFormation);
-        
-        // ATMOSPHERIC EFFECTS
-        const dustMote = new THREE.MeshBasicMaterial({
-            color: 0xDDD8C7,
-            transparent: true,
-            opacity: 0.4,
-            emissive: 0xDDD8C7,
-            emissiveIntensity: 0.2
-        });
-        this.materials.set('dust_mote', dustMote);
-        
-        const magicalResidue = new THREE.MeshBasicMaterial({
-            color: 0x9370DB,
-            transparent: true,
-            opacity: 0.6,
-            emissive: 0x9370DB,
-            emissiveIntensity: 0.4
-        });
-        this.materials.set('magical_residue', magicalResidue);
-        
-        console.log(`Created ${this.materials.size} Gothic Ruins materials with simple repeating textures!`);
-        console.log('Texture types created:', Array.from(this.textures.keys()));
+        try {
+            // Simple solid color materials as fallbacks
+            const materials = {
+                'arena_floor': 0x2C3E50,
+                'arena_wall': 0x34495E,
+                'arena_ceiling': 0x1B2631,
+                'chamber_floor': 0x5D4E37,
+                'chamber_wall': 0x6B5B73,
+                'chamber_ceiling': 0x483D54,
+                'platform_floor': 0x1F3A93,
+                'platform_wall': 0x2E4BC6,
+                'platform_ceiling': 0x1A237E,
+                'passage_floor': 0x566573,
+                'passage_wall': 0x626567,
+                'passage_ceiling': 0x455A64,
+                'broken_stone': 0x8B7355,
+                'rusted_metal': 0x8B4513,
+                'ancient_gold': 0xB8860B,
+                'crystal_formation': 0x4169E1,
+                'dust_mote': 0xDDD8C7,
+                'magical_residue': 0x9370DB
+            };
+            
+            Object.entries(materials).forEach(([name, color]) => {
+                const material = new THREE.MeshLambertMaterial({ color });
+                this.materials.set(name, material);
+            });
+            
+            console.log('Fallback materials created successfully');
+            return true;
+            
+        } catch (error) {
+            console.error('Failed to create fallback materials:', error);
+            return false;
+        }
     }
     
     setupBillboardSystem() {
@@ -901,31 +970,49 @@ class DungeonSystem {
     }
     
     getMaterialsForRoomType(roomType) {
-        switch(roomType) {
-            case 'center': // Combat arena
-                return {
-                    floor: this.materials.get('arena_floor'),
-                    wall: this.materials.get('arena_wall'),
-                    ceiling: this.materials.get('arena_ceiling')
-                };
-            case 'orbital': // Tactical chambers
-                return {
-                    floor: this.materials.get('chamber_floor'),
-                    wall: this.materials.get('chamber_wall'),
-                    ceiling: this.materials.get('chamber_ceiling')
-                };
-            case 'cardinal': // Multi-level platforms
-                return {
-                    floor: this.materials.get('platform_floor'),
-                    wall: this.materials.get('platform_wall'),
-                    ceiling: this.materials.get('platform_ceiling')
-                };
-            default: // Passages
-                return {
-                    floor: this.materials.get('passage_floor'),
-                    wall: this.materials.get('passage_wall'),
-                    ceiling: this.materials.get('passage_ceiling')
-                };
+        try {
+            let floorMaterial, wallMaterial, ceilingMaterial;
+            
+            switch(roomType) {
+                case 'center': // Combat arena
+                    floorMaterial = this.materials.get('arena_floor');
+                    wallMaterial = this.materials.get('arena_wall');
+                    ceilingMaterial = this.materials.get('arena_ceiling');
+                    break;
+                case 'orbital': // Tactical chambers
+                    floorMaterial = this.materials.get('chamber_floor');
+                    wallMaterial = this.materials.get('chamber_wall');
+                    ceilingMaterial = this.materials.get('chamber_ceiling');
+                    break;
+                case 'cardinal': // Multi-level platforms
+                    floorMaterial = this.materials.get('platform_floor');
+                    wallMaterial = this.materials.get('platform_wall');
+                    ceilingMaterial = this.materials.get('platform_ceiling');
+                    break;
+                default: // Passages
+                    floorMaterial = this.materials.get('passage_floor');
+                    wallMaterial = this.materials.get('passage_wall');
+                    ceilingMaterial = this.materials.get('passage_ceiling');
+                    break;
+            }
+            
+            // Fallback to basic materials if specific ones don't exist
+            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+            
+            return {
+                floor: floorMaterial || fallbackMaterial,
+                wall: wallMaterial || fallbackMaterial,
+                ceiling: ceilingMaterial || fallbackMaterial
+            };
+            
+        } catch (error) {
+            console.error('Error getting materials for room type:', roomType, error);
+            const fallbackMaterial = new THREE.MeshLambertMaterial({ color: 0x808080 });
+            return {
+                floor: fallbackMaterial,
+                wall: fallbackMaterial,
+                ceiling: fallbackMaterial
+            };
         }
     }
     
@@ -1095,33 +1182,46 @@ class DungeonSystem {
     }
     
     addCentralOrb(ruinsGroup, room) {
-        const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
-        const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
-        
-        // Simple circular basin/pedestal
-        const basinGeometry = new THREE.CylinderGeometry(2, 2.2, 0.8, 16);
-        const basin = new THREE.Mesh(basinGeometry, this.materials.get('ancient_gold'));
-        basin.position.set(worldX, this.floorHeight + 0.4, worldZ);
-        basin.castShadow = true;
-        basin.receiveShadow = true;
-        ruinsGroup.add(basin);
-        
-        // Glowing orb
-        const orbGeometry = new THREE.SphereGeometry(0.8, 16, 12);
-        const orb = new THREE.Mesh(orbGeometry, this.materials.get('crystal_formation'));
-        orb.position.set(worldX, this.floorHeight + 1.4, worldZ);
-        
-        // Add glowing animation to the orb
-        orb.userData = {
-            originalEmissiveIntensity: 0.5,
-            pulseSpeed: 1.2,
-            rotationSpeed: 0.01
-        };
-        
-        ruinsGroup.add(orb);
-        this.combatElements.push(orb);
-        
-        console.log('Added central orb feature');
+        try {
+            const worldX = (room.gridX - this.gridWidth/2) * this.gridSize;
+            const worldZ = (room.gridZ - this.gridDepth/2) * this.gridSize;
+            
+            // Get materials safely
+            const basinMaterial = this.materials.get('ancient_gold') || 
+                new THREE.MeshLambertMaterial({ color: 0xB8860B });
+            const orbMaterial = this.materials.get('crystal_formation') || 
+                new THREE.MeshLambertMaterial({ color: 0x4169E1, emissive: 0x4169E1, emissiveIntensity: 0.3 });
+            
+            // Simple circular basin/pedestal
+            const basinGeometry = new THREE.CylinderGeometry(2, 2.2, 0.8, 16);
+            const basin = new THREE.Mesh(basinGeometry, basinMaterial);
+            basin.position.set(worldX, this.floorHeight + 0.4, worldZ);
+            basin.castShadow = true;
+            basin.receiveShadow = true;
+            ruinsGroup.add(basin);
+            
+            // Glowing orb
+            const orbGeometry = new THREE.SphereGeometry(0.8, 16, 12);
+            const orb = new THREE.Mesh(orbGeometry, orbMaterial);
+            orb.position.set(worldX, this.floorHeight + 1.4, worldZ);
+            
+            // Add glowing animation to the orb
+            orb.userData = {
+                originalEmissiveIntensity: 0.5,
+                pulseSpeed: 1.2,
+                rotationSpeed: 0.01
+            };
+            
+            ruinsGroup.add(orb);
+            this.combatElements.push(orb);
+            
+            console.log('Added central orb feature successfully');
+            return true;
+            
+        } catch (error) {
+            console.error('Error creating central orb:', error);
+            return false;
+        }
     }
     
     addCombatElements(ruinsGroup, room) {
