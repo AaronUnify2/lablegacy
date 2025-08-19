@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Labyrinth Legacy - Debug Mode</title>
+    <title>Labyrinth Legacy</title>
     <style>
         body {
             margin: 0;
@@ -401,36 +401,18 @@
                 left: 15px;
             }
         }
-
-        /* Debug Console */
-        #debugConsole {
-            position: absolute;
-            top: 200px;
-            right: 20px;
-            width: 300px;
-            height: 200px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid #333;
-            color: #00ff00;
-            font-family: monospace;
-            font-size: 10px;
-            padding: 10px;
-            overflow-y: auto;
-            z-index: 50;
-            display: none;
-        }
     </style>
 </head>
 <body>
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div style="font-size: 32px; margin-bottom: 10px;">🏰 Labyrinth Legacy</div>
-        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.9.2 - Debug Mode</div>
+        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.8.2 - Gothic Ruins Edition</div>
         <div id="loadingProgress">Initializing...</div>
         <div class="loading-bar">
             <div class="loading-fill" id="loadingFill"></div>
         </div>
-        <div id="loadingStatus">Loading debug systems...</div>
+        <div id="loadingStatus">Preparing game engine...</div>
     </div>
 
     <!-- Error Display -->
@@ -477,17 +459,12 @@
                 </div>
             </div>
             
-            <!-- Debug Console -->
-            <div id="debugConsole">
-                <div id="debugOutput"></div>
-            </div>
-            
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
-                <small>DEBUG MODE: Menu = +10 floors, E+Esc = +1 floor, ⚔️ = Test Progression</small><br>
-                <small>🔮 = Debug Dungeon Info | ⬆️ = Toggle Debug Console | 💨 = Clear Console</small><br>
-                <small>Focus on basic geometry and lighting - sub-systems disabled for debugging</small>
+                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, ⚔️ = Defeat Enemies (Progress)</small><br>
+                <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
+                <small>Creepy mask portals block paths - defeat enemies to unlock new areas!</small>
             </div>
         </div>
         
@@ -525,39 +502,10 @@
         </div>
     </div>
 
-    <!-- SIMPLIFIED DEBUG SCRIPT SYSTEM -->
+    <!-- SIMPLIFIED SCRIPT LOADING SYSTEM -->
     <script>
-        // Debug Console
-        let debugConsole = null;
-        let debugOutput = null;
-        
-        function initDebugConsole() {
-            debugConsole = document.getElementById('debugConsole');
-            debugOutput = document.getElementById('debugOutput');
-        }
-        
-        function debugLog(message) {
-            console.log(message);
-            if (debugOutput) {
-                debugOutput.innerHTML += message + '<br>';
-                debugConsole.scrollTop = debugConsole.scrollHeight;
-            }
-        }
-        
-        function toggleDebugConsole() {
-            if (debugConsole) {
-                debugConsole.style.display = debugConsole.style.display === 'none' ? 'block' : 'none';
-            }
-        }
-        
-        function clearDebugConsole() {
-            if (debugOutput) {
-                debugOutput.innerHTML = '';
-            }
-        }
-        
-        // Simple Direct Loader for Debug Mode
-        class DebugLoader {
+        // Simplified Script Loader
+        class SimplifiedLoader {
             constructor() {
                 this.scripts = [
                     { 
@@ -574,6 +522,11 @@
                         url: 'src/systems/player.js', 
                         name: 'Player System', 
                         check: () => window.Player
+                    },
+                    { 
+                        url: 'src/systems/dungeon.js', 
+                        name: 'Dungeon System', 
+                        check: () => window.DungeonSystem
                     }
                 ];
                 
@@ -587,7 +540,7 @@
 
             showError(message) {
                 console.error('LOADING ERROR:', message);
-                this.errorMessage.innerHTML = message;
+                this.errorMessage.innerHTML = message; // Use innerHTML to preserve formatting
                 this.errorDisplay.style.display = 'block';
                 this.loadingScreen.style.display = 'none';
             }
@@ -597,26 +550,98 @@
                 this.loadingFill.style.width = percentage + '%';
                 this.loadingProgress.textContent = `Loading... ${Math.round(percentage)}%`;
                 this.loadingStatus.textContent = status;
-                debugLog(`[LOADER] ${status} (${Math.round(percentage)}%)`);
+                console.log(`[LOADER] ${status} (${Math.round(percentage)}%)`);
             }
 
             loadScript(scriptInfo) {
                 return new Promise((resolve, reject) => {
-                    debugLog(`[LOADER] Loading ${scriptInfo.name}...`);
+                    console.log(`[LOADER] Loading ${scriptInfo.name}...`);
                     
                     const script = document.createElement('script');
                     script.src = scriptInfo.url;
                     script.type = 'text/javascript';
                     
                     script.onload = () => {
-                        debugLog(`[LOADER] ${scriptInfo.name} loaded, verifying...`);
+                        console.log(`[LOADER] ${scriptInfo.name} loaded, verifying...`);
                         
+                        // Give time for script to initialize
                         setTimeout(() => {
                             if (scriptInfo.check()) {
-                                debugLog(`[LOADER] ✓ ${scriptInfo.name} verified`);
+                                console.log(`[LOADER] ✓ ${scriptInfo.name} verified`);
                                 resolve();
                             } else {
-                                reject(new Error(`${scriptInfo.name} verification failed`));
+                                // THIS IS WHERE WE ADD THE DETAILED ERROR CHECK
+                                let errorMessage = `${scriptInfo.name} verification failed`;
+                                
+                                // If this is the Dungeon System, get detailed error info
+                                if (scriptInfo.name === 'Dungeon System') {
+                                    console.log('[LOADER] Dungeon System failed, checking error details...');
+                                    
+                                    // Check if error function exists
+                                    if (typeof window.getDungeonSystemError === 'function') {
+                                        try {
+                                            console.log('[LOADER] getDungeonSystemError function found, calling...');
+                                            const detailedError = window.getDungeonSystemError();
+                                            console.log('[LOADER] Detailed error:', detailedError);
+                                            errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
+                                        } catch (e) {
+                                            console.log('[LOADER] Error calling getDungeonSystemError:', e);
+                                            errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
+                                        }
+                                    } else {
+                                        console.log('[LOADER] getDungeonSystemError function not found');
+                                        errorMessage += `<br><br>Error function not available`;
+                                    }
+                                    
+                                    // Check for global error variables directly
+                                    if (window.DUNGEON_SYSTEM_STATUS) {
+                                        console.log('[LOADER] Found DUNGEON_SYSTEM_STATUS:', window.DUNGEON_SYSTEM_STATUS);
+                                        errorMessage += `<br><br><strong>Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
+                                    } else {
+                                        console.log('[LOADER] DUNGEON_SYSTEM_STATUS not found');
+                                        errorMessage += `<br><br>No status information available`;
+                                    }
+                                    
+                                    if (window.DUNGEON_SYSTEM_ERROR) {
+                                        console.log('[LOADER] Found DUNGEON_SYSTEM_ERROR:', window.DUNGEON_SYSTEM_ERROR);
+                                        errorMessage += `<br><br><strong>Error:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
+                                    } else {
+                                        console.log('[LOADER] DUNGEON_SYSTEM_ERROR not found');
+                                        errorMessage += `<br><br>No error details available`;
+                                    }
+                                    
+                                    // Check if DungeonSystem class exists but verification failed
+                                    if (window.DungeonSystem) {
+                                        console.log('[LOADER] DungeonSystem class exists, checking verification methods...');
+                                        
+                                        try {
+                                            // Try to create a test instance
+                                            const testScene = { add: () => {}, remove: () => {} };
+                                            const testInstance = new window.DungeonSystem(testScene, null);
+                                            
+                                            // Check verification methods
+                                            const verifyMethods = ['verify', 'isReady', 'isValid', 'isInitialized'];
+                                            for (const method of verifyMethods) {
+                                                if (typeof testInstance[method] === 'function') {
+                                                    const result = testInstance[method]();
+                                                    console.log(`[LOADER] ${method}() returned:`, result);
+                                                    errorMessage += `<br>${method}(): ${result}`;
+                                                } else {
+                                                    console.log(`[LOADER] ${method} method not found`);
+                                                    errorMessage += `<br>${method}: NOT FOUND`;
+                                                }
+                                            }
+                                        } catch (constructorError) {
+                                            console.log('[LOADER] Error creating test instance:', constructorError);
+                                            errorMessage += `<br><br><strong>Constructor Error:</strong><br>${constructorError.message}`;
+                                        }
+                                    } else {
+                                        console.log('[LOADER] DungeonSystem class not found at all');
+                                        errorMessage += `<br><br>DungeonSystem class not found in window object`;
+                                    }
+                                }
+                                
+                                reject(new Error(errorMessage));
                             }
                         }, 200);
                     };
@@ -630,42 +655,38 @@
             }
 
             async loadAllScripts() {
-                debugLog('[LOADER] Starting debug mode loading...');
+                console.log('[LOADER] Starting simplified script loading...');
                 
                 try {
-                    // Load external scripts
+                    // Load all scripts
                     for (let i = 0; i < this.scripts.length; i++) {
                         const script = this.scripts[i];
-                        this.updateProgress(i, this.scripts.length + 3, `Loading ${script.name}...`);
+                        this.updateProgress(i, this.scripts.length + 2, `Loading ${script.name}...`);
                         
                         await this.loadScript(script);
-                        await new Promise(resolve => setTimeout(resolve, 200));
+                        await new Promise(resolve => setTimeout(resolve, 300));
                     }
                     
-                    // Load inline dungeon system
-                    this.updateProgress(this.scripts.length, this.scripts.length + 3, 'Loading debug dungeon system...');
-                    this.loadInlineDungeonSystem();
-                    
                     // Initialize input
-                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 3, 'Initializing input...');
+                    this.updateProgress(this.scripts.length, this.scripts.length + 2, 'Initializing input...');
                     if (window.setupInput) {
                         setupInput();
                         await new Promise(resolve => setTimeout(resolve, 200));
                     }
                     
                     // Initialize game
-                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 3, 'Starting debug game...');
+                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 2, 'Starting game...');
                     await this.initializeGame();
                     
                     // Complete
-                    this.updateProgress(this.scripts.length + 3, this.scripts.length + 3, 'Debug mode ready!');
+                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 2, 'Game ready!');
                     
                     // Hide loading screen
                     this.loadingScreen.style.opacity = '0';
                     this.loadingScreen.style.transition = 'opacity 0.5s ease';
                     setTimeout(() => {
                         this.loadingScreen.style.display = 'none';
-                        debugLog('[LOADER] ✓ Debug game ready!');
+                        console.log('[LOADER] ✓ Game ready to play!');
                     }, 500);
                     
                 } catch (error) {
@@ -674,266 +695,29 @@
                 }
             }
 
-            loadInlineDungeonSystem() {
-                debugLog('[LOADER] Loading inline debug dungeon system...');
-                
-                // This is where we'll inline the debug dungeon system
-                // For now, create a minimal version
-                
-                class DebugDungeonSystem {
-                    constructor(scene, player) {
-                        debugLog('[DUNGEON] Initializing Debug Dungeon System...');
-                        
-                        this.scene = scene;
-                        this.player = player;
-                        this.currentFloor = 1;
-                        this.currentDungeonGroup = null;
-                        this.currentFloorMap = null;
-                        
-                        // Grid settings
-                        this.gridSize = 2;
-                        this.dungeonWidth = 60;  // Smaller for testing
-                        this.dungeonDepth = 60;
-                        this.gridWidth = Math.floor(this.dungeonWidth / this.gridSize);
-                        this.gridDepth = Math.floor(this.dungeonDepth / this.gridSize);
-                        this.floorHeight = 0;
-                        this.ceilingHeight = 12;
-                        
-                        // Simple materials
-                        this.materials = {
-                            floor: new THREE.MeshLambertMaterial({ color: 0x444444 }),
-                            wall: new THREE.MeshLambertMaterial({ color: 0x666666 }),
-                            ceiling: new THREE.MeshLambertMaterial({ color: 0x333333 })
-                        };
-                        
-                        if (this.player) {
-                            this.player.setDungeonSystem(this);
-                        }
-                        
-                        debugLog('[DUNGEON] ✓ Debug system initialized');
-                    }
-                    
-                    generateDungeon(floorNumber) {
-                        debugLog(`[DUNGEON] === GENERATING DEBUG FLOOR ${floorNumber} ===`);
-                        
-                        this.currentFloor = floorNumber;
-                        this.clearCurrentDungeon();
-                        
-                        // Simple room layout - just a central room
-                        const roomLayout = {
-                            rooms: {
-                                center: {
-                                    id: 'center',
-                                    type: 'center',
-                                    gridX: Math.floor(this.gridWidth / 2),
-                                    gridZ: Math.floor(this.gridDepth / 2),
-                                    size: 15
-                                }
-                            },
-                            connections: []
-                        };
-                        
-                        // Create simple floor map
-                        const floorMap = Array(this.gridDepth).fill().map(() => Array(this.gridWidth).fill(false));
-                        
-                        // Carve center room
-                        const room = roomLayout.rooms.center;
-                        const halfSize = Math.floor(room.size / 2);
-                        
-                        for (let z = room.gridZ - halfSize; z <= room.gridZ + halfSize; z++) {
-                            for (let x = room.gridX - halfSize; x <= room.gridX + halfSize; x++) {
-                                if (x >= 0 && x < this.gridWidth && z >= 0 && z < this.gridDepth) {
-                                    floorMap[z][x] = true;
-                                }
-                            }
-                        }
-                        
-                        this.currentFloorMap = floorMap;
-                        
-                        // Generate geometry
-                        this.generateDebugArchitecture(floorMap);
-                        
-                        debugLog('[DUNGEON] ✓ Debug generation complete');
-                        return { floor: floorNumber, roomLayout, floorMap };
-                    }
-                    
-                    generateDebugArchitecture(floorMap) {
-                        debugLog('[DUNGEON] Creating debug architecture...');
-                        
-                        const dungeonGroup = new THREE.Group();
-                        dungeonGroup.name = 'debug_dungeon';
-                        
-                        let geometryCount = 0;
-                        
-                        // Generate floors and walls
-                        for (let z = 0; z < this.gridDepth; z++) {
-                            for (let x = 0; x < this.gridWidth; x++) {
-                                if (floorMap[z][x]) {
-                                    const worldX = (x - this.gridWidth/2) * this.gridSize;
-                                    const worldZ = (z - this.gridDepth/2) * this.gridSize;
-                                    
-                                    // Floor
-                                    const floorGeometry = new THREE.PlaneGeometry(this.gridSize, this.gridSize);
-                                    const floor = new THREE.Mesh(floorGeometry, this.materials.floor);
-                                    floor.rotation.x = -Math.PI / 2;
-                                    floor.position.set(worldX, this.floorHeight, worldZ);
-                                    floor.receiveShadow = true;
-                                    dungeonGroup.add(floor);
-                                    geometryCount++;
-                                    
-                                    // Check for walls needed
-                                    const directions = [
-                                        { dx: 0, dz: -1, wallX: 0, wallZ: -this.gridSize/2 },
-                                        { dx: 0, dz: 1, wallX: 0, wallZ: this.gridSize/2 },
-                                        { dx: 1, dz: 0, wallX: this.gridSize/2, wallZ: 0 },
-                                        { dx: -1, dz: 0, wallX: -this.gridSize/2, wallZ: 0 }
-                                    ];
-                                    
-                                    directions.forEach(dir => {
-                                        const neighborX = x + dir.dx;
-                                        const neighborZ = z + dir.dz;
-                                        
-                                        if (neighborX < 0 || neighborX >= this.gridWidth || 
-                                            neighborZ < 0 || neighborZ >= this.gridDepth || 
-                                            !floorMap[neighborZ][neighborX]) {
-                                            
-                                            const wallGeometry = new THREE.BoxGeometry(this.gridSize, this.ceilingHeight, 0.5);
-                                            const wall = new THREE.Mesh(wallGeometry, this.materials.wall);
-                                            wall.position.set(
-                                                worldX + dir.wallX, 
-                                                this.floorHeight + this.ceilingHeight/2, 
-                                                worldZ + dir.wallZ
-                                            );
-                                            wall.castShadow = true;
-                                            wall.receiveShadow = true;
-                                            dungeonGroup.add(wall);
-                                            geometryCount++;
-                                        }
-                                    });
-                                }
-                            }
-                        }
-                        
-                        // Add some lights
-                        const centerLight = new THREE.PointLight(0xFFFFFF, 8.0, 100);
-                        centerLight.position.set(0, 10, 0);
-                        centerLight.castShadow = true;
-                        dungeonGroup.add(centerLight);
-                        
-                        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
-                        dungeonGroup.add(ambientLight);
-                        
-                        debugLog(`[DUNGEON] Generated ${geometryCount} geometry pieces`);
-                        debugLog(`[DUNGEON] Adding dungeon group to scene...`);
-                        
-                        this.scene.add(dungeonGroup);
-                        this.currentDungeonGroup = dungeonGroup;
-                        
-                        // Verify it was added
-                        setTimeout(() => {
-                            debugLog(`[DUNGEON] Scene children: ${this.scene.children.length}`);
-                            debugLog(`[DUNGEON] Dungeon group children: ${dungeonGroup.children.length}`);
-                            
-                            let foundInScene = false;
-                            this.scene.traverse((child) => {
-                                if (child.name === 'debug_dungeon') {
-                                    foundInScene = true;
-                                }
-                            });
-                            debugLog(`[DUNGEON] Found in scene: ${foundInScene}`);
-                        }, 100);
-                    }
-                    
-                    clearCurrentDungeon() {
-                        debugLog('[DUNGEON] Clearing previous dungeon...');
-                        if (this.currentDungeonGroup) {
-                            this.scene.remove(this.currentDungeonGroup);
-                            this.currentDungeonGroup = null;
-                        }
-                    }
-                    
-                    // Collision methods
-                    isPositionWalkable(worldX, worldZ) {
-                        if (!this.currentFloorMap) return true;
-                        
-                        const gridX = Math.floor((worldX + this.dungeonWidth/2) / this.gridSize + 0.5);
-                        const gridZ = Math.floor((worldZ + this.dungeonDepth/2) / this.gridSize + 0.5);
-                        
-                        if (gridX < 0 || gridX >= this.gridWidth || gridZ < 0 || gridZ >= this.gridDepth) {
-                            return false;
-                        }
-                        
-                        return this.currentFloorMap[gridZ][gridX];
-                    }
-                    
-                    isPositionSolid(worldX, worldZ) {
-                        return !this.isPositionWalkable(worldX, worldZ);
-                    }
-                    
-                    getFloorHeight(worldX, worldZ) {
-                        return this.floorHeight;
-                    }
-                    
-                    getCeilingHeight(worldX, worldZ) {
-                        return this.floorHeight + this.ceilingHeight;
-                    }
-                    
-                    getCurrentTheme() {
-                        return 'debug';
-                    }
-                    
-                    update(deltaTime) {
-                        // Nothing to update in debug mode
-                    }
-                    
-                    debugInfo() {
-                        debugLog('[DUNGEON] === DEBUG INFO ===');
-                        debugLog(`Current floor: ${this.currentFloor}`);
-                        debugLog(`Dungeon group: ${this.currentDungeonGroup ? 'EXISTS' : 'NULL'}`);
-                        if (this.currentDungeonGroup) {
-                            debugLog(`Dungeon children: ${this.currentDungeonGroup.children.length}`);
-                        }
-                        debugLog(`Scene children: ${this.scene.children.length}`);
-                        
-                        let lightCount = 0;
-                        this.scene.traverse((child) => {
-                            if (child.type && child.type.includes('Light')) {
-                                lightCount++;
-                            }
-                        });
-                        debugLog(`Total lights: ${lightCount}`);
-                        debugLog('[DUNGEON] === END DEBUG ===');
-                    }
-                }
-                
-                // Make it globally available
-                window.DungeonSystem = DebugDungeonSystem;
-                debugLog('[LOADER] ✓ Debug dungeon system loaded');
-            }
-
             async initializeGame() {
-                // Create debug game engine
-                window.game = new DebugLabyrinthGame();
+                // Create game engine
+                window.game = new LabyrinthGame();
                 
                 // Wait for initialization
                 let attempts = 0;
-                while (attempts < 30 && (!window.game || window.game.gameState !== 'playing')) {
+                while (attempts < 50 && (!window.game || window.game.gameState !== 'playing')) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                     attempts++;
                 }
                 
                 if (!window.game || window.game.gameState !== 'playing') {
-                    throw new Error('Debug game failed to initialize');
+                    throw new Error('Game failed to initialize properly');
                 }
                 
-                debugLog('[LOADER] ✓ Debug game initialized');
+                console.log('[LOADER] ✓ Game initialized successfully');
             }
         }
 
-        // Debug Game Engine
-        class DebugLabyrinthGame {
+        // Main Game Engine - SIMPLIFIED VERSION
+        class LabyrinthGame {
             constructor() {
-                debugLog('[GAME] Initializing Debug Game...');
+                console.log('[GAME] Initializing Simplified Labyrinth Game...');
                 
                 this.scene = null;
                 this.camera = null;
@@ -945,21 +729,27 @@
                 this.currentFloor = 1;
                 this.clock = new THREE.Clock();
                 
+                this.isPointerLocked = false;
+                
                 this.init();
             }
             
             init() {
                 try {
-                    debugLog('[GAME] Setting up core systems...');
+                    console.log('[GAME] Setting up core systems...');
                     
                     // Setup scene
                     this.scene = new THREE.Scene();
-                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.005);
+                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
                     this.scene.background = new THREE.Color(0x0f0f1f);
                     
                     // Setup renderer
-                    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                    this.renderer = new THREE.WebGLRenderer({ 
+                        antialias: true,
+                        powerPreference: "high-performance"
+                    });
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                     this.renderer.shadowMap.enabled = true;
                     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                     
@@ -970,22 +760,22 @@
                     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                     this.camera.position.set(0, 1.8, 0);
                     
-                    // Add basic scene lighting
-                    const ambientLight = new THREE.AmbientLight(0x404040, 0.2);
+                    // Setup lighting
+                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
                     this.scene.add(ambientLight);
                     
-                    const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 1.0);
-                    directionalLight.position.set(10, 20, 10);
+                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                    directionalLight.position.set(10, 20, 5);
                     directionalLight.castShadow = true;
                     this.scene.add(directionalLight);
                     
                     // Setup player
                     this.player = new Player(this.scene, this.camera);
                     
-                    // Setup debug dungeon system
+                    // Setup dungeon - NO ASYNC
                     this.dungeonSystem = new DungeonSystem(this.scene, this.player);
                     
-                    // Generate first floor
+                    // Generate first floor immediately
                     this.dungeonSystem.generateDungeon(this.currentFloor);
                     
                     // Position player
@@ -999,13 +789,30 @@
                         this.renderer.setSize(window.innerWidth, window.innerHeight);
                     });
                     
+                    // Setup pointer lock
+                    if (!inputState.isMobile) {
+                        this.renderer.domElement.addEventListener('click', () => {
+                            this.renderer.domElement.requestPointerLock();
+                        });
+                        
+                        document.addEventListener('pointerlockchange', () => {
+                            this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
+                        });
+                        
+                        document.addEventListener('keydown', (e) => {
+                            if (e.code === 'Escape' && this.isPointerLocked) {
+                                document.exitPointerLock();
+                            }
+                        });
+                    }
+                    
                     this.gameState = 'playing';
                     this.gameLoop();
                     
-                    debugLog('[GAME] ✓ Debug game initialized successfully');
+                    console.log('[GAME] ✓ Game initialized successfully');
                     
                 } catch (error) {
-                    debugLog(`[GAME] Initialization failed: ${error.message}`);
+                    console.error('[GAME] Initialization failed:', error);
                     this.gameState = 'error';
                 }
             }
@@ -1020,7 +827,7 @@
                     this.player.update(deltaTime, input);
                 }
                 
-                // Update dungeon
+                // Update dungeon system
                 if (this.dungeonSystem) {
                     this.dungeonSystem.update(deltaTime);
                 }
@@ -1029,43 +836,33 @@
                 inputState.mouse.deltaX = 0;
                 inputState.mouse.deltaY = 0;
                 
-                // Handle debug controls
-                this.handleDebugControls(input);
-                
                 // Update UI
                 this.updateUI();
+                this.checkFloorProgression(input);
             }
             
-            handleDebugControls(input) {
-                // Menu button: Skip 10 floors
+            checkFloorProgression(input) {
+                // Menu button: Skip 10 floors ahead
                 if (input.justPressed.menu) {
                     this.advanceFloors(10);
                 }
                 
-                // E + Esc: Skip 1 floor
+                // E + Esc together: Advance 1 floor
                 if (input.justPressed.interact && input.menu) {
                     this.advanceFloors(1);
                 }
                 
-                // Staff: Debug info
-                if (input.justPressed.chargeAttack) {
-                    this.dungeonSystem.debugInfo();
-                }
-                
-                // Jump: Toggle debug console
-                if (input.justPressed.jump) {
-                    toggleDebugConsole();
-                }
-                
-                // Dash: Clear debug console
-                if (input.justPressed.dash) {
-                    clearDebugConsole();
+                // Sword button: Progress through rooms
+                if (input.justPressed.attack) {
+                    if (this.dungeonSystem) {
+                        this.dungeonSystem.togglePortals();
+                    }
                 }
             }
             
             advanceFloors(count) {
                 this.currentFloor += count;
-                debugLog(`[GAME] Advancing ${count} floors to floor ${this.currentFloor}`);
+                console.log(`[GAME] Advancing ${count} floors to floor ${this.currentFloor}`);
                 
                 if (this.dungeonSystem) {
                     this.dungeonSystem.generateDungeon(this.currentFloor);
@@ -1081,7 +878,8 @@
             updateFloorIndicator() {
                 const floorElement = document.getElementById('floorIndicator');
                 if (floorElement) {
-                    floorElement.textContent = `Floor ${this.currentFloor} - Debug Mode`;
+                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
+                    floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
                 }
             }
             
@@ -1101,6 +899,38 @@
                 if (manaFill) manaFill.style.width = manaPercent + '%';
                 
                 this.updateCompass();
+                this.updateProgressionIndicator();
+            }
+            
+            updateProgressionIndicator() {
+                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
+                
+                const progression = this.dungeonSystem.roomProgression;
+                const directions = ['north', 'east', 'west', 'south'];
+                
+                directions.forEach(dir => {
+                    const element = document.getElementById(`progress-${dir}`);
+                    if (element) {
+                        const room = progression[dir];
+                        let status = '';
+                        let color = '';
+                        
+                        if (room.enemiesDefeated) {
+                            status = 'COMPLETED ✓';
+                            color = '#00ff00';
+                        } else if (room.unlocked) {
+                            status = 'OPEN - Fight!';
+                            color = '#ffff00';
+                        } else {
+                            status = 'LOCKED';
+                            color = '#ff6666';
+                        }
+                        
+                        const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
+                        element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
+                        element.style.color = color;
+                    }
+                });
             }
             
             updateCompass() {
@@ -1125,20 +955,28 @@
                     this.update(deltaTime);
                     this.render();
                 } catch (error) {
-                    debugLog(`[GAME] Game loop error: ${error.message}`);
+                    console.error('[GAME] Game loop error:', error);
                 }
                 
                 requestAnimationFrame(() => this.gameLoop());
             }
         }
 
-        // Start when DOM is ready
+        // Start loading when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
-            initDebugConsole();
-            debugLog('[MAIN] DOM loaded, starting debug mode...');
+            console.log('[MAIN] DOM loaded, starting simplified loading...');
             
-            const loader = new DebugLoader();
+            const loader = new SimplifiedLoader();
             loader.loadAllScripts();
+        });
+        
+        // Global error handlers
+        window.addEventListener('error', function(event) {
+            console.error('[GLOBAL ERROR]', event.error);
+        });
+        
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('[UNHANDLED PROMISE REJECTION]', event.reason);
         });
     </script>
 </body>
