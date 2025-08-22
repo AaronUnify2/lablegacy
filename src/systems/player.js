@@ -56,6 +56,7 @@ class Player {
         this.swordGroup = null;
         this.isAttacking = false;
         this.attackCooldown = 0;
+        this.swordStaminaCost = 15; // Stamina cost for sword attacks
         
         this.init();
     }
@@ -76,20 +77,20 @@ class Player {
         this.swordGroup = new THREE.Group();
         this.swordGroup.name = 'player_sword';
         
-        // Sword blade - long and sleek
-        const bladeGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.02);
+        // Sword blade - larger and more visible
+        const bladeGeometry = new THREE.BoxGeometry(0.12, 1.8, 0.03);
         const bladeMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0xC0C0C0,
-            emissive: 0x222222,
-            emissiveIntensity: 0.1
+            color: 0xE0E0E0,
+            emissive: 0x444444,
+            emissiveIntensity: 0.2
         });
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.position.set(0, 0.6, 0);
+        blade.position.set(0, 0.9, 0);
         blade.castShadow = true;
         this.swordGroup.add(blade);
         
-        // Sword crossguard
-        const crossguardGeometry = new THREE.BoxGeometry(0.3, 0.04, 0.04);
+        // Sword crossguard - larger
+        const crossguardGeometry = new THREE.BoxGeometry(0.4, 0.06, 0.06);
         const crossguardMaterial = new THREE.MeshLambertMaterial({ 
             color: 0x8B4513,
             emissive: 0x4A2C1A,
@@ -100,33 +101,33 @@ class Player {
         crossguard.castShadow = true;
         this.swordGroup.add(crossguard);
         
-        // Sword handle
-        const handleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.25, 8);
+        // Sword handle - slightly larger
+        const handleGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8);
         const handleMaterial = new THREE.MeshLambertMaterial({ 
             color: 0x654321,
             emissive: 0x2A1810,
             emissiveIntensity: 0.1
         });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        handle.position.set(0, -0.125, 0);
+        handle.position.set(0, -0.15, 0);
         handle.castShadow = true;
         this.swordGroup.add(handle);
         
-        // Sword pommel
-        const pommelGeometry = new THREE.SphereGeometry(0.04, 8, 6);
+        // Sword pommel - larger
+        const pommelGeometry = new THREE.SphereGeometry(0.06, 8, 6);
         const pommelMaterial = new THREE.MeshLambertMaterial({ 
             color: 0xB8860B,
             emissive: 0x5C430A,
-            emissiveIntensity: 0.2
+            emissiveIntensity: 0.3
         });
         const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
-        pommel.position.set(0, -0.25, 0);
+        pommel.position.set(0, -0.3, 0);
         pommel.castShadow = true;
         this.swordGroup.add(pommel);
         
-        // Position sword relative to camera (right hand position)
-        this.swordGroup.position.set(0.3, -0.3, -0.5);
-        this.swordGroup.rotation.set(0, 0, Math.PI / 6); // Slight angle
+        // Position sword relative to camera (more visible position)
+        this.swordGroup.position.set(0.4, -0.4, -0.8);
+        this.swordGroup.rotation.set(-0.2, 0.1, Math.PI / 8); // Better angle for visibility
         
         // Add sword to camera so it moves with player view
         this.camera.add(this.swordGroup);
@@ -134,7 +135,10 @@ class Player {
         // Store reference to blade for future hit detection
         this.sword = blade;
         
-        console.log('Sword created and attached to player');
+        console.log('Enhanced sword created and attached to player');
+        console.log('Sword position:', this.swordGroup.position);
+        console.log('Sword rotation:', this.swordGroup.rotation);
+        console.log('Sword children count:', this.swordGroup.children.length);
     }
     
     update(deltaTime, input) {
@@ -224,8 +228,10 @@ class Player {
         }
         
         // Sword attack
-        if (input.justPressed.attack && this.attackCooldown <= 0) {
+        if (input.justPressed.attack && this.attackCooldown <= 0 && this.stamina >= this.swordStaminaCost) {
             this.performSwordAttack();
+        } else if (input.justPressed.attack && this.stamina < this.swordStaminaCost) {
+            console.log("Not enough stamina to attack! Need " + this.swordStaminaCost + ", have " + Math.floor(this.stamina));
         }
         
         if (input.justPressed.chargeAttack) {
@@ -475,8 +481,9 @@ class Player {
         
         this.isAttacking = true;
         this.attackCooldown = 0.6; // 600ms attack cooldown
+        this.stamina -= this.swordStaminaCost; // Consume stamina
         
-        console.log('🗡️ Sword attack performed!');
+        console.log('🗡️ Sword attack performed! Stamina: ' + Math.floor(this.stamina) + '/' + this.maxStamina);
         
         // Start sword swing animation
         this.animateSwordSwing();
