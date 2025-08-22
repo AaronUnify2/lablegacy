@@ -77,57 +77,57 @@ class Player {
         this.swordGroup = new THREE.Group();
         this.swordGroup.name = 'player_sword';
         
-        // Sword blade - larger and more visible
-        const bladeGeometry = new THREE.BoxGeometry(0.12, 1.8, 0.03);
+        // Sword blade - EXTRA LARGE and centered for debugging
+        const bladeGeometry = new THREE.BoxGeometry(0.5, 6.0, 0.2);
         const bladeMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0xE0E0E0,
-            emissive: 0x444444,
-            emissiveIntensity: 0.2
+            color: 0xFFFFFF, // Pure white for maximum visibility
+            emissive: 0x888888,
+            emissiveIntensity: 0.5
         });
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.position.set(0, 0.9, 0);
+        blade.position.set(0, 0, 0); // Centered
         blade.castShadow = true;
         this.swordGroup.add(blade);
         
-        // Sword crossguard - larger
-        const crossguardGeometry = new THREE.BoxGeometry(0.4, 0.06, 0.06);
+        // Sword crossguard - LARGE
+        const crossguardGeometry = new THREE.BoxGeometry(1.5, 0.3, 0.3);
         const crossguardMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0x8B4513,
-            emissive: 0x4A2C1A,
-            emissiveIntensity: 0.1
+            color: 0xFF0000, // Bright red for visibility
+            emissive: 0x660000,
+            emissiveIntensity: 0.3
         });
         const crossguard = new THREE.Mesh(crossguardGeometry, crossguardMaterial);
-        crossguard.position.set(0, 0, 0);
+        crossguard.position.set(0, -3, 0);
         crossguard.castShadow = true;
         this.swordGroup.add(crossguard);
         
-        // Sword handle - slightly larger
-        const handleGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.3, 8);
+        // Sword handle - LARGE
+        const handleGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.0, 8);
         const handleMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0x654321,
-            emissive: 0x2A1810,
-            emissiveIntensity: 0.1
+            color: 0x00FF00, // Bright green for visibility
+            emissive: 0x006600,
+            emissiveIntensity: 0.3
         });
         const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-        handle.position.set(0, -0.15, 0);
+        handle.position.set(0, -3.5, 0);
         handle.castShadow = true;
         this.swordGroup.add(handle);
         
-        // Sword pommel - larger
-        const pommelGeometry = new THREE.SphereGeometry(0.06, 8, 6);
+        // Sword pommel - LARGE
+        const pommelGeometry = new THREE.SphereGeometry(0.3, 8, 6);
         const pommelMaterial = new THREE.MeshLambertMaterial({ 
-            color: 0xB8860B,
-            emissive: 0x5C430A,
+            color: 0x0000FF, // Bright blue for visibility
+            emissive: 0x000066,
             emissiveIntensity: 0.3
         });
         const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
-        pommel.position.set(0, -0.3, 0);
+        pommel.position.set(0, -4, 0);
         pommel.castShadow = true;
         this.swordGroup.add(pommel);
         
-        // Position sword relative to camera (more visible position)
-        this.swordGroup.position.set(0.4, -0.4, -0.8);
-        this.swordGroup.rotation.set(-0.2, 0.1, Math.PI / 8); // Better angle for visibility
+        // Position sword DEAD CENTER of screen for debugging
+        this.swordGroup.position.set(0, 0, -3); // Directly in front, 3 units away
+        this.swordGroup.rotation.set(0, 0, 0); // No rotation
         
         // Add sword to camera so it moves with player view
         this.camera.add(this.swordGroup);
@@ -135,10 +135,11 @@ class Player {
         // Store reference to blade for future hit detection
         this.sword = blade;
         
-        console.log('Enhanced sword created and attached to player');
+        console.log('🗡️ DEBUG SWORD: EXTRA LARGE and CENTERED');
         console.log('Sword position:', this.swordGroup.position);
         console.log('Sword rotation:', this.swordGroup.rotation);
         console.log('Sword children count:', this.swordGroup.children.length);
+        console.log('Camera children count:', this.camera.children.length);
     }
     
     update(deltaTime, input) {
