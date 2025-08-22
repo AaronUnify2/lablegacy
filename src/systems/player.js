@@ -51,17 +51,90 @@ class Player {
         this.dashStaminaCost = 30;
         this.jumpStaminaCost = 20;
         
+        // Weapon system
+        this.sword = null;
+        this.swordGroup = null;
+        this.isAttacking = false;
+        this.attackCooldown = 0;
+        
         this.init();
     }
     
     init() {
         this.camera.position.copy(this.position);
-        console.log('Player initialized');
+        this.createSword();
+        console.log('Player initialized with sword');
     }
     
     setDungeonSystem(dungeonSystem) {
         this.dungeonSystem = dungeonSystem;
         console.log('Player connected to dungeon system for collision detection');
+    }
+    
+    createSword() {
+        // Create sword group to hold all sword components
+        this.swordGroup = new THREE.Group();
+        this.swordGroup.name = 'player_sword';
+        
+        // Sword blade - long and sleek
+        const bladeGeometry = new THREE.BoxGeometry(0.08, 1.2, 0.02);
+        const bladeMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xC0C0C0,
+            emissive: 0x222222,
+            emissiveIntensity: 0.1
+        });
+        const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
+        blade.position.set(0, 0.6, 0);
+        blade.castShadow = true;
+        this.swordGroup.add(blade);
+        
+        // Sword crossguard
+        const crossguardGeometry = new THREE.BoxGeometry(0.3, 0.04, 0.04);
+        const crossguardMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x8B4513,
+            emissive: 0x4A2C1A,
+            emissiveIntensity: 0.1
+        });
+        const crossguard = new THREE.Mesh(crossguardGeometry, crossguardMaterial);
+        crossguard.position.set(0, 0, 0);
+        crossguard.castShadow = true;
+        this.swordGroup.add(crossguard);
+        
+        // Sword handle
+        const handleGeometry = new THREE.CylinderGeometry(0.03, 0.03, 0.25, 8);
+        const handleMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0x654321,
+            emissive: 0x2A1810,
+            emissiveIntensity: 0.1
+        });
+        const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+        handle.position.set(0, -0.125, 0);
+        handle.castShadow = true;
+        this.swordGroup.add(handle);
+        
+        // Sword pommel
+        const pommelGeometry = new THREE.SphereGeometry(0.04, 8, 6);
+        const pommelMaterial = new THREE.MeshLambertMaterial({ 
+            color: 0xB8860B,
+            emissive: 0x5C430A,
+            emissiveIntensity: 0.2
+        });
+        const pommel = new THREE.Mesh(pommelGeometry, pommelMaterial);
+        pommel.position.set(0, -0.25, 0);
+        pommel.castShadow = true;
+        this.swordGroup.add(pommel);
+        
+        // Position sword relative to camera (right hand position)
+        this.swordGroup.position.set(0.3, -0.3, -0.5);
+        this.swordGroup.rotation.set(0, 0, Math.PI / 6); // Slight angle
+        
+        // Add sword to camera so it moves with player view
+        this.camera.add(this.swordGroup);
+        
+        // Store reference to blade for future hit detection
+        this.sword = blade;
+        
+        console.log('Sword created and attached to player');
     }
     
     update(deltaTime, input) {
@@ -150,8 +223,9 @@ class Player {
             console.log("Interact pressed!");
         }
         
-        if (input.justPressed.attack) {
-            console.log("Sword attack!");
+        // Sword attack
+        if (input.justPressed.attack && this.attackCooldown <= 0) {
+            this.performSwordAttack();
         }
         
         if (input.justPressed.chargeAttack) {
@@ -390,6 +464,71 @@ class Player {
         if (this.dashCooldown > 0) {
             this.dashCooldown -= deltaTime;
         }
+        
+        if (this.attackCooldown > 0) {
+            this.attackCooldown -= deltaTime;
+        }
+    }
+    
+    performSwordAttack() {
+        if (this.isAttacking) return;
+        
+        this.isAttacking = true;
+        this.attackCooldown = 0.6; // 600ms attack cooldown
+        
+        console.log('🗡️ Sword attack performed!');
+        
+        // Start sword swing animation
+        this.animateSwordSwing();
+        
+        // Reset attack state after animation
+        setTimeout(() => {
+            this.isAttacking = false;
+        }, 300); // 300ms attack duration
+    }
+    
+    animateSwordSwing() {
+        if (!this.swordGroup) return;
+        
+        // Store original rotation for reset
+        const originalRotation = {
+            x: this.swordGroup.rotation.x,
+            y: this.swordGroup.rotation.y,
+            z: this.swordGroup.rotation.z
+        };
+        
+        // Quick swing animation using rotation
+        const swingDuration = 300; // milliseconds
+        const swingAmount = Math.PI / 3; // 60 degree swing
+        const startTime = Date.now();
+        
+        const animateSwing = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / swingDuration, 1);
+            
+            // Swing motion - quick out, slower back
+            let swingProgress;
+            if (progress < 0.4) {
+                // Fast swing out
+                swingProgress = progress / 0.4;
+            } else {
+                // Slower return
+                swingProgress = 1 - ((progress - 0.4) / 0.6);
+            }
+            
+            // Apply swing rotation
+            this.swordGroup.rotation.z = originalRotation.z + (Math.sin(swingProgress * Math.PI) * swingAmount);
+            this.swordGroup.rotation.x = originalRotation.x + (Math.sin(swingProgress * Math.PI) * 0.3);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animateSwing);
+            } else {
+                // Reset to original position
+                this.swordGroup.rotation.set(originalRotation.x, originalRotation.y, originalRotation.z);
+            }
+        };
+        
+        animateSwing();
     }
     
     updateCamera() {
