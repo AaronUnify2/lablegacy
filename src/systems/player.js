@@ -85,7 +85,7 @@ class Player {
             emissiveIntensity: 0.5
         });
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.position.set(0, 0, 0); // Centered
+        blade.position.set(1, 1, 3); // Centered
         blade.castShadow = true;
         this.swordGroup.add(blade);
         
