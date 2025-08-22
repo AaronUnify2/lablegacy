@@ -462,7 +462,7 @@
             <div id="instructions">
                 WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
                 <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
-                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor, ⚔️ = Defeat Enemies (Progress)</small><br>
+                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small><br>
                 <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
                 <small>Creepy mask portals block paths - defeat enemies to unlock new areas!</small>
             </div>
@@ -852,11 +852,10 @@
                     this.advanceFloors(1);
                 }
                 
-                // Sword button: Progress through rooms
+                // Attack button is now disconnected from portal progression
+                // (Will be connected to sword combat in next stage)
                 if (input.justPressed.attack) {
-                    if (this.dungeonSystem) {
-                        this.dungeonSystem.togglePortals();
-                    }
+                    console.log('Attack button pressed - ready for sword implementation');
                 }
             }
             
