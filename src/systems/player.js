@@ -78,14 +78,14 @@ class Player {
         this.swordGroup.name = 'player_sword';
         
         // Sword blade - EXTRA LARGE and centered for debugging
-        const bladeGeometry = new THREE.BoxGeometry(0.5, 6.0, 0.2);
+        const bladeGeometry = new THREE.BoxGeometry(5, 6.0, 5);
         const bladeMaterial = new THREE.MeshLambertMaterial({ 
             color: 0xFFFFFF, // Pure white for maximum visibility
             emissive: 0x888888,
             emissiveIntensity: 0.5
         });
         const blade = new THREE.Mesh(bladeGeometry, bladeMaterial);
-        blade.position.set(1, 1, 3); // Centered
+        blade.position.set(0, 0, -5); // Centered
         blade.castShadow = true;
         this.swordGroup.add(blade);
         
