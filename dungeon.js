@@ -54,9 +54,9 @@ export async function initDungeon(renderer, floor = 1) {
     
     dungeonScene = new THREE.Scene();
     
-    // Set fog based on floor aesthetic
+    // Set fog based on floor aesthetic - MUCH less dense
     const fogColor = getFloorFogColor(floor);
-    dungeonScene.fog = new THREE.FogExp2(fogColor, 0.025);
+    dungeonScene.fog = new THREE.FogExp2(fogColor, 0.008);
     dungeonScene.background = new THREE.Color(fogColor);
     
     // Create shared geometries and materials
@@ -125,41 +125,41 @@ function createSharedResources(floor) {
 
 function getFloorPalette(floor) {
     if (floor <= 3) {
-        // Mechanical/tomb - cool cyan
+        // Mechanical/tomb - cool cyan - BRIGHTER
         return {
-            floor: 0x1a1a2e,
-            wall: 0x16213e,
-            accent: 0x0f3460,
+            floor: 0x2a2a3e,
+            wall: 0x26334e,
+            accent: 0x1f4470,
             glow: 0x00ffff,
             portal: 0x00ffff,
             fog: 0x0a0a15
         };
     } else if (floor <= 6) {
-        // Corrupted/hybrid - purple mixing
+        // Corrupted/hybrid - purple mixing - BRIGHTER
         return {
-            floor: 0x1a1520,
-            wall: 0x2d1b4e,
-            accent: 0x4a1d6b,
+            floor: 0x2a2530,
+            wall: 0x3d2b5e,
+            accent: 0x5a2d7b,
             glow: 0xbf00ff,
             portal: 0x9900ff,
             fog: 0x100818
         };
     } else if (floor <= 9) {
-        // Dream/organic - warm amber
+        // Dream/organic - warm amber - BRIGHTER
         return {
-            floor: 0x1f1a10,
-            wall: 0x2a2015,
-            accent: 0x4a3520,
+            floor: 0x2f2a20,
+            wall: 0x3a3025,
+            accent: 0x5a4530,
             glow: 0xffaa00,
             portal: 0xffd700,
             fog: 0x15120a
         };
     } else {
-        // Final floor - golden ethereal
+        // Final floor - golden ethereal - BRIGHTER
         return {
-            floor: 0x1a1812,
-            wall: 0x252015,
-            accent: 0x3a3020,
+            floor: 0x2a2822,
+            wall: 0x353025,
+            accent: 0x4a4030,
             glow: 0xffd700,
             portal: 0xffffff,
             fog: 0x18150f
@@ -652,14 +652,19 @@ function addCoverObjects(group, roomSize, style) {
 // ============================================
 
 function addAmbientLighting(floor) {
-    // Very dim ambient for atmosphere
-    const ambient = new THREE.AmbientLight(0x111111, 0.3);
+    // Brighter ambient so geometry is visible
+    const ambient = new THREE.AmbientLight(0x404050, 1.0);
     dungeonScene.add(ambient);
     
-    // Hemisphere light for subtle color variation
+    // Hemisphere light for color variation
     const palette = getFloorPalette(floor);
-    const hemi = new THREE.HemisphereLight(palette.glow, palette.floor, 0.2);
+    const hemi = new THREE.HemisphereLight(palette.glow, 0x202020, 0.8);
     dungeonScene.add(hemi);
+    
+    // Add a directional light for overall visibility
+    const dirLight = new THREE.DirectionalLight(0x6666aa, 0.5);
+    dirLight.position.set(10, 20, 10);
+    dungeonScene.add(dirLight);
 }
 
 function addHallwayLights(group, length, width) {
@@ -668,11 +673,11 @@ function addHallwayLights(group, length, width) {
     const spacing = length / (numLights + 1);
     
     for (let i = 1; i <= numLights; i++) {
-        // Light on each wall
-        const light = new THREE.PointLight(palette.glow, 0.8, 8);
+        // Light on each wall - MUCH brighter
+        const light = new THREE.PointLight(palette.glow, 2, 20);
         light.position.set(-length/2 + i * spacing, WALL_HEIGHT - 1, 0);
         group.add(light);
-        animatedLights.push({ light, baseIntensity: 0.8, variation: 0.2 });
+        animatedLights.push({ light, baseIntensity: 2, variation: 0.3 });
         
         // Visual glow marker
         const glowGeom = new THREE.SphereGeometry(0.15, 8, 8);
@@ -693,29 +698,23 @@ function addCornerLights(group, roomSize) {
     ];
     
     corners.forEach(pos => {
-        const light = new THREE.PointLight(palette.glow, 0.6, 10);
+        const light = new THREE.PointLight(palette.glow, 2, 25);
         light.position.set(pos.x, WALL_HEIGHT - 1, pos.z);
-        light.castShadow = true;
-        light.shadow.mapSize.width = 256;
-        light.shadow.mapSize.height = 256;
         group.add(light);
-        animatedLights.push({ light, baseIntensity: 0.6, variation: 0.15 });
+        animatedLights.push({ light, baseIntensity: 2, variation: 0.3 });
     });
 }
 
 function addArenaLighting(group, roomSize) {
     const palette = getFloorPalette(currentFloor);
     
-    // Central spotlight
-    const spotlight = new THREE.SpotLight(palette.glow, 2, roomSize, Math.PI / 4, 0.5, 1);
+    // Central spotlight - brighter
+    const spotlight = new THREE.SpotLight(palette.glow, 4, roomSize * 1.5, Math.PI / 4, 0.5, 1);
     spotlight.position.set(0, WALL_HEIGHT - 0.5, 0);
     spotlight.target.position.set(0, 0, 0);
-    spotlight.castShadow = true;
-    spotlight.shadow.mapSize.width = 512;
-    spotlight.shadow.mapSize.height = 512;
     group.add(spotlight);
     group.add(spotlight.target);
-    animatedLights.push({ light: spotlight, baseIntensity: 2, variation: 0.5 });
+    animatedLights.push({ light: spotlight, baseIntensity: 4, variation: 0.8 });
     
     // Corner accent lights
     addCornerLights(group, roomSize);
@@ -724,7 +723,7 @@ function addArenaLighting(group, roomSize) {
 function addPillarRoomLighting(group, roomSize) {
     const palette = getFloorPalette(currentFloor);
     
-    // Vertical strip lights on walls
+    // Vertical strip lights on walls - brighter and longer range
     for (let i = 0; i < 4; i++) {
         const angle = (i / 4) * Math.PI * 2;
         const x = Math.cos(angle) * (roomSize / 2 - 0.5);
@@ -732,34 +731,33 @@ function addPillarRoomLighting(group, roomSize) {
         
         for (let j = 0; j < 4; j++) {
             const y = 3 + j * 4;
-            const light = new THREE.PointLight(palette.glow, 0.4, 6);
+            const light = new THREE.PointLight(palette.glow, 1.5, 15);
             light.position.set(x, y, z);
             group.add(light);
-            animatedLights.push({ light, baseIntensity: 0.4, variation: 0.1, phase: i + j });
+            animatedLights.push({ light, baseIntensity: 1.5, variation: 0.3, phase: i + j });
         }
     }
     
-    // Dramatic central light from above
-    const topLight = new THREE.PointLight(palette.glow, 1.5, 25);
+    // Dramatic central light from above - much brighter
+    const topLight = new THREE.PointLight(palette.glow, 4, 40);
     topLight.position.set(0, PILLAR_ROOM_HEIGHT - 1, 0);
     group.add(topLight);
-    animatedLights.push({ light: topLight, baseIntensity: 1.5, variation: 0.3 });
+    animatedLights.push({ light: topLight, baseIntensity: 4, variation: 0.5 });
 }
 
 function addArchiveLighting(group, roomSize) {
     const palette = getFloorPalette(currentFloor);
     
-    // Soft overhead light
-    const mainLight = new THREE.PointLight(palette.glow, 1, 15);
+    // Soft overhead light - brighter
+    const mainLight = new THREE.PointLight(palette.glow, 3, 30);
     mainLight.position.set(0, WALL_HEIGHT - 1, 0);
-    mainLight.castShadow = true;
     group.add(mainLight);
     
     // Portal glow (adds to portal's own light)
-    const portalLight = new THREE.PointLight(palette.portal, 1.5, 8);
+    const portalLight = new THREE.PointLight(palette.portal, 3, 15);
     portalLight.position.set(0, 2, roomSize/2 - 2);
     group.add(portalLight);
-    animatedLights.push({ light: portalLight, baseIntensity: 1.5, variation: 0.4 });
+    animatedLights.push({ light: portalLight, baseIntensity: 3, variation: 0.6 });
 }
 
 // ============================================
