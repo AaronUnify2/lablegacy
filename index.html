@@ -42,16 +42,7 @@
             <!-- Notification -->
             <div id="notification" class="hidden"></div>
 
-            <!-- Left side: Joystick -->
-            <div id="joystick-zone">
-                <div id="joystick-base">
-                    <div id="joystick-knob"></div>
-                </div>
-            </div>
-
-            <!-- Right side: Camera zone + Buttons -->
-            <div id="camera-zone"></div>
-            
+            <!-- Action buttons (right side) -->
             <div id="action-buttons">
                 <button id="btn-jump" class="action-btn">JUMP</button>
                 <button id="btn-attack" class="action-btn attack-btn">ATTACK</button>
@@ -74,19 +65,22 @@
                 <div id="town-floor">Highest Floor: 1</div>
             </div>
 
-            <!-- Joystick (same as dungeon) -->
+            <!-- Interact button -->
+            <button id="btn-interact" class="hidden">Talk</button>
+            <button id="btn-enter-dungeon" class="hidden">ENTER THE OBELISK</button>
+        </div>
+
+        <!-- Shared Controls (visible in both dungeon and town) -->
+        <div id="shared-controls" class="hidden">
+            <!-- Joystick (left side) -->
             <div id="joystick-zone">
                 <div id="joystick-base">
                     <div id="joystick-knob"></div>
                 </div>
             </div>
 
-            <!-- Camera zone -->
+            <!-- Camera zone (right side for swipe) -->
             <div id="camera-zone"></div>
-
-            <!-- Interact button -->
-            <button id="btn-interact" class="hidden">Talk</button>
-            <button id="btn-enter-dungeon" class="hidden">ENTER THE OBELISK</button>
         </div>
 
         <!-- Dialogue Box -->
