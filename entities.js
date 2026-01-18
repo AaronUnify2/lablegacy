@@ -5,7 +5,21 @@
 
 import * as THREE from 'three';
 import { getDungeonScene, getRoomData } from './dungeon.js';
-import { damagePlayer, getUpgradeLevel, hasAbility, getGameData } from './game.js';
+
+// ============================================
+// GAME BRIDGE (to avoid circular imports)
+// ============================================
+
+let gameBridge = {
+    damagePlayer: () => {},
+    getUpgradeLevel: () => 0,
+    hasAbility: () => false,
+    getGameData: () => ({ player: { health: 100, maxHealth: 100 }, upgrades: {} })
+};
+
+export function setGameBridge(bridge) {
+    gameBridge = { ...gameBridge, ...bridge };
+}
 
 // ============================================
 // STATE
@@ -194,9 +208,9 @@ function updatePlayer(delta, inputState) {
     // Combat
     updateCooldowns(delta);
     if (attack) fireBasicAttack();
-    if (inputState.ability1 && hasAbility('spread') && cooldowns.spread <= 0) fireSpreadAttack();
-    if (inputState.ability2 && hasAbility('burst') && cooldowns.burst <= 0) activateBurstMode();
-    if (inputState.ability3 && hasAbility('mega') && cooldowns.mega <= 0) fireMegaBall();
+    if (inputState.ability1 && gameBridge.hasAbility('spread') && cooldowns.spread <= 0) fireSpreadAttack();
+    if (inputState.ability2 && gameBridge.hasAbility('burst') && cooldowns.burst <= 0) activateBurstMode();
+    if (inputState.ability3 && gameBridge.hasAbility('mega') && cooldowns.mega <= 0) fireMegaBall();
     
     if (burstModeActive) {
         burstModeTimer -= delta;
@@ -267,7 +281,7 @@ function checkWallCollision() {
 // ============================================
 
 function updateCooldowns(delta) {
-    const cdMod = 1 - (getUpgradeLevel('cooldownReduction') * 0.08);
+    const cdMod = 1 - (gameBridge.getUpgradeLevel('cooldownReduction') * 0.08);
     ['attack', 'spread', 'burst', 'mega'].forEach(cd => { if (cooldowns[cd] > 0) cooldowns[cd] -= delta; });
     
     // Update UI
@@ -278,7 +292,7 @@ function updateCooldowns(delta) {
 }
 
 function fireBasicAttack() {
-    const fireRateMod = 1 - (getUpgradeLevel('fireRate') * 0.08);
+    const fireRateMod = 1 - (gameBridge.getUpgradeLevel('fireRate') * 0.08);
     let cd = baseCooldowns.attack * fireRateMod;
     if (burstModeActive) cd *= 0.3;
     if (cooldowns.attack > 0) return;
@@ -287,7 +301,7 @@ function fireBasicAttack() {
 }
 
 function fireSpreadAttack() {
-    const cdMod = 1 - (getUpgradeLevel('cooldownReduction') * 0.05);
+    const cdMod = 1 - (gameBridge.getUpgradeLevel('cooldownReduction') * 0.05);
     cooldowns.spread = baseCooldowns.spread * cdMod;
     [-0.4, -0.2, 0, 0.2, 0.4].forEach(offset => {
         createProjectile(player.position.clone(), player.rotation.y + offset, 'spread');
@@ -295,14 +309,14 @@ function fireSpreadAttack() {
 }
 
 function activateBurstMode() {
-    const cdMod = 1 - (getUpgradeLevel('cooldownReduction') * 0.05);
+    const cdMod = 1 - (gameBridge.getUpgradeLevel('cooldownReduction') * 0.05);
     cooldowns.burst = baseCooldowns.burst * cdMod;
     burstModeActive = true;
     burstModeTimer = 4;
 }
 
 function fireMegaBall() {
-    const cdMod = 1 - (getUpgradeLevel('cooldownReduction') * 0.05);
+    const cdMod = 1 - (gameBridge.getUpgradeLevel('cooldownReduction') * 0.05);
     cooldowns.mega = baseCooldowns.mega * cdMod;
     createProjectile(player.position.clone(), player.rotation.y, 'mega');
 }
@@ -311,9 +325,9 @@ function createProjectile(position, angle, type) {
     const scene = getDungeonScene();
     if (!scene) return;
     
-    const baseDmg = 10 + (getUpgradeLevel('baseDamage') * 3);
-    const abilityMod = 1 + (getUpgradeLevel('abilityDamage') * 0.15);
-    const aimAssist = getUpgradeLevel('aimAssist') * 0.08;
+    const baseDmg = 10 + (gameBridge.getUpgradeLevel('baseDamage') * 3);
+    const abilityMod = 1 + (gameBridge.getUpgradeLevel('abilityDamage') * 0.15);
+    const aimAssist = gameBridge.getUpgradeLevel('aimAssist') * 0.08;
     
     const configs = {
         basic: { size: 0.15, speed: 20, damage: baseDmg, color: 0x00ffff, life: 2 },
@@ -647,7 +661,7 @@ function updateEnemyProjectiles(delta) {
         }
         
         if (proj.position.distanceTo(player.position) < player.userData.radius + 0.2 && !player.userData.invulnerable) {
-            damagePlayer(proj.userData.damage);
+            gameBridge.damagePlayer(proj.userData.damage);
             player.userData.invulnerable = true;
             player.userData.invulnerableTimer = 0.5;
             scene.remove(proj);
@@ -661,7 +675,7 @@ function createExplosion(position, damage) {
     if (!scene) return;
     
     if (position.distanceTo(player.position) < 2.5 && !player.userData.invulnerable) {
-        damagePlayer(damage);
+        gameBridge.damagePlayer(damage);
         player.userData.invulnerable = true;
         player.userData.invulnerableTimer = 0.5;
     }
@@ -956,7 +970,7 @@ function updateBoss(delta) {
             tr.userData.lifespan -= delta;
             tr.material.opacity = tr.userData.lifespan / tr.userData.maxLife * 0.6;
             if (player.position.distanceTo(tr.position) < 1 && !player.userData.invulnerable) {
-                damagePlayer(5);
+                gameBridge.damagePlayer(5);
                 player.userData.invulnerable = true;
                 player.userData.invulnerableTimer = 0.3;
             }
@@ -976,7 +990,7 @@ function updateBoss(delta) {
             currentBoss.position.z = newPos.z;
             createHitEffect(currentBoss.position.clone(), 0xbf00ff);
             if (currentBoss.position.distanceTo(player.position) < 2 && !player.userData.invulnerable) {
-                damagePlayer(20);
+                gameBridge.damagePlayer(20);
                 player.userData.invulnerable = true;
                 player.userData.invulnerableTimer = 0.5;
             }
@@ -1082,7 +1096,7 @@ function updateBoss(delta) {
                 z.position.add(toP);
             }
             if (player.position.distanceTo(z.position) < 2 && !player.userData.invulnerable) {
-                damagePlayer(10);
+                gameBridge.damagePlayer(10);
                 player.userData.invulnerable = true;
                 player.userData.invulnerableTimer = 0.5;
             }
@@ -1138,7 +1152,7 @@ function fireSentinelBeam() {
     const dist = currentBoss.position.distanceTo(player.position);
     const pAngle = Math.atan2(player.position.x - currentBoss.position.x, player.position.z - currentBoss.position.z);
     if (dist < 15 && Math.abs(angle - pAngle) < 0.3 && !player.userData.invulnerable) {
-        damagePlayer(25);
+        gameBridge.damagePlayer(25);
         player.userData.invulnerable = true;
         player.userData.invulnerableTimer = 1;
     }
@@ -1153,7 +1167,7 @@ function fireSentinelBeam() {
             beam.position.z = currentBoss.position.z + Math.cos(angle + sweep) * 10;
             const newPAngle = Math.atan2(player.position.x - currentBoss.position.x, player.position.z - currentBoss.position.z);
             if (dist < 15 && Math.abs((angle + sweep) - newPAngle) < 0.3 && !player.userData.invulnerable) {
-                damagePlayer(25);
+                gameBridge.damagePlayer(25);
                 player.userData.invulnerable = true;
                 player.userData.invulnerableTimer = 1;
             }
@@ -1179,7 +1193,7 @@ function createShockwave(position, tier) {
         wave.material.opacity = 1 - scale / 6;
         const dist = player.position.distanceTo(position);
         if (dist < scale && dist > scale - 1 && !player.userData.invulnerable) {
-            damagePlayer(15);
+            gameBridge.damagePlayer(15);
             player.userData.invulnerable = true;
             player.userData.invulnerableTimer = 0.5;
         }
@@ -1328,7 +1342,7 @@ function updatePillarBoss(delta) {
                     const pAngle = Math.atan2(player.position.z - pillarBoss.position.z, player.position.x - pillarBoss.position.x);
                     const bAngle = beam.rotation.y % (Math.PI * 2);
                     if (Math.abs(pAngle - bAngle) < 0.3 || Math.abs(pAngle - bAngle) > Math.PI * 2 - 0.3) {
-                        damagePlayer(20);
+                        gameBridge.damagePlayer(20);
                         player.userData.invulnerable = true;
                         player.userData.invulnerableTimer = 1;
                     }
@@ -1406,7 +1420,7 @@ function checkEnemyCollision() {
     
     for (const e of enemies) {
         if (player.position.distanceTo(e.position) < player.userData.radius + e.userData.radius) {
-            damagePlayer(e.userData.damage);
+            gameBridge.damagePlayer(e.userData.damage);
             player.userData.invulnerable = true;
             player.userData.invulnerableTimer = 0.5;
             break;
@@ -1414,7 +1428,7 @@ function checkEnemyCollision() {
     }
     
     if (currentBoss && player.position.distanceTo(currentBoss.position) < player.userData.radius + currentBoss.userData.radius) {
-        damagePlayer(15);
+        gameBridge.damagePlayer(15);
         player.userData.invulnerable = true;
         player.userData.invulnerableTimer = 0.5;
     }
@@ -1426,7 +1440,7 @@ function checkEnemyCollision() {
                 if (player.position.x >= bbox.min.x && player.position.x <= bbox.max.x &&
                     player.position.z >= bbox.min.z && player.position.z <= bbox.max.z &&
                     Math.abs(player.position.y - bbox.max.y) < 0.5) {
-                    damagePlayer(5);
+                    gameBridge.damagePlayer(5);
                     player.userData.invulnerable = true;
                     player.userData.invulnerableTimer = 0.3;
                 }
@@ -1437,13 +1451,13 @@ function checkEnemyCollision() {
 
 export function playerTakeDamage(amount) {
     if (player.userData.invulnerable) return;
-    damagePlayer(amount);
+    gameBridge.damagePlayer(amount);
     player.userData.invulnerable = true;
     player.userData.invulnerableTimer = 0.5;
 }
 
 export function isPlayerDead() {
-    return getGameData().player.health <= 0;
+    return gameBridge.getGameData().player.health <= 0;
 }
 
 export function getXPGained() { return xpGained; }
