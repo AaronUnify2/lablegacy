@@ -100,7 +100,7 @@ function initRenderer() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Limit pixel ratio for performance
     renderer.shadowMap.enabled = false; // Disable shadows for mobile
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.2; // Slightly brighter
+    renderer.toneMappingExposure = 1.8; // Much brighter for better visibility
     
     clock = new THREE.Clock();
     
