@@ -26,9 +26,9 @@ export async function initTown(renderer, unlockedNPCs = ['guide']) {
     
     townScene = new THREE.Scene();
     
-    // Sky/atmosphere
+    // Sky/atmosphere - less dense fog
     townScene.background = new THREE.Color(0x1a1520);
-    townScene.fog = new THREE.FogExp2(0x1a1520, 0.02);
+    townScene.fog = new THREE.FogExp2(0x1a1520, 0.008);
     
     // Build environment
     buildGround();
@@ -370,8 +370,8 @@ function createWagon(ownerType) {
         group.add(wheel);
     });
     
-    // Lantern
-    const lanternLight = new THREE.PointLight(0xffaa44, 0.5, 8);
+    // Lantern - brighter
+    const lanternLight = new THREE.PointLight(0xffaa44, 1.5, 15);
     lanternLight.position.set(0, 3, 1);
     group.add(lanternLight);
     
@@ -410,14 +410,13 @@ function createCampfire() {
         group.add(fire);
     }
     
-    // Fire light
-    const fireLight = new THREE.PointLight(0xff6600, 1.5, 15);
+    // Fire light - much brighter
+    const fireLight = new THREE.PointLight(0xff6600, 3, 25);
     fireLight.position.y = 1;
-    fireLight.castShadow = true;
     group.add(fireLight);
     
     // Secondary flicker light
-    const flickerLight = new THREE.PointLight(0xff4400, 0.8, 10);
+    const flickerLight = new THREE.PointLight(0xff4400, 2, 18);
     flickerLight.position.y = 0.5;
     group.add(flickerLight);
     group.userData.flickerLight = flickerLight;
@@ -507,26 +506,17 @@ function createNPC(type) {
 // ============================================
 
 function addLighting() {
-    // Moonlight
-    const moonLight = new THREE.DirectionalLight(0x6666aa, 0.3);
+    // Moonlight - brighter
+    const moonLight = new THREE.DirectionalLight(0x8888cc, 0.8);
     moonLight.position.set(10, 20, 10);
-    moonLight.castShadow = true;
-    moonLight.shadow.mapSize.width = 1024;
-    moonLight.shadow.mapSize.height = 1024;
-    moonLight.shadow.camera.near = 1;
-    moonLight.shadow.camera.far = 50;
-    moonLight.shadow.camera.left = -30;
-    moonLight.shadow.camera.right = 30;
-    moonLight.shadow.camera.top = 30;
-    moonLight.shadow.camera.bottom = -30;
     townScene.add(moonLight);
     
-    // Ambient
-    const ambient = new THREE.AmbientLight(0x222233, 0.4);
+    // Ambient - much brighter so scene is visible
+    const ambient = new THREE.AmbientLight(0x404060, 1.2);
     townScene.add(ambient);
     
-    // Hemisphere for sky/ground color
-    const hemi = new THREE.HemisphereLight(0x334455, 0x222211, 0.3);
+    // Hemisphere for sky/ground color - brighter
+    const hemi = new THREE.HemisphereLight(0x6677aa, 0x333322, 0.8);
     townScene.add(hemi);
 }
 
