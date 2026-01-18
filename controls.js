@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { getPlayer } from './entities.js';
+import { getDungeonScene, getTownScene } from './dungeon.js';
 
 // ============================================
 // STATE
@@ -12,6 +13,7 @@ import { getPlayer } from './entities.js';
 
 let camera;
 let controlsEnabled = true;
+let currentScene = null;
 
 // Input state
 const inputState = {
@@ -31,7 +33,9 @@ const inputState = {
 // Touch tracking
 const touches = {
     joystick: null,
-    look: null
+    look: null,
+    lookLastX: null,
+    lookLastY: null
 };
 
 // Joystick
@@ -44,17 +48,25 @@ const joystick = {
     maxDistance: 50
 };
 
-// Camera settings
+// Camera settings - positioned behind player
 const cameraSettings = {
     distance: 10,
     height: 6,
     targetDistance: 10,
     targetHeight: 6,
-    angle: 0,
+    angle: Math.PI, // Start behind player (player faces -Z, camera at +Z)
+    targetAngle: Math.PI, // Target angle for smooth following
     pitch: 0.3,
     smoothing: 5,
-    isTown: false
+    angleSmoothing: 3, // How fast camera rotates to follow player
+    isTown: false,
+    autoFollowEnabled: true, // Camera follows behind player when moving
+    manualControlTimer: 0 // Timer after manual camera control
 };
+
+// Raycaster for camera collision
+const raycaster = new THREE.Raycaster();
+const cameraCollisionLayers = [];
 
 // ============================================
 // INITIALIZATION
@@ -99,6 +111,11 @@ function setupTouchControls() {
     joystickZone.addEventListener('touchend', handleJoystickEnd, { passive: false });
     joystickZone.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
     
+    // GLOBAL touch end handler to catch when finger leaves the joystick zone
+    // This fixes the stuck joystick issue
+    document.addEventListener('touchend', handleGlobalTouchEnd, { passive: false });
+    document.addEventListener('touchcancel', handleGlobalTouchEnd, { passive: false });
+    
     // Look swipe (right side of screen)
     gameContainer.addEventListener('touchstart', handleLookStart, { passive: false });
     gameContainer.addEventListener('touchmove', handleLookMove, { passive: false });
@@ -141,14 +158,37 @@ function handleJoystickMove(e) {
 function handleJoystickEnd(e) {
     for (const touch of e.changedTouches) {
         if (touch.identifier === touches.joystick) {
-            joystick.active = false;
-            touches.joystick = null;
-            inputState.moveX = 0;
-            inputState.moveZ = 0;
-            resetJoystickVisual();
+            resetJoystick();
             break;
         }
     }
+}
+
+// Global handler to catch touch ends anywhere - fixes stuck joystick
+function handleGlobalTouchEnd(e) {
+    if (touches.joystick === null) return;
+    
+    // Check if the joystick touch is still active
+    let joystickTouchStillActive = false;
+    for (const touch of e.touches) {
+        if (touch.identifier === touches.joystick) {
+            joystickTouchStillActive = true;
+            break;
+        }
+    }
+    
+    // If joystick touch is no longer in the active touches, reset it
+    if (!joystickTouchStillActive) {
+        resetJoystick();
+    }
+}
+
+function resetJoystick() {
+    joystick.active = false;
+    touches.joystick = null;
+    inputState.moveX = 0;
+    inputState.moveZ = 0;
+    resetJoystickVisual();
 }
 
 function updateJoystickVisual() {
@@ -186,19 +226,16 @@ function updateMovementInput() {
     }
     
     // Normalize to -1 to 1
-    inputState.moveX = dx / joystick.maxDistance;
-    inputState.moveZ = dy / joystick.maxDistance;
+    const rawX = dx / joystick.maxDistance;
+    const rawZ = dy / joystick.maxDistance;
     
     // Transform based on camera angle
     const angle = cameraSettings.angle;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     
-    const worldX = inputState.moveX * cos - inputState.moveZ * sin;
-    const worldZ = inputState.moveX * sin + inputState.moveZ * cos;
-    
-    inputState.moveX = worldX;
-    inputState.moveZ = worldZ;
+    inputState.moveX = rawX * cos - rawZ * sin;
+    inputState.moveZ = rawX * sin + rawZ * cos;
 }
 
 function handleLookStart(e) {
@@ -218,6 +255,11 @@ function handleLookStart(e) {
         }
         
         touches.look = touch.identifier;
+        touches.lookLastX = touch.clientX;
+        touches.lookLastY = touch.clientY;
+        
+        // Manual camera control - disable auto-follow temporarily
+        cameraSettings.manualControlTimer = 1.5; // 1.5 seconds before auto-follow resumes
         break;
     }
 }
@@ -227,10 +269,6 @@ function handleLookMove(e) {
     
     for (const touch of e.changedTouches) {
         if (touch.identifier === touches.look) {
-            // Calculate delta from movement
-            const movementX = e.movementX || 0;
-            const movementY = e.movementY || 0;
-            
             // Use touch movement for camera rotation
             inputState.lookDeltaX = (touch.clientX - (touches.lookLastX || touch.clientX)) * 0.01;
             inputState.lookDeltaY = (touch.clientY - (touches.lookLastY || touch.clientY)) * 0.01;
@@ -240,7 +278,11 @@ function handleLookMove(e) {
             
             // Apply to camera angle
             cameraSettings.angle -= inputState.lookDeltaX;
+            cameraSettings.targetAngle = cameraSettings.angle; // Sync target when manually controlling
             cameraSettings.pitch = Math.max(-0.5, Math.min(0.8, cameraSettings.pitch + inputState.lookDeltaY));
+            
+            // Reset auto-follow timer on manual control
+            cameraSettings.manualControlTimer = 1.5;
             
             break;
         }
@@ -370,6 +412,7 @@ function setupKeyboardControls() {
             isMouseDown = true;
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
+            cameraSettings.manualControlTimer = 1.5;
         }
     });
     
@@ -385,7 +428,10 @@ function setupKeyboardControls() {
             const dy = e.clientY - lastMouseY;
             
             cameraSettings.angle -= dx * 0.005;
+            cameraSettings.targetAngle = cameraSettings.angle;
             cameraSettings.pitch = Math.max(-0.5, Math.min(0.8, cameraSettings.pitch + dy * 0.005));
+            
+            cameraSettings.manualControlTimer = 1.5;
             
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
@@ -432,6 +478,7 @@ export function updateControls(delta, scene, isTown = false) {
     const player = getPlayer();
     if (!player) return;
     
+    currentScene = scene;
     cameraSettings.isTown = isTown;
     
     // Adjust camera distance for town vs dungeon
@@ -447,12 +494,47 @@ export function updateControls(delta, scene, isTown = false) {
     cameraSettings.distance += (cameraSettings.targetDistance - cameraSettings.distance) * delta * 2;
     cameraSettings.height += (cameraSettings.targetHeight - cameraSettings.height) * delta * 2;
     
-    // Calculate camera position
+    // Update manual control timer
+    if (cameraSettings.manualControlTimer > 0) {
+        cameraSettings.manualControlTimer -= delta;
+    }
+    
+    // Auto-follow camera: swing behind player when walking
+    if (cameraSettings.autoFollowEnabled && cameraSettings.manualControlTimer <= 0) {
+        const isMoving = Math.abs(inputState.moveX) > 0.1 || Math.abs(inputState.moveZ) > 0.1;
+        
+        if (isMoving) {
+            // Calculate the angle the player is facing (based on movement direction)
+            // We want camera BEHIND player, so add PI
+            const playerFacingAngle = Math.atan2(inputState.moveX, inputState.moveZ);
+            cameraSettings.targetAngle = playerFacingAngle + Math.PI;
+        }
+        
+        // Smoothly interpolate camera angle towards target
+        let angleDiff = cameraSettings.targetAngle - cameraSettings.angle;
+        
+        // Normalize angle difference to -PI to PI for shortest rotation
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        
+        cameraSettings.angle += angleDiff * delta * cameraSettings.angleSmoothing;
+    }
+    
+    // Calculate desired camera position
     const targetPos = player.position.clone();
     
-    const camX = targetPos.x + Math.sin(cameraSettings.angle) * cameraSettings.distance;
-    const camZ = targetPos.z + Math.cos(cameraSettings.angle) * cameraSettings.distance;
-    const camY = targetPos.y + cameraSettings.height + cameraSettings.pitch * 5;
+    let camX = targetPos.x + Math.sin(cameraSettings.angle) * cameraSettings.distance;
+    let camZ = targetPos.z + Math.cos(cameraSettings.angle) * cameraSettings.distance;
+    let camY = targetPos.y + cameraSettings.height + cameraSettings.pitch * 5;
+    
+    // Camera wall collision detection
+    if (scene && !isTown) {
+        const desiredPos = new THREE.Vector3(camX, camY, camZ);
+        const adjustedPos = checkCameraCollision(targetPos, desiredPos, scene);
+        camX = adjustedPos.x;
+        camY = adjustedPos.y;
+        camZ = adjustedPos.z;
+    }
     
     // Smooth camera movement
     camera.position.lerp(
@@ -464,6 +546,58 @@ export function updateControls(delta, scene, isTown = false) {
     const lookTarget = targetPos.clone();
     lookTarget.y += 1; // Look at player's center
     camera.lookAt(lookTarget);
+}
+
+// ============================================
+// CAMERA COLLISION
+// ============================================
+
+function checkCameraCollision(playerPos, desiredCamPos, scene) {
+    // Raycast from player to desired camera position
+    const direction = new THREE.Vector3().subVectors(desiredCamPos, playerPos);
+    const distance = direction.length();
+    direction.normalize();
+    
+    // Start ray slightly above player
+    const rayOrigin = playerPos.clone();
+    rayOrigin.y += 1;
+    
+    raycaster.set(rayOrigin, direction);
+    raycaster.far = distance;
+    
+    // Get all meshes in scene that could block camera
+    const collidables = [];
+    scene.traverse((obj) => {
+        if (obj.isMesh && obj.geometry) {
+            // Skip small objects, transparent objects, and the player
+            if (obj.parent && obj.parent.name === 'player') return;
+            if (obj.material && obj.material.transparent && obj.material.opacity < 0.5) return;
+            
+            // Only collide with walls, floors, ceilings (larger objects)
+            const bbox = new THREE.Box3().setFromObject(obj);
+            const size = new THREE.Vector3();
+            bbox.getSize(size);
+            
+            // Only include objects large enough to be walls/floors
+            if (size.x > 1 || size.y > 1 || size.z > 1) {
+                collidables.push(obj);
+            }
+        }
+    });
+    
+    const intersects = raycaster.intersectObjects(collidables, false);
+    
+    if (intersects.length > 0) {
+        // Camera would clip through something - move it closer
+        const hitDistance = intersects[0].distance;
+        const safeDistance = Math.max(hitDistance - 0.5, 1); // Keep at least 1 unit from player
+        
+        // Calculate new camera position at safe distance
+        const newPos = rayOrigin.clone().add(direction.multiplyScalar(safeDistance));
+        return newPos;
+    }
+    
+    return desiredCamPos;
 }
 
 // ============================================
@@ -501,18 +635,23 @@ export function disableControls() {
     inputState.ability1 = false;
     inputState.ability2 = false;
     inputState.ability3 = false;
+    
+    // Also reset joystick
+    resetJoystick();
 }
 
 export function resetCamera(isTown = false) {
-    cameraSettings.angle = 0;
+    cameraSettings.angle = Math.PI; // Behind player
+    cameraSettings.targetAngle = Math.PI;
     cameraSettings.pitch = 0.3;
     cameraSettings.isTown = isTown;
     cameraSettings.targetDistance = isTown ? 12 : 10;
     cameraSettings.targetHeight = isTown ? 8 : 6;
     cameraSettings.distance = cameraSettings.targetDistance;
     cameraSettings.height = cameraSettings.targetHeight;
+    cameraSettings.manualControlTimer = 0;
     
-    // Immediately position camera
+    // Immediately position camera behind player
     const player = getPlayer();
     if (player && camera) {
         const targetPos = player.position.clone();
