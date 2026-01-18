@@ -2,981 +2,154 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Labyrinth Legacy</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            overflow: hidden;
-            font-family: 'Courier New', monospace;
-            cursor: none;
-        }
-
-        #gameContainer {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        #ui {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 100;
-        }
-
-        #healthBar {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 200px;
-            height: 20px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #8B4513;
-            border-radius: 10px;
-        }
-
-        #healthFill {
-            height: 100%;
-            background: linear-gradient(90deg, #8B0000, #DC143C);
-            border-radius: 8px;
-            width: 100%;
-            transition: width 0.3s ease;
-        }
-
-        #staminaBar {
-            position: absolute;
-            top: 50px;
-            left: 20px;
-            width: 150px;
-            height: 15px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #4682B4;
-            border-radius: 8px;
-        }
-
-        #staminaFill {
-            height: 100%;
-            background: linear-gradient(90deg, #4169E1, #87CEEB);
-            border-radius: 6px;
-            width: 100%;
-            transition: width 0.2s ease;
-        }
-
-        #manaBar {
-            position: absolute;
-            top: 75px;
-            left: 20px;
-            width: 150px;
-            height: 15px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid #9370DB;
-            border-radius: 8px;
-        }
-
-        #manaFill {
-            height: 100%;
-            background: linear-gradient(90deg, #4B0082, #9370DB);
-            border-radius: 6px;
-            width: 100%;
-            transition: width 0.2s ease;
-        }
-
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.8);
-            border-radius: 50%;
-            pointer-events: none;
-        }
-
-        #crosshair::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 4px;
-            height: 4px;
-            background: rgba(255,255,255,0.9);
-            border-radius: 50%;
-        }
-
-        #instructions {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            color: rgba(255,255,255,0.7);
-            font-size: 14px;
-            pointer-events: none;
-        }
-
-        /* Loading Screen */
-        #loadingScreen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
-            color: #fff;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        #loadingProgress {
-            margin-top: 20px;
-            font-size: 18px;
-            color: #4CAF50;
-        }
-
-        #loadingStatus {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #ccc;
-        }
-
-        .loading-bar {
-            width: 300px;
-            height: 20px;
-            background: #333;
-            border: 2px solid #666;
-            border-radius: 10px;
-            margin-top: 20px;
-            overflow: hidden;
-        }
-
-        .loading-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #4CAF50, #8BC34A);
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        /* Error display */
-        #errorDisplay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.1);
-            border: 2px solid #ff0000;
-            padding: 20px;
-            border-radius: 10px;
-            color: #ff6666;
-            font-size: 12px;
-            display: none;
-            z-index: 2000;
-            max-width: 80%;
-            text-align: left;
-            font-family: monospace;
-        }
-
-        /* Mobile Controls Styles */
-        #mobile-controls {
-            position: absolute;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            height: 40%;
-            z-index: 1000;
-            pointer-events: none;
-            display: none;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0;
-        }
-
-        #joystick {
-            position: relative;
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            border: 2px solid rgba(100, 149, 237, 0.8);
-            background-color: rgba(65, 105, 225, 0.3);
-            pointer-events: auto;
-            box-shadow: 0 0 15px rgba(100, 149, 237, 0.8);
-            margin-left: 20px;
-        }
-
-        #joystick-knob {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-color: rgba(65, 105, 225, 0.8);
-            pointer-events: none;
-        }
-
-        #menu-button {
-            width: 31px;
-            height: 31px;
-            border-radius: 50%;
-            background-color: rgba(240, 240, 240, 0.8);
-            border: 2px solid rgba(255, 255, 255, 1);
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #333;
-            font-family: Arial, sans-serif;
-            font-weight: bold;
-            font-size: 11px;
-            user-select: none;
-            pointer-events: auto;
-            position: relative;
-        }
-
-        #action-buttons {
-            position: relative;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            grid-template-rows: repeat(2, 1fr);
-            gap: 6px;
-            pointer-events: auto;
-            margin-right: 20px;
-        }
-
-        .control-button {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-family: Arial, sans-serif;
-            font-weight: bold;
-            user-select: none;
-            font-size: 16px;
-            transition: transform 0.1s ease;
-        }
-
-        @media (max-width: 768px) {
-            #mobile-controls {
-                display: flex;
-            }
-            #instructions {
-                display: none;
-            }
-        }
-
-        /* Floor indicator */
-        #floorIndicator {
-            position: absolute;
-            top: 100px;
-            left: 20px;
-            color: rgba(255,255,255,0.9);
-            font-size: 18px;
-            font-weight: bold;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        }
-
-        /* Room Progression Indicator */
-        #progressionIndicator {
-            position: absolute;
-            top: 130px;
-            left: 20px;
-            color: rgba(255,255,255,0.9);
-            font-size: 14px;
-            font-weight: bold;
-            pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-        }
-
-        /* Compass */
-        #compass {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 120px;
-            height: 120px;
-            border: 3px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.7);
-            pointer-events: none;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-
-        #compass-face {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-        }
-
-        .compass-direction {
-            position: absolute;
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: bold;
-            font-size: 16px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-        }
-
-        #compass-n {
-            top: 5px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #ff6b6b;
-        }
-
-        #compass-s {
-            bottom: 5px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-
-        #compass-e {
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-
-        #compass-w {
-            left: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-        }
-
-        #compass-needle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 2px;
-            height: 45px;
-            background: linear-gradient(180deg, #ff6b6b 0%, #ff6b6b 60%, #ffffff 60%, #ffffff 100%);
-            transform-origin: bottom center;
-            transform: translate(-50%, -100%);
-            border-radius: 1px;
-            box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
-        }
-
-        #compass-center {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 8px;
-            height: 8px;
-            background: #ffffff;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
-        }
-
-        @media (max-width: 768px) {
-            #compass {
-                width: 100px;
-                height: 100px;
-                top: 15px;
-                right: 15px;
-            }
-            
-            .compass-direction {
-                font-size: 14px;
-            }
-            
-            #compass-needle {
-                height: 38px;
-            }
-            
-            #progressionIndicator {
-                font-size: 12px;
-                top: 120px;
-                left: 15px;
-            }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Echoes of the Obelisk</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loadingScreen">
-        <div style="font-size: 32px; margin-bottom: 10px;">🏰 Labyrinth Legacy</div>
-        <div style="font-size: 16px; color: #888; margin-bottom: 20px;">v0.8.2 - Gothic Ruins Edition</div>
-        <div id="loadingProgress">Initializing...</div>
-        <div class="loading-bar">
-            <div class="loading-fill" id="loadingFill"></div>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>ECHOES OF THE OBELISK</h1>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loading-progress"></div>
+            </div>
+            <p id="loading-text">Initializing...</p>
         </div>
-        <div id="loadingStatus">Preparing game engine...</div>
     </div>
 
-    <!-- Error Display -->
-    <div id="errorDisplay">
-        <h3>Loading Error</h3>
-        <p id="errorMessage"></p>
-        <button onclick="location.reload()" style="margin-top: 10px; padding: 10px 20px; background: #ff6666; border: none; color: white; border-radius: 5px; cursor: pointer;">Retry</button>
-    </div>
-
-    <div id="gameContainer">
-        <div id="ui">
-            <div id="healthBar">
-                <div id="healthFill"></div>
-            </div>
-            <div id="staminaBar">
-                <div id="staminaFill"></div>
-            </div>
-            <div id="manaBar">
-                <div id="manaFill"></div>
-            </div>
-            <div id="crosshair"></div>
-            <div id="floorIndicator">Floor 1</div>
-            
-            <!-- Room Progression Indicator -->
-            <div id="progressionIndicator">
-                <div>Room Progress:</div>
-                <div style="margin-top: 5px;">
-                    <span id="progress-north" style="color: #00ff00;">⬆️ North: OPEN</span><br>
-                    <span id="progress-east" style="color: #ff6666;">➡️ East: LOCKED</span><br>
-                    <span id="progress-west" style="color: #ff6666;">⬅️ West: LOCKED</span><br>
-                    <span id="progress-south" style="color: #ff6666;">⬇️ South: LOCKED</span>
-                </div>
-            </div>
-            
-            <!-- Compass -->
-            <div id="compass">
-                <div id="compass-face">
-                    <div id="compass-n" class="compass-direction">N</div>
-                    <div id="compass-s" class="compass-direction">S</div>
-                    <div id="compass-e" class="compass-direction">E</div>
-                    <div id="compass-w" class="compass-direction">W</div>
-                    <div id="compass-needle"></div>
-                    <div id="compass-center"></div>
-                </div>
-            </div>
-            
-            <div id="instructions">
-                WASD: Move | Mouse: Look | Shift: Dash | Space: Jump | E: Interact | Esc: Menu<br>
-                <small>Mobile: Left stick to move, right stick to look, tap action buttons</small><br>
-                <small>Testing: Menu button = +10 floors, E+Esc = +1 floor</small><br>
-                <small>Progressive System: North→East→West→South rooms unlock as enemies are defeated!</small><br>
-                <small>Creepy mask portals block paths - defeat enemies to unlock new areas!</small>
-            </div>
-        </div>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
         
-        <!-- Mobile Controls -->
+        <!-- HUD -->
+        <div id="hud">
+            <div id="health-bar">
+                <div id="health-fill"></div>
+                <span id="health-text">100/100</span>
+            </div>
+            <div id="xp-display">
+                <span id="xp-icon">◆</span>
+                <span id="xp-value">0</span>
+            </div>
+            <div id="floor-display">FLOOR <span id="floor-number">1</span></div>
+        </div>
+
+        <!-- Ability cooldowns -->
+        <div id="ability-bar">
+            <div class="ability-slot" id="ability-spread" data-ability="spread">
+                <div class="ability-icon">⁂</div>
+                <div class="ability-cooldown"></div>
+                <span class="ability-key">1</span>
+            </div>
+            <div class="ability-slot" id="ability-burst" data-ability="burst">
+                <div class="ability-icon">⚡</div>
+                <div class="ability-cooldown"></div>
+                <span class="ability-key">2</span>
+            </div>
+            <div class="ability-slot" id="ability-mega" data-ability="mega">
+                <div class="ability-icon">●</div>
+                <div class="ability-cooldown"></div>
+                <span class="ability-key">3</span>
+            </div>
+        </div>
+
+        <!-- Mobile controls -->
         <div id="mobile-controls">
-            <div id="joystick">
-                <div id="joystick-knob"></div>
-            </div>
-            
-            <div id="menu-button" class="control-button" data-action="menu">
-                <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
-                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
-                    <div style="width: 12px; height: 2px; background-color: #333; border-radius: 1px;"></div>
+            <div id="joystick-zone">
+                <div id="joystick-base">
+                    <div id="joystick-stick"></div>
                 </div>
             </div>
-            
             <div id="action-buttons">
-                <div id="button-sword" class="control-button" data-action="attack" 
-                     style="background-color: rgba(205, 133, 63, 0.8); border: 2px solid rgba(205, 133, 63, 1); 
-                     box-shadow: 0 0 10px rgba(205, 133, 63, 0.8); grid-row: 1; grid-column: 1;">⚔️</div>
-                
-                <div id="button-staff" class="control-button" data-action="chargeAttack" 
-                     style="background-color: rgba(186, 85, 211, 0.8); border: 2px solid rgba(186, 85, 211, 1); 
-                     box-shadow: 0 0 10px rgba(186, 85, 211, 0.8); grid-row: 1; grid-column: 2;">🔮</div>
-                
-                <div id="button-jump" class="control-button" data-action="jump" 
-                     style="background-color: rgba(60, 179, 113, 0.8); border: 2px solid rgba(60, 179, 113, 1); 
-                     box-shadow: 0 0 10px rgba(60, 179, 113, 0.8); grid-row: 2; grid-column: 1;">⬆️</div>
-                
-                <div id="button-dash" class="control-button" data-action="dash" 
-                     style="background-color: rgba(255, 150, 50, 0.8); border: 2px solid rgba(255, 150, 50, 1); 
-                     box-shadow: 0 0 10px rgba(255, 150, 50, 0.8); grid-row: 2; grid-column: 2;">💨</div>
+                <button id="btn-jump" class="action-btn">JUMP</button>
+                <button id="btn-attack" class="action-btn primary">ATTACK</button>
+            </div>
+            <div id="ability-buttons">
+                <button id="btn-spread" class="ability-btn">⁂</button>
+                <button id="btn-burst" class="ability-btn">⚡</button>
+                <button id="btn-mega" class="ability-btn">●</button>
             </div>
         </div>
+
+        <!-- Dialogue box -->
+        <div id="dialogue-box" class="hidden">
+            <div id="dialogue-speaker"></div>
+            <div id="dialogue-text"></div>
+            <div id="dialogue-continue">TAP TO CONTINUE</div>
+        </div>
+
+        <!-- Lore fragment display -->
+        <div id="lore-display" class="hidden">
+            <div id="lore-content"></div>
+            <button id="lore-close">CLOSE</button>
+        </div>
+
+        <!-- Pause menu -->
+        <div id="pause-menu" class="hidden">
+            <h2>PAUSED</h2>
+            <button id="btn-resume">RESUME</button>
+            <button id="btn-town">RETURN TO CAMP</button>
+            <button id="btn-controls">CONTROLS</button>
+        </div>
+
+        <!-- Death screen -->
+        <div id="death-screen" class="hidden">
+            <h2>FALLEN</h2>
+            <p>The obelisk claims another soul...</p>
+            <p id="xp-lost">XP Lost: <span>0</span></p>
+            <button id="btn-retry">TRY AGAIN</button>
+            <button id="btn-retreat">RETREAT TO CAMP</button>
+        </div>
+
+        <!-- Victory screen -->
+        <div id="victory-screen" class="hidden">
+            <h2>FLOOR CLEARED</h2>
+            <p id="xp-gained">XP Gained: <span>0</span></p>
+            <button id="btn-next-floor">DESCEND DEEPER</button>
+            <button id="btn-return-camp">RETURN TO CAMP</button>
+        </div>
+
+        <!-- Final victory screen -->
+        <div id="final-victory" class="hidden">
+            <h2>THE OBELISK AWAKENS</h2>
+            <div id="final-text"></div>
+            <button id="btn-credits">CONTINUE</button>
+        </div>
+
+        <!-- Town UI -->
+        <div id="town-ui" class="hidden">
+            <div id="town-header">
+                <h2>EXPEDITION CAMP</h2>
+                <div id="town-xp">◆ <span id="town-xp-value">0</span></div>
+            </div>
+            <button id="btn-enter-dungeon">ENTER THE OBELISK</button>
+            <div id="floor-select" class="hidden">
+                <h3>SELECT FLOOR</h3>
+                <div id="floor-buttons"></div>
+                <button id="btn-cancel-floor">CANCEL</button>
+            </div>
+        </div>
+
+        <!-- Shop UI -->
+        <div id="shop-ui" class="hidden">
+            <h3 id="shop-title">SHOP</h3>
+            <div id="shop-items"></div>
+            <button id="btn-close-shop">CLOSE</button>
+        </div>
+
+        <!-- Pause button -->
+        <button id="btn-pause">❚❚</button>
     </div>
 
-    <!-- SIMPLIFIED SCRIPT LOADING SYSTEM -->
-    <script>
-        // Simplified Script Loader
-        class SimplifiedLoader {
-            constructor() {
-                this.scripts = [
-                    { 
-                        url: 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 
-                        name: 'Three.js', 
-                        check: () => window.THREE
-                    },
-                    { 
-                        url: 'src/core/input.js', 
-                        name: 'Input System', 
-                        check: () => window.setupInput && window.getInput
-                    },
-                    { 
-                        url: 'src/systems/player.js', 
-                        name: 'Player System', 
-                        check: () => window.Player
-                    },
-                    { 
-                        url: 'src/systems/dungeon.js', 
-                        name: 'Dungeon System', 
-                        check: () => window.DungeonSystem
-                    }
-                ];
-                
-                this.loadingProgress = document.getElementById('loadingProgress');
-                this.loadingStatus = document.getElementById('loadingStatus');
-                this.loadingFill = document.getElementById('loadingFill');
-                this.loadingScreen = document.getElementById('loadingScreen');
-                this.errorDisplay = document.getElementById('errorDisplay');
-                this.errorMessage = document.getElementById('errorMessage');
-            }
-
-            showError(message) {
-                console.error('LOADING ERROR:', message);
-                this.errorMessage.innerHTML = message; // Use innerHTML to preserve formatting
-                this.errorDisplay.style.display = 'block';
-                this.loadingScreen.style.display = 'none';
-            }
-
-            updateProgress(step, total, status) {
-                const percentage = (step / total) * 100;
-                this.loadingFill.style.width = percentage + '%';
-                this.loadingProgress.textContent = `Loading... ${Math.round(percentage)}%`;
-                this.loadingStatus.textContent = status;
-                console.log(`[LOADER] ${status} (${Math.round(percentage)}%)`);
-            }
-
-            loadScript(scriptInfo) {
-                return new Promise((resolve, reject) => {
-                    console.log(`[LOADER] Loading ${scriptInfo.name}...`);
-                    
-                    const script = document.createElement('script');
-                    script.src = scriptInfo.url;
-                    script.type = 'text/javascript';
-                    
-                    script.onload = () => {
-                        console.log(`[LOADER] ${scriptInfo.name} loaded, verifying...`);
-                        
-                        // Give time for script to initialize
-                        setTimeout(() => {
-                            if (scriptInfo.check()) {
-                                console.log(`[LOADER] ✓ ${scriptInfo.name} verified`);
-                                resolve();
-                            } else {
-                                // THIS IS WHERE WE ADD THE DETAILED ERROR CHECK
-                                let errorMessage = `${scriptInfo.name} verification failed`;
-                                
-                                // If this is the Dungeon System, get detailed error info
-                                if (scriptInfo.name === 'Dungeon System') {
-                                    console.log('[LOADER] Dungeon System failed, checking error details...');
-                                    
-                                    // Check if error function exists
-                                    if (typeof window.getDungeonSystemError === 'function') {
-                                        try {
-                                            console.log('[LOADER] getDungeonSystemError function found, calling...');
-                                            const detailedError = window.getDungeonSystemError();
-                                            console.log('[LOADER] Detailed error:', detailedError);
-                                            errorMessage = `<strong>Dungeon System Failed:</strong><br><br>${detailedError}`;
-                                        } catch (e) {
-                                            console.log('[LOADER] Error calling getDungeonSystemError:', e);
-                                            errorMessage += `<br><br>Could not get detailed error: ${e.message}`;
-                                        }
-                                    } else {
-                                        console.log('[LOADER] getDungeonSystemError function not found');
-                                        errorMessage += `<br><br>Error function not available`;
-                                    }
-                                    
-                                    // Check for global error variables directly
-                                    if (window.DUNGEON_SYSTEM_STATUS) {
-                                        console.log('[LOADER] Found DUNGEON_SYSTEM_STATUS:', window.DUNGEON_SYSTEM_STATUS);
-                                        errorMessage += `<br><br><strong>Status:</strong><br>${window.DUNGEON_SYSTEM_STATUS}`;
-                                    } else {
-                                        console.log('[LOADER] DUNGEON_SYSTEM_STATUS not found');
-                                        errorMessage += `<br><br>No status information available`;
-                                    }
-                                    
-                                    if (window.DUNGEON_SYSTEM_ERROR) {
-                                        console.log('[LOADER] Found DUNGEON_SYSTEM_ERROR:', window.DUNGEON_SYSTEM_ERROR);
-                                        errorMessage += `<br><br><strong>Error:</strong><br>${window.DUNGEON_SYSTEM_ERROR}`;
-                                    } else {
-                                        console.log('[LOADER] DUNGEON_SYSTEM_ERROR not found');
-                                        errorMessage += `<br><br>No error details available`;
-                                    }
-                                    
-                                    // Check if DungeonSystem class exists but verification failed
-                                    if (window.DungeonSystem) {
-                                        console.log('[LOADER] DungeonSystem class exists, checking verification methods...');
-                                        
-                                        try {
-                                            // Try to create a test instance
-                                            const testScene = { add: () => {}, remove: () => {} };
-                                            const testInstance = new window.DungeonSystem(testScene, null);
-                                            
-                                            // Check verification methods
-                                            const verifyMethods = ['verify', 'isReady', 'isValid', 'isInitialized'];
-                                            for (const method of verifyMethods) {
-                                                if (typeof testInstance[method] === 'function') {
-                                                    const result = testInstance[method]();
-                                                    console.log(`[LOADER] ${method}() returned:`, result);
-                                                    errorMessage += `<br>${method}(): ${result}`;
-                                                } else {
-                                                    console.log(`[LOADER] ${method} method not found`);
-                                                    errorMessage += `<br>${method}: NOT FOUND`;
-                                                }
-                                            }
-                                        } catch (constructorError) {
-                                            console.log('[LOADER] Error creating test instance:', constructorError);
-                                            errorMessage += `<br><br><strong>Constructor Error:</strong><br>${constructorError.message}`;
-                                        }
-                                    } else {
-                                        console.log('[LOADER] DungeonSystem class not found at all');
-                                        errorMessage += `<br><br>DungeonSystem class not found in window object`;
-                                    }
-                                }
-                                
-                                reject(new Error(errorMessage));
-                            }
-                        }, 200);
-                    };
-                    
-                    script.onerror = () => {
-                        reject(new Error(`Failed to load ${scriptInfo.name} from ${scriptInfo.url}`));
-                    };
-                    
-                    document.head.appendChild(script);
-                });
-            }
-
-            async loadAllScripts() {
-                console.log('[LOADER] Starting simplified script loading...');
-                
-                try {
-                    // Load all scripts
-                    for (let i = 0; i < this.scripts.length; i++) {
-                        const script = this.scripts[i];
-                        this.updateProgress(i, this.scripts.length + 2, `Loading ${script.name}...`);
-                        
-                        await this.loadScript(script);
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
-                    
-                    // Initialize input
-                    this.updateProgress(this.scripts.length, this.scripts.length + 2, 'Initializing input...');
-                    if (window.setupInput) {
-                        setupInput();
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                    }
-                    
-                    // Initialize game
-                    this.updateProgress(this.scripts.length + 1, this.scripts.length + 2, 'Starting game...');
-                    await this.initializeGame();
-                    
-                    // Complete
-                    this.updateProgress(this.scripts.length + 2, this.scripts.length + 2, 'Game ready!');
-                    
-                    // Hide loading screen
-                    this.loadingScreen.style.opacity = '0';
-                    this.loadingScreen.style.transition = 'opacity 0.5s ease';
-                    setTimeout(() => {
-                        this.loadingScreen.style.display = 'none';
-                        console.log('[LOADER] ✓ Game ready to play!');
-                    }, 500);
-                    
-                } catch (error) {
-                    console.error('[LOADER] Failed:', error);
-                    this.showError(error.message);
-                }
-            }
-
-            async initializeGame() {
-                // Create game engine
-                window.game = new LabyrinthGame();
-                
-                // Wait for initialization
-                let attempts = 0;
-                while (attempts < 50 && (!window.game || window.game.gameState !== 'playing')) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-                
-                if (!window.game || window.game.gameState !== 'playing') {
-                    throw new Error('Game failed to initialize properly');
-                }
-                
-                console.log('[LOADER] ✓ Game initialized successfully');
-            }
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
         }
-
-        // Main Game Engine - SIMPLIFIED VERSION
-        class LabyrinthGame {
-            constructor() {
-                console.log('[GAME] Initializing Simplified Labyrinth Game...');
-                
-                this.scene = null;
-                this.camera = null;
-                this.renderer = null;
-                this.player = null;
-                this.dungeonSystem = null;
-                
-                this.gameState = 'loading';
-                this.currentFloor = 1;
-                this.clock = new THREE.Clock();
-                
-                this.isPointerLocked = false;
-                
-                this.init();
-            }
-            
-            init() {
-                try {
-                    console.log('[GAME] Setting up core systems...');
-                    
-                    // Setup scene
-                    this.scene = new THREE.Scene();
-                    this.scene.fog = new THREE.FogExp2(0x1a1a2e, 0.02);
-                    this.scene.background = new THREE.Color(0x0f0f1f);
-                    
-                    // Setup renderer
-                    this.renderer = new THREE.WebGLRenderer({ 
-                        antialias: true,
-                        powerPreference: "high-performance"
-                    });
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
-                    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                    this.renderer.shadowMap.enabled = true;
-                    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                    
-                    const gameContainer = document.getElementById('gameContainer');
-                    gameContainer.appendChild(this.renderer.domElement);
-                    
-                    // Setup camera
-                    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                    this.camera.position.set(0, 1.8, 0);
-                    
-                    // Setup lighting
-                    const ambientLight = new THREE.AmbientLight(0xffffff, 0.08);
-                    this.scene.add(ambientLight);
-                    
-                    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
-                    directionalLight.position.set(10, 20, 5);
-                    directionalLight.castShadow = true;
-                    this.scene.add(directionalLight);
-                    
-                    // Setup player
-                    this.player = new Player(this.scene, this.camera);
-                    
-                    // Setup dungeon - NO ASYNC
-                    this.dungeonSystem = new DungeonSystem(this.scene, this.player);
-                    
-                    // Generate first floor immediately
-                    this.dungeonSystem.generateDungeon(this.currentFloor);
-                    
-                    // Position player
-                    this.player.position.set(0, 1.8, 0);
-                    this.player.camera.position.copy(this.player.position);
-                    
-                    // Setup window resize
-                    window.addEventListener('resize', () => {
-                        this.camera.aspect = window.innerWidth / window.innerHeight;
-                        this.camera.updateProjectionMatrix();
-                        this.renderer.setSize(window.innerWidth, window.innerHeight);
-                    });
-                    
-                    // Setup pointer lock
-                    if (!inputState.isMobile) {
-                        this.renderer.domElement.addEventListener('click', () => {
-                            this.renderer.domElement.requestPointerLock();
-                        });
-                        
-                        document.addEventListener('pointerlockchange', () => {
-                            this.isPointerLocked = document.pointerLockElement === this.renderer.domElement;
-                        });
-                        
-                        document.addEventListener('keydown', (e) => {
-                            if (e.code === 'Escape' && this.isPointerLocked) {
-                                document.exitPointerLock();
-                            }
-                        });
-                    }
-                    
-                    this.gameState = 'playing';
-                    this.gameLoop();
-                    
-                    console.log('[GAME] ✓ Game initialized successfully');
-                    
-                } catch (error) {
-                    console.error('[GAME] Initialization failed:', error);
-                    this.gameState = 'error';
-                }
-            }
-            
-            update(deltaTime) {
-                if (this.gameState !== 'playing') return;
-                
-                const input = getInput();
-                
-                // Update player
-                if (this.player) {
-                    this.player.update(deltaTime, input);
-                }
-                
-                // Update dungeon system
-                if (this.dungeonSystem) {
-                    this.dungeonSystem.update(deltaTime);
-                }
-                
-                // Reset mouse delta
-                inputState.mouse.deltaX = 0;
-                inputState.mouse.deltaY = 0;
-                
-                // Update UI
-                this.updateUI();
-                this.checkFloorProgression(input);
-            }
-            
-            checkFloorProgression(input) {
-                // Menu button: Skip 10 floors ahead
-                if (input.justPressed.menu) {
-                    this.advanceFloors(10);
-                }
-                
-                // E + Esc together: Advance 1 floor
-                if (input.justPressed.interact && input.menu) {
-                    this.advanceFloors(1);
-                }
-                
-                // Attack button is now disconnected from portal progression
-                // (Will be connected to sword combat in next stage)
-                if (input.justPressed.attack) {
-                    console.log('Attack button pressed - ready for sword implementation');
-                }
-            }
-            
-            advanceFloors(count) {
-                this.currentFloor += count;
-                console.log(`[GAME] Advancing ${count} floors to floor ${this.currentFloor}`);
-                
-                if (this.dungeonSystem) {
-                    this.dungeonSystem.generateDungeon(this.currentFloor);
-                }
-                
-                this.player.position.set(0, 1.8, 0);
-                this.player.velocity.set(0, 0, 0);
-                this.player.camera.position.copy(this.player.position);
-                
-                this.updateFloorIndicator();
-            }
-            
-            updateFloorIndicator() {
-                const floorElement = document.getElementById('floorIndicator');
-                if (floorElement) {
-                    const theme = this.dungeonSystem ? this.dungeonSystem.getCurrentTheme() : 'stone';
-                    floorElement.textContent = `Floor ${this.currentFloor} - ${theme.charAt(0).toUpperCase() + theme.slice(1)} Depths`;
-                }
-            }
-            
-            updateUI() {
-                if (!this.player) return;
-                
-                const healthPercent = (this.player.health / this.player.maxHealth) * 100;
-                const staminaPercent = (this.player.stamina / this.player.maxStamina) * 100;
-                const manaPercent = (this.player.mana / this.player.maxMana) * 100;
-                
-                const healthFill = document.getElementById('healthFill');
-                const staminaFill = document.getElementById('staminaFill');
-                const manaFill = document.getElementById('manaFill');
-                
-                if (healthFill) healthFill.style.width = healthPercent + '%';
-                if (staminaFill) staminaFill.style.width = staminaPercent + '%';
-                if (manaFill) manaFill.style.width = manaPercent + '%';
-                
-                this.updateCompass();
-                this.updateProgressionIndicator();
-            }
-            
-            updateProgressionIndicator() {
-                if (!this.dungeonSystem || !this.dungeonSystem.roomProgression) return;
-                
-                const progression = this.dungeonSystem.roomProgression;
-                const directions = ['north', 'east', 'west', 'south'];
-                
-                directions.forEach(dir => {
-                    const element = document.getElementById(`progress-${dir}`);
-                    if (element) {
-                        const room = progression[dir];
-                        let status = '';
-                        let color = '';
-                        
-                        if (room.enemiesDefeated) {
-                            status = 'COMPLETED ✓';
-                            color = '#00ff00';
-                        } else if (room.unlocked) {
-                            status = 'OPEN - Fight!';
-                            color = '#ffff00';
-                        } else {
-                            status = 'LOCKED';
-                            color = '#ff6666';
-                        }
-                        
-                        const icons = { north: '⬆️', east: '➡️', west: '⬅️', south: '⬇️' };
-                        element.innerHTML = `${icons[dir]} ${dir.charAt(0).toUpperCase() + dir.slice(1)}: ${status}`;
-                        element.style.color = color;
-                    }
-                });
-            }
-            
-            updateCompass() {
-                if (!this.player) return;
-                
-                const compassNeedle = document.getElementById('compass-needle');
-                if (compassNeedle) {
-                    const yawDegrees = (this.player.yaw * 180 / Math.PI);
-                    compassNeedle.style.transform = `translate(-50%, -100%) rotate(${yawDegrees}deg)`;
-                }
-            }
-            
-            render() {
-                if (this.renderer && this.scene && this.camera && this.gameState === 'playing') {
-                    this.renderer.render(this.scene, this.camera);
-                }
-            }
-            
-            gameLoop() {
-                try {
-                    const deltaTime = this.clock.getDelta();
-                    this.update(deltaTime);
-                    this.render();
-                } catch (error) {
-                    console.error('[GAME] Game loop error:', error);
-                }
-                
-                requestAnimationFrame(() => this.gameLoop());
-            }
-        }
-
-        // Start loading when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('[MAIN] DOM loaded, starting simplified loading...');
-            
-            const loader = new SimplifiedLoader();
-            loader.loadAllScripts();
-        });
-        
-        // Global error handlers
-        window.addEventListener('error', function(event) {
-            console.error('[GLOBAL ERROR]', event.error);
-        });
-        
-        window.addEventListener('unhandledrejection', function(event) {
-            console.error('[UNHANDLED PROMISE REJECTION]', event.reason);
-        });
+    }
     </script>
+    <script type="module" src="game.js"></script>
 </body>
 </html>
