@@ -5,9 +5,9 @@
 
 import * as THREE from 'three';
 import { initDungeon, getDungeonScene, loadFloor, getRoomData, getCurrentFloor, setCurrentFloor, disposeDungeon } from './dungeon.js';
-import { initTown, getTownScene, disposeTown, showNPCDialogue } from './town.js';
+import { initTown, getTownScene, disposeTown, showNPCDialogue, setNPCInteractionCallback } from './town.js';
 import { initControls, updateControls, getInputState, resetInput, setCameraTarget } from './controls.js';
-import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, spawnMiniBoss, spawnPillarBoss, getXPGained, resetXPGained, disposeBosses, disposePillarBoss, clearPlatformCache, getBoss } from './entities.js';
+import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, spawnMiniBoss, spawnPillarBoss, getXPGained, resetXPGained, disposeBosses, disposePillarBoss, clearPlatformCache, getBoss, setGameBridge } from './entities.js';
 
 // ============================================
 // GAME STATE
@@ -63,36 +63,51 @@ const getUpgradeCost = (level) => Math.floor(50 * Math.pow(1.4, level)); // 50, 
 // ============================================
 
 export async function initGame() {
-    // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.8;
-    document.getElementById('game-container').appendChild(renderer.domElement);
-    
-    // Camera
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    
-    // Initialize systems
-    await initControls(camera, renderer.domElement);
-    await initEntities();
-    await initDungeon();
-    await initTown();
-    
-    // Load save if exists
-    loadGame();
-    
-    // Window resize
-    window.addEventListener('resize', onWindowResize);
-    
-    // Show title screen
-    showTitleScreen();
-    
-    // Start game loop
-    animate();
+    try {
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.8;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+        
+        // Camera
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Initialize systems
+        await initControls(camera, renderer.domElement);
+        await initEntities();
+        await initDungeon();
+        await initTown();
+        
+        // Set up bridges to avoid circular dependencies
+        setGameBridge({
+            damagePlayer,
+            getUpgradeLevel,
+            hasAbility,
+            getGameData
+        });
+        setNPCInteractionCallback(interactWithNPC);
+        
+        // Load save if exists
+        loadGame();
+        
+        // Window resize
+        window.addEventListener('resize', onWindowResize);
+        
+        // Show title screen
+        showTitleScreen();
+        
+        // Start game loop
+        animate();
+        
+        console.log('Game initialized successfully');
+    } catch (error) {
+        console.error('Game initialization failed:', error);
+    }
 }
 
 function onWindowResize() {
@@ -161,6 +176,7 @@ export function enterTown() {
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.add('hidden');
     document.getElementById('town-ui').classList.remove('hidden');
+    document.getElementById('shared-controls').classList.remove('hidden');
     document.getElementById('dialogue-box').classList.add('hidden');
     document.getElementById('death-screen').classList.add('hidden');
     document.getElementById('victory-screen').classList.add('hidden');
@@ -192,6 +208,7 @@ export function enterDungeon(floor = null) {
     document.getElementById('title-screen').classList.add('hidden');
     document.getElementById('game-ui').classList.remove('hidden');
     document.getElementById('town-ui').classList.add('hidden');
+    document.getElementById('shared-controls').classList.remove('hidden');
     document.getElementById('dialogue-box').classList.add('hidden');
     
     // Clear previous state
