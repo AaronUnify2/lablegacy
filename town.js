@@ -26,9 +26,9 @@ export async function initTown(renderer, unlockedNPCs = ['guide']) {
     
     townScene = new THREE.Scene();
     
-    // Sky/atmosphere - less dense fog
-    townScene.background = new THREE.Color(0x1a1520);
-    townScene.fog = new THREE.FogExp2(0x1a1520, 0.008);
+    // Sky/atmosphere - MUCH less dense fog for visibility
+    townScene.background = new THREE.Color(0x2a2535);  // Brighter background
+    townScene.fog = new THREE.FogExp2(0x2a2535, 0.004); // Much less dense fog
     
     // Build environment
     buildGround();
@@ -45,10 +45,10 @@ export async function initTown(renderer, unlockedNPCs = ['guide']) {
 // ============================================
 
 function buildGround() {
-    // Main clearing
+    // Main clearing - brighter color
     const groundGeom = new THREE.CircleGeometry(30, 32);
     const groundMat = new THREE.MeshStandardMaterial({
-        color: 0x2a3020,
+        color: 0x3a4535,  // Brighter
         roughness: 0.95
     });
     const ground = new THREE.Mesh(groundGeom, groundMat);
@@ -59,7 +59,7 @@ function buildGround() {
     // Path to dungeon
     const pathGeom = new THREE.PlaneGeometry(4, 15);
     const pathMat = new THREE.MeshStandardMaterial({
-        color: 0x3a3530,
+        color: 0x4a4540,  // Brighter
         roughness: 0.9
     });
     const path = new THREE.Mesh(pathGeom, pathMat);
@@ -119,10 +119,10 @@ function buildForest() {
 function createTree() {
     const group = new THREE.Group();
     
-    // Trunk
+    // Trunk - brighter
     const trunkGeom = new THREE.CylinderGeometry(0.3, 0.5, 4, 6);
     const trunkMat = new THREE.MeshStandardMaterial({
-        color: 0x3d2817,
+        color: 0x5d4827,  // Brighter trunk
         roughness: 0.9
     });
     const trunk = new THREE.Mesh(trunkGeom, trunkMat);
@@ -130,9 +130,9 @@ function createTree() {
     trunk.castShadow = true;
     group.add(trunk);
     
-    // Foliage layers
+    // Foliage layers - brighter greens
     const foliageMat = new THREE.MeshStandardMaterial({
-        color: 0x1a3020,
+        color: 0x2a5035,  // Brighter foliage
         roughness: 0.8
     });
     
@@ -154,7 +154,7 @@ function createBush() {
     const group = new THREE.Group();
     
     const bushMat = new THREE.MeshStandardMaterial({
-        color: 0x2a4030,
+        color: 0x3a5540,  // Brighter
         roughness: 0.9
     });
     
@@ -181,15 +181,15 @@ function buildDungeonEntrance() {
     
     // Cave mouth (dark opening)
     const caveGeom = new THREE.CircleGeometry(3, 16);
-    const caveMat = new THREE.MeshBasicMaterial({ color: 0x050508 });
+    const caveMat = new THREE.MeshBasicMaterial({ color: 0x080810 });
     const cave = new THREE.Mesh(caveGeom, caveMat);
     cave.position.z = 0.1;
     cave.position.y = 2;
     group.add(cave);
     
-    // Stone archway
+    // Stone archway - brighter
     const archMat = new THREE.MeshStandardMaterial({
-        color: 0x4a4a5a,
+        color: 0x6a6a7a,  // Brighter stone
         roughness: 0.7,
         metalness: 0.2
     });
@@ -216,11 +216,11 @@ function buildDungeonEntrance() {
     
     // Ornate door frame (the elaborate sealed door)
     const doorMat = new THREE.MeshStandardMaterial({
-        color: 0x1a1a2e,
+        color: 0x2a2a4e,  // Brighter
         metalness: 0.8,
         roughness: 0.3,
-        emissive: 0x000033,
-        emissiveIntensity: 0.2
+        emissive: 0x000066,
+        emissiveIntensity: 0.3
     });
     
     const doorGeom = new THREE.PlaneGeometry(5, 4.5);
@@ -232,7 +232,7 @@ function buildDungeonEntrance() {
     const runeMat = new THREE.MeshBasicMaterial({
         color: 0x00ffff,
         transparent: true,
-        opacity: 0.7
+        opacity: 0.8
     });
     
     const runePositions = [
@@ -252,19 +252,19 @@ function buildDungeonEntrance() {
     const glowMat = new THREE.MeshBasicMaterial({
         color: 0x00ffff,
         transparent: true,
-        opacity: 0.5
+        opacity: 0.6
     });
     const glow = new THREE.Mesh(glowGeom, glowMat);
     glow.position.set(0, 2.5, 0.26);
     group.add(glow);
     
-    // Light from entrance
-    const entranceLight = new THREE.PointLight(0x00ffff, 1, 15);
+    // Light from entrance - BRIGHTER
+    const entranceLight = new THREE.PointLight(0x00ffff, 3, 25);
     entranceLight.position.set(0, 3, 1);
     group.add(entranceLight);
     
-    // Ambient obelisk hum light
-    const humLight = new THREE.PointLight(0x6600ff, 0.5, 20);
+    // Ambient obelisk hum light - BRIGHTER
+    const humLight = new THREE.PointLight(0x6600ff, 1.5, 30);
     humLight.position.set(0, 2, -2);
     group.add(humLight);
     
@@ -276,73 +276,98 @@ function buildCamp(unlockedNPCs) {
     npcs.forEach(npc => townScene.remove(npc.group));
     npcs = [];
     
-    // Wagon circle positions (parking area)
-    const wagonPositions = [
-        { x: -8, z: 8, rotation: 0.3, npc: 'guide' },
-        { x: 8, z: 8, rotation: -0.3, npc: 'merchant' },
-        { x: -10, z: 0, rotation: 0.8, npc: 'scholar' },
-        { x: 10, z: 0, rotation: -0.8, npc: 'nomad' },
-        { x: -8, z: -6, rotation: 1.2, npc: 'scientist' },
-        { x: 8, z: -6, rotation: -1.2, npc: 'stranger' }
-    ];
-    
-    // Central campfire
+    // Campfire in center
     const campfire = createCampfire();
     campfire.position.set(0, 0, 5);
     townScene.add(campfire);
     
-    // Place wagons and NPCs
-    wagonPositions.forEach(pos => {
-        if (unlockedNPCs.includes(pos.npc)) {
-            const wagon = createWagon(pos.npc);
-            wagon.position.set(pos.x, 0, pos.z);
-            wagon.rotation.y = pos.rotation;
-            townScene.add(wagon);
-            
-            // NPC standing near wagon
-            const npc = createNPC(pos.npc);
-            npc.group.position.set(
-                pos.x + Math.sin(pos.rotation) * 2,
-                0,
-                pos.z + Math.cos(pos.rotation) * 2
-            );
+    // Tents/shelters
+    const tent1 = createTent();
+    tent1.position.set(-8, 0, 8);
+    tent1.rotation.y = 0.3;
+    townScene.add(tent1);
+    
+    const tent2 = createTent();
+    tent2.position.set(8, 0, 10);
+    tent2.rotation.y = -0.4;
+    townScene.add(tent2);
+    
+    // Merchant wagon
+    const wagon = createWagon();
+    wagon.position.set(10, 0, 3);
+    wagon.rotation.y = -0.5;
+    townScene.add(wagon);
+    
+    // NPCs based on unlocked list
+    const npcPositions = {
+        guide: { x: 2, z: 7 },
+        merchant: { x: 8, z: 3 },
+        scholar: { x: -6, z: 8 },
+        nomad: { x: -3, z: 12 },
+        scientist: { x: 5, z: 12 },
+        stranger: { x: -10, z: 5 }
+    };
+    
+    unlockedNPCs.forEach(type => {
+        if (npcPositions[type]) {
+            const npc = createNPC(type);
+            npc.group.position.set(npcPositions[type].x, 0, npcPositions[type].z);
             townScene.add(npc.group);
             npcs.push(npc);
         }
     });
 }
 
-function createWagon(ownerType) {
+function createTent() {
     const group = new THREE.Group();
     
-    // Get wagon color based on owner
-    const colors = {
-        guide: 0x4a3020,
-        merchant: 0x5a4030,
-        scholar: 0x3a3050,
-        nomad: 0x4a4030,
-        scientist: 0x3a4050,
-        stranger: 0x2a2030
-    };
-    
-    const wagonColor = colors[ownerType] || 0x4a3020;
-    const wagonMat = new THREE.MeshStandardMaterial({
-        color: wagonColor,
-        roughness: 0.9
+    // Tent body - brighter
+    const tentGeom = new THREE.ConeGeometry(3, 3, 4);
+    const tentMat = new THREE.MeshStandardMaterial({
+        color: 0x7a6a50,  // Brighter canvas
+        roughness: 0.9,
+        side: THREE.DoubleSide
     });
+    const tent = new THREE.Mesh(tentGeom, tentMat);
+    tent.position.y = 1.5;
+    tent.rotation.y = Math.PI / 4;
+    tent.castShadow = true;
+    group.add(tent);
     
-    // Wagon body
-    const bodyGeom = new THREE.BoxGeometry(3, 1.5, 2);
-    const body = new THREE.Mesh(bodyGeom, wagonMat);
-    body.position.y = 1.2;
+    // Entrance flap
+    const flapGeom = new THREE.PlaneGeometry(1.5, 2);
+    const flap = new THREE.Mesh(flapGeom, tentMat);
+    flap.position.set(0, 1, 1.8);
+    flap.rotation.x = 0.2;
+    group.add(flap);
+    
+    // Interior light
+    const interiorLight = new THREE.PointLight(0xffaa44, 1.0, 8);
+    interiorLight.position.set(0, 1, 0);
+    group.add(interiorLight);
+    
+    return group;
+}
+
+function createWagon() {
+    const group = new THREE.Group();
+    
+    // Wagon body - brighter
+    const bodyGeom = new THREE.BoxGeometry(3, 1.5, 2.5);
+    const bodyMat = new THREE.MeshStandardMaterial({
+        color: 0x6d4827,  // Brighter wood
+        roughness: 0.8
+    });
+    const body = new THREE.Mesh(bodyGeom, bodyMat);
+    body.position.y = 1.25;
     body.castShadow = true;
     group.add(body);
     
-    // Wagon canopy
-    const canopyGeom = new THREE.CylinderGeometry(1.2, 1.2, 3, 8, 1, false, 0, Math.PI);
+    // Canopy - brighter
+    const canopyGeom = new THREE.CylinderGeometry(1.5, 1.5, 3.2, 8, 1, true);
     const canopyMat = new THREE.MeshStandardMaterial({
-        color: 0x8a7060,
-        roughness: 0.95,
+        color: 0x9a7a5a,  // Brighter
+        roughness: 0.9,
         side: THREE.DoubleSide
     });
     const canopy = new THREE.Mesh(canopyGeom, canopyMat);
@@ -353,7 +378,7 @@ function createWagon(ownerType) {
     
     // Wheels
     const wheelGeom = new THREE.CylinderGeometry(0.5, 0.5, 0.2, 12);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x3d2817 });
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x5d4827 });
     
     const wheelPositions = [
         { x: -1.2, z: 1.2 },
@@ -370,8 +395,8 @@ function createWagon(ownerType) {
         group.add(wheel);
     });
     
-    // Lantern - brighter
-    const lanternLight = new THREE.PointLight(0xffaa44, 1.5, 15);
+    // Lantern - BRIGHTER
+    const lanternLight = new THREE.PointLight(0xffaa44, 3, 20);
     lanternLight.position.set(0, 3, 1);
     group.add(lanternLight);
     
@@ -385,7 +410,7 @@ function createCampfire() {
     for (let i = 0; i < 8; i++) {
         const angle = (i / 8) * Math.PI * 2;
         const stoneGeom = new THREE.BoxGeometry(0.4, 0.3, 0.4);
-        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a });
+        const stoneMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a });
         const stone = new THREE.Mesh(stoneGeom, stoneMat);
         stone.position.set(Math.cos(angle) * 0.8, 0.15, Math.sin(angle) * 0.8);
         stone.rotation.y = angle;
@@ -410,13 +435,13 @@ function createCampfire() {
         group.add(fire);
     }
     
-    // Fire light - much brighter
-    const fireLight = new THREE.PointLight(0xff6600, 3, 25);
+    // Fire light - MUCH brighter and longer range
+    const fireLight = new THREE.PointLight(0xff6600, 6, 35);
     fireLight.position.y = 1;
     group.add(fireLight);
     
-    // Secondary flicker light
-    const flickerLight = new THREE.PointLight(0xff4400, 2, 18);
+    // Secondary flicker light - BRIGHTER
+    const flickerLight = new THREE.PointLight(0xff4400, 4, 25);
     flickerLight.position.y = 0.5;
     group.add(flickerLight);
     group.userData.flickerLight = flickerLight;
@@ -427,14 +452,14 @@ function createCampfire() {
 function createNPC(type) {
     const group = new THREE.Group();
     
-    // NPC colors
+    // NPC colors - BRIGHTER
     const colors = {
-        guide: { robe: 0x4a6040, accent: 0x88aa77 },
-        merchant: { robe: 0x6a5030, accent: 0xddaa44 },
-        scholar: { robe: 0x3a3060, accent: 0x8888cc },
-        nomad: { robe: 0x5a4a30, accent: 0xcc9966 },
-        scientist: { robe: 0x3a5060, accent: 0x66aacc },
-        stranger: { robe: 0x2a2030, accent: 0x9966aa }
+        guide: { robe: 0x5a7050, accent: 0xa8cc97 },
+        merchant: { robe: 0x8a6040, accent: 0xffcc44 },
+        scholar: { robe: 0x4a4080, accent: 0xa8a8ee },
+        nomad: { robe: 0x7a6a40, accent: 0xeeaa77 },
+        scientist: { robe: 0x4a6a80, accent: 0x88ccee },
+        stranger: { robe: 0x3a3040, accent: 0xbb88cc }
     };
     
     const color = colors[type] || colors.guide;
@@ -450,7 +475,7 @@ function createNPC(type) {
     
     // Head
     const headGeom = new THREE.SphereGeometry(0.25, 12, 12);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0x8a7766 });
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x9a8876 });  // Brighter skin
     const head = new THREE.Mesh(headGeom, headMat);
     head.position.y = 1.45;
     head.castShadow = true;
@@ -465,7 +490,7 @@ function createNPC(type) {
         group.add(hood);
     } else if (type === 'merchant') {
         const hatGeom = new THREE.CylinderGeometry(0.2, 0.35, 0.3, 8);
-        const hat = new THREE.Mesh(hatGeom, new THREE.MeshStandardMaterial({ color: 0x4a3020 }));
+        const hat = new THREE.Mesh(hatGeom, new THREE.MeshStandardMaterial({ color: 0x5a4030 }));
         hat.position.y = 1.7;
         group.add(hat);
     } else if (type === 'stranger') {
@@ -502,22 +527,36 @@ function createNPC(type) {
 }
 
 // ============================================
-// LIGHTING
+// LIGHTING - SIGNIFICANTLY BRIGHTER
 // ============================================
 
 function addLighting() {
-    // Moonlight - brighter
-    const moonLight = new THREE.DirectionalLight(0x8888cc, 0.8);
+    // Moonlight - MUCH brighter
+    const moonLight = new THREE.DirectionalLight(0xaaaaee, 2.0);  // Increased from 0.8
     moonLight.position.set(10, 20, 10);
     townScene.add(moonLight);
     
-    // Ambient - much brighter so scene is visible
-    const ambient = new THREE.AmbientLight(0x404060, 1.2);
+    // Second directional from opposite angle
+    const moonLight2 = new THREE.DirectionalLight(0x8888cc, 1.2);
+    moonLight2.position.set(-15, 15, -10);
+    townScene.add(moonLight2);
+    
+    // Ambient - MUCH brighter so scene is clearly visible
+    const ambient = new THREE.AmbientLight(0x606080, 3.0);  // Increased from 1.2 to 3.0
     townScene.add(ambient);
     
-    // Hemisphere for sky/ground color - brighter
-    const hemi = new THREE.HemisphereLight(0x6677aa, 0x333322, 0.8);
+    // Hemisphere for sky/ground color - BRIGHTER
+    const hemi = new THREE.HemisphereLight(0x8899cc, 0x444433, 1.5);  // Increased from 0.8
     townScene.add(hemi);
+    
+    // Add some fill lights around the camp area
+    const campFill1 = new THREE.PointLight(0xffaa66, 2, 25);
+    campFill1.position.set(-5, 5, 5);
+    townScene.add(campFill1);
+    
+    const campFill2 = new THREE.PointLight(0xffaa66, 2, 25);
+    campFill2.position.set(5, 5, 8);
+    townScene.add(campFill2);
 }
 
 // ============================================
@@ -533,7 +572,7 @@ export function updateTown(delta, gameData) {
     townScene.traverse(obj => {
         if (obj.userData && obj.userData.flickerLight) {
             const flicker = 0.8 + Math.sin(time * 10) * 0.2 + Math.sin(time * 15) * 0.1;
-            obj.userData.flickerLight.intensity = flicker;
+            obj.userData.flickerLight.intensity = 4 * flicker;  // Base intensity * flicker
         }
     });
     
