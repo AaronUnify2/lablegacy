@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { initDungeon, updateDungeon, getDungeonScene, disposeDungeon, getRoomData, checkRoomTransition, getCurrentRoom, setCurrentRoom, ROOM_TYPES } from './dungeon.js';
-import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, getEnemies, disposeBosses, playerTakeDamage, isPlayerDead, getXPGained, resetXPGained, spawnMiniBoss, spawnPillarBoss, getBoss, disposePillarBoss } from './entities.js';
+import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, getEnemies, disposeBosses, playerTakeDamage, isPlayerDead, getXPGained, resetXPGained, spawnMiniBoss, spawnPillarBoss, getBoss, disposePillarBoss, clearPlatformCache } from './entities.js';
 import { initControls, updateControls, getInputState, disposeControls, enableControls, disableControls, resetCamera } from './controls.js';
 import { initTown, updateTown, getTownScene, disposeTown, getNPCInteraction, showTownUI, hideTownUI } from './town.js';
 
@@ -92,16 +92,15 @@ function initRenderer() {
     
     renderer = new THREE.WebGLRenderer({
         canvas: canvas,
-        antialias: true,
+        antialias: false, // Disable for mobile performance
         powerPreference: 'high-performance'
     });
     
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Limit pixel ratio for performance
+    renderer.shadowMap.enabled = false; // Disable shadows for mobile
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 1.2; // Slightly brighter
     
     clock = new THREE.Clock();
     
@@ -295,6 +294,7 @@ function enterDungeon(floor) {
     
     // Set up dungeon for this floor
     disposeDungeon();
+    clearPlatformCache(); // Clear cached platform references
     initDungeon(renderer, floor);
     currentScene = getDungeonScene();
     
