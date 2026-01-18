@@ -123,17 +123,14 @@ function updatePlayer(delta, inputState) {
     
     // Movement
     const moveDir = new THREE.Vector3(moveX, 0, moveZ);
-    if (moveDir.length() > 0) {
+    if (moveDir.length() > 0.1) {
         moveDir.normalize();
         player.rotation.y = Math.atan2(moveDir.x, moveDir.z);
         player.position.x += moveDir.x * userData.moveSpeed * delta;
         player.position.z += moveDir.z * userData.moveSpeed * delta;
     }
     
-    // Gravity
-    userData.velocity.y += userData.gravity * delta;
-    
-    // Jump
+    // Jump input (only when grounded)
     if (jump && userData.onGround) {
         userData.velocity.y = userData.jumpForce;
         userData.onGround = false;
@@ -149,9 +146,13 @@ function updatePlayer(delta, inputState) {
         userData.canWallJump = false;
     }
     
-    player.position.y += userData.velocity.y * delta;
+    // Apply gravity only if not on ground
+    if (!userData.onGround) {
+        userData.velocity.y += userData.gravity * delta;
+        player.position.y += userData.velocity.y * delta;
+    }
     
-    // Ground
+    // Ground check - simple
     if (player.position.y <= 0) {
         player.position.y = 0;
         userData.velocity.y = 0;
@@ -159,8 +160,13 @@ function updatePlayer(delta, inputState) {
         userData.canWallJump = false;
     }
     
-    checkPlatformCollision();
-    checkWallCollision();
+    // Platform collision (simplified - only check when falling)
+    if (userData.velocity.y < 0) {
+        checkPlatformCollision();
+    }
+    
+    // Wall collision (simplified)
+    checkWallCollisionSimple();
     
     // Combat
     updateCooldowns(delta);
@@ -177,56 +183,148 @@ function updatePlayer(delta, inputState) {
     checkEnemyCollision();
 }
 
+// Store platform references for faster collision
+let platformsCache = [];
+
 function checkPlatformCollision() {
+    // Only check when falling
+    if (player.userData.velocity.y >= 0) return;
+    
     const scene = getDungeonScene();
     if (!scene) return;
     
-    scene.traverse(obj => {
-        if (obj.userData?.isPlatform) {
-            const box = new THREE.Box3().setFromObject(obj);
-            if (player.userData.velocity.y < 0) {
-                const prevY = player.position.y - player.userData.velocity.y * 0.016;
-                if (prevY >= box.max.y && player.position.y < box.max.y) {
-                    if (player.position.x > box.min.x && player.position.x < box.max.x &&
-                        player.position.z > box.min.z && player.position.z < box.max.z) {
-                        player.position.y = box.max.y;
-                        player.userData.velocity.y = 0;
-                        player.userData.onGround = true;
-                    }
-                }
+    // Rebuild cache if empty (platforms are static so this is fine)
+    if (platformsCache.length === 0) {
+        scene.traverse(obj => {
+            if (obj.userData?.isPlatform) {
+                platformsCache.push(obj);
             }
-        }
-    });
-}
-
-function checkWallCollision() {
-    const scene = getDungeonScene();
-    if (!scene) return;
+        });
+    }
     
     const playerRadius = player.userData.radius;
-    player.userData.canWallJump = false;
     
-    scene.traverse(obj => {
-        if (obj.geometry && obj.material && !obj.userData?.isPlatform && !obj.userData?.isPortal) {
-            const box = new THREE.Box3().setFromObject(obj);
-            const closestX = Math.max(box.min.x, Math.min(player.position.x, box.max.x));
-            const closestZ = Math.max(box.min.z, Math.min(player.position.z, box.max.z));
-            const distX = player.position.x - closestX;
-            const distZ = player.position.z - closestZ;
-            const dist = Math.sqrt(distX * distX + distZ * distZ);
-            
-            if (dist < playerRadius && box.max.y > player.position.y + 0.5) {
-                if (dist > 0) {
-                    player.position.x += (distX / dist) * (playerRadius - dist);
-                    player.position.z += (distZ / dist) * (playerRadius - dist);
-                    if (!player.userData.onGround) {
-                        player.userData.canWallJump = true;
-                        player.userData.lastWallNormal = new THREE.Vector3(distX, 0, distZ).normalize();
-                    }
-                }
-            }
+    for (const platform of platformsCache) {
+        const box = new THREE.Box3().setFromObject(platform);
+        
+        // Quick AABB check first
+        if (player.position.x < box.min.x - playerRadius || 
+            player.position.x > box.max.x + playerRadius ||
+            player.position.z < box.min.z - playerRadius || 
+            player.position.z > box.max.z + playerRadius) {
+            continue;
         }
-    });
+        
+        // Check if landing on top
+        if (player.position.y < box.max.y + 0.1 && player.position.y > box.max.y - 0.5) {
+            player.position.y = box.max.y;
+            player.userData.velocity.y = 0;
+            player.userData.onGround = true;
+            return;
+        }
+    }
+}
+
+// Clear platform cache when dungeon changes
+export function clearPlatformCache() {
+    platformsCache = [];
+}
+
+function checkWallCollisionSimple() {
+    // Simple boundary-based collision instead of traversing scene
+    const playerRadius = player.userData.radius;
+    const pos = player.position;
+    
+    // Room boundaries based on dungeon layout
+    // Center room: -10 to 10 on both axes
+    // With hallways extending from there
+    
+    // Get approximate room bounds
+    const CENTER = 10;
+    const HALLWAY = 3;
+    
+    // Check if in center room
+    if (Math.abs(pos.x) < CENTER && Math.abs(pos.z) < CENTER) {
+        // In center, check walls except hallway openings
+        // North wall (with hallway opening in center)
+        if (pos.z < -CENTER + playerRadius && (pos.x < -HALLWAY || pos.x > HALLWAY)) {
+            pos.z = -CENTER + playerRadius;
+            enableWallJump(0, 1);
+        }
+        // South wall
+        if (pos.z > CENTER - playerRadius && (pos.x < -HALLWAY || pos.x > HALLWAY)) {
+            pos.z = CENTER - playerRadius;
+            enableWallJump(0, -1);
+        }
+        // East wall
+        if (pos.x > CENTER - playerRadius && (pos.z < -HALLWAY || pos.z > HALLWAY)) {
+            pos.x = CENTER - playerRadius;
+            enableWallJump(-1, 0);
+        }
+        // West wall
+        if (pos.x < -CENTER + playerRadius && (pos.z < -HALLWAY || pos.z > HALLWAY)) {
+            pos.x = -CENTER + playerRadius;
+            enableWallJump(1, 0);
+        }
+    }
+    
+    // Hallway walls
+    // East hallway
+    if (pos.x > CENTER && pos.x < CENTER + 15) {
+        if (pos.z < -HALLWAY + playerRadius) { pos.z = -HALLWAY + playerRadius; enableWallJump(0, 1); }
+        if (pos.z > HALLWAY - playerRadius) { pos.z = HALLWAY - playerRadius; enableWallJump(0, -1); }
+    }
+    // West hallway
+    if (pos.x < -CENTER && pos.x > -CENTER - 15) {
+        if (pos.z < -HALLWAY + playerRadius) { pos.z = -HALLWAY + playerRadius; enableWallJump(0, 1); }
+        if (pos.z > HALLWAY - playerRadius) { pos.z = HALLWAY - playerRadius; enableWallJump(0, -1); }
+    }
+    // North hallway
+    if (pos.z < -CENTER && pos.z > -CENTER - 15) {
+        if (pos.x < -HALLWAY + playerRadius) { pos.x = -HALLWAY + playerRadius; enableWallJump(1, 0); }
+        if (pos.x > HALLWAY - playerRadius) { pos.x = HALLWAY - playerRadius; enableWallJump(-1, 0); }
+    }
+    // South hallway
+    if (pos.z > CENTER && pos.z < CENTER + 15) {
+        if (pos.x < -HALLWAY + playerRadius) { pos.x = -HALLWAY + playerRadius; enableWallJump(1, 0); }
+        if (pos.x > HALLWAY - playerRadius) { pos.x = HALLWAY - playerRadius; enableWallJump(-1, 0); }
+    }
+    
+    // Orbital room boundaries (rough - they're offset from hallway ends)
+    const ORBITAL_START = CENTER + 15;
+    const ORBITAL_SIZE = 8;
+    
+    // East room
+    if (pos.x > ORBITAL_START) {
+        if (pos.x > ORBITAL_START + ORBITAL_SIZE - playerRadius) pos.x = ORBITAL_START + ORBITAL_SIZE - playerRadius;
+        if (pos.z < -ORBITAL_SIZE + playerRadius) pos.z = -ORBITAL_SIZE + playerRadius;
+        if (pos.z > ORBITAL_SIZE - playerRadius) pos.z = ORBITAL_SIZE - playerRadius;
+    }
+    // West room
+    if (pos.x < -ORBITAL_START) {
+        if (pos.x < -ORBITAL_START - ORBITAL_SIZE + playerRadius) pos.x = -ORBITAL_START - ORBITAL_SIZE + playerRadius;
+        if (pos.z < -ORBITAL_SIZE + playerRadius) pos.z = -ORBITAL_SIZE + playerRadius;
+        if (pos.z > ORBITAL_SIZE - playerRadius) pos.z = ORBITAL_SIZE - playerRadius;
+    }
+    // North room
+    if (pos.z < -ORBITAL_START) {
+        if (pos.z < -ORBITAL_START - ORBITAL_SIZE + playerRadius) pos.z = -ORBITAL_START - ORBITAL_SIZE + playerRadius;
+        if (pos.x < -ORBITAL_SIZE + playerRadius) pos.x = -ORBITAL_SIZE + playerRadius;
+        if (pos.x > ORBITAL_SIZE - playerRadius) pos.x = ORBITAL_SIZE - playerRadius;
+    }
+    // South room
+    if (pos.z > ORBITAL_START) {
+        if (pos.z > ORBITAL_START + ORBITAL_SIZE - playerRadius) pos.z = ORBITAL_START + ORBITAL_SIZE - playerRadius;
+        if (pos.x < -ORBITAL_SIZE + playerRadius) pos.x = -ORBITAL_SIZE + playerRadius;
+        if (pos.x > ORBITAL_SIZE - playerRadius) pos.x = ORBITAL_SIZE - playerRadius;
+    }
+}
+
+function enableWallJump(normalX, normalZ) {
+    if (!player.userData.onGround) {
+        player.userData.canWallJump = true;
+        player.userData.lastWallNormal = new THREE.Vector3(normalX, 0, normalZ);
+    }
 }
 
 function checkEnemyCollision() {
