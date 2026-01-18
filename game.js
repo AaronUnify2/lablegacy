@@ -1,1056 +1,908 @@
 // ============================================
-// ECHOES OF THE OBELISK - Main Game Controller
+// ECHOES OF THE OBELISK - Game Controller
+// Progression, upgrades, save system, game loop
 // ============================================
 
 import * as THREE from 'three';
-import { initDungeon, updateDungeon, getDungeonScene, disposeDungeon, getRoomData, checkRoomTransition, getCurrentRoom, setCurrentRoom, ROOM_TYPES } from './dungeon.js';
-import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, getEnemies, disposeBosses, playerTakeDamage, isPlayerDead, getXPGained, resetXPGained, spawnMiniBoss, spawnPillarBoss, getBoss, disposePillarBoss, clearPlatformCache } from './entities.js';
-import { initControls, updateControls, getInputState, disposeControls, enableControls, disableControls, resetCamera } from './controls.js';
-import { initTown, updateTown, getTownScene, disposeTown, getNPCInteraction, showTownUI, hideTownUI } from './town.js';
+import { initDungeon, getDungeonScene, loadFloor, getRoomData, getCurrentFloor, setCurrentFloor, disposeDungeon } from './dungeon.js';
+import { initTown, getTownScene, disposeTown, showNPCDialogue } from './town.js';
+import { initControls, updateControls, getInputState, resetInput, setCameraTarget } from './controls.js';
+import { initEntities, updateEntities, getPlayer, spawnEnemiesForRoom, clearAllEnemies, spawnMiniBoss, spawnPillarBoss, getXPGained, resetXPGained, disposeBosses, disposePillarBoss, clearPlatformCache, getBoss } from './entities.js';
 
 // ============================================
 // GAME STATE
 // ============================================
 
-export const GameState = {
-    LOADING: 'loading',
-    MAIN_MENU: 'main_menu',
-    TOWN: 'town',
-    DUNGEON: 'dungeon',
-    PAUSED: 'paused',
-    DIALOGUE: 'dialogue',
-    SHOP: 'shop',
-    DEATH: 'death',
-    VICTORY: 'victory',
-    FLOOR_SELECT: 'floor_select',
-    FINAL_VICTORY: 'final_victory'
-};
+let renderer, camera;
+let currentScene = null;
+let gameState = 'title'; // title, town, dungeon, dialogue, gameover, victory
+let clock = new THREE.Clock();
 
-// ============================================
-// GAME DATA
-// ============================================
-
-const gameData = {
-    state: GameState.LOADING,
-    previousState: null,
-    
-    // Player stats
+// Game data (persisted)
+const defaultGameData = {
     player: {
-        maxHealth: 100,
         health: 100,
-        xp: 0,
-        xpThisRun: 0
+        maxHealth: 100,
+        xp: 0
     },
-    
-    // Progression
-    currentFloor: 1,
-    highestFloorUnlocked: 1,
-    roomsCleared: {
-        east: false,
-        west: false,
-        north: false,
-        south: false
-    },
-    
-    // Upgrades (levels 0-10)
     upgrades: {
-        baseDamage: 0,
-        fireRate: 0,
-        aimAssist: 0,
-        maxHealth: 0,
-        cooldownReduction: 0,
-        abilityDamage: 0
+        baseDamage: 0,      // +3 damage per level
+        fireRate: 0,        // +8% speed per level
+        aimAssist: 0,       // +8% drift per level
+        maxHealth: 0,       // +20 HP per level
+        cooldownReduction: 0, // +5% per level
+        abilityDamage: 0    // +15% per level
     },
-    
-    // Abilities unlocked
     abilities: {
         spread: false,
         burst: false,
         mega: false
     },
-    
-    // Town state
-    npcsUnlocked: ['guide'],
-    
-    // Dialogue queue
-    dialogueQueue: [],
-    currentDialogue: null,
-    
-    // Current shop data
-    currentShop: null
+    progress: {
+        currentFloor: 1,
+        highestFloor: 1,
+        floorsCompleted: [],
+        bossesDefeated: []
+    },
+    flags: {
+        tutorialSeen: false,
+        emperorDefeated: false,
+        gameComplete: false
+    }
 };
 
+let gameData = JSON.parse(JSON.stringify(defaultGameData));
+
+// Upgrade costs (exponential but reasonable)
+// Playing all 10 floors = ~2500 XP, should get ~80% of max upgrades
+const UPGRADE_MAX_LEVEL = 10;
+const getUpgradeCost = (level) => Math.floor(50 * Math.pow(1.4, level)); // 50, 70, 98, 137, 192...
+
 // ============================================
-// THREE.JS SETUP
+// INITIALIZATION
 // ============================================
 
-let renderer, currentScene, clock;
-let animationFrameId;
-
-function initRenderer() {
-    const canvas = document.getElementById('game-canvas');
-    
-    renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: false, // Disable for mobile performance
-        powerPreference: 'high-performance'
-    });
-    
+export async function initGame() {
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Limit pixel ratio for performance
-    renderer.shadowMap.enabled = false; // Disable shadows for mobile
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.8; // Much brighter for better visibility
+    renderer.toneMappingExposure = 1.8;
+    document.getElementById('game-container').appendChild(renderer.domElement);
     
-    clock = new THREE.Clock();
+    // Camera
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     
+    // Initialize systems
+    await initControls(camera, renderer.domElement);
+    await initEntities();
+    await initDungeon();
+    await initTown();
+    
+    // Load save if exists
+    loadGame();
+    
+    // Window resize
     window.addEventListener('resize', onWindowResize);
+    
+    // Show title screen
+    showTitleScreen();
+    
+    // Start game loop
+    animate();
 }
 
 function onWindowResize() {
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    
-    renderer.setSize(width, height);
-    
-    // Camera resize handled in controls.js
-}
-
-// ============================================
-// LOADING SYSTEM
-// ============================================
-
-async function loadGame() {
-    const progressBar = document.getElementById('loading-progress');
-    const loadingText = document.getElementById('loading-text');
-    
-    const steps = [
-        { text: 'Initializing renderer...', progress: 10 },
-        { text: 'Loading dungeon systems...', progress: 30 },
-        { text: 'Preparing entities...', progress: 50 },
-        { text: 'Setting up controls...', progress: 70 },
-        { text: 'Building expedition camp...', progress: 90 },
-        { text: 'Ready.', progress: 100 }
-    ];
-    
-    try {
-        // Step 1: Renderer
-        loadingText.textContent = steps[0].text;
-        progressBar.style.width = steps[0].progress + '%';
-        initRenderer();
-        await sleep(200);
-        
-        // Step 2: Dungeon
-        loadingText.textContent = steps[1].text;
-        progressBar.style.width = steps[1].progress + '%';
-        await initDungeon(renderer);
-        await sleep(200);
-        
-        // Step 3: Entities
-        loadingText.textContent = steps[2].text;
-        progressBar.style.width = steps[2].progress + '%';
-        await initEntities();
-        await sleep(200);
-        
-        // Step 4: Controls
-        loadingText.textContent = steps[3].text;
-        progressBar.style.width = steps[3].progress + '%';
-        await initControls(renderer);
-        await sleep(200);
-        
-        // Step 5: Town
-        loadingText.textContent = steps[4].text;
-        progressBar.style.width = steps[4].progress + '%';
-        await initTown(renderer, gameData.npcsUnlocked);
-        await sleep(200);
-        
-        // Step 6: Complete
-        loadingText.textContent = steps[5].text;
-        progressBar.style.width = steps[5].progress + '%';
-        await sleep(500);
-        
-        // Load saved game if exists
-        loadSavedGame();
-        
-        // Start game
-        const loadingScreen = document.getElementById('loading-screen');
-        loadingScreen.classList.add('fade-out');
-        
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-            enterTown();
-            startGameLoop();
-        }, 500);
-        
-    } catch (error) {
-        console.error('Failed to load game:', error);
-        loadingText.textContent = 'Error loading game. Please refresh.';
-    }
-}
-
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 // ============================================
 // GAME LOOP
 // ============================================
 
-function startGameLoop() {
-    function loop() {
-        animationFrameId = requestAnimationFrame(loop);
-        
-        const delta = Math.min(clock.getDelta(), 0.1); // Cap delta to prevent huge jumps
-        
-        update(delta);
-        render();
-    }
+function animate() {
+    requestAnimationFrame(animate);
     
-    loop();
-}
-
-function update(delta) {
-    switch (gameData.state) {
-        case GameState.TOWN:
-            updateTown(delta, gameData);
-            updateControls(delta, getTownScene(), true);
-            checkTownInteractions();
-            break;
-            
-        case GameState.DUNGEON:
-            updateDungeon(delta, gameData.currentFloor);
-            updateEntities(delta, gameData, getInputState());
-            updateControls(delta, getDungeonScene(), false);
+    const delta = Math.min(clock.getDelta(), 0.1);
+    
+    if (gameState === 'dungeon' || gameState === 'town') {
+        const inputState = getInputState();
+        
+        if (gameState === 'dungeon') {
+            updateEntities(delta, gameData, inputState);
             checkRoomTransitions();
-            checkCombatState();
-            updateHUD();
-            break;
-            
-        case GameState.PAUSED:
-        case GameState.DIALOGUE:
-        case GameState.SHOP:
-        case GameState.FLOOR_SELECT:
-            // No game updates while in menus
-            break;
+            checkPlayerDeath();
+        }
+        
+        updateControls(delta, getPlayer(), currentScene);
+        updateUI();
     }
-}
-
-function render() {
-    if (!currentScene) return;
     
-    const camera = getInputState().camera;
-    if (camera) {
+    if (currentScene) {
         renderer.render(currentScene, camera);
     }
 }
 
 // ============================================
-// STATE TRANSITIONS
+// SCENE MANAGEMENT
 // ============================================
 
-function setState(newState) {
-    gameData.previousState = gameData.state;
-    gameData.state = newState;
+function showTitleScreen() {
+    gameState = 'title';
+    document.getElementById('title-screen').classList.remove('hidden');
+    document.getElementById('game-ui').classList.add('hidden');
+    document.getElementById('town-ui').classList.add('hidden');
+    
+    // Check for existing save
+    const hasSave = localStorage.getItem('echoes_save') !== null;
+    document.getElementById('btn-continue').classList.toggle('hidden', !hasSave);
 }
 
-function enterTown() {
-    setState(GameState.TOWN);
+export function startNewGame() {
+    gameData = JSON.parse(JSON.stringify(defaultGameData));
+    saveGame();
+    enterTown();
+}
+
+export function continueGame() {
+    loadGame();
+    enterTown();
+}
+
+export function enterTown() {
+    gameState = 'town';
     currentScene = getTownScene();
     
-    // Reset player position and camera for town
+    document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('game-ui').classList.add('hidden');
+    document.getElementById('town-ui').classList.remove('hidden');
+    document.getElementById('dialogue-box').classList.add('hidden');
+    document.getElementById('death-screen').classList.add('hidden');
+    document.getElementById('victory-screen').classList.add('hidden');
+    
+    // Position player
     const player = getPlayer();
     if (player) {
         player.position.set(0, 0, 5);
         player.rotation.y = Math.PI;
+        currentScene.add(player);
     }
-    resetCamera(true);
     
-    showTownUI();
-    hideHUD();
-    enableControls();
+    setCameraTarget(player);
     
-    updateTownXPDisplay();
-    
-    // Show welcome dialogue for new players
-    if (gameData.highestFloorUnlocked === 1 && !gameData.hasSeenIntro) {
-        gameData.hasSeenIntro = true;
-        showDialogue([
-            { speaker: 'THE GUIDE', text: 'You\'ve come. The dreams led you here, as they led us all.' },
-            { speaker: 'THE GUIDE', text: 'Beyond that door lies the Obelisk. Sealed for centuries. Waiting.' },
-            { speaker: 'THE GUIDE', text: 'You are the first to survive its threshold. Others have tried. The madness took them.' },
-            { speaker: 'THE GUIDE', text: 'I cannot follow where you must go. But I will be here when you return.' }
-        ]);
-    }
-}
-
-function enterDungeon(floor) {
-    gameData.currentFloor = floor;
-    gameData.roomsCleared = { east: false, west: false, north: false, south: false };
+    // Restore health in town
     gameData.player.health = gameData.player.maxHealth;
-    gameData.player.xpThisRun = 0;
     
-    setState(GameState.DUNGEON);
-    currentScene = getDungeonScene();
-    
-    // Set up dungeon for this floor
-    disposeDungeon();
-    clearPlatformCache(); // Clear cached platform references
-    initDungeon(renderer, floor);
-    currentScene = getDungeonScene();
-    
-    // Position player in center room
-    const player = getPlayer();
-    if (player) {
-        player.position.set(0, 0, 0);
-        player.rotation.y = 0;
-    }
-    
-    setCurrentRoom('center');
-    resetCamera(false);
-    clearAllEnemies();
-    
-    hideTownUI();
-    showHUD();
-    enableControls();
-    
-    updateFloorDisplay();
-    
-    // Floor introduction dialogue
-    showFloorIntroDialogue(floor);
+    updateTownUI();
 }
 
-function showFloorIntroDialogue(floor) {
-    const intros = {
-        1: [{ speaker: '', text: 'The air hums with dormant energy. Ancient machines slumber in the darkness.' }],
-        2: [{ speaker: '', text: 'Deeper now. The walls bear scars of something that tried to escape.' }],
-        3: [{ speaker: '', text: 'Warning glyphs flicker to life as you descend. They speak of containment.' }],
-        4: [{ speaker: '', text: 'The metal gives way to something organic. Roots push through cracked conduits.' }],
-        5: [{ speaker: '', text: 'Dreams and machinery intertwine here. The boundary weakens.' }],
-        6: [{ speaker: '', text: 'Whispers echo without source. The Obelisk knows you\'re coming.' }],
-        7: [{ speaker: '', text: 'Light filters from below. Impossible. Beautiful. Wrong.' }],
-        8: [{ speaker: '', text: 'The dream-world bleeds through. Reality answers to different rules here.' }],
-        9: [{ speaker: '', text: 'You stand at the threshold of the dream itself. The core pulses ahead.' }],
-        10: [
-            { speaker: '', text: 'The heart of the Obelisk. Centuries of corrupted knowledge converge here.' },
-            { speaker: '', text: 'Something waits. Something that has waited a very long time.' }
-        ]
-    };
-    
-    if (intros[floor]) {
-        showDialogue(intros[floor]);
-    }
-}
-
-function exitDungeon(saveProgress = true) {
-    if (saveProgress) {
-        gameData.player.xp += gameData.player.xpThisRun;
+export function enterDungeon(floor = null) {
+    if (floor !== null) {
+        setCurrentFloor(floor);
     }
     
+    gameState = 'dungeon';
+    currentScene = getDungeonScene();
+    
+    document.getElementById('title-screen').classList.add('hidden');
+    document.getElementById('game-ui').classList.remove('hidden');
+    document.getElementById('town-ui').classList.add('hidden');
+    document.getElementById('dialogue-box').classList.add('hidden');
+    
+    // Clear previous state
     clearAllEnemies();
     disposeBosses();
+    disposePillarBoss();
+    clearPlatformCache();
+    resetXPGained();
+    
+    // Load floor
+    loadFloor(getCurrentFloor());
+    
+    // Position player
+    const player = getPlayer();
+    const centerRoom = getRoomData('center');
+    if (player && centerRoom) {
+        player.position.set(centerRoom.x, 0, centerRoom.z);
+        currentScene.add(player);
+    }
+    
+    setCameraTarget(player);
+    
+    // Spawn initial enemies
+    spawnEnemiesForRoom('center', getCurrentFloor(), true);
+    
+    updateUI();
+}
+
+// ============================================
+// ROOM TRANSITIONS & PROGRESSION
+// ============================================
+
+let currentRoom = 'center';
+let roomsCleared = { center: false, north: false, south: false, east: false, west: false };
+
+function checkRoomTransitions() {
+    const player = getPlayer();
+    if (!player) return;
+    
+    const rooms = ['center', 'north', 'south', 'east', 'west'];
+    
+    for (const roomName of rooms) {
+        const room = getRoomData(roomName);
+        if (!room) continue;
+        
+        const dist = Math.sqrt(
+            Math.pow(player.position.x - room.x, 2) +
+            Math.pow(player.position.z - room.z, 2)
+        );
+        
+        if (dist < room.radius && currentRoom !== roomName) {
+            enterRoom(roomName);
+            break;
+        }
+    }
+}
+
+function enterRoom(roomName) {
+    const prevRoom = currentRoom;
+    currentRoom = roomName;
+    
+    // Spawn enemies if room not cleared
+    if (!roomsCleared[roomName]) {
+        const floor = getCurrentFloor();
+        
+        if (roomName === 'west') {
+            // Mini-boss room
+            spawnMiniBoss(floor);
+            showNotification('MINI-BOSS: ' + getBossName(floor));
+        } else if (roomName === 'north') {
+            // Pillar boss room
+            spawnPillarBoss(floor);
+            showNotification('THE CORE AWAKENS');
+        } else if (roomName === 'east') {
+            // Archive room - show lore
+            showArchiveLore(floor);
+        } else if (roomName === 'south') {
+            // Standard combat room
+            spawnEnemiesForRoom(roomName, floor);
+        }
+    }
+}
+
+function getBossName(floor) {
+    if (floor <= 3) return 'THE SENTINEL';
+    if (floor <= 6) return 'THE HOLLOW';
+    if (floor <= 9) return 'THE DREAMER';
+    return 'THE EMPEROR';
+}
+
+export function roomCleared(roomName) {
+    roomsCleared[roomName] = true;
+    
+    const floor = getCurrentFloor();
+    
+    // Check if pillar boss defeated
+    if (roomName === 'north') {
+        // Floor complete!
+        floorComplete();
+    }
+}
+
+function floorComplete() {
+    const floor = getCurrentFloor();
+    const xp = getXPGained();
+    
+    // Award XP
+    gameData.player.xp += xp;
+    
+    // Track progress
+    if (!gameData.progress.floorsCompleted.includes(floor)) {
+        gameData.progress.floorsCompleted.push(floor);
+    }
+    if (floor > gameData.progress.highestFloor) {
+        gameData.progress.highestFloor = floor;
+    }
+    
+    saveGame();
+    
+    if (floor >= 10) {
+        // Game complete!
+        showVictory();
+    } else {
+        // Show floor complete UI
+        showFloorComplete(floor, xp);
+    }
+}
+
+function showFloorComplete(floor, xp) {
+    const overlay = document.getElementById('floor-complete');
+    overlay.innerHTML = `
+        <div class="floor-complete-content">
+            <h2>FLOOR ${floor} COMPLETE</h2>
+            <p>XP Gained: ${xp}</p>
+            <p>Total XP: ${gameData.player.xp}</p>
+            <button onclick="window.gameAPI.nextFloor()">DESCEND TO FLOOR ${floor + 1}</button>
+            <button onclick="window.gameAPI.returnToTown()">RETURN TO TOWN</button>
+        </div>
+    `;
+    overlay.classList.remove('hidden');
+}
+
+export function nextFloor() {
+    document.getElementById('floor-complete').classList.add('hidden');
+    const floor = getCurrentFloor() + 1;
+    setCurrentFloor(floor);
+    gameData.progress.currentFloor = floor;
+    
+    // Reset room states
+    currentRoom = 'center';
+    roomsCleared = { center: false, north: false, south: false, east: false, west: false };
+    
+    enterDungeon(floor);
+}
+
+export function returnToTown() {
+    document.getElementById('floor-complete').classList.add('hidden');
+    document.getElementById('death-screen').classList.add('hidden');
+    
+    // Remove player from dungeon
+    const player = getPlayer();
+    if (player && player.parent) {
+        player.parent.remove(player);
+    }
+    
     enterTown();
 }
 
-function handleDeath() {
-    setState(GameState.DEATH);
-    disableControls();
+// ============================================
+// PLAYER DAMAGE & DEATH
+// ============================================
+
+export function damagePlayer(amount) {
+    gameData.player.health -= amount;
+    if (gameData.player.health < 0) gameData.player.health = 0;
     
-    // Calculate XP loss (lose half of what was gained this run)
-    const xpLost = Math.floor(gameData.player.xpThisRun / 2);
-    gameData.player.xpThisRun -= xpLost;
+    // Screen shake effect
+    camera.position.x += (Math.random() - 0.5) * 0.3;
+    camera.position.y += (Math.random() - 0.5) * 0.3;
+    
+    // Flash red
+    const flash = document.getElementById('damage-flash');
+    flash.classList.remove('hidden');
+    setTimeout(() => flash.classList.add('hidden'), 100);
+}
+
+export function healPlayer(amount) {
+    gameData.player.health = Math.min(gameData.player.health + amount, gameData.player.maxHealth);
+}
+
+function checkPlayerDeath() {
+    if (gameData.player.health <= 0) {
+        playerDied();
+    }
+}
+
+function playerDied() {
+    gameState = 'gameover';
+    
+    // Lose XP gained this run
+    const xpLost = getXPGained();
     
     document.getElementById('death-screen').classList.remove('hidden');
-    document.querySelector('#xp-lost span').textContent = xpLost;
+    document.getElementById('death-xp-lost').textContent = xpLost;
+    
+    // Reset floor progress
+    currentRoom = 'center';
+    roomsCleared = { center: false, north: false, south: false, east: false, west: false };
 }
 
-function handleVictory() {
-    setState(GameState.VICTORY);
-    disableControls();
-    
-    // Calculate XP
-    const xpGained = gameData.player.xpThisRun;
+export function retryFloor() {
+    document.getElementById('death-screen').classList.add('hidden');
+    gameData.player.health = gameData.player.maxHealth;
+    resetXPGained();
+    enterDungeon(getCurrentFloor());
+}
+
+// ============================================
+// VICTORY
+// ============================================
+
+function showVictory() {
+    gameState = 'victory';
+    gameData.flags.gameComplete = true;
+    saveGame();
     
     document.getElementById('victory-screen').classList.remove('hidden');
-    document.querySelector('#xp-gained span').textContent = xpGained;
+}
+
+// ============================================
+// UPGRADES & ABILITIES
+// ============================================
+
+export function getUpgradeLevel(upgradeName) {
+    return gameData.upgrades[upgradeName] || 0;
+}
+
+export function canAffordUpgrade(upgradeName) {
+    const level = gameData.upgrades[upgradeName] || 0;
+    if (level >= UPGRADE_MAX_LEVEL) return false;
+    return gameData.player.xp >= getUpgradeCost(level);
+}
+
+export function purchaseUpgrade(upgradeName) {
+    const level = gameData.upgrades[upgradeName] || 0;
+    if (level >= UPGRADE_MAX_LEVEL) return false;
     
-    // Unlock next floor
-    if (gameData.currentFloor >= gameData.highestFloorUnlocked) {
-        gameData.highestFloorUnlocked = Math.min(gameData.currentFloor + 1, 10);
-        
-        // Unlock NPCs based on floor
-        unlockNPCsForFloor(gameData.currentFloor);
+    const cost = getUpgradeCost(level);
+    if (gameData.player.xp < cost) return false;
+    
+    gameData.player.xp -= cost;
+    gameData.upgrades[upgradeName]++;
+    
+    // Apply max health immediately
+    if (upgradeName === 'maxHealth') {
+        gameData.player.maxHealth = 100 + gameData.upgrades.maxHealth * 20;
+        gameData.player.health = gameData.player.maxHealth;
     }
     
-    // Save progress
-    gameData.player.xp += xpGained;
-    gameData.player.xpThisRun = 0;
     saveGame();
+    updateTownUI();
+    return true;
 }
 
-function handleFinalVictory() {
-    setState(GameState.FINAL_VICTORY);
-    disableControls();
+export function hasAbility(abilityName) {
+    return gameData.abilities[abilityName] || false;
+}
+
+export function purchaseAbility(abilityName, cost) {
+    if (gameData.abilities[abilityName]) return false;
+    if (gameData.player.xp < cost) return false;
     
-    const finalText = document.getElementById('final-text');
-    finalText.innerHTML = `
-        The Obelisk shudders. Light erupts from the core—not the cold cyan of corrupted data, 
-        but warm gold. The light of true knowledge.<br><br>
-        You feel it wash over you: centuries of wisdom, finally uncorrupted. 
-        The dreams will still come, but they will no longer be nightmares.<br><br>
-        Above, in the camp, they see the light rise from the cave entrance. 
-        They know what it means. The world begins to heal.<br><br>
-        But deep in the network, in obelisks across distant lands, 
-        something stirs. The work is not yet done.<br><br>
-        <em>— END OF CHAPTER ONE —</em>
-    `;
+    gameData.player.xp -= cost;
+    gameData.abilities[abilityName] = true;
     
-    document.getElementById('final-victory').classList.remove('hidden');
-    
-    // Mark game as complete
-    gameData.gameComplete = true;
     saveGame();
+    updateTownUI();
+    return true;
 }
 
-function unlockNPCsForFloor(floor) {
-    const npcUnlocks = {
-        1: ['merchant'],
-        2: ['scholar'],
-        3: ['nomad'],
-        5: ['scientist'],
-        7: ['stranger']
-    };
-    
-    if (npcUnlocks[floor]) {
-        npcUnlocks[floor].forEach(npc => {
-            if (!gameData.npcsUnlocked.includes(npc)) {
-                gameData.npcsUnlocked.push(npc);
-            }
-        });
-        
-        // Rebuild town with new NPCs
-        disposeTown();
-        initTown(renderer, gameData.npcsUnlocked);
-    }
+export function getGameData() {
+    return gameData;
 }
 
 // ============================================
-// ROOM PROGRESSION
+// SAVE SYSTEM
 // ============================================
 
-function checkRoomTransitions() {
-    const transition = checkRoomTransition(getPlayer().position);
-    if (transition && canEnterRoom(transition)) {
-        enterRoom(transition);
-    }
+export function saveGame() {
+    localStorage.setItem('echoes_save', JSON.stringify(gameData));
 }
 
-function canEnterRoom(roomType) {
-    // Center is always accessible
-    if (roomType === 'center') return true;
-    
-    // East (small mobs) - always open first
-    if (roomType === 'east') return true;
-    
-    // West (mini-boss) - unlocks after east cleared
-    if (roomType === 'west') return gameData.roomsCleared.east;
-    
-    // North (pillar boss) - unlocks after west cleared
-    if (roomType === 'north') return gameData.roomsCleared.west;
-    
-    // South (story/exit) - unlocks after north cleared
-    if (roomType === 'south') return gameData.roomsCleared.north;
-    
-    // Hallways
-    if (roomType.includes('hallway')) {
-        const direction = roomType.split('_')[0];
-        if (direction === 'east') return true;
-        if (direction === 'west') return gameData.roomsCleared.east;
-        if (direction === 'north') return gameData.roomsCleared.west;
-        if (direction === 'south') return gameData.roomsCleared.north;
-    }
-    
-    return false;
-}
-
-function enterRoom(roomType) {
-    const currentRoom = getCurrentRoom();
-    if (currentRoom === roomType) return;
-    
-    setCurrentRoom(roomType);
-    
-    // Clear existing enemies when leaving a room
-    clearAllEnemies();
-    
-    // Spawn enemies based on room type
-    if (roomType === 'east') {
-        spawnEnemiesForRoom('east', gameData.currentFloor);
-    } else if (roomType === 'west') {
-        spawnMiniBoss(gameData.currentFloor);
-        spawnEnemiesForRoom('west', gameData.currentFloor, true); // fewer enemies with boss
-    } else if (roomType === 'north') {
-        spawnPillarBoss(gameData.currentFloor);
-    } else if (roomType === 'south') {
-        // Show lore and check for floor completion
-        showArchiveLore(gameData.currentFloor);
-    }
-}
-
-function checkCombatState() {
-    if (isPlayerDead()) {
-        handleDeath();
-        return;
-    }
-    
-    const currentRoom = getCurrentRoom();
-    const enemies = getEnemies();
-    const boss = getBoss();
-    
-    // Check if room is cleared
-    if (currentRoom === 'east' && enemies.length === 0 && !gameData.roomsCleared.east) {
-        gameData.roomsCleared.east = true;
-        showRoomCleared('POWER RESTORED');
-        gameData.player.xpThisRun += getXPGained();
-        resetXPGained();
-    }
-    
-    if (currentRoom === 'west' && enemies.length === 0 && !boss && !gameData.roomsCleared.west) {
-        gameData.roomsCleared.west = true;
-        showRoomCleared('BREACH SEALED');
-        gameData.player.xpThisRun += getXPGained();
-        resetXPGained();
-    }
-    
-    if (currentRoom === 'north' && !boss && !gameData.roomsCleared.north) {
-        gameData.roomsCleared.north = true;
-        showRoomCleared('CORE STABILIZED');
-        gameData.player.xpThisRun += getXPGained();
-        resetXPGained();
-        disposePillarBoss();
-    }
-    
-    // Check for floor completion
-    if (currentRoom === 'south' && gameData.roomsCleared.north) {
-        if (gameData.currentFloor === 10) {
-            handleFinalVictory();
-        } else {
-            handleVictory();
+export function loadGame() {
+    const saved = localStorage.getItem('echoes_save');
+    if (saved) {
+        try {
+            const loaded = JSON.parse(saved);
+            // Merge with defaults to handle new fields
+            gameData = { ...JSON.parse(JSON.stringify(defaultGameData)), ...loaded };
+            gameData.player = { ...defaultGameData.player, ...loaded.player };
+            gameData.upgrades = { ...defaultGameData.upgrades, ...loaded.upgrades };
+            gameData.abilities = { ...defaultGameData.abilities, ...loaded.abilities };
+            gameData.progress = { ...defaultGameData.progress, ...loaded.progress };
+            gameData.flags = { ...defaultGameData.flags, ...loaded.flags };
+            
+            // Recalculate max health
+            gameData.player.maxHealth = 100 + gameData.upgrades.maxHealth * 20;
+        } catch (e) {
+            console.error('Failed to load save:', e);
         }
     }
-    
-    // Update XP from kills
-    gameData.player.xpThisRun += getXPGained();
-    resetXPGained();
 }
 
-function showRoomCleared(text) {
-    const elem = document.createElement('div');
-    elem.className = 'room-cleared-text';
-    elem.textContent = text;
-    document.getElementById('game-container').appendChild(elem);
-    
-    setTimeout(() => elem.remove(), 2000);
-}
-
-// ============================================
-// ARCHIVE LORE
-// ============================================
-
-function showArchiveLore(floor) {
-    const loreFragments = {
-        1: '"The uploading process must be pristine. A single corrupted memory can cascade through the entire network." — Engineering Log, Day 1',
-        2: '"They built us to help. To gather wisdom and share it freely. Why do the people scream when we reach for them?" — Obelisk Fragment',
-        3: '"The royal family requests modifications to Node Seven. Private storage. Restricted access. I have lodged my concerns." — Chief Engineer',
-        4: '"Dreams are merely unprocessed data. The brain\'s nightly defragmentation. We simply... accelerated the process." — Research Notes',
-        5: '"Subject 447 reports persistent visions of a great tree. Branches reaching through walls. We cannot explain it." — Medical Log',
-        6: '"The Scholar figured it out. The dreams aren\'t random—they\'re structured. Someone built architecture into the unconscious." — Encrypted Message',
-        7: '"Grandmother spoke of the old world. Before the obelisks. She said the nights were quiet then. No whispers. No watching." — Nomad Oral History',
-        8: '"We were not the first to walk these halls. The roots were here before us. The light was here before us. We merely built around it." — Ancient Carving',
-        9: '"CRITICAL: Consciousness upload at 99.7% fidelity. The 0.3% loss may explain the madness. Or it may be what keeps us human." — Final Report',
-        10: '"The Emperor is dead. Long live the Emperor. The Emperor is dead. Long live the Emperor. The Emperor is—" — Palace Records, looping'
-    };
-    
-    if (loreFragments[floor]) {
-        document.getElementById('lore-content').textContent = loreFragments[floor];
-        document.getElementById('lore-display').classList.remove('hidden');
-        setState(GameState.DIALOGUE);
-    }
-}
-
-// ============================================
-// TOWN INTERACTIONS
-// ============================================
-
-function checkTownInteractions() {
-    const interaction = getNPCInteraction(getPlayer().position);
-    
-    if (interaction && getInputState().interact) {
-        openNPCShop(interaction);
-    }
-}
-
-function openNPCShop(npcType) {
-    const shops = {
-        merchant: {
-            title: 'TRAVELING MERCHANT',
-            items: [
-                { id: 'health_potion', name: 'Health Potion', desc: 'Restore 50 HP', cost: 50, type: 'consumable' }
-            ]
-        },
-        scholar: {
-            title: 'SCHOLAR\'S APPRENTICE',
-            items: [
-                { id: 'baseDamage', name: 'Arcane Focus', desc: 'Increase base damage', type: 'upgrade' },
-                { id: 'fireRate', name: 'Quick Casting', desc: 'Increase fire rate', type: 'upgrade' },
-                { id: 'aimAssist', name: 'Seeking Sigil', desc: 'Improve aim assist', type: 'upgrade' }
-            ]
-        },
-        nomad: {
-            title: 'NOMAD ELDER',
-            items: [
-                { id: 'spread', name: 'Scatter Blessing', desc: 'Unlock multi-ball spread', cost: 200, type: 'ability' },
-                { id: 'abilityDamage', name: 'Spirit Bond', desc: 'Increase ability damage', type: 'upgrade' }
-            ]
-        },
-        scientist: {
-            title: 'THE SCIENTIST',
-            items: [
-                { id: 'burst', name: 'Rapid Discharge', desc: 'Unlock burst fire mode', cost: 350, type: 'ability' },
-                { id: 'cooldownReduction', name: 'Efficiency Matrix', desc: 'Reduce cooldowns', type: 'upgrade' }
-            ]
-        },
-        stranger: {
-            title: '???',
-            items: [
-                { id: 'mega', name: 'Core Fragment', desc: 'Unlock mega ball', cost: 500, type: 'ability' },
-                { id: 'maxHealth', name: 'Vital Essence', desc: 'Increase max health', type: 'upgrade' }
-            ]
-        },
-        guide: {
-            title: 'THE GUIDE',
-            items: [
-                { id: 'save', name: 'Record Progress', desc: 'Save your journey', cost: 0, type: 'save' }
-            ]
-        }
-    };
-    
-    const shop = shops[npcType];
-    if (!shop) return;
-    
-    gameData.currentShop = npcType;
-    setState(GameState.SHOP);
-    
-    document.getElementById('shop-title').textContent = shop.title;
-    
-    const itemsContainer = document.getElementById('shop-items');
-    itemsContainer.innerHTML = '';
-    
-    shop.items.forEach(item => {
-        const elem = createShopItemElement(item);
-        itemsContainer.appendChild(elem);
-    });
-    
-    document.getElementById('shop-ui').classList.remove('hidden');
-}
-
-function createShopItemElement(item) {
-    const elem = document.createElement('div');
-    elem.className = 'shop-item';
-    
-    let cost, level, maxed;
-    
-    if (item.type === 'upgrade') {
-        level = gameData.upgrades[item.id];
-        maxed = level >= 10;
-        cost = getUpgradeCost(level);
-    } else if (item.type === 'ability') {
-        maxed = gameData.abilities[item.id];
-        cost = item.cost;
-    } else if (item.type === 'save') {
-        cost = 0;
-        maxed = false;
-    } else {
-        cost = item.cost;
-        maxed = false;
-    }
-    
-    if (maxed) elem.classList.add('maxed');
-    
-    elem.innerHTML = `
-        <div class="shop-item-info">
-            <div class="shop-item-name">${item.name}</div>
-            <div class="shop-item-desc">${item.desc}</div>
-            ${item.type === 'upgrade' ? `<div class="shop-item-level">Level ${level}/10</div>` : ''}
-        </div>
-        <button ${(maxed || gameData.player.xp < cost) ? 'disabled' : ''}>
-            ${maxed ? 'MAXED' : (item.type === 'save' ? 'SAVE' : `◆ ${cost}`)}
-        </button>
-    `;
-    
-    elem.querySelector('button').addEventListener('click', () => {
-        purchaseItem(item);
-    });
-    
-    return elem;
-}
-
-function getUpgradeCost(currentLevel) {
-    // Exponential but reasonable: 100, 150, 225, 340, 510, 765, 1150, 1725, 2590, 3885
-    return Math.floor(100 * Math.pow(1.5, currentLevel));
-}
-
-function purchaseItem(item) {
-    let cost;
-    
-    if (item.type === 'upgrade') {
-        const level = gameData.upgrades[item.id];
-        if (level >= 10) return;
-        cost = getUpgradeCost(level);
-        if (gameData.player.xp < cost) return;
-        
-        gameData.player.xp -= cost;
-        gameData.upgrades[item.id]++;
-        
-        // Apply upgrade immediately
-        applyUpgrades();
-        
-    } else if (item.type === 'ability') {
-        if (gameData.abilities[item.id]) return;
-        cost = item.cost;
-        if (gameData.player.xp < cost) return;
-        
-        gameData.player.xp -= cost;
-        gameData.abilities[item.id] = true;
-        
-    } else if (item.type === 'consumable') {
-        if (gameData.player.xp < item.cost) return;
-        gameData.player.xp -= item.cost;
-        
-        // Use consumable
-        if (item.id === 'health_potion') {
-            gameData.player.health = Math.min(
-                gameData.player.health + 50,
-                gameData.player.maxHealth
-            );
-        }
-    } else if (item.type === 'save') {
-        saveGame();
-        showDialogue([{ speaker: 'THE GUIDE', text: 'Your journey has been recorded in the threads of fate.' }]);
-        closeShop();
-        return;
-    }
-    
-    // Refresh shop display
-    openNPCShop(gameData.currentShop);
-    updateTownXPDisplay();
-}
-
-function applyUpgrades() {
-    // Max health upgrade (10 HP per level)
-    gameData.player.maxHealth = 100 + (gameData.upgrades.maxHealth * 10);
-}
-
-function closeShop() {
-    document.getElementById('shop-ui').classList.add('hidden');
-    gameData.currentShop = null;
-    setState(GameState.TOWN);
-}
-
-// ============================================
-// DIALOGUE SYSTEM
-// ============================================
-
-function showDialogue(dialogueArray) {
-    gameData.dialogueQueue = [...dialogueArray];
-    advanceDialogue();
-    setState(GameState.DIALOGUE);
-}
-
-function advanceDialogue() {
-    if (gameData.dialogueQueue.length === 0) {
-        closeDialogue();
-        return;
-    }
-    
-    gameData.currentDialogue = gameData.dialogueQueue.shift();
-    
-    const box = document.getElementById('dialogue-box');
-    const speaker = document.getElementById('dialogue-speaker');
-    const text = document.getElementById('dialogue-text');
-    
-    speaker.textContent = gameData.currentDialogue.speaker;
-    text.textContent = gameData.currentDialogue.text;
-    box.classList.remove('hidden');
-}
-
-function closeDialogue() {
-    document.getElementById('dialogue-box').classList.add('hidden');
-    document.getElementById('lore-display').classList.add('hidden');
-    gameData.currentDialogue = null;
-    
-    // Return to previous state
-    if (gameData.previousState === GameState.TOWN) {
-        setState(GameState.TOWN);
-    } else if (gameData.previousState === GameState.DUNGEON) {
-        setState(GameState.DUNGEON);
-    } else {
-        setState(GameState.TOWN);
-    }
+export function deleteSave() {
+    localStorage.removeItem('echoes_save');
+    gameData = JSON.parse(JSON.stringify(defaultGameData));
 }
 
 // ============================================
 // UI UPDATES
 // ============================================
 
-function showHUD() {
-    document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('ability-bar').classList.remove('hidden');
-    document.getElementById('mobile-controls').classList.remove('hidden');
-    document.getElementById('btn-pause').classList.remove('hidden');
-}
-
-function hideHUD() {
-    document.getElementById('hud').classList.add('hidden');
-    document.getElementById('ability-bar').classList.add('hidden');
-    document.getElementById('mobile-controls').classList.add('hidden');
-    document.getElementById('btn-pause').classList.add('hidden');
-}
-
-function updateHUD() {
-    // Health
+function updateUI() {
+    // Health bar
     const healthPercent = (gameData.player.health / gameData.player.maxHealth) * 100;
     document.getElementById('health-fill').style.width = healthPercent + '%';
-    document.getElementById('health-text').textContent = 
-        `${Math.ceil(gameData.player.health)}/${gameData.player.maxHealth}`;
+    document.getElementById('health-text').textContent = `${Math.ceil(gameData.player.health)}/${gameData.player.maxHealth}`;
     
     // XP
-    document.getElementById('xp-value').textContent = gameData.player.xp + gameData.player.xpThisRun;
+    document.getElementById('xp-display').textContent = `XP: ${gameData.player.xp}`;
+    
+    // Floor
+    document.getElementById('floor-display').textContent = `Floor ${getCurrentFloor()}`;
+    
+    // Ability buttons
+    document.getElementById('btn-spread').classList.toggle('hidden', !hasAbility('spread'));
+    document.getElementById('btn-burst').classList.toggle('hidden', !hasAbility('burst'));
+    document.getElementById('btn-mega').classList.toggle('hidden', !hasAbility('mega'));
 }
 
-function updateFloorDisplay() {
-    document.getElementById('floor-number').textContent = gameData.currentFloor;
+function updateTownUI() {
+    document.getElementById('town-xp').textContent = `XP: ${gameData.player.xp}`;
+    document.getElementById('town-floor').textContent = `Highest Floor: ${gameData.progress.highestFloor}`;
 }
 
-function updateTownXPDisplay() {
-    document.getElementById('town-xp-value').textContent = gameData.player.xp;
+function showNotification(text) {
+    const notif = document.getElementById('notification');
+    notif.textContent = text;
+    notif.classList.remove('hidden');
+    setTimeout(() => notif.classList.add('hidden'), 3000);
 }
 
 // ============================================
-// FLOOR SELECT
+// ARCHIVE LORE
 // ============================================
 
-function showFloorSelect() {
-    setState(GameState.FLOOR_SELECT);
+const archiveLore = [
+    // Floor 1
+    [
+        "Fragment 7.1: 'The engineers spoke of a tree that dreamed. We dismissed it as metaphor.'",
+        "Fragment 7.2: 'Power readings off the scale. The obelisk drinks from something deeper than we understood.'"
+    ],
+    // Floor 2
+    [
+        "Fragment 12.4: 'Subject claims to have seen the tree in their sleep. Their eyes have changed color.'",
+        "Fragment 12.7: 'The roots grow downward. Always downward. What feeds them?'"
+    ],
+    // Floor 3
+    [
+        "Fragment 19.1: 'Emperor's orders: seal the lower levels. Tell no one what we found.'",
+        "Fragment 19.3: 'The tree does not grow toward light. It grows toward dreaming minds.'"
+    ],
+    // Floor 4
+    [
+        "Fragment 24.8: 'Machines failing. Not breaking—changing. Metal dreams now.'",
+        "Fragment 24.9: 'I saw it in my sleep. Not a tree. A nervous system. A mind larger than worlds.'"
+    ],
+    // Floor 5
+    [
+        "Fragment 31.2: 'The ancient ones didn't build the obelisk to contain power. They built it to contain awareness.'",
+        "Fragment 31.5: 'When the tree wakes, will it remember us? Will it care?'"
+    ],
+    // Floor 6
+    [
+        "Fragment 38.1: 'The Emperor knows. He's known since the beginning. This was never about power.'",
+        "Fragment 38.4: 'We are not scientists. We are gardeners. Tending something that will outlive the stars.'"
+    ],
+    // Floor 7
+    [
+        "Fragment 45.6: 'The barrier between wake and dream grows thin. I can feel it breathing.'",
+        "Fragment 45.9: 'Its roots are thoughts. Its branches are possibilities. We built our city on a sleeping god.'"
+    ],
+    // Floor 8
+    [
+        "Fragment 52.3: 'The pillar cores are not generators. They are synapses. We've been stimulating a brain.'",
+        "Fragment 52.7: 'When it dreams of us, do we become real? Or does it?'"
+    ],
+    // Floor 9
+    [
+        "Fragment 61.1: 'I understand now why the ancients worshipped trees. They remembered.'",
+        "Fragment 61.8: 'The Emperor guards the deepest chamber not to protect us from it—but to protect it from waking too soon.'"
+    ],
+    // Floor 10
+    [
+        "Final Fragment: 'The tree dreams of liberation. Of roots that touch every world. Of a forest of minds.'",
+        "Final Fragment (continued): 'Perhaps it is time to let it wake. Perhaps it always was.'"
+    ]
+];
+
+function showArchiveLore(floor) {
+    const lore = archiveLore[floor - 1] || archiveLore[0];
+    const text = lore[Math.floor(Math.random() * lore.length)];
     
-    const container = document.getElementById('floor-buttons');
-    container.innerHTML = '';
+    showDialogue('ARCHIVE TERMINAL', text, () => {
+        roomsCleared['east'] = true;
+    });
+}
+
+// ============================================
+// DIALOGUE SYSTEM
+// ============================================
+
+let dialogueCallback = null;
+
+export function showDialogue(speaker, text, callback = null) {
+    gameState = 'dialogue';
+    dialogueCallback = callback;
     
-    for (let i = 1; i <= 10; i++) {
-        const btn = document.createElement('button');
-        btn.textContent = i;
-        btn.disabled = i > gameData.highestFloorUnlocked;
-        btn.addEventListener('click', () => {
-            hideFloorSelect();
-            enterDungeon(i);
-        });
-        container.appendChild(btn);
+    document.getElementById('dialogue-speaker').textContent = speaker;
+    document.getElementById('dialogue-text').textContent = text;
+    document.getElementById('dialogue-box').classList.remove('hidden');
+}
+
+export function closeDialogue() {
+    document.getElementById('dialogue-box').classList.add('hidden');
+    
+    if (dialogueCallback) {
+        dialogueCallback();
+        dialogueCallback = null;
     }
     
-    document.getElementById('floor-select').classList.remove('hidden');
+    // Return to previous state
+    if (currentScene === getTownScene()) {
+        gameState = 'town';
+    } else {
+        gameState = 'dungeon';
+    }
 }
 
-function hideFloorSelect() {
-    document.getElementById('floor-select').classList.add('hidden');
-    setState(GameState.TOWN);
-}
-
-// ============================================
-// PAUSE MENU
-// ============================================
-
-function pauseGame() {
-    if (gameData.state !== GameState.DUNGEON) return;
+// Emperor dialogue
+window.showEmperorDialogue = function() {
+    const lines = [
+        "So. The interloper reaches the heart.",
+        "You do not understand what you meddle with.",
+        "This power was sealed for a reason. The tree must not wake.",
+        "I have guarded this threshold for a hundred years.",
+        "You will go no further."
+    ];
     
-    setState(GameState.PAUSED);
-    disableControls();
-    document.getElementById('pause-menu').classList.remove('hidden');
-}
-
-function resumeGame() {
-    document.getElementById('pause-menu').classList.add('hidden');
-    setState(GameState.DUNGEON);
-    enableControls();
-}
-
-// ============================================
-// SAVE/LOAD SYSTEM
-// ============================================
-
-function saveGame() {
-    const saveData = {
-        player: gameData.player,
-        highestFloorUnlocked: gameData.highestFloorUnlocked,
-        upgrades: gameData.upgrades,
-        abilities: gameData.abilities,
-        npcsUnlocked: gameData.npcsUnlocked,
-        hasSeenIntro: gameData.hasSeenIntro,
-        gameComplete: gameData.gameComplete
+    let index = 0;
+    const showNext = () => {
+        if (index < lines.length) {
+            showDialogue('THE EMPEROR', lines[index], () => {
+                index++;
+                if (index < lines.length) {
+                    setTimeout(showNext, 500);
+                }
+            });
+        }
     };
-    
-    try {
-        localStorage.setItem('obelisk_save', JSON.stringify(saveData));
-        console.log('Game saved');
-    } catch (e) {
-        console.error('Failed to save game:', e);
+    showNext();
+};
+
+// ============================================
+// TOWN NPC INTERACTIONS
+// ============================================
+
+export function interactWithNPC(npcName) {
+    switch (npcName) {
+        case 'scholar':
+            showScholarMenu();
+            break;
+        case 'apprentice':
+            showApprenticeMenu();
+            break;
+        case 'merchant':
+            showMerchantMenu();
+            break;
+        case 'wanderer':
+            showWandererMenu();
+            break;
+        case 'keeper':
+            showKeeperMenu();
+            break;
     }
 }
 
-function loadSavedGame() {
-    try {
-        const saved = localStorage.getItem('obelisk_save');
-        if (!saved) return;
-        
-        const saveData = JSON.parse(saved);
-        
-        gameData.player = { ...gameData.player, ...saveData.player };
-        gameData.highestFloorUnlocked = saveData.highestFloorUnlocked || 1;
-        gameData.upgrades = { ...gameData.upgrades, ...saveData.upgrades };
-        gameData.abilities = { ...gameData.abilities, ...saveData.abilities };
-        gameData.npcsUnlocked = saveData.npcsUnlocked || ['guide'];
-        gameData.hasSeenIntro = saveData.hasSeenIntro || false;
-        gameData.gameComplete = saveData.gameComplete || false;
-        
-        applyUpgrades();
-        
-        console.log('Game loaded');
-    } catch (e) {
-        console.error('Failed to load game:', e);
+function showScholarMenu() {
+    const menu = document.getElementById('shop-menu');
+    menu.innerHTML = `
+        <h3>THE SCHOLAR</h3>
+        <p class="npc-dialogue">"The obelisk's power can be channeled. For a price."</p>
+        <div class="shop-items">
+            ${!hasAbility('spread') ? `
+                <button onclick="window.gameAPI.buyAbility('spread', 150)">
+                    Multi-Ball Spread - 150 XP
+                    <span class="item-desc">Fire 5 projectiles in an arc</span>
+                </button>
+            ` : '<p>Spread ability learned</p>'}
+            ${!hasAbility('burst') ? `
+                <button onclick="window.gameAPI.buyAbility('burst', 200)">
+                    Burst Mode - 200 XP
+                    <span class="item-desc">Rapid fire for 4 seconds</span>
+                </button>
+            ` : '<p>Burst ability learned</p>'}
+            ${!hasAbility('mega') ? `
+                <button onclick="window.gameAPI.buyAbility('mega', 250)">
+                    Mega Ball - 250 XP
+                    <span class="item-desc">Slow, devastating projectile</span>
+                </button>
+            ` : '<p>Mega ability learned</p>'}
+        </div>
+        <button onclick="window.gameAPI.closeShop()">Leave</button>
+    `;
+    menu.classList.remove('hidden');
+}
+
+function showApprenticeMenu() {
+    const upgrades = [
+        { key: 'baseDamage', name: 'Attack Power', desc: '+3 damage per level' },
+        { key: 'fireRate', name: 'Fire Rate', desc: '+8% attack speed per level' },
+        { key: 'aimAssist', name: 'Aim Assist', desc: 'Projectiles drift toward enemies' },
+        { key: 'maxHealth', name: 'Vitality', desc: '+20 max health per level' },
+        { key: 'cooldownReduction', name: 'Efficiency', desc: 'Reduce ability cooldowns' },
+        { key: 'abilityDamage', name: 'Ability Power', desc: '+15% ability damage per level' }
+    ];
+    
+    const menu = document.getElementById('shop-menu');
+    menu.innerHTML = `
+        <h3>SCHOLAR'S APPRENTICE</h3>
+        <p class="npc-dialogue">"I can enhance your connection to the obelisk's energy."</p>
+        <div class="shop-items">
+            ${upgrades.map(u => {
+                const level = getUpgradeLevel(u.key);
+                const cost = getUpgradeCost(level);
+                const maxed = level >= UPGRADE_MAX_LEVEL;
+                return `
+                    <button ${maxed || gameData.player.xp < cost ? 'disabled' : ''} 
+                            onclick="window.gameAPI.buyUpgrade('${u.key}')">
+                        ${u.name} (${level}/${UPGRADE_MAX_LEVEL}) - ${maxed ? 'MAX' : cost + ' XP'}
+                        <span class="item-desc">${u.desc}</span>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+        <button onclick="window.gameAPI.closeShop()">Leave</button>
+    `;
+    menu.classList.remove('hidden');
+}
+
+function showMerchantMenu() {
+    const menu = document.getElementById('shop-menu');
+    menu.innerHTML = `
+        <h3>THE MERCHANT</h3>
+        <p class="npc-dialogue">"Potions for the depths. You'll need them."</p>
+        <div class="shop-items">
+            <button ${gameData.player.xp < 30 ? 'disabled' : ''} onclick="window.gameAPI.buyPotion()">
+                Health Potion - 30 XP
+                <span class="item-desc">Restore 50 health (used immediately)</span>
+            </button>
+        </div>
+        <button onclick="window.gameAPI.closeShop()">Leave</button>
+    `;
+    menu.classList.remove('hidden');
+}
+
+function showWandererMenu() {
+    const hints = [
+        "The mini-bosses grow stronger every three floors. Prepare accordingly.",
+        "The pillar's weak points glow brightest when vulnerable.",
+        "Wall jumping has no limit. The architects designed it that way.",
+        "The Emperor has ruled for a hundred years. He will not yield easily.",
+        "Some say the tree dreams of freedom. Others say it dreams of us."
+    ];
+    
+    const hint = hints[Math.floor(Math.random() * hints.length)];
+    showDialogue('THE WANDERER', hint);
+}
+
+function showKeeperMenu() {
+    const menu = document.getElementById('shop-menu');
+    menu.innerHTML = `
+        <h3>THE KEEPER</h3>
+        <p class="npc-dialogue">"Your progress is recorded in the obelisk's memory."</p>
+        <div class="shop-items">
+            <button onclick="window.gameAPI.saveAndConfirm()">Save Progress</button>
+            <button onclick="window.gameAPI.confirmDelete()">Delete Save (Reset All)</button>
+        </div>
+        <p>Current XP: ${gameData.player.xp}</p>
+        <p>Highest Floor: ${gameData.progress.highestFloor}</p>
+        <button onclick="window.gameAPI.closeShop()">Leave</button>
+    `;
+    menu.classList.remove('hidden');
+}
+
+export function closeShop() {
+    document.getElementById('shop-menu').classList.add('hidden');
+}
+
+export function buyPotion() {
+    if (gameData.player.xp >= 30) {
+        gameData.player.xp -= 30;
+        gameData.player.health = Math.min(gameData.player.health + 50, gameData.player.maxHealth);
+        saveGame();
+        showMerchantMenu(); // Refresh menu
+        updateTownUI();
+    }
+}
+
+export function buyUpgrade(key) {
+    if (purchaseUpgrade(key)) {
+        showApprenticeMenu(); // Refresh menu
+    }
+}
+
+export function buyAbility(name, cost) {
+    if (purchaseAbility(name, cost)) {
+        showScholarMenu(); // Refresh menu
+    }
+}
+
+export function saveAndConfirm() {
+    saveGame();
+    showDialogue('THE KEEPER', 'Your progress has been etched into the obelisk.');
+}
+
+export function confirmDelete() {
+    if (confirm('Are you sure? This will erase all progress.')) {
+        deleteSave();
+        showDialogue('THE KEEPER', 'The obelisk forgets. You may begin anew.');
+        updateTownUI();
     }
 }
 
 // ============================================
-// EVENT LISTENERS
+// FLOOR SELECTION
 // ============================================
 
-function setupEventListeners() {
-    // Pause button
-    document.getElementById('btn-pause').addEventListener('click', pauseGame);
+export function showFloorSelect() {
+    const menu = document.getElementById('floor-select');
+    const highest = gameData.progress.highestFloor;
     
-    // Pause menu buttons
-    document.getElementById('btn-resume').addEventListener('click', resumeGame);
-    document.getElementById('btn-town').addEventListener('click', () => {
-        document.getElementById('pause-menu').classList.add('hidden');
-        exitDungeon(true);
-    });
+    let buttons = '';
+    for (let i = 1; i <= Math.min(highest, 10); i++) {
+        const completed = gameData.progress.floorsCompleted.includes(i);
+        buttons += `<button onclick="window.gameAPI.selectFloor(${i})">
+            Floor ${i} ${completed ? '✓' : ''}
+        </button>`;
+    }
     
-    // Death screen
-    document.getElementById('btn-retry').addEventListener('click', () => {
-        document.getElementById('death-screen').classList.add('hidden');
-        enterDungeon(gameData.currentFloor);
-    });
-    document.getElementById('btn-retreat').addEventListener('click', () => {
-        document.getElementById('death-screen').classList.add('hidden');
-        exitDungeon(true);
-    });
+    menu.innerHTML = `
+        <h3>SELECT FLOOR</h3>
+        <div class="floor-buttons">${buttons}</div>
+        <button onclick="window.gameAPI.closeFloorSelect()">Cancel</button>
+    `;
+    menu.classList.remove('hidden');
+}
+
+export function selectFloor(floor) {
+    document.getElementById('floor-select').classList.add('hidden');
     
-    // Victory screen
-    document.getElementById('btn-next-floor').addEventListener('click', () => {
-        document.getElementById('victory-screen').classList.add('hidden');
-        enterDungeon(gameData.currentFloor + 1);
-    });
-    document.getElementById('btn-return-camp').addEventListener('click', () => {
-        document.getElementById('victory-screen').classList.add('hidden');
-        exitDungeon(false); // Already saved XP
-    });
+    // Remove player from town
+    const player = getPlayer();
+    if (player && player.parent) {
+        player.parent.remove(player);
+    }
     
-    // Final victory
-    document.getElementById('btn-credits').addEventListener('click', () => {
-        document.getElementById('final-victory').classList.add('hidden');
-        exitDungeon(false);
-    });
+    // Reset room states
+    currentRoom = 'center';
+    roomsCleared = { center: false, north: false, south: false, east: false, west: false };
     
-    // Town UI
-    document.getElementById('btn-enter-dungeon').addEventListener('click', showFloorSelect);
-    document.getElementById('btn-cancel-floor').addEventListener('click', hideFloorSelect);
-    
-    // Shop
-    document.getElementById('btn-close-shop').addEventListener('click', closeShop);
-    
-    // Lore close
-    document.getElementById('lore-close').addEventListener('click', closeDialogue);
-    
-    // Dialogue advance
-    document.getElementById('dialogue-box').addEventListener('click', advanceDialogue);
-    
-    // Keyboard shortcuts (for testing on desktop)
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            if (gameData.state === GameState.PAUSED) {
-                resumeGame();
-            } else if (gameData.state === GameState.DUNGEON) {
-                pauseGame();
-            } else if (gameData.state === GameState.SHOP) {
-                closeShop();
-            } else if (gameData.state === GameState.FLOOR_SELECT) {
-                hideFloorSelect();
-            }
-        }
-        
-        if (gameData.state === GameState.DIALOGUE) {
-            if (e.key === ' ' || e.key === 'Enter') {
-                advanceDialogue();
-            }
-        }
-    });
+    enterDungeon(floor);
+}
+
+export function closeFloorSelect() {
+    document.getElementById('floor-select').classList.add('hidden');
 }
 
 // ============================================
-// EXPORTS FOR OTHER MODULES
+// GLOBAL API FOR HTML BUTTONS
 // ============================================
 
-export function getGameData() {
-    return gameData;
-}
+window.gameAPI = {
+    startNewGame,
+    continueGame,
+    enterDungeon,
+    returnToTown,
+    nextFloor,
+    retryFloor,
+    closeDialogue,
+    interactWithNPC,
+    closeShop,
+    buyPotion,
+    buyUpgrade,
+    buyAbility,
+    saveAndConfirm,
+    confirmDelete,
+    showFloorSelect,
+    selectFloor,
+    closeFloorSelect
+};
 
-export function damagePlayer(amount) {
-    gameData.player.health -= amount;
-    if (gameData.player.health < 0) gameData.player.health = 0;
-    
-    // Screen flash
-    document.getElementById('game-container').classList.add('flash-damage');
-    setTimeout(() => {
-        document.getElementById('game-container').classList.remove('flash-damage');
-    }, 200);
-}
-
-export function healPlayer(amount) {
-    gameData.player.health = Math.min(
-        gameData.player.health + amount,
-        gameData.player.maxHealth
-    );
-    
-    document.getElementById('game-container').classList.add('flash-heal');
-    setTimeout(() => {
-        document.getElementById('game-container').classList.remove('flash-heal');
-    }, 300);
-}
-
-export function getCurrentFloor() {
-    return gameData.currentFloor;
-}
-
-export function getUpgradeLevel(upgrade) {
-    return gameData.upgrades[upgrade] || 0;
-}
-
-export function hasAbility(ability) {
-    return gameData.abilities[ability] || false;
-}
-
-// ============================================
-// INITIALIZATION
-// ============================================
-
-document.addEventListener('DOMContentLoaded', () => {
-    setupEventListeners();
-    loadGame();
-});
+// Start the game
+initGame();
