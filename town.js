@@ -4,7 +4,13 @@
 // ============================================
 
 import * as THREE from 'three';
-import { interactWithNPC } from './game.js';
+
+// Callback for NPC interaction (set by game.js to avoid circular import)
+let npcInteractionCallback = null;
+
+export function setNPCInteractionCallback(callback) {
+    npcInteractionCallback = callback;
+}
 
 let townScene;
 let npcs = [];
@@ -670,8 +676,8 @@ export function checkNPCInteraction(playerPosition) {
 }
 
 export function triggerNPCInteraction() {
-    if (interactableNPC) {
-        interactWithNPC(interactableNPC.userData.npcType);
+    if (interactableNPC && npcInteractionCallback) {
+        npcInteractionCallback(interactableNPC.userData.npcType);
     }
 }
 
