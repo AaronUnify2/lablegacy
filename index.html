@@ -2,135 +2,1071 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="screen-orientation" content="landscape">
-    <title>Echoes of the Obelisk</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#0a0a12">
+    <title>Obelisk: Dream of the Ancients</title>
+    <style>
+/* ============================================
+   OBELISK: DREAM OF THE ANCIENTS - STYLES
+   ============================================ */
+
+:root {
+    --bg-machine: #0a0a12;
+    --metal: #3a3a4a;
+    --cyan-glow: #00ffff;
+    --accent-blue: #0066aa;
+    --bg-corruption: #0a0812;
+    --corrupted-metal: #2a2a3a;
+    --purple: #9900ff;
+    --magenta: #ff00aa;
+    --cyan-remnant: #00aaaa;
+    --bg-dream: #12100a;
+    --organic: #4a3a2a;
+    --amber: #ffaa00;
+    --gold: #ffcc44;
+    --purple-remnant: #aa66ff;
+    --bg-source: #1a1812;
+    --radiant: #ffffff;
+    --dream-cyan: #aaffff;
+    --ui-bg: rgba(10, 10, 18, 0.9);
+    --ui-border: rgba(0, 255, 255, 0.3);
+    --ui-text: #e0e0f0;
+    --health-color: #00ff88;
+    --health-low: #ff4444;
+    --xp-color: #ffcc44;
+    --danger: #ff4444;
+    --btn-size: 60px;
+    --btn-size-large: 70px;
+    --joystick-size: 120px;
+    --hud-padding: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-machine); color: var(--ui-text);
+    touch-action: none; user-select: none;
+    -webkit-user-select: none; -webkit-touch-callout: none;
+}
+
+.hidden { display: none !important; }
+
+#loading-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(180deg, var(--bg-machine) 0%, #050510 100%);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+
+.loading-content { text-align: center; padding: 20px; }
+
+.game-title {
+    font-size: 3rem; font-weight: 100; letter-spacing: 1rem;
+    color: var(--cyan-glow);
+    text-shadow: 0 0 30px var(--cyan-glow), 0 0 60px var(--accent-blue);
+    margin-bottom: 0.5rem; animation: titlePulse 3s ease-in-out infinite;
+}
+
+.game-subtitle {
+    font-size: 1rem; font-weight: 300; letter-spacing: 0.3rem;
+    color: var(--ui-text); opacity: 0.7; margin-bottom: 2rem;
+}
+
+@keyframes titlePulse {
+    0%, 100% { text-shadow: 0 0 30px var(--cyan-glow), 0 0 60px var(--accent-blue); }
+    50% { text-shadow: 0 0 40px var(--cyan-glow), 0 0 80px var(--accent-blue); }
+}
+
+.loading-bar-container {
+    width: 200px; height: 4px; background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px; margin: 0 auto 1rem; overflow: hidden;
+}
+
+.loading-bar {
+    width: 0%; height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--cyan-glow));
+    border-radius: 2px; transition: width 0.3s ease;
+    box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.loading-text { font-size: 0.875rem; color: var(--cyan-glow); opacity: 0.8; }
+
+#main-menu, #settings-panel, #pause-menu, #floor-select {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(180deg, rgba(10, 10, 18, 0.95) 0%, rgba(5, 5, 16, 0.98) 100%);
+    display: flex; align-items: center; justify-content: center; z-index: 900;
+}
+
+.menu-content, .panel-content { text-align: center; padding: 30px; max-width: 400px; width: 90%; }
+.menu-buttons { display: flex; flex-direction: column; gap: 15px; margin-top: 2rem; }
+
+.menu-btn {
+    padding: 15px 40px; font-size: 1rem; font-weight: 500; letter-spacing: 0.1rem;
+    color: var(--ui-text); background: rgba(0, 102, 170, 0.3);
+    border: 1px solid var(--ui-border); border-radius: 4px;
+    cursor: pointer; transition: all 0.2s ease;
+}
+
+.menu-btn:hover, .menu-btn:active {
+    background: rgba(0, 255, 255, 0.2); border-color: var(--cyan-glow);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.menu-btn.danger { background: rgba(255, 68, 68, 0.2); border-color: rgba(255, 68, 68, 0.5); }
+.menu-btn.danger:hover { background: rgba(255, 68, 68, 0.4); border-color: var(--danger); }
+
+.setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 4px;
+}
+
+.setting-row label { font-size: 0.9rem; flex: 1; text-align: left; }
+.setting-row input[type="range"] { flex: 2; margin: 0 15px; accent-color: var(--cyan-glow); }
+.setting-row span { width: 40px; text-align: right; color: var(--cyan-glow); }
+
+#game-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+#game-canvas { width: 100%; height: 100%; display: block; }
+
+#hud { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+#health-container { position: absolute; top: var(--hud-padding); left: var(--hud-padding); width: 150px; }
+
+.stat-bar {
+    position: relative; height: 20px; background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; overflow: hidden;
+}
+
+.stat-fill { height: 100%; transition: width 0.3s ease; }
+.health-fill { background: linear-gradient(90deg, var(--health-color), #44ffaa); box-shadow: 0 0 10px var(--health-color); }
+.health-fill.low { background: linear-gradient(90deg, var(--health-low), #ff6666); box-shadow: 0 0 10px var(--health-low); animation: healthPulse 0.5s ease-in-out infinite; }
+
+@keyframes healthPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+.stat-text {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 0.75rem; font-weight: bold; color: white; text-shadow: 1px 1px 2px black;
+}
+
+#xp-container {
+    position: absolute; top: var(--hud-padding); left: 170px;
+    display: flex; align-items: center; gap: 5px; padding: 5px 12px;
+    background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 204, 68, 0.3); border-radius: 15px;
+}
+
+.xp-icon { color: var(--xp-color); font-size: 1rem; }
+#xp-text { color: var(--xp-color); font-size: 0.9rem; font-weight: bold; }
+
+#floor-container {
+    position: absolute; top: var(--hud-padding); right: var(--hud-padding);
+    padding: 5px 15px; background: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--ui-border); border-radius: 15px;
+}
+
+#floor-text { color: var(--cyan-glow); font-size: 0.9rem; font-weight: 500; }
+
+#inventory-container { position: absolute; top: 45px; left: var(--hud-padding); display: flex; gap: 5px; }
+
+.inventory-slot {
+    width: 40px; height: 40px; background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: auto; cursor: pointer;
+}
+
+.inventory-slot:active { border-color: var(--cyan-glow); background: rgba(0, 255, 255, 0.1); }
+.potion-icon { font-size: 1.2rem; color: var(--health-color); }
+.potion-count { font-size: 0.65rem; color: white; margin-top: -2px; }
+
+#minimap {
+    position: absolute; bottom: 90px; left: var(--hud-padding);
+    width: 120px; height: 120px; background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--ui-border); border-radius: 8px; overflow: hidden;
+}
+
+#minimap-canvas { width: 100%; height: 100%; }
+
+#touch-controls { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; pointer-events: none; }
+#joystick-zone { position: absolute; left: 0; bottom: 0; width: 40%; height: 50%; pointer-events: auto; }
+
+#joystick-base {
+    position: absolute; width: var(--joystick-size); height: var(--joystick-size);
+    background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+
+#joystick-stick {
+    width: 50px; height: 50px;
+    background: radial-gradient(circle, rgba(0, 255, 255, 0.8) 0%, rgba(0, 102, 170, 0.6) 100%);
+    border: 2px solid var(--cyan-glow); border-radius: 50%;
+    box-shadow: 0 0 15px var(--cyan-glow); transition: transform 0.05s ease;
+}
+
+#buttons-zone { position: absolute; right: 10px; bottom: 10px; width: 180px; height: 200px; pointer-events: auto; }
+
+.action-btn, .ability-btn {
+    position: absolute; width: var(--btn-size); height: var(--btn-size);
+    border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.5); color: white; font-size: 1.5rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.1s ease;
+}
+
+.action-btn:active, .ability-btn:active {
+    transform: scale(0.95); border-color: var(--cyan-glow);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+}
+
+.action-btn.primary {
+    width: var(--btn-size-large); height: var(--btn-size-large);
+    background: rgba(0, 255, 255, 0.2); border-color: var(--cyan-glow);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+#btn-attack { bottom: 50px; right: 10px; }
+#btn-jump { bottom: 120px; right: 30px; }
+#btn-spread { bottom: 0; right: 90px; }
+#btn-burst { bottom: 90px; right: 100px; }
+#btn-mega { bottom: 160px; right: 70px; }
+
+.ability-btn { width: 55px; height: 55px; }
+.ability-icon { font-size: 1.3rem; color: var(--cyan-glow); }
+
+.cooldown-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7); border-radius: 50%; display: none;
+}
+
+.ability-btn.on-cooldown { opacity: 0.6; }
+.ability-btn.on-cooldown .cooldown-overlay { display: block; animation: cooldownSweep var(--cooldown-duration, 8s) linear forwards; }
+
+@keyframes cooldownSweep {
+    from { clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, 50% 0%); }
+    to { clip-path: polygon(50% 50%, 50% 0%, 50% 0%, 50% 0%, 50% 0%, 50% 0%, 50% 0%); }
+}
+
+#dialogue-box { position: fixed; bottom: 0; left: 0; width: 100%; padding: 15px; z-index: 200; }
+
+.dialogue-content {
+    max-width: 600px; margin: 0 auto; padding: 15px 20px;
+    background: var(--ui-bg); border: 1px solid var(--ui-border);
+    border-radius: 8px; box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
+
+.dialogue-speaker { display: block; font-size: 0.85rem; font-weight: bold; color: var(--cyan-glow); margin-bottom: 8px; }
+.dialogue-text { font-size: 1rem; line-height: 1.5; color: var(--ui-text); margin-bottom: 10px; }
+.dialogue-continue { display: block; text-align: right; font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); animation: blink 1s ease-in-out infinite; }
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+#interaction-prompt {
+    position: fixed; bottom: 25%; left: 50%; transform: translateX(-50%);
+    padding: 10px 25px; background: var(--ui-bg); border: 1px solid var(--cyan-glow);
+    border-radius: 20px; z-index: 150; animation: promptPulse 1.5s ease-in-out infinite;
+}
+
+#interaction-prompt span { color: var(--cyan-glow); font-size: 0.9rem; }
+
+@keyframes promptPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 255, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(0, 255, 255, 0.6); }
+}
+
+#shop-panel {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9); display: flex; align-items: center; justify-content: center; z-index: 300;
+}
+
+.shop-content {
+    width: 90%; max-width: 500px; max-height: 80vh;
+    background: var(--ui-bg); border: 1px solid var(--ui-border);
+    border-radius: 12px; padding: 20px; overflow-y: auto;
+}
+
+.shop-content h2 { text-align: center; color: var(--cyan-glow); margin-bottom: 20px; font-weight: 300; letter-spacing: 0.2rem; }
+#shop-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+.shop-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 15px; background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;
+    cursor: pointer; transition: all 0.2s ease;
+}
+
+.shop-item:hover, .shop-item:active { border-color: var(--cyan-glow); background: rgba(0, 255, 255, 0.1); }
+.shop-item.cannot-afford { opacity: 0.5; cursor: not-allowed; }
+.shop-item.maxed { opacity: 0.7; cursor: default; border-color: var(--gold); }
+
+.item-info { flex: 1; }
+.item-name { display: block; font-size: 0.95rem; color: white; margin-bottom: 3px; }
+.item-desc { display: block; font-size: 0.75rem; color: rgba(255, 255, 255, 0.6); }
+.item-level { display: block; font-size: 0.7rem; color: var(--cyan-glow); margin-top: 2px; }
+.item-cost { display: flex; align-items: center; gap: 5px; color: var(--xp-color); font-weight: bold; }
+
+.shop-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.xp-display { color: var(--xp-color); font-size: 1rem; }
+
+#floor-buttons { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0; }
+
+.floor-btn {
+    padding: 15px 10px; font-size: 1rem; color: var(--ui-text);
+    background: rgba(0, 102, 170, 0.3); border: 1px solid var(--ui-border);
+    border-radius: 8px; cursor: pointer; transition: all 0.2s ease;
+}
+
+.floor-btn:hover:not(:disabled) { border-color: var(--cyan-glow); background: rgba(0, 255, 255, 0.2); }
+.floor-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.floor-btn.current { border-color: var(--gold); background: rgba(255, 204, 68, 0.2); }
+
+#death-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(20, 0, 0, 0.95); display: flex; align-items: center; justify-content: center; z-index: 500;
+}
+
+.death-content { text-align: center; padding: 30px; }
+
+.death-content h1 {
+    font-size: 3rem; font-weight: 100; letter-spacing: 0.5rem;
+    color: var(--danger); text-shadow: 0 0 30px var(--danger);
+    margin-bottom: 1rem; animation: deathPulse 2s ease-in-out infinite;
+}
+
+@keyframes deathPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+.death-message { color: rgba(255, 255, 255, 0.7); margin-bottom: 1.5rem; }
+.xp-lost { color: var(--danger); font-size: 1.2rem; margin-bottom: 2rem; }
+
+#victory-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(10, 20, 10, 0.95); display: flex; align-items: center; justify-content: center; z-index: 500;
+}
+
+.victory-content { text-align: center; padding: 30px; }
+
+.victory-content h1 {
+    font-size: 2.5rem; font-weight: 100; letter-spacing: 0.3rem;
+    color: var(--gold); text-shadow: 0 0 30px var(--amber); margin-bottom: 1rem;
+}
+
+.victory-message { color: rgba(255, 255, 255, 0.8); margin-bottom: 1.5rem; max-width: 400px; }
+.xp-gained { color: var(--xp-color); font-size: 1.2rem; margin-bottom: 2rem; }
+
+#lore-panel {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9); display: flex; align-items: center; justify-content: center; z-index: 400;
+}
+
+.lore-content {
+    max-width: 500px; width: 90%; padding: 25px;
+    background: linear-gradient(135deg, rgba(10, 10, 18, 0.95) 0%, rgba(20, 15, 25, 0.95) 100%);
+    border: 1px solid var(--purple); border-radius: 12px; text-align: center;
+    box-shadow: 0 0 40px rgba(153, 0, 255, 0.3);
+}
+
+.lore-content h3 { color: var(--purple); font-weight: 300; letter-spacing: 0.2rem; margin-bottom: 20px; }
+#lore-text { font-size: 1rem; line-height: 1.8; color: var(--ui-text); font-style: italic; margin-bottom: 25px; }
+
+#damage-numbers { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+
+.damage-number {
+    position: absolute; font-size: 1.2rem; font-weight: bold; color: var(--danger);
+    text-shadow: 2px 2px 4px black, -1px -1px 2px black;
+    animation: damageFloat 1s ease-out forwards; pointer-events: none;
+}
+
+.damage-number.heal { color: var(--health-color); }
+.damage-number.crit { font-size: 1.6rem; color: var(--gold); }
+
+@keyframes damageFloat {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-50px) scale(0.5); }
+}
+
+#btn-pause {
+    position: fixed; top: var(--hud-padding); left: 50%; transform: translateX(-50%);
+    width: 40px; height: 40px; font-size: 1.5rem; color: white;
+    background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px; cursor: pointer; z-index: 100;
+}
+
+#btn-pause:active { background: rgba(0, 255, 255, 0.2); border-color: var(--cyan-glow); }
+
+@media (orientation: portrait) {
+    .game-title { font-size: 2rem; letter-spacing: 0.5rem; }
+    #minimap { width: 80px; height: 80px; bottom: 100px; }
+    #minimap-canvas { width: 80px; height: 80px; }
+}
+
+@media (min-width: 768px) {
+    :root { --btn-size: 70px; --btn-size-large: 85px; --joystick-size: 150px; }
+    .game-title { font-size: 4rem; }
+    .dialogue-text { font-size: 1.1rem; }
+}
+    </style>
 </head>
 <body>
-    <div id="game-container">
-        <!-- Title Screen -->
-        <div id="title-screen">
-            <div class="title-content">
-                <h1>ECHOES OF THE OBELISK</h1>
-                <p class="tagline">Beneath the spire, the dream-tree stirs</p>
-                <div class="title-buttons">
-                    <button id="btn-new-game" onclick="gameAPI.startNewGame()">NEW GAME</button>
-                    <button id="btn-continue" class="hidden" onclick="gameAPI.continueGame()">CONTINUE</button>
-                </div>
-                <p class="controls-hint">
-                    Mobile: Joystick to move, swipe right side to look<br>
-                    Desktop: WASD + Mouse
-                </p>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1 class="game-title">OBELISK</h1>
+            <h2 class="game-subtitle">Dream of the Ancients</h2>
+            <div class="loading-bar-container">
+                <div class="loading-bar" id="loading-bar"></div>
             </div>
+            <p class="loading-text" id="loading-text">Initializing...</p>
         </div>
+    </div>
 
-        <!-- Game UI (Dungeon) -->
-        <div id="game-ui" class="hidden">
-            <!-- Top bar -->
-            <div id="top-bar">
-                <div id="health-bar">
-                    <div id="health-fill"></div>
-                    <span id="health-text">100/100</span>
-                </div>
-                <div id="floor-display">Floor 1</div>
-                <div id="xp-display">XP: 0</div>
-            </div>
-
-            <!-- Notification -->
-            <div id="notification" class="hidden"></div>
-
-            <!-- Action buttons (right side) -->
-            <div id="action-buttons">
-                <button id="btn-jump" class="action-btn">JUMP</button>
-                <button id="btn-attack" class="action-btn attack-btn">ATTACK</button>
-            </div>
-
-            <div id="ability-buttons">
-                <button id="btn-spread" class="ability-btn hidden">SPREAD</button>
-                <button id="btn-burst" class="ability-btn hidden">BURST</button>
-                <button id="btn-mega" class="ability-btn hidden">MEGA</button>
-            </div>
-
-            <!-- Damage flash -->
-            <div id="damage-flash" class="hidden"></div>
-        </div>
-
-        <!-- Town UI -->
-        <div id="town-ui" class="hidden">
-            <div id="town-top-bar">
-                <div id="town-xp">XP: 0</div>
-                <div id="town-floor">Highest Floor: 1</div>
-            </div>
-
-            <!-- Interact button -->
-            <button id="btn-interact" class="hidden">Talk</button>
-            <button id="btn-enter-dungeon" class="hidden">ENTER THE OBELISK</button>
-        </div>
-
-        <!-- Shared Controls (visible in both dungeon and town) -->
-        <div id="shared-controls" class="hidden">
-            <!-- Joystick (left side) -->
-            <div id="joystick-zone">
-                <div id="joystick-base">
-                    <div id="joystick-knob"></div>
-                </div>
-            </div>
-
-            <!-- Camera zone (right side for swipe) -->
-            <div id="camera-zone"></div>
-        </div>
-
-        <!-- Dialogue Box -->
-        <div id="dialogue-box" class="hidden">
-            <div id="dialogue-content">
-                <h3 id="dialogue-speaker"></h3>
-                <p id="dialogue-text"></p>
-                <button id="dialogue-close">Continue</button>
-            </div>
-        </div>
-
-        <!-- Shop/NPC Menu -->
-        <div id="shop-menu" class="hidden"></div>
-
-        <!-- Floor Select -->
-        <div id="floor-select" class="hidden"></div>
-
-        <!-- Floor Complete -->
-        <div id="floor-complete" class="hidden"></div>
-
-        <!-- Death Screen -->
-        <div id="death-screen" class="hidden">
-            <div class="death-content">
-                <h2>FALLEN</h2>
-                <p>The obelisk consumes your progress.</p>
-                <p>XP Lost: <span id="death-xp-lost">0</span></p>
-                <button onclick="gameAPI.retryFloor()">RETRY FLOOR</button>
-                <button onclick="gameAPI.returnToTown()">RETURN TO TOWN</button>
-            </div>
-        </div>
-
-        <!-- Victory Screen -->
-        <div id="victory-screen" class="hidden">
-            <div class="victory-content">
-                <h2>THE DREAM-TREE AWAKENS</h2>
-                <p>The obelisk crumbles. Light floods the depths.</p>
-                <p>You have freed the ancient consciousness.</p>
-                <p>What dreams will it bring to the waking world?</p>
-                <button onclick="gameAPI.returnToTown()">RETURN TO TOWN</button>
+    <!-- Main Menu -->
+    <div id="main-menu" class="hidden">
+        <div class="menu-content">
+            <h1 class="game-title">OBELISK</h1>
+            <h2 class="game-subtitle">Dream of the Ancients</h2>
+            <div class="menu-buttons">
+                <button id="btn-new-game" class="menu-btn">New Game</button>
+                <button id="btn-continue" class="menu-btn hidden">Continue</button>
+                <button id="btn-settings" class="menu-btn">Settings</button>
             </div>
         </div>
     </div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="hidden">
+        <div class="panel-content">
+            <h2>Settings</h2>
+            <div class="setting-row">
+                <label>Camera Sensitivity</label>
+                <input type="range" id="camera-sensitivity" min="0.1" max="1" step="0.1" value="0.5">
+                <span id="sensitivity-value">0.5</span>
+            </div>
+            <button id="btn-delete-save" class="menu-btn danger">Delete Save</button>
+            <button id="btn-settings-back" class="menu-btn">Back</button>
+        </div>
+    </div>
+
+    <!-- Game Canvas Container -->
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div id="health-container">
+            <div class="stat-bar">
+                <div class="stat-fill health-fill" id="health-fill"></div>
+                <span class="stat-text" id="health-text">100/100</span>
+            </div>
+        </div>
+        <div id="xp-container">
+            <span class="xp-icon">✧</span>
+            <span id="xp-text">0</span>
+        </div>
+        <div id="floor-container">
+            <span id="floor-text">Floor 1</span>
+        </div>
+        <div id="inventory-container">
+            <div class="inventory-slot" id="potion-slot">
+                <span class="potion-icon">⚗</span>
+                <span class="potion-count" id="potion-count">0</span>
+            </div>
+        </div>
+        <div id="minimap">
+            <canvas id="minimap-canvas" width="120" height="120"></canvas>
+        </div>
+    </div>
+
+    <!-- Touch Controls -->
+    <div id="touch-controls" class="hidden">
+        <div id="joystick-zone">
+            <div id="joystick-base" class="hidden">
+                <div id="joystick-stick"></div>
+            </div>
+        </div>
+        <div id="buttons-zone">
+            <button id="btn-mega" class="ability-btn" data-cooldown="20">
+                <span class="ability-icon">◉</span>
+                <div class="cooldown-overlay"></div>
+            </button>
+            <button id="btn-burst" class="ability-btn" data-cooldown="15">
+                <span class="ability-icon">⚡</span>
+                <div class="cooldown-overlay"></div>
+            </button>
+            <button id="btn-jump" class="action-btn">
+                <span class="btn-icon">↑</span>
+            </button>
+            <button id="btn-attack" class="action-btn primary">
+                <span class="btn-icon">✦</span>
+            </button>
+            <button id="btn-spread" class="ability-btn" data-cooldown="8">
+                <span class="ability-icon">⋯</span>
+                <div class="cooldown-overlay"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Dialogue Box -->
+    <div id="dialogue-box" class="hidden">
+        <div class="dialogue-content">
+            <span class="dialogue-speaker" id="dialogue-speaker">Guide</span>
+            <p class="dialogue-text" id="dialogue-text"></p>
+            <span class="dialogue-continue">Tap to continue...</span>
+        </div>
+    </div>
+
+    <!-- Interaction Prompt -->
+    <div id="interaction-prompt" class="hidden">
+        <span>Tap to interact</span>
+    </div>
+
+    <!-- Shop Panel -->
+    <div id="shop-panel" class="hidden">
+        <div class="shop-content">
+            <h2 id="shop-title">Shop</h2>
+            <div id="shop-items"></div>
+            <div class="shop-footer">
+                <span class="xp-display">XP: <span id="shop-xp">0</span></span>
+                <button id="btn-shop-close" class="menu-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floor Select Panel -->
+    <div id="floor-select" class="hidden">
+        <div class="panel-content">
+            <h2>Select Floor</h2>
+            <div id="floor-buttons"></div>
+            <button id="btn-floor-cancel" class="menu-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="hidden">
+        <div class="panel-content">
+            <h2>Paused</h2>
+            <button id="btn-resume" class="menu-btn">Resume</button>
+            <button id="btn-return-town" class="menu-btn">Return to Town</button>
+            <button id="btn-pause-settings" class="menu-btn">Settings</button>
+            <button id="btn-quit" class="menu-btn danger">Quit to Menu</button>
+        </div>
+    </div>
+
+    <!-- Death Screen -->
+    <div id="death-screen" class="hidden">
+        <div class="death-content">
+            <h1>YOU DIED</h1>
+            <p class="death-message">The darkness claims another...</p>
+            <p class="xp-lost">XP Lost: <span id="xp-lost-amount">0</span></p>
+            <button id="btn-respawn" class="menu-btn">Return to Town</button>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="hidden">
+        <div class="victory-content">
+            <h1>FLOOR CLEARED</h1>
+            <p class="victory-message" id="victory-message"></p>
+            <p class="xp-gained">XP Gained: <span id="xp-gained-amount">0</span></p>
+            <button id="btn-continue-victory" class="menu-btn">Continue</button>
+        </div>
+    </div>
+
+    <!-- Lore Panel -->
+    <div id="lore-panel" class="hidden">
+        <div class="lore-content">
+            <h3 id="lore-title">Archive Fragment</h3>
+            <p id="lore-text"></p>
+            <button id="btn-lore-close" class="menu-btn">Close</button>
+        </div>
+    </div>
+
+    <!-- Damage Numbers Container -->
+    <div id="damage-numbers"></div>
+
+    <!-- Pause Button -->
+    <button id="btn-pause" class="hidden">☰</button>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Controls Module (Global) -->
+    <script>
+// ============================================
+// CONTROLS MODULE - Global Object
+// ============================================
+const Controls = {
+    inputState: {
+        moveX: 0, moveY: 0, cameraDeltaX: 0, cameraDeltaY: 0,
+        jumping: false, attacking: false,
+        useSpread: false, useBurst: false, useMega: false,
+        usePotion: false, interact: false,
+        cameraSensitivity: 0.5,
+        joystickTouch: null, cameraTouch: null,
+        lastCameraX: null, lastCameraY: null
+    },
+    
+    cooldowns: { spread: { current: 0, max: 8 }, burst: { current: 0, max: 15 }, mega: { current: 0, max: 20 } },
+    
+    JOYSTICK_MAX_DISTANCE: 50, DEAD_ZONE: 0.1,
+    cameraDistance: 8, cameraHeight: 4, cameraTargetDistance: 8, cameraTargetHeight: 4,
+    CAMERA_MIN_PITCH: 0.17, CAMERA_MAX_PITCH: 1.05, cameraPitch: 0.5, cameraYaw: 0,
+    
+    CameraMode: { NORMAL: 'normal', MINI_BOSS: 'mini_boss', PILLAR_BOSS: 'pillar_boss' },
+    currentCameraMode: 'normal',
+    elements: {},
+    
+    init() {
+        this.elements = {
+            joystickZone: document.getElementById('joystick-zone'),
+            joystickBase: document.getElementById('joystick-base'),
+            joystickStick: document.getElementById('joystick-stick'),
+            btnAttack: document.getElementById('btn-attack'),
+            btnJump: document.getElementById('btn-jump'),
+            btnSpread: document.getElementById('btn-spread'),
+            btnBurst: document.getElementById('btn-burst'),
+            btnMega: document.getElementById('btn-mega'),
+            potionSlot: document.getElementById('potion-slot')
+        };
+        
+        this.initJoystick(); this.initButtons(); this.initCameraControls(); this.initKeyboard();
+        
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('#touch-controls') || e.target.closest('#game-canvas')) e.preventDefault();
+        }, { passive: false });
+        
+        const saved = localStorage.getItem('obelisk_sensitivity');
+        if (saved) this.inputState.cameraSensitivity = parseFloat(saved);
+    },
+    
+    initJoystick() {
+        const z = this.elements.joystickZone;
+        z.addEventListener('touchstart', (e) => this.handleJoystickStart(e), { passive: false });
+        z.addEventListener('touchmove', (e) => this.handleJoystickMove(e), { passive: false });
+        z.addEventListener('touchend', (e) => this.handleJoystickEnd(e), { passive: false });
+        z.addEventListener('touchcancel', (e) => this.handleJoystickEnd(e), { passive: false });
+    },
+    
+    handleJoystickStart(e) {
+        e.preventDefault();
+        if (this.inputState.joystickTouch !== null) return;
+        const t = e.changedTouches[0];
+        this.inputState.joystickTouch = t.identifier;
+        const r = this.elements.joystickZone.getBoundingClientRect();
+        this.elements.joystickBase.style.left = `${t.clientX - r.left - 60}px`;
+        this.elements.joystickBase.style.top = `${t.clientY - r.top - 60}px`;
+        this.elements.joystickBase.classList.remove('hidden');
+    },
+    
+    handleJoystickMove(e) {
+        e.preventDefault();
+        for (const t of e.changedTouches) {
+            if (t.identifier === this.inputState.joystickTouch) {
+                const r = this.elements.joystickBase.getBoundingClientRect();
+                let dx = t.clientX - (r.left + r.width/2), dy = t.clientY - (r.top + r.height/2);
+                const d = Math.sqrt(dx*dx + dy*dy);
+                if (d > this.JOYSTICK_MAX_DISTANCE) { dx = (dx/d)*this.JOYSTICK_MAX_DISTANCE; dy = (dy/d)*this.JOYSTICK_MAX_DISTANCE; }
+                this.elements.joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+                const nx = dx/this.JOYSTICK_MAX_DISTANCE, ny = dy/this.JOYSTICK_MAX_DISTANCE, m = Math.sqrt(nx*nx + ny*ny);
+                if (m < this.DEAD_ZONE) { this.inputState.moveX = 0; this.inputState.moveY = 0; }
+                else { const rm = (m - this.DEAD_ZONE)/(1 - this.DEAD_ZONE); this.inputState.moveX = (nx/m)*rm; this.inputState.moveY = (ny/m)*rm; }
+            }
         }
-    }
+    },
+    
+    handleJoystickEnd(e) {
+        for (const t of e.changedTouches) {
+            if (t.identifier === this.inputState.joystickTouch) {
+                this.inputState.joystickTouch = null; this.inputState.moveX = 0; this.inputState.moveY = 0;
+                this.elements.joystickBase.classList.add('hidden');
+                this.elements.joystickStick.style.transform = 'translate(0, 0)';
+            }
+        }
+    },
+    
+    initButtons() {
+        const { btnAttack, btnJump, btnSpread, btnBurst, btnMega, potionSlot } = this.elements;
+        btnAttack.addEventListener('touchstart', (e) => { e.preventDefault(); this.inputState.attacking = true; });
+        btnAttack.addEventListener('touchend', (e) => { e.preventDefault(); this.inputState.attacking = false; });
+        btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); this.inputState.jumping = true; });
+        btnJump.addEventListener('touchend', (e) => { e.preventDefault(); this.inputState.jumping = false; });
+        btnSpread.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.cooldowns.spread.current <= 0) this.inputState.useSpread = true; });
+        btnBurst.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.cooldowns.burst.current <= 0) this.inputState.useBurst = true; });
+        btnMega.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.cooldowns.mega.current <= 0) this.inputState.useMega = true; });
+        potionSlot.addEventListener('touchstart', (e) => { e.preventDefault(); this.inputState.usePotion = true; });
+    },
+    
+    initCameraControls() {
+        const c = document.getElementById('game-canvas');
+        c.addEventListener('touchstart', (e) => this.handleCameraStart(e), { passive: false });
+        c.addEventListener('touchmove', (e) => this.handleCameraMove(e), { passive: false });
+        c.addEventListener('touchend', (e) => this.handleCameraEnd(e), { passive: false });
+    },
+    
+    handleCameraStart(e) {
+        const t = e.changedTouches[0], x = t.clientX, w = window.innerWidth;
+        if (x < w*0.4 || x > w*0.75) return;
+        if (this.inputState.cameraTouch === null) {
+            e.preventDefault(); this.inputState.cameraTouch = t.identifier;
+            this.inputState.lastCameraX = t.clientX; this.inputState.lastCameraY = t.clientY;
+        }
+    },
+    
+    handleCameraMove(e) {
+        for (const t of e.changedTouches) {
+            if (t.identifier === this.inputState.cameraTouch) {
+                e.preventDefault();
+                const mx = t.clientX - (this.inputState.lastCameraX || t.clientX);
+                const my = t.clientY - (this.inputState.lastCameraY || t.clientY);
+                this.inputState.lastCameraX = t.clientX; this.inputState.lastCameraY = t.clientY;
+                this.cameraYaw -= mx * this.inputState.cameraSensitivity * 0.01;
+                this.cameraPitch = Math.max(this.CAMERA_MIN_PITCH, Math.min(this.CAMERA_MAX_PITCH, this.cameraPitch + my * this.inputState.cameraSensitivity * 0.01));
+            }
+        }
+    },
+    
+    handleCameraEnd(e) {
+        for (const t of e.changedTouches) {
+            if (t.identifier === this.inputState.cameraTouch) {
+                this.inputState.cameraTouch = null; this.inputState.lastCameraX = null; this.inputState.lastCameraY = null;
+            }
+        }
+    },
+    
+    initKeyboard() {
+        const keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.code] = true; if (e.code === 'Space') this.inputState.jumping = true; if (e.code === 'KeyE') this.inputState.interact = true; });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'Space') this.inputState.jumping = false; });
+        window.addEventListener('mousedown', (e) => { if (e.button === 0) this.inputState.attacking = true; });
+        window.addEventListener('mouseup', (e) => { if (e.button === 0) this.inputState.attacking = false; });
+        window.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                this.cameraYaw -= e.movementX * 0.002 * this.inputState.cameraSensitivity;
+                this.cameraPitch = Math.max(this.CAMERA_MIN_PITCH, Math.min(this.CAMERA_MAX_PITCH, this.cameraPitch + e.movementY * 0.002 * this.inputState.cameraSensitivity));
+            }
+        });
+        document.getElementById('game-canvas').addEventListener('click', () => { document.getElementById('game-canvas').requestPointerLock?.(); });
+        setInterval(() => {
+            let mx = 0, my = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) my = -1;
+            if (keys['KeyS'] || keys['ArrowDown']) my = 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) mx = -1;
+            if (keys['KeyD'] || keys['ArrowRight']) mx = 1;
+            if (mx !== 0 && my !== 0) { const m = Math.sqrt(mx*mx + my*my); mx /= m; my /= m; }
+            if (this.inputState.joystickTouch === null) { this.inputState.moveX = mx; this.inputState.moveY = my; }
+        }, 16);
+    },
+    
+    setCameraMode(mode) {
+        this.currentCameraMode = mode;
+        if (mode === this.CameraMode.NORMAL) { this.cameraTargetDistance = 8; this.cameraTargetHeight = 4; }
+        else if (mode === this.CameraMode.MINI_BOSS) { this.cameraTargetDistance = 12; this.cameraTargetHeight = 5; }
+        else if (mode === this.CameraMode.PILLAR_BOSS) { this.cameraTargetDistance = 20; this.cameraTargetHeight = 8; }
+    },
+    
+    updateCamera(camera, playerPosition, delta) {
+        this.cameraDistance += (this.cameraTargetDistance - this.cameraDistance) * 0.05;
+        this.cameraHeight += (this.cameraTargetHeight - this.cameraHeight) * 0.05;
+        const hd = this.cameraDistance * Math.cos(this.cameraPitch), vd = this.cameraDistance * Math.sin(this.cameraPitch);
+        const tx = playerPosition.x - Math.sin(this.cameraYaw) * hd, ty = playerPosition.y + vd + 1, tz = playerPosition.z - Math.cos(this.cameraYaw) * hd;
+        camera.position.x += (tx - camera.position.x) * 0.1;
+        camera.position.y += (ty - camera.position.y) * 0.1;
+        camera.position.z += (tz - camera.position.z) * 0.1;
+        camera.lookAt(playerPosition.x, playerPosition.y + 1, playerPosition.z);
+    },
+    
+    triggerCooldown(ability, duration) {
+        if (this.cooldowns[ability]) {
+            this.cooldowns[ability].current = duration || this.cooldowns[ability].max;
+            const btn = ability === 'spread' ? this.elements.btnSpread : ability === 'burst' ? this.elements.btnBurst : this.elements.btnMega;
+            if (btn) { btn.classList.add('on-cooldown'); btn.style.setProperty('--cooldown-duration', `${this.cooldowns[ability].current}s`); }
+        }
+    },
+    
+    updateCooldowns(delta) {
+        for (const [a, cd] of Object.entries(this.cooldowns)) {
+            if (cd.current > 0) {
+                cd.current -= delta;
+                if (cd.current <= 0) { cd.current = 0; const btn = a === 'spread' ? this.elements.btnSpread : a === 'burst' ? this.elements.btnBurst : this.elements.btnMega; if (btn) btn.classList.remove('on-cooldown'); }
+            }
+        }
+    },
+    
+    getCooldown(a) { return this.cooldowns[a] ? this.cooldowns[a].current : 0; },
+    getCameraYaw() { return this.cameraYaw; },
+    setCameraYaw(y) { this.cameraYaw = y; },
+    getInputState() { return { ...this.inputState }; },
+    resetInputFlags() { this.inputState.useSpread = false; this.inputState.useBurst = false; this.inputState.useMega = false; this.inputState.usePotion = false; this.inputState.interact = false; },
+    setSensitivity(v) { this.inputState.cameraSensitivity = v; localStorage.setItem('obelisk_sensitivity', v.toString()); },
+    update(delta) { this.updateCooldowns(delta); }
+};
     </script>
-    <script type="module" src="game.js"></script>
+    
+    <!-- World Module -->
+    <script src="world.js"></script>
+    
+    <!-- Game Module -->
+    <script>
+// ============================================
+// GAME MODULE
+// ============================================
+const GAME_STATE = { LOADING: 'loading', MENU: 'menu', TOWN: 'town', DUNGEON: 'dungeon', PAUSED: 'paused', DIALOGUE: 'dialogue', SHOP: 'shop', DEATH: 'death', VICTORY: 'victory' };
+
+let currentState = GAME_STATE.LOADING, previousState = null;
+let scene, camera, renderer, clock;
+
+const DEFAULT_SAVE = {
+    version: 1,
+    player: { maxFloorReached: 1, currentXP: 0,
+        upgrades: { maxHealth: 0, baseDamage: 0, fireRate: 0, aimAssist: 0, spreadDamage: 0, spreadArc: 0, spreadCooldown: 0, burstDuration: 0, burstCooldown: 0, megaDamage: 0, megaCooldown: 0, globalCooldown: 0, globalAbilityDamage: 0 },
+        inventory: { smallPotions: 0, mediumPotions: 0, largePotions: 0 }
+    },
+    town: { npcsArrived: ['guide'], dialoguesSeen: [] },
+    lore: { fragmentsCollected: [] },
+    settings: { cameraSensitivity: 0.5 },
+    timestamp: null
+};
+
+let gameState = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+let UI = {}, currentFloor = 1, sessionXPGained = 0, dialogueQueue = [], interactableNPC = null, cameraShake = 0;
+
+async function initGame() {
+    initUIReferences(); updateLoading(10, 'Setting up renderer...');
+    await initRenderer(); updateLoading(30, 'Loading controls...');
+    Controls.init(); updateLoading(50, 'Loading assets...');
+    loadGame(); updateLoading(70, 'Preparing world...');
+    World.initPlayer(scene); World.applyUpgrades(gameState.player.upgrades);
+    updateLoading(90, 'Almost ready...'); setupGlobalCallbacks(); bindUIEvents();
+    updateLoading(100, 'Ready!'); await delay(500); setState(GAME_STATE.MENU);
+    clock = new THREE.Clock(); gameLoop();
+}
+
+function initUIReferences() {
+    const ids = ['loading-screen','loading-bar','loading-text','main-menu','btn-new-game','btn-continue','btn-settings','settings-panel','btn-settings-back','btn-delete-save','hud','touch-controls','btn-pause','pause-menu','btn-resume','btn-return-town','btn-pause-settings','btn-quit','dialogue-box','dialogue-speaker','dialogue-text','shop-panel','shop-items','shop-xp','btn-shop-close','shop-title','floor-select','floor-buttons','btn-floor-cancel','death-screen','btn-respawn','xp-lost-amount','victory-screen','btn-continue-victory','victory-message','xp-gained-amount','lore-panel','lore-text','btn-lore-close','interaction-prompt','health-fill','health-text','xp-text','floor-text','potion-count'];
+    ids.forEach(id => { const camel = id.replace(/-([a-z])/g, (g) => g[1].toUpperCase()); UI[camel] = document.getElementById(id); });
+}
+
+async function initRenderer() {
+    scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a0a12);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 100); camera.position.set(0, 5, 10);
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: false, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    window.addEventListener('resize', () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && currentState === GAME_STATE.DUNGEON) setState(GAME_STATE.PAUSED); });
+}
+
+function setupGlobalCallbacks() {
+    window.gameState = gameState;
+    window.awardXP = (a) => { gameState.player.currentXP += a; sessionXPGained += a; updateXPDisplay(); };
+    window.showMessage = (m) => console.log('Message:', m);
+    window.showDialogue = (s, t) => { dialogueQueue.push({ speaker: s, text: t }); if (currentState !== GAME_STATE.DIALOGUE) showNextDialogue(); };
+    window.onPlayerDeath = () => handlePlayerDeath();
+    window.onFloorComplete = () => handleFloorComplete();
+    window.shakeCamera = (i) => { cameraShake = Math.max(cameraShake, i); };
+}
+
+function bindUIEvents() {
+    UI.btnNewGame.addEventListener('click', startNewGame);
+    UI.btnContinue.addEventListener('click', continueGame);
+    UI.btnSettings.addEventListener('click', () => showSettings(false));
+    UI.btnSettingsBack.addEventListener('click', hideSettings);
+    UI.btnDeleteSave.addEventListener('click', confirmDeleteSave);
+    document.getElementById('camera-sensitivity').addEventListener('input', (e) => { const v = parseFloat(e.target.value); document.getElementById('sensitivity-value').textContent = v.toFixed(1); Controls.setSensitivity(v); gameState.settings.cameraSensitivity = v; });
+    UI.btnPause.addEventListener('click', () => setState(GAME_STATE.PAUSED));
+    UI.btnResume.addEventListener('click', () => setState(previousState || GAME_STATE.DUNGEON));
+    UI.btnReturnTown.addEventListener('click', () => setState(GAME_STATE.TOWN));
+    UI.btnPauseSettings.addEventListener('click', () => showSettings(true));
+    UI.btnQuit.addEventListener('click', quitToMenu);
+    UI.dialogueBox.addEventListener('click', advanceDialogue);
+    UI.btnShopClose.addEventListener('click', closeShop);
+    UI.btnFloorCancel.addEventListener('click', () => UI.floorSelect.classList.add('hidden'));
+    UI.btnRespawn.addEventListener('click', respawnPlayer);
+    UI.btnContinueVictory.addEventListener('click', continueAfterVictory);
+    UI.btnLoreClose.addEventListener('click', () => { UI.lorePanel.classList.add('hidden'); if (previousState) setState(previousState); });
+    UI.interactionPrompt.addEventListener('click', handleInteraction);
+    document.getElementById('potion-slot').addEventListener('click', usePotion);
+    window.addEventListener('beforeunload', saveGame);
+}
+
+function setState(newState) {
+    previousState = currentState; currentState = newState;
+    [UI.loadingScreen, UI.mainMenu, UI.settingsPanel, UI.pauseMenu, UI.dialogueBox, UI.shopPanel, UI.floorSelect, UI.deathScreen, UI.victoryScreen, UI.lorePanel].forEach(el => el && el.classList.add('hidden'));
+    const showUI = [GAME_STATE.TOWN, GAME_STATE.DUNGEON, GAME_STATE.DIALOGUE].includes(newState);
+    UI.hud.classList.toggle('hidden', !showUI); UI.touchControls.classList.toggle('hidden', !showUI); UI.btnPause.classList.toggle('hidden', !showUI);
+    switch (newState) {
+        case GAME_STATE.LOADING: UI.loadingScreen.classList.remove('hidden'); break;
+        case GAME_STATE.MENU: UI.mainMenu.classList.remove('hidden'); UI.btnContinue.classList.toggle('hidden', !hasSaveData()); break;
+        case GAME_STATE.TOWN: enterTown(); break;
+        case GAME_STATE.PAUSED: UI.pauseMenu.classList.remove('hidden'); break;
+        case GAME_STATE.DIALOGUE: UI.dialogueBox.classList.remove('hidden'); break;
+        case GAME_STATE.SHOP: UI.shopPanel.classList.remove('hidden'); break;
+        case GAME_STATE.DEATH: UI.deathScreen.classList.remove('hidden'); break;
+        case GAME_STATE.VICTORY: UI.victoryScreen.classList.remove('hidden'); break;
+    }
+}
+
+function gameLoop() { requestAnimationFrame(gameLoop); const d = Math.min(clock.getDelta(), 0.1); if (currentState === GAME_STATE.TOWN || currentState === GAME_STATE.DUNGEON) update(d); renderer.render(scene, camera); }
+
+function update(delta) {
+    const input = Controls.getInputState(); Controls.update(delta);
+    World.updatePlayer(delta, input); Controls.updateCamera(camera, World.player.position, delta);
+    if (cameraShake > 0) { camera.position.x += (Math.random()-0.5)*cameraShake; camera.position.y += (Math.random()-0.5)*cameraShake; cameraShake *= 0.9; if (cameraShake < 0.01) cameraShake = 0; }
+    if (currentState === GAME_STATE.TOWN) {
+        World.updateTown(delta); interactableNPC = World.checkNPCInteraction(World.player.position);
+        UI.interactionPrompt.classList.toggle('hidden', !interactableNPC);
+        if (World.player.position.z < -18) showFloorSelect();
+        if (input.interact && interactableNPC) { handleInteraction(); Controls.resetInputFlags(); }
+    } else if (currentState === GAME_STATE.DUNGEON) {
+        World.updateDungeon(delta); World.updateProjectiles(delta); World.updateEnemies(delta); World.updateMiniBoss(delta); World.updatePillarBoss(delta); updateMinimap();
+    }
+    if (input.usePotion) { usePotion(); Controls.resetInputFlags(); }
+}
+
+function enterTown() {
+    World.cleanupDungeon(); World.initTown(scene); World.resetPlayerPosition();
+    World.player.position.set(0, 0, 5); if (World.player.mesh) World.player.mesh.position.copy(World.player.position);
+    World.fullHealPlayer(); Controls.setCameraMode(Controls.CameraMode.NORMAL); Controls.setCameraYaw(Math.PI);
+    updateUI(); UI.floorText.textContent = 'Town';
+}
+
+function enterDungeon(floor) {
+    currentFloor = floor; sessionXPGained = 0; World.cleanupTown(); World.initDungeon(scene, floor);
+    World.resetPlayerPosition(); World.fullHealPlayer(); Controls.setCameraMode(Controls.CameraMode.NORMAL); Controls.setCameraYaw(0);
+    updateUI(); UI.floorText.textContent = `Floor ${floor}`; UI.floorSelect.classList.add('hidden'); setState(GAME_STATE.DUNGEON);
+}
+
+function showFloorSelect() {
+    UI.floorButtons.innerHTML = '';
+    for (let i = 1; i <= 10; i++) {
+        const btn = document.createElement('button'); btn.className = 'floor-btn'; btn.textContent = i;
+        btn.disabled = i > gameState.player.maxFloorReached;
+        if (i === gameState.player.maxFloorReached) btn.classList.add('current');
+        btn.addEventListener('click', () => enterDungeon(i)); UI.floorButtons.appendChild(btn);
+    }
+    UI.floorSelect.classList.remove('hidden');
+}
+
+function handleFloorComplete() {
+    if (currentFloor >= gameState.player.maxFloorReached) gameState.player.maxFloorReached = Math.min(currentFloor + 1, 10);
+    const lore = World.getLoreFragment(currentFloor);
+    if (lore && !gameState.lore.fragmentsCollected.includes(`${currentFloor}`)) { gameState.lore.fragmentsCollected.push(`${currentFloor}`); showLore(lore); }
+    saveGame(); UI.victoryMessage.textContent = currentFloor === 10 ? "You have restored the obelisk. The dream-tree stirs..." : `Floor ${currentFloor} conquered. The depths await.`;
+    UI.xpGainedAmount.textContent = sessionXPGained; setState(GAME_STATE.VICTORY);
+}
+
+function continueAfterVictory() { if (currentFloor >= 10) quitToMenu(); else setState(GAME_STATE.TOWN); }
+function showLore(text) { UI.loreText.textContent = text; UI.lorePanel.classList.remove('hidden'); }
+function handlePlayerDeath() { const loss = Math.floor(gameState.player.currentXP * 0.25); gameState.player.currentXP -= loss; UI.xpLostAmount.textContent = loss; setState(GAME_STATE.DEATH); }
+function respawnPlayer() { saveGame(); setState(GAME_STATE.TOWN); }
+
+function handleInteraction() {
+    if (!interactableNPC) return;
+    const t = interactableNPC.type;
+    switch (t) {
+        case 'guide': showDialogueMsg('The Guide', World.getNPCDialogue('guide', gameState.player.maxFloorReached)); saveGame(); break;
+        case 'merchant': case 'scholar': case 'storyteller': case 'scientist': openShop(t); break;
+        case 'hooded': case 'traveler': showDialogueMsg(t === 'hooded' ? 'Hooded Figure' : 'Wounded Traveler', World.getNPCDialogue(t, gameState.player.maxFloorReached)); break;
+    }
+    UI.interactionPrompt.classList.add('hidden');
+}
+
+function showDialogueMsg(s, t) { dialogueQueue.push({ speaker: s, text: t }); if (currentState !== GAME_STATE.DIALOGUE) showNextDialogue(); }
+function showNextDialogue() { if (dialogueQueue.length === 0) { setState(previousState || GAME_STATE.TOWN); return; } const d = dialogueQueue.shift(); UI.dialogueSpeaker.textContent = d.speaker; UI.dialogueText.textContent = d.text; setState(GAME_STATE.DIALOGUE); }
+function advanceDialogue() { showNextDialogue(); }
+
+const SHOP_ITEMS = {
+    merchant: [{ id: 'smallPotion', name: 'Small Potion', desc: 'Restore 30 HP', cost: 25, type: 'consumable' },{ id: 'mediumPotion', name: 'Medium Potion', desc: 'Restore 60 HP', cost: 45, type: 'consumable' },{ id: 'largePotion', name: 'Large Potion', desc: 'Restore all HP', cost: 80, type: 'consumable' }],
+    scholar: [{ id: 'maxHealth', name: 'Vitality', desc: 'Increase max health', cost: [50,100,175,275,400], type: 'upgrade', maxLevel: 5 },{ id: 'baseDamage', name: 'Power', desc: 'Increase base damage', cost: [50,100,175,275,400], type: 'upgrade', maxLevel: 5 },{ id: 'fireRate', name: 'Speed', desc: 'Increase fire rate', cost: [50,100,175,275,400], type: 'upgrade', maxLevel: 5 },{ id: 'aimAssist', name: 'Focus', desc: 'Improve aim assist', cost: [50,100,175,275,400], type: 'upgrade', maxLevel: 5 }],
+    storyteller: [{ id: 'spreadCooldown', name: 'Spread: Cooldown', desc: 'Reduce cooldown', cost: [75,150,300], type: 'upgrade', maxLevel: 3 },{ id: 'burstDuration', name: 'Burst: Duration', desc: 'Longer burst mode', cost: [75,150,300], type: 'upgrade', maxLevel: 3 },{ id: 'megaCooldown', name: 'Mega: Cooldown', desc: 'Reduce cooldown', cost: [75,150,300], type: 'upgrade', maxLevel: 3 }],
+    scientist: [{ id: 'spreadDamage', name: 'Spread: Damage', desc: 'More damage per ball', cost: [75,150,300], type: 'upgrade', maxLevel: 3 },{ id: 'megaDamage', name: 'Mega: Damage', desc: 'More mega damage', cost: [75,150,300], type: 'upgrade', maxLevel: 3 },{ id: 'globalCooldown', name: 'Efficiency', desc: 'All cooldowns reduced', cost: [100,200,400], type: 'upgrade', maxLevel: 3 }]
+};
+const NPC_TITLES = { merchant: "The Merchant", scholar: "Scholar's Apprentice", storyteller: "Nomad Storyteller", scientist: "The Scientist" };
+
+function openShop(npcType) {
+    const items = SHOP_ITEMS[npcType]; if (!items) return;
+    UI.shopTitle.textContent = NPC_TITLES[npcType] || 'Shop'; UI.shopItems.innerHTML = ''; UI.shopXP.textContent = gameState.player.currentXP;
+    for (const item of items) {
+        const div = document.createElement('div'); div.className = 'shop-item';
+        let lvl = 0, cost = item.cost, maxed = false;
+        if (item.type === 'upgrade') { lvl = gameState.player.upgrades[item.id] || 0; maxed = lvl >= item.maxLevel; cost = maxed ? 0 : item.cost[lvl]; }
+        const afford = gameState.player.currentXP >= cost && !maxed;
+        if (!afford && !maxed) div.classList.add('cannot-afford'); if (maxed) div.classList.add('maxed');
+        div.innerHTML = `<div class="item-info"><span class="item-name">${item.name}</span><span class="item-desc">${item.desc}</span>${item.type === 'upgrade' ? `<span class="item-level">Level ${lvl}/${item.maxLevel}</span>` : ''}</div><span class="item-cost">${maxed ? 'MAX' : `✧ ${cost}`}</span>`;
+        if (afford) div.addEventListener('click', () => purchaseItem(item, npcType));
+        UI.shopItems.appendChild(div);
+    }
+    setState(GAME_STATE.SHOP);
+}
+
+function purchaseItem(item, npcType) {
+    let cost;
+    if (item.type === 'consumable') {
+        cost = item.cost; const total = gameState.player.inventory.smallPotions + gameState.player.inventory.mediumPotions + gameState.player.inventory.largePotions;
+        if (total >= 3) { showDialogueMsg(NPC_TITLES[npcType], "You can't carry any more potions!"); return; }
+        if (item.id === 'smallPotion') gameState.player.inventory.smallPotions++;
+        else if (item.id === 'mediumPotion') gameState.player.inventory.mediumPotions++;
+        else if (item.id === 'largePotion') gameState.player.inventory.largePotions++;
+    } else if (item.type === 'upgrade') {
+        const lvl = gameState.player.upgrades[item.id] || 0; if (lvl >= item.maxLevel) return;
+        cost = item.cost[lvl]; gameState.player.upgrades[item.id] = lvl + 1; World.applyUpgrades(gameState.player.upgrades);
+    }
+    gameState.player.currentXP -= cost; openShop(npcType); updateUI();
+}
+
+function closeShop() { setState(GAME_STATE.TOWN); }
+
+function usePotion() {
+    const need = World.player.maxHealth - World.player.health; if (need <= 0) return;
+    if (need <= 30 && gameState.player.inventory.smallPotions > 0) { gameState.player.inventory.smallPotions--; World.healPlayer(30); }
+    else if (need <= 60 && gameState.player.inventory.mediumPotions > 0) { gameState.player.inventory.mediumPotions--; World.healPlayer(60); }
+    else if (gameState.player.inventory.largePotions > 0) { gameState.player.inventory.largePotions--; World.healPlayer(World.player.maxHealth); }
+    else if (gameState.player.inventory.mediumPotions > 0) { gameState.player.inventory.mediumPotions--; World.healPlayer(60); }
+    else if (gameState.player.inventory.smallPotions > 0) { gameState.player.inventory.smallPotions--; World.healPlayer(30); }
+    updateUI();
+}
+
+function updateUI() { updateXPDisplay(); updatePotionDisplay(); }
+function updateXPDisplay() { if (UI.xpText) UI.xpText.textContent = gameState.player.currentXP; if (UI.shopXP) UI.shopXP.textContent = gameState.player.currentXP; }
+function updatePotionDisplay() { if (UI.potionCount) UI.potionCount.textContent = gameState.player.inventory.smallPotions + gameState.player.inventory.mediumPotions + gameState.player.inventory.largePotions; }
+
+function updateMinimap() {
+    const canvas = document.getElementById('minimap-canvas'); if (!canvas) return;
+    const ctx = canvas.getContext('2d'), data = World.getDungeonData();
+    ctx.fillStyle = '#0a0a12'; ctx.fillRect(0, 0, 120, 120);
+    const rp = { center: {x:60,y:60}, east: {x:100,y:60}, west: {x:20,y:60}, north: {x:60,y:20}, south: {x:60,y:100} };
+    for (const [r, p] of Object.entries(rp)) {
+        if (data.roomCleared[r]) ctx.fillStyle = '#00aa00';
+        else if (r === data.currentRoom) ctx.fillStyle = '#00ffff';
+        else if (data.gateStates[r] !== false) ctx.fillStyle = '#666666';
+        else ctx.fillStyle = '#333333';
+        ctx.fillRect(p.x-10, p.y-10, 20, 20);
+    }
+    ctx.strokeStyle = '#444444'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(70,60); ctx.lineTo(90,60); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(50,60); ctx.lineTo(30,60); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60,50); ctx.lineTo(60,30); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60,70); ctx.lineTo(60,90); ctx.stroke();
+    const pr = rp[data.currentRoom]; if (pr) { ctx.fillStyle = '#ffff00'; ctx.beginPath(); ctx.arc(pr.x, pr.y, 4, 0, Math.PI*2); ctx.fill(); }
+}
+
+function updateLoading(p, t) { if (UI.loadingBar) UI.loadingBar.style.width = `${p}%`; if (UI.loadingText) UI.loadingText.textContent = t; }
+function saveGame() { gameState.timestamp = Date.now(); localStorage.setItem('obelisk_save', JSON.stringify(gameState)); }
+function loadGame() { const d = localStorage.getItem('obelisk_save'); if (d) { try { const p = JSON.parse(d); gameState = {...DEFAULT_SAVE,...p}; gameState.player = {...DEFAULT_SAVE.player,...p.player}; gameState.player.upgrades = {...DEFAULT_SAVE.player.upgrades,...p.player?.upgrades}; gameState.player.inventory = {...DEFAULT_SAVE.player.inventory,...p.player?.inventory}; Controls.setSensitivity(gameState.settings.cameraSensitivity); } catch(e) { console.error('Load failed:', e); } } }
+function hasSaveData() { return localStorage.getItem('obelisk_save') !== null; }
+function deleteSave() { localStorage.removeItem('obelisk_save'); gameState = JSON.parse(JSON.stringify(DEFAULT_SAVE)); }
+function confirmDeleteSave() { if (confirm('Delete save? This cannot be undone.')) { deleteSave(); hideSettings(); UI.btnContinue.classList.add('hidden'); } }
+function startNewGame() { if (hasSaveData() && !confirm('Overwrite existing save?')) return; deleteSave(); World.applyUpgrades(gameState.player.upgrades); setState(GAME_STATE.TOWN); showDialogueMsg('The Guide', "Welcome, dreamer. The obelisk has called you here."); showDialogueMsg('The Guide', "Approach the cave entrance when you're ready to descend."); }
+function continueGame() { World.applyUpgrades(gameState.player.upgrades); setState(GAME_STATE.TOWN); }
+function showSettings(fromPause) { UI.settingsPanel.classList.remove('hidden'); if (fromPause) UI.pauseMenu.classList.add('hidden'); else UI.mainMenu.classList.add('hidden'); document.getElementById('camera-sensitivity').value = gameState.settings.cameraSensitivity; document.getElementById('sensitivity-value').textContent = gameState.settings.cameraSensitivity.toFixed(1); }
+function hideSettings() { UI.settingsPanel.classList.add('hidden'); saveGame(); if (currentState === GAME_STATE.PAUSED || previousState === GAME_STATE.PAUSED) UI.pauseMenu.classList.remove('hidden'); else UI.mainMenu.classList.remove('hidden'); }
+function quitToMenu() { saveGame(); World.cleanupDungeon(); World.cleanupTown(); setState(GAME_STATE.MENU); }
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initGame);
+else initGame();
+    </script>
 </body>
 </html>
