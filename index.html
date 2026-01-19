@@ -1053,8 +1053,8 @@ let townLights = [];
 
 const player = {
     mesh: null,
-    position: new THREE.Vector3(0, 0, 0),
-    velocity: new THREE.Vector3(0, 0, 0),
+    position: null,  // Initialized in initPlayer
+    velocity: null,  // Initialized in initPlayer
     
     // Stats
     maxHealth: 100,
@@ -1102,6 +1102,10 @@ const UPGRADE_VALUES = {
 
 function initPlayer(sceneRef) {
     scene = sceneRef;
+    
+    // Initialize Vector3 objects (can't do at module load since THREE might not be ready)
+    player.position = new THREE.Vector3(0, 0, 0);
+    player.velocity = new THREE.Vector3(0, 0, 0);
     
     // Create player mesh group
     player.mesh = new THREE.Group();
@@ -3762,14 +3766,36 @@ let gameState = JSON.parse(JSON.stringify(DEFAULT_SAVE));
 let UI = {}, currentFloor = 1, sessionXPGained = 0, dialogueQueue = [], interactableNPC = null, cameraShake = 0;
 
 async function initGame() {
-    initUIReferences(); updateLoading(10, 'Setting up renderer...');
-    await initRenderer(); updateLoading(30, 'Loading controls...');
-    Controls.init(); updateLoading(50, 'Loading assets...');
-    loadGame(); updateLoading(70, 'Preparing world...');
-    World.initPlayer(scene); World.applyUpgrades(gameState.player.upgrades);
-    updateLoading(90, 'Almost ready...'); setupGlobalCallbacks(); bindUIEvents();
-    updateLoading(100, 'Ready!'); await delay(500); setState(GAME_STATE.MENU);
-    clock = new THREE.Clock(); gameLoop();
+    try {
+        console.log('Starting initGame...');
+        initUIReferences(); 
+        console.log('UI refs done');
+        updateLoading(10, 'Setting up renderer...');
+        await initRenderer(); 
+        console.log('Renderer done, scene:', scene);
+        updateLoading(30, 'Loading controls...');
+        Controls.init(); 
+        console.log('Controls done');
+        updateLoading(50, 'Loading assets...');
+        loadGame(); 
+        console.log('Save loaded');
+        updateLoading(70, 'Preparing world...');
+        World.initPlayer(scene); 
+        console.log('Player init done');
+        World.applyUpgrades(gameState.player.upgrades);
+        updateLoading(90, 'Almost ready...'); 
+        setupGlobalCallbacks(); 
+        bindUIEvents();
+        updateLoading(100, 'Ready!'); 
+        await delay(500); 
+        setState(GAME_STATE.MENU);
+        clock = new THREE.Clock(); 
+        gameLoop();
+        console.log('Game started!');
+    } catch (e) {
+        console.error('initGame error:', e);
+        document.getElementById('loading-text').textContent = 'Error: ' + e.message;
+    }
 }
 
 function initUIReferences() {
