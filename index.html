@@ -306,6 +306,17 @@
         const gameState = {
             grid: [],
             trees: [],
+            buildings: [],
+            units: [],
+            playerBuildingSites: [],
+            enemyBuildingSites: [],
+            selectedSite: null,
+            selectedBuilding: null,
+            resources: {
+                wood: 100,
+                coal: 0,
+                energy: 50
+            },
             camera: {
                 target: { x: CONFIG.GRID_WIDTH / 2, z: CONFIG.GRID_HEIGHT / 2 },
                 distance: 80,
@@ -318,6 +329,10 @@
                 mobileActions: {}
             }
         };
+        
+        // Raycaster for click detection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
 
         // Cell types
         const CELL = {
@@ -332,7 +347,7 @@
         // ============================================
         // THREE.JS SETUP
         // ============================================
-        let scene, camera, renderer;
+        let scene, camera, renderer, raycaster, mouse;
         let treeGeometry, treeMaterials;
 
         function initThree() {
@@ -354,6 +369,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             document.getElementById('game-container').appendChild(renderer.domElement);
+            
+            // Raycaster for click detection
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
 
             // Lighting
             const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
@@ -856,16 +875,26 @@
             clearing.position.set(center.x, 0.01, center.z);
             scene.add(clearing);
 
-            // Building placement indicators (7 spots)
-            const buildingSpots = [
-                { x: 0, z: 0 },           // Center
-                { x: -10, z: -8 },        // Back left
-                { x: 10, z: -8 },         // Back right
-                { x: -12, z: 4 },         // Front left
-                { x: 12, z: 4 },          // Front right
-                { x: -5, z: 10 },         // Far front left
-                { x: 5, z: 10 }           // Far front right
-            ];
+            // Building placement indicators (16 spots: 2x2 center + 12 ring)
+            const buildingSpots = [];
+            
+            // Center 2x2 (4 spots)
+            const centerOffset = 4;
+            buildingSpots.push({ x: -centerOffset, z: -centerOffset, id: 'center-0' });
+            buildingSpots.push({ x: centerOffset, z: -centerOffset, id: 'center-1' });
+            buildingSpots.push({ x: -centerOffset, z: centerOffset, id: 'center-2' });
+            buildingSpots.push({ x: centerOffset, z: centerOffset, id: 'center-3' });
+            
+            // Outer ring (12 spots in a circle)
+            const ringRadius = 16;
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                buildingSpots.push({
+                    x: Math.cos(angle) * ringRadius,
+                    z: Math.sin(angle) * ringRadius,
+                    id: `ring-${i}`
+                });
+            }
 
             buildingSpots.forEach((spot, index) => {
                 const spotGeometry = new THREE.PlaneGeometry(6, 6);
@@ -881,7 +910,22 @@
                     0.02,
                     center.z + spot.z
                 );
+                spotMesh.userData = {
+                    type: 'buildingSite',
+                    siteId: spot.id,
+                    owner: label === 'Player Base' ? 'player' : 'enemy',
+                    gridX: Math.floor(center.x + spot.x),
+                    gridZ: Math.floor(center.z + spot.z),
+                    building: null
+                };
                 scene.add(spotMesh);
+                
+                // Track building sites
+                if (label === 'Player Base') {
+                    gameState.playerBuildingSites.push(spotMesh);
+                } else {
+                    gameState.enemyBuildingSites.push(spotMesh);
+                }
 
                 // Add border
                 const borderGeometry = new THREE.EdgesGeometry(spotGeometry);
@@ -1153,7 +1197,80 @@
                 gameState.camera.distance += e.deltaY * 0.1;
                 gameState.camera.distance = Math.max(20, Math.min(200, gameState.camera.distance));
             });
+            
+            // Click detection for building sites
+            renderer.domElement.addEventListener('click', onCanvasClick);
+            renderer.domElement.addEventListener('touchend', (e) => {
+                if (e.changedTouches.length === 1 && !touchStart) {
+                    // This was a tap, not a drag
+                    const touch = e.changedTouches[0];
+                    onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+                }
+            });
         }
+
+        // ============================================
+        // CLICK DETECTION
+        // ============================================
+        function onCanvasClick(event) {
+            // Calculate mouse position
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Check building sites first
+            const siteIntersects = raycaster.intersectObjects(gameState.playerBuildingSites);
+            
+            if (siteIntersects.length > 0) {
+                const clickedSite = siteIntersects[0].object;
+                
+                if (clickedSite.userData.building) {
+                    // Site has a building - show building menu
+                    gameState.selectedBuilding = clickedSite.userData.building;
+                    gameState.selectedSite = null;
+                    if (window.GameUI) {
+                        GameUI.showBuildingMenu(clickedSite.userData.building);
+                    }
+                } else {
+                    // Empty site - show build menu
+                    gameState.selectedSite = clickedSite;
+                    gameState.selectedBuilding = null;
+                    if (window.GameUI) {
+                        GameUI.showBuildMenu(clickedSite);
+                    }
+                }
+                return;
+            }
+            
+            // Clicked elsewhere - close menus
+            gameState.selectedSite = null;
+            gameState.selectedBuilding = null;
+            if (window.GameUI) {
+                GameUI.hideMenus();
+            }
+        }
+        
+        function onCanvasTap(event) {
+            if (event.touches.length === 1) {
+                const touch = event.touches[0];
+                onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+            }
+        }
+
+        // ============================================
+        // EXPOSE GLOBALS FOR MODULES
+        // ============================================
+        window.GameEngine = {
+            scene,
+            camera,
+            renderer,
+            gameState,
+            CONFIG,
+            CELL,
+            THREE
+        };
 
         // ============================================
         // ANIMATION LOOP
@@ -1161,6 +1278,12 @@
         function animate() {
             requestAnimationFrame(animate);
             updateCamera();
+            
+            // Update units if module loaded
+            if (window.GameUnits) {
+                GameUnits.update();
+            }
+            
             renderer.render(scene, camera);
         }
 
@@ -1175,10 +1298,19 @@
             // Start at player base
             jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
             
+            // Initialize modules after DOM ready
+            if (window.GameUI) GameUI.init();
+            if (window.GameBuildings) GameBuildings.init();
+            if (window.GameUnits) GameUnits.init();
+            
             animate();
         }
 
-        init();
+        // Wait for modules to load
+        window.addEventListener('load', init);
     </script>
+    <script src="js/buildings.js"></script>
+    <script src="js/units.js"></script>
+    <script src="js/ui.js"></script>
 </body>
 </html>
