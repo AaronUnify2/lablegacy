@@ -288,8 +288,27 @@
     <script>
         // Pre-Three.js check
         document.getElementById('debug-panel').innerHTML = 'Waiting for THREE.js...<br>';
+        
+        // Timeout check
+        setTimeout(function() {
+            var panel = document.getElementById('debug-panel');
+            if (typeof THREE === 'undefined') {
+                panel.innerHTML += '<span style="color:orange">THREE.js taking too long, trying backup CDN...</span><br>';
+                var backup = document.createElement('script');
+                backup.src = 'https://unpkg.com/three@0.128.0/build/three.min.js';
+                backup.onload = function() {
+                    panel.innerHTML += 'Backup CDN loaded!<br>';
+                };
+                backup.onerror = function() {
+                    panel.innerHTML += '<span style="color:red">Backup CDN also failed!</span><br>';
+                };
+                document.head.appendChild(backup);
+            }
+        }, 3000);
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="document.getElementById('debug-panel').innerHTML += 'FAILED TO LOAD THREE.JS<br>'"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" 
+            onload="document.getElementById('debug-panel').innerHTML += 'THREE.js loaded from primary CDN<br>'"
+            onerror="document.getElementById('debug-panel').innerHTML += '<span style=color:red>PRIMARY CDN FAILED</span><br>'"></script>
     <script>
         // GLOBAL ERROR HANDLER
         window.onerror = function(msg, url, line, col, error) {
