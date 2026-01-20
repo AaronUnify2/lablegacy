@@ -271,6 +271,7 @@
                 <div><span class="key">R</span><span class="key">F</span> — Zoom in/out</div>
                 <div><span class="key">Space</span> — Toggle top-down view</div>
                 <div><span class="key">1</span><span class="key">2</span> — Jump to Player/Enemy base</div>
+                <div style="margin-top: 8px; color: #7ddf64;">Click units to select & command</div>
             </div>
 
             <div id="mobile-controls">
@@ -388,6 +389,7 @@
             enemyBuildingSites: [],
             selectedSite: null,
             selectedBuilding: null,
+            selectedUnit: null,
             resources: {
                 wood: 500,
                 energy: 300
@@ -693,16 +695,6 @@
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(20, 38, 18, Math.PI * 0.5, Math.PI * 1.5);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(32, 28, 20, Math.PI * 1.2, Math.PI * 1.8);
-            ctx.stroke();
-            
-            // Better outline - trace the outer edge
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
             ctx.moveTo(4, 44);
             ctx.quadraticCurveTo(2, 28, 16, 14);
             ctx.quadraticCurveTo(32, 2, 48, 14);
@@ -899,52 +891,42 @@
                     // Distance from edges (for high-yield)
                     const distFromLeftEdge = x;
                     const distFromRightEdge = CONFIG.GRID_WIDTH - x;
-                    const minEdgeDist = Math.min(distFromLeftEdge, distFromRightEdge);
+                    const minDistFromEdge = Math.min(distFromLeftEdge, distFromRightEdge);
 
                     // Distance from center (for energy trees)
-                    const distFromCenterZ = Math.abs(z - mapCenterZ);
-                    const distFromCenterX = Math.abs(x - CONFIG.GRID_WIDTH / 2);
-                    const distFromCenter = Math.sqrt(distFromCenterX * distFromCenterX + distFromCenterZ * distFromCenterZ);
+                    const distFromCenter = Math.abs(z - mapCenterZ);
 
                     // High-yield trees near edges
-                    if (minEdgeDist < CONFIG.HIGH_YIELD_EDGE_DISTANCE) {
-                        const edgeFactor = 1 - (minEdgeDist / CONFIG.HIGH_YIELD_EDGE_DISTANCE);
-                        if (Math.random() < CONFIG.HIGH_YIELD_PROBABILITY * edgeFactor) {
-                            treeType = CELL.TREE_HIGH_YIELD;
-                        }
+                    if (minDistFromEdge < CONFIG.HIGH_YIELD_EDGE_DISTANCE && Math.random() < CONFIG.HIGH_YIELD_PROBABILITY) {
+                        treeType = CELL.TREE_HIGH_YIELD;
                     }
-
-                    // Energy trees clustered in center with scatter
-                    if (distFromCenter < CONFIG.ENERGY_CENTER_CLUSTER_RADIUS) {
-                        const centerFactor = 1 - (distFromCenter / CONFIG.ENERGY_CENTER_CLUSTER_RADIUS);
-                        if (Math.random() < CONFIG.ENERGY_CENTER_PROBABILITY * centerFactor) {
-                            treeType = CELL.TREE_ENERGY;
-                        }
-                    } else if (Math.random() < CONFIG.ENERGY_SCATTER_PROBABILITY) {
+                    // Energy trees in center cluster
+                    else if (distFromCenter < CONFIG.ENERGY_CENTER_CLUSTER_RADIUS && Math.random() < CONFIG.ENERGY_CENTER_PROBABILITY) {
+                        treeType = CELL.TREE_ENERGY;
+                    }
+                    // Scattered energy trees elsewhere
+                    else if (Math.random() < CONFIG.ENERGY_SCATTER_PROBABILITY) {
                         treeType = CELL.TREE_ENERGY;
                     }
 
-                    // Place tree
+                    // Mark grid and create tree
                     gameState.grid[x][z] = treeType;
                     createTree(x, z, treeType);
                 }
             }
 
-            // Update UI
-            document.getElementById('tree-count').textContent = gameState.trees.length.toLocaleString();
-            
-            // Generate minimap
-            generateMinimap();
+            // Update tree count
+            document.getElementById('tree-count').textContent = gameState.trees.length;
         }
 
         function markClearing(center, cellType) {
+            const radiusSq = CONFIG.CLEARING_RADIUS * CONFIG.CLEARING_RADIUS;
+            
             for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
                 for (let z = 0; z < CONFIG.GRID_HEIGHT; z++) {
                     const dx = x - center.x;
                     const dz = z - center.z;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    
-                    if (dist < CONFIG.CLEARING_RADIUS) {
+                    if (dx * dx + dz * dz < radiusSq) {
                         gameState.grid[x][z] = cellType;
                     }
                 }
@@ -952,246 +934,149 @@
         }
 
         function createClearingVisual(center, color, label) {
-            // Clearing ground
+            // Create circular clearing ground
             const clearingGeometry = new THREE.CircleGeometry(CONFIG.CLEARING_RADIUS, 32);
-            const clearingMaterial = new THREE.MeshLambertMaterial({ 
+            const clearingMaterial = new THREE.MeshLambertMaterial({
                 color: color,
-                transparent: true,
-                opacity: 0.8
+                side: THREE.DoubleSide
             });
             const clearing = new THREE.Mesh(clearingGeometry, clearingMaterial);
             clearing.rotation.x = -Math.PI / 2;
-            clearing.position.set(center.x, 0.01, center.z);
+            clearing.position.set(center.x, 0.1, center.z);
             scene.add(clearing);
 
-            // Building placement indicators (16 spots: 2x2 center + 12 ring)
-            const buildingSpots = [];
+            // Add building site markers (5 sites per base)
+            const siteCount = 5;
+            const siteRadius = CONFIG.CLEARING_RADIUS * 0.6;
             
-            // Center 2x2 (4 spots)
-            const centerOffset = 4;
-            buildingSpots.push({ x: -centerOffset, z: -centerOffset, id: 'center-0' });
-            buildingSpots.push({ x: centerOffset, z: -centerOffset, id: 'center-1' });
-            buildingSpots.push({ x: -centerOffset, z: centerOffset, id: 'center-2' });
-            buildingSpots.push({ x: centerOffset, z: centerOffset, id: 'center-3' });
-            
-            // Outer ring (12 spots in a circle)
-            const ringRadius = 16;
-            for (let i = 0; i < 12; i++) {
-                const angle = (i / 12) * Math.PI * 2 - Math.PI / 2;
-                buildingSpots.push({
-                    x: Math.cos(angle) * ringRadius,
-                    z: Math.sin(angle) * ringRadius,
-                    id: `ring-${i}`
-                });
-            }
-
-            buildingSpots.forEach((spot, index) => {
-                const spotGeometry = new THREE.PlaneGeometry(6, 6);
-                const spotMaterial = new THREE.MeshLambertMaterial({
-                    color: 0x5a5a4a,
-                    transparent: true,
-                    opacity: 0.6
-                });
-                const spotMesh = new THREE.Mesh(spotGeometry, spotMaterial);
-                spotMesh.rotation.x = -Math.PI / 2;
-                spotMesh.position.set(
-                    center.x + spot.x,
-                    0.02,
-                    center.z + spot.z
-                );
-                spotMesh.userData = {
-                    type: 'buildingSite',
-                    siteId: spot.id,
-                    owner: label === 'Player Base' ? 'player' : 'enemy',
-                    gridX: Math.floor(center.x + spot.x),
-                    gridZ: Math.floor(center.z + spot.z),
-                    building: null
-                };
-                scene.add(spotMesh);
+            for (let i = 0; i < siteCount; i++) {
+                const angle = (i / siteCount) * Math.PI * 2;
+                const siteX = center.x + Math.cos(angle) * siteRadius;
+                const siteZ = center.z + Math.sin(angle) * siteRadius;
                 
-                // Track building sites
-                if (label === 'Player Base') {
-                    gameState.playerBuildingSites.push(spotMesh);
-                } else {
-                    gameState.enemyBuildingSites.push(spotMesh);
-                }
-
-                // Add border
-                const borderGeometry = new THREE.EdgesGeometry(spotGeometry);
-                const borderMaterial = new THREE.LineBasicMaterial({ color: 0x8a8a6a });
-                const border = new THREE.LineSegments(borderGeometry, borderMaterial);
-                border.rotation.x = -Math.PI / 2;
-                border.position.copy(spotMesh.position);
-                border.position.y = 0.03;
-                scene.add(border);
-            });
+                createBuildingSite(siteX, siteZ, label === 'Player Base');
+            }
         }
 
-        function createTree(gridX, gridZ, treeType) {
+        function createBuildingSite(x, z, isPlayer) {
+            const geometry = new THREE.CircleGeometry(3, 6);
+            const material = new THREE.MeshLambertMaterial({
+                color: isPlayer ? 0x5a8a4a : 0x8a5a4a,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.6
+            });
+            const site = new THREE.Mesh(geometry, material);
+            site.rotation.x = -Math.PI / 2;
+            site.position.set(x, 0.15, z);
+            site.userData = { isPlayer, building: null };
+            scene.add(site);
+            
+            if (isPlayer) {
+                gameState.playerBuildingSites.push(site);
+            } else {
+                gameState.enemyBuildingSites.push(site);
+            }
+        }
+
+        function createTree(x, z, type) {
             let material;
-            switch (treeType) {
+            let scale;
+            
+            switch(type) {
+                case CELL.TREE_NORMAL:
+                    material = treeMaterials.normal.clone();
+                    scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
+                    break;
                 case CELL.TREE_HIGH_YIELD:
                     material = treeMaterials.highYield.clone();
+                    scale = (CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN)) * 1.3;
                     break;
                 case CELL.TREE_ENERGY:
                     material = treeMaterials.energy.clone();
+                    scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
                     break;
-                default:
-                    material = treeMaterials.normal.clone();
             }
 
             const sprite = new THREE.Sprite(material);
+            sprite.scale.set(4 * scale, 6 * scale, 1);
             
-            // Random scale variation
-            const scale = CONFIG.TREE_SCALE_MIN + 
-                Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
-            
-            // Energy trees are slightly larger
-            const finalScale = treeType === CELL.TREE_ENERGY ? scale * 1.2 : scale;
-            
-            sprite.scale.set(finalScale * 3, finalScale * 4.5, 1);
-            
-            // Position with slight random offset for natural look
+            // Add slight random offset within cell
             const offsetX = (Math.random() - 0.5) * 0.5;
             const offsetZ = (Math.random() - 0.5) * 0.5;
             
             sprite.position.set(
-                gridX * CONFIG.CELL_SIZE + offsetX,
-                finalScale * 2.25,
-                gridZ * CONFIG.CELL_SIZE + offsetZ
+                x + offsetX,
+                3 * scale,
+                z + offsetZ
             );
-
+            
+            sprite.userData = { gridX: x, gridZ: z, type };
+            
             scene.add(sprite);
-            gameState.trees.push({
-                sprite,
-                gridX,
-                gridZ,
-                type: treeType
-            });
-        }
-
-        // ============================================
-        // MINIMAP
-        // ============================================
-        function generateMinimap() {
-            const canvas = document.querySelector('#minimap canvas');
-            canvas.width = 180;
-            canvas.height = 90;
-            const ctx = canvas.getContext('2d');
-
-            // Background
-            ctx.fillStyle = '#1a2a1a';
-            ctx.fillRect(0, 0, 180, 90);
-
-            // Scale factors
-            const scaleX = 180 / CONFIG.GRID_WIDTH;
-            const scaleY = 90 / CONFIG.GRID_HEIGHT;
-
-            // Draw trees
-            for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
-                for (let z = 0; z < CONFIG.GRID_HEIGHT; z++) {
-                    const cell = gameState.grid[x][z];
-                    let color = null;
-
-                    switch (cell) {
-                        case CELL.TREE_NORMAL:
-                            color = '#4a8c3a';
-                            break;
-                        case CELL.TREE_HIGH_YIELD:
-                            color = '#2d5a1e';
-                            break;
-                        case CELL.TREE_ENERGY:
-                            color = '#9b4dca';
-                            break;
-                        case CELL.CLEARING_PLAYER:
-                            color = '#4a6a3a';
-                            break;
-                        case CELL.CLEARING_ENEMY:
-                            color = '#6a4a3a';
-                            break;
-                    }
-
-                    if (color) {
-                        ctx.fillStyle = color;
-                        ctx.fillRect(
-                            x * scaleX,
-                            z * scaleY,
-                            Math.max(1, scaleX),
-                            Math.max(1, scaleY)
-                        );
-                    }
-                }
-            }
-        }
-
-        function updateMinimapCamera() {
-            const canvas = document.querySelector('#minimap canvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Redraw base minimap
-            generateMinimap();
-            
-            // Draw camera position
-            const scaleX = 180 / CONFIG.GRID_WIDTH;
-            const scaleY = 90 / CONFIG.GRID_HEIGHT;
-            
-            ctx.strokeStyle = '#ffff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(
-                gameState.camera.target.x * scaleX - 10,
-                gameState.camera.target.z * scaleY - 5,
-                20,
-                10
-            );
+            gameState.trees.push(sprite);
         }
 
         // ============================================
         // CAMERA CONTROLS
         // ============================================
         function updateCamera() {
-            const cam = gameState.camera;
-            const keys = gameState.input.keys;
-            const mobile = gameState.input.mobileActions;
-
-            // Pan
-            let moveX = 0, moveZ = 0;
-            if (keys['KeyW'] || keys['ArrowUp'] || mobile.up) moveZ -= CONFIG.CAMERA_SPEED;
-            if (keys['KeyS'] || keys['ArrowDown'] || mobile.down) moveZ += CONFIG.CAMERA_SPEED;
-            if (keys['KeyA'] || keys['ArrowLeft'] || mobile.left) moveX -= CONFIG.CAMERA_SPEED;
-            if (keys['KeyD'] || keys['ArrowRight'] || mobile.right) moveX += CONFIG.CAMERA_SPEED;
-
-            // Apply rotation to movement
-            const cos = Math.cos(cam.angle);
-            const sin = Math.sin(cam.angle);
-            cam.target.x += moveX * cos - moveZ * sin;
-            cam.target.z += moveX * sin + moveZ * cos;
-
-            // Clamp to map bounds
-            cam.target.x = Math.max(0, Math.min(CONFIG.GRID_WIDTH, cam.target.x));
-            cam.target.z = Math.max(0, Math.min(CONFIG.GRID_HEIGHT, cam.target.z));
-
-            // Rotate
-            if (keys['KeyQ'] || mobile.rotleft) cam.angle -= CONFIG.ROTATE_SPEED;
-            if (keys['KeyE'] || mobile.rotright) cam.angle += CONFIG.ROTATE_SPEED;
-
+            const speed = CONFIG.CAMERA_SPEED;
+            const rotSpeed = CONFIG.ROTATE_SPEED;
+            const zoomSpeed = CONFIG.ZOOM_SPEED;
+            
+            // Keyboard input
+            if (gameState.input.keys['KeyW'] || gameState.input.keys['ArrowUp'] || gameState.input.mobileActions.up) {
+                gameState.camera.target.z -= speed * Math.cos(gameState.camera.angle);
+                gameState.camera.target.x -= speed * Math.sin(gameState.camera.angle);
+            }
+            if (gameState.input.keys['KeyS'] || gameState.input.keys['ArrowDown'] || gameState.input.mobileActions.down) {
+                gameState.camera.target.z += speed * Math.cos(gameState.camera.angle);
+                gameState.camera.target.x += speed * Math.sin(gameState.camera.angle);
+            }
+            if (gameState.input.keys['KeyA'] || gameState.input.keys['ArrowLeft'] || gameState.input.mobileActions.left) {
+                gameState.camera.target.x -= speed * Math.cos(gameState.camera.angle);
+                gameState.camera.target.z += speed * Math.sin(gameState.camera.angle);
+            }
+            if (gameState.input.keys['KeyD'] || gameState.input.keys['ArrowRight'] || gameState.input.mobileActions.right) {
+                gameState.camera.target.x += speed * Math.cos(gameState.camera.angle);
+                gameState.camera.target.z -= speed * Math.sin(gameState.camera.angle);
+            }
+            
+            // Rotation
+            if (gameState.input.keys['KeyQ'] || gameState.input.mobileActions.rotleft) {
+                gameState.camera.angle -= rotSpeed;
+            }
+            if (gameState.input.keys['KeyE'] || gameState.input.mobileActions.rotright) {
+                gameState.camera.angle += rotSpeed;
+            }
+            
             // Zoom
-            if (keys['KeyR'] || mobile.zoomin) cam.distance = Math.max(20, cam.distance - CONFIG.ZOOM_SPEED);
-            if (keys['KeyF'] || mobile.zoomout) cam.distance = Math.min(200, cam.distance + CONFIG.ZOOM_SPEED);
-
+            if (gameState.input.keys['KeyR'] || gameState.input.mobileActions.zoomin) {
+                gameState.camera.distance = Math.max(20, gameState.camera.distance - zoomSpeed);
+            }
+            if (gameState.input.keys['KeyF'] || gameState.input.mobileActions.zoomout) {
+                gameState.camera.distance = Math.min(200, gameState.camera.distance + zoomSpeed);
+            }
+            
+            // Clamp target position
+            gameState.camera.target.x = Math.max(0, Math.min(CONFIG.GRID_WIDTH, gameState.camera.target.x));
+            gameState.camera.target.z = Math.max(0, Math.min(CONFIG.GRID_HEIGHT, gameState.camera.target.z));
+            
             // Calculate camera position
-            const pitch = cam.isTopDown ? Math.PI / 2 - 0.01 : cam.pitch;
+            const pitch = gameState.camera.isTopDown ? Math.PI / 2 - 0.01 : gameState.camera.pitch;
             
-            camera.position.x = cam.target.x + Math.sin(cam.angle) * Math.cos(pitch) * cam.distance;
-            camera.position.y = Math.sin(pitch) * cam.distance;
-            camera.position.z = cam.target.z + Math.cos(cam.angle) * Math.cos(pitch) * cam.distance;
+            camera.position.x = gameState.camera.target.x + Math.sin(gameState.camera.angle) * Math.cos(pitch) * gameState.camera.distance;
+            camera.position.y = Math.sin(pitch) * gameState.camera.distance;
+            camera.position.z = gameState.camera.target.z + Math.cos(gameState.camera.angle) * Math.cos(pitch) * gameState.camera.distance;
             
-            camera.lookAt(cam.target.x, 0, cam.target.z);
-
+            camera.lookAt(gameState.camera.target.x, 0, gameState.camera.target.z);
+            
             // Update UI
-            document.getElementById('camera-pos').textContent = 
-                `${Math.round(cam.target.x)}, ${Math.round(cam.target.z)}`;
-            
-            updateMinimapCamera();
+            const posDisplay = document.getElementById('camera-pos');
+            if (posDisplay) {
+                posDisplay.textContent = `${Math.floor(gameState.camera.target.x)}, ${Math.floor(gameState.camera.target.z)}`;
+            }
         }
 
         function jumpToLocation(x, z) {
@@ -1207,15 +1092,36 @@
             document.addEventListener('keydown', (e) => {
                 gameState.input.keys[e.code] = true;
                 
-                // Special keys
+                // Toggle top-down view
                 if (e.code === 'Space') {
                     gameState.camera.isTopDown = !gameState.camera.isTopDown;
                 }
+                
+                // Quick jump keys
                 if (e.code === 'Digit1') {
                     jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
                 }
                 if (e.code === 'Digit2') {
                     jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
+                }
+                
+                // Escape to cancel command mode
+                if (e.code === 'Escape') {
+                    if (window.GameUnits) {
+                        const mode = GameUnits.getCommandMode();
+                        if (mode) {
+                            GameUnits.setCommandMode(null);
+                            if (window.GameUI) {
+                                GameUI.hideCommandIndicator();
+                                const selectedUnit = GameUnits.getSelectedUnit();
+                                if (selectedUnit) {
+                                    GameUI.showUnitMenu(selectedUnit);
+                                }
+                            }
+                        } else {
+                            GameUnits.deselectUnit();
+                        }
+                    }
                 }
             });
 
@@ -1253,11 +1159,14 @@
 
             // Touch pan on canvas
             let touchStart = null;
+            let lastTapTime = 0;
+            
             renderer.domElement.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 1) {
                     touchStart = {
                         x: e.touches[0].clientX,
-                        y: e.touches[0].clientY
+                        y: e.touches[0].clientY,
+                        time: Date.now()
                     };
                 }
             });
@@ -1267,17 +1176,24 @@
                     const deltaX = e.touches[0].clientX - touchStart.x;
                     const deltaY = e.touches[0].clientY - touchStart.y;
                     
-                    gameState.camera.target.x -= deltaX * 0.1;
-                    gameState.camera.target.z -= deltaY * 0.1;
-                    
-                    touchStart = {
-                        x: e.touches[0].clientX,
-                        y: e.touches[0].clientY
-                    };
+                    // Only pan if moved significantly (not a tap)
+                    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                        gameState.camera.target.x -= deltaX * 0.1;
+                        gameState.camera.target.z -= deltaY * 0.1;
+                        
+                        touchStart.x = e.touches[0].clientX;
+                        touchStart.y = e.touches[0].clientY;
+                        touchStart.moved = true;
+                    }
                 }
             });
 
-            renderer.domElement.addEventListener('touchend', () => {
+            renderer.domElement.addEventListener('touchend', (e) => {
+                if (touchStart && !touchStart.moved && Date.now() - touchStart.time < 300) {
+                    // This was a tap, not a drag
+                    const touch = e.changedTouches[0];
+                    onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+                }
                 touchStart = null;
             });
 
@@ -1287,15 +1203,8 @@
                 gameState.camera.distance = Math.max(20, Math.min(200, gameState.camera.distance));
             });
             
-            // Click detection for building sites
+            // Click detection for building sites and units
             renderer.domElement.addEventListener('click', onCanvasClick);
-            renderer.domElement.addEventListener('touchend', (e) => {
-                if (e.changedTouches.length === 1 && !touchStart) {
-                    // This was a tap, not a drag
-                    const touch = e.changedTouches[0];
-                    onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
-                }
-            });
         }
 
         // ============================================
@@ -1311,11 +1220,57 @@
             
             raycaster.setFromCamera(mouse, camera);
             
-            // Check building sites first
+            // Check if we're in command mode
+            if (window.GameUnits) {
+                const commandMode = GameUnits.getCommandMode();
+                
+                if (commandMode === 'move') {
+                    // Get ground intersection for move command
+                    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                    const intersectPoint = new THREE.Vector3();
+                    raycaster.ray.intersectPlane(groundPlane, intersectPoint);
+                    
+                    if (intersectPoint) {
+                        const selectedUnit = GameUnits.getSelectedUnit();
+                        if (selectedUnit) {
+                            GameUnits.commandMove(selectedUnit, intersectPoint.x, intersectPoint.z);
+                            GameUnits.setCommandMode(null);
+                            if (window.GameUI) {
+                                GameUI.hideCommandIndicator();
+                                GameUI.showUnitMenu(selectedUnit);
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
+            
+            // Check for unit selection first
+            if (window.GameUnits && gameState.units.length > 0) {
+                const unitSprites = gameState.units.map(u => u.sprite);
+                const unitIntersects = raycaster.intersectObjects(unitSprites);
+                
+                if (unitIntersects.length > 0) {
+                    const clickedSprite = unitIntersects[0].object;
+                    const clickedUnit = gameState.units.find(u => u.sprite === clickedSprite);
+                    
+                    if (clickedUnit && clickedUnit.owner === 'player') {
+                        GameUnits.selectUnit(clickedUnit);
+                        return;
+                    }
+                }
+            }
+            
+            // Check building sites
             const siteIntersects = raycaster.intersectObjects(gameState.playerBuildingSites);
             
             if (siteIntersects.length > 0) {
                 const clickedSite = siteIntersects[0].object;
+                
+                // Deselect any unit first
+                if (window.GameUnits) {
+                    GameUnits.deselectUnit();
+                }
                 
                 if (clickedSite.userData.building) {
                     // Site has a building - show building menu
@@ -1335,18 +1290,16 @@
                 return;
             }
             
-            // Clicked elsewhere - close menus
+            // Clicked elsewhere - close menus and deselect
             gameState.selectedSite = null;
             gameState.selectedBuilding = null;
+            
+            if (window.GameUnits) {
+                GameUnits.deselectUnit();
+            }
+            
             if (window.GameUI) {
                 GameUI.hideMenus();
-            }
-        }
-        
-        function onCanvasTap(event) {
-            if (event.touches.length === 1) {
-                const touch = event.touches[0];
-                onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
             }
         }
 
