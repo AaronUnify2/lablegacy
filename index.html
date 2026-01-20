@@ -1260,19 +1260,6 @@
         }
 
         // ============================================
-        // EXPOSE GLOBALS FOR MODULES
-        // ============================================
-        window.GameEngine = {
-            scene,
-            camera,
-            renderer,
-            gameState,
-            CONFIG,
-            CELL,
-            THREE
-        };
-
-        // ============================================
         // ANIMATION LOOP
         // ============================================
         function animate() {
@@ -1294,6 +1281,17 @@
             initThree();
             generateMap();
             initInput();
+            
+            // Expose globals for modules AFTER Three.js is initialized
+            window.GameEngine = {
+                scene,
+                camera,
+                renderer,
+                gameState,
+                CONFIG,
+                CELL,
+                THREE
+            };
             
             // Start at player base
             jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
