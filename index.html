@@ -285,8 +285,45 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
+        // Pre-Three.js check
+        document.getElementById('debug-panel').innerHTML = 'Waiting for THREE.js...<br>';
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" onerror="document.getElementById('debug-panel').innerHTML += 'FAILED TO LOAD THREE.JS<br>'"></script>
+    <script>
+        // GLOBAL ERROR HANDLER
+        window.onerror = function(msg, url, line, col, error) {
+            var panel = document.getElementById('debug-panel');
+            if (panel) {
+                panel.innerHTML += '<span style="color:red">ERROR: ' + msg + ' at line ' + line + '</span><br>';
+            }
+            console.error('Global error:', msg, url, line);
+            return false;
+        };
+        
+        // IMMEDIATE DEBUG - First thing that runs
+        (function() {
+            var panel = document.getElementById('debug-panel');
+            if (panel) panel.innerHTML = 'JS STARTED<br>';
+        })();
+        
+        // Debug logging function
+        function debug(msg) {
+            console.log(msg);
+            try {
+                var panel = document.getElementById('debug-panel');
+                if (panel) {
+                    panel.innerHTML += msg + '<br>';
+                    panel.scrollTop = panel.scrollHeight;
+                }
+            } catch(e) {
+                console.log('Debug panel error:', e);
+            }
+        }
+        
+        debug('Debug function defined');
+        debug('THREE exists: ' + (typeof THREE !== 'undefined'));
+        
         // ============================================
         // CONFIGURATION
         // ============================================
@@ -317,19 +354,7 @@
             ROTATE_SPEED: 0.03
         };
         
-        // Debug logging function
-        function debug(msg) {
-            console.log(msg);
-            try {
-                const panel = document.getElementById('debug-panel');
-                if (panel) {
-                    panel.innerHTML += msg + '<br>';
-                    panel.scrollTop = panel.scrollHeight;
-                }
-            } catch(e) {
-                console.log('Debug panel error:', e);
-            }
-        }
+        debug('CONFIG defined');
 
         // ============================================
         // GAME STATE
@@ -361,9 +386,20 @@
             }
         };
         
-        // Raycaster for click detection
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
+        debug('gameState defined');
+        
+        // Raycaster for click detection - created lazily
+        let raycaster = null;
+        let mouse = null;
+        
+        function ensureRaycaster() {
+            if (!raycaster) {
+                raycaster = new THREE.Raycaster();
+                mouse = new THREE.Vector2();
+            }
+        }
+        
+        debug('Raycaster setup defined');
 
         // Cell types
         const CELL = {
@@ -374,6 +410,9 @@
             CLEARING_PLAYER: 4,
             CLEARING_ENEMY: 5
         };
+        
+        debug('CELL types defined');
+        debug('All top-level definitions complete');
 
         // ============================================
         // THREE.JS SETUP
@@ -1244,6 +1283,8 @@
         // CLICK DETECTION
         // ============================================
         function onCanvasClick(event) {
+            ensureRaycaster();
+            
             // Calculate mouse position
             const rect = renderer.domElement.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1393,8 +1434,8 @@
         debug('Script loaded, waiting for window.load event...');
         debug('THREE.js available: ' + (typeof THREE !== 'undefined'));
     </script>
-    <script src="js/buildings.js"></script>
-    <script src="js/units.js"></script>
-    <script src="js/ui.js"></script>
+    <script src="js/buildings.js" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js" onerror="debug('FAILED to load ui.js')"></script>
 </body>
 </html>
