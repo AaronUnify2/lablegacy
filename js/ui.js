@@ -3,6 +3,8 @@
 // ============================================
 
 window.GameUI = (function() {
+    console.log('ui.js loading...');
+    
     let menuContainer = null;
     let resourceDisplay = null;
     
