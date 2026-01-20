@@ -246,6 +246,23 @@
                 <canvas id="minimap-canvas"></canvas>
             </div>
 
+            <div id="debug-panel" style="
+            position: absolute;
+            bottom: 200px;
+            left: 10px;
+            background: rgba(0,0,0,0.9);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 9999;
+            pointer-events: auto;
+            border: 1px solid #0f0;
+        "></div>
+
             <div id="controls-help">
                 <h3>🎮 Controls</h3>
                 <div><span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span> or <span class="key">Arrows</span> — Pan camera</div>
@@ -299,6 +316,20 @@
             ZOOM_SPEED: 2,
             ROTATE_SPEED: 0.03
         };
+        
+        // Debug logging function
+        function debug(msg) {
+            console.log(msg);
+            try {
+                const panel = document.getElementById('debug-panel');
+                if (panel) {
+                    panel.innerHTML += msg + '<br>';
+                    panel.scrollTop = panel.scrollHeight;
+                }
+            } catch(e) {
+                console.log('Debug panel error:', e);
+            }
+        }
 
         // ============================================
         // GAME STATE
@@ -1278,11 +1309,37 @@
         // INITIALIZATION
         // ============================================
         function init() {
-            initThree();
-            generateMap();
-            initInput();
+            debug('=== INIT START ===');
+            
+            try {
+                debug('1. Calling initThree()...');
+                initThree();
+                debug('1. initThree() OK. scene:' + !!scene + ' cam:' + !!camera + ' rend:' + !!renderer);
+            } catch(e) {
+                debug('ERROR initThree: ' + e.message);
+                return;
+            }
+            
+            try {
+                debug('2. Calling generateMap()...');
+                generateMap();
+                debug('2. generateMap() OK. Trees:' + gameState.trees.length);
+            } catch(e) {
+                debug('ERROR generateMap: ' + e.message);
+                return;
+            }
+            
+            try {
+                debug('3. Calling initInput()...');
+                initInput();
+                debug('3. initInput() OK');
+            } catch(e) {
+                debug('ERROR initInput: ' + e.message);
+                return;
+            }
             
             // Expose globals for modules AFTER Three.js is initialized
+            debug('4. Setting GameEngine globals...');
             window.GameEngine = {
                 scene,
                 camera,
@@ -1292,20 +1349,49 @@
                 CELL,
                 THREE
             };
+            debug('4. GameEngine OK');
             
             // Start at player base
+            debug('5. Jump to player base...');
             jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
             
             // Initialize modules after DOM ready
-            if (window.GameUI) GameUI.init();
-            if (window.GameBuildings) GameBuildings.init();
-            if (window.GameUnits) GameUnits.init();
+            try {
+                debug('6. Init modules...');
+                if (window.GameUI) {
+                    debug('6a. GameUI.init()...');
+                    GameUI.init();
+                } else {
+                    debug('6a. GameUI NOT FOUND');
+                }
+                if (window.GameBuildings) {
+                    debug('6b. GameBuildings.init()...');
+                    GameBuildings.init();
+                } else {
+                    debug('6b. GameBuildings NOT FOUND');
+                }
+                if (window.GameUnits) {
+                    debug('6c. GameUnits.init()...');
+                    GameUnits.init();
+                } else {
+                    debug('6c. GameUnits NOT FOUND');
+                }
+                debug('6. Modules done');
+            } catch(e) {
+                debug('ERROR modules: ' + e.message);
+            }
             
+            debug('7. Starting animate...');
             animate();
+            debug('=== INIT COMPLETE ===');
         }
 
         // Wait for modules to load
         window.addEventListener('load', init);
+        
+        // Early check that script is running
+        debug('Script loaded, waiting for window.load event...');
+        debug('THREE.js available: ' + (typeof THREE !== 'undefined'));
     </script>
     <script src="js/buildings.js"></script>
     <script src="js/units.js"></script>
