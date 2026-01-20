@@ -3,7 +3,11 @@
 // ============================================
 
 window.GameBuildings = (function() {
-    const { scene, gameState, CONFIG, THREE } = window.GameEngine;
+    // Get references lazily to avoid initialization order issues
+    const getEngine = () => window.GameEngine;
+    const getScene = () => window.GameEngine.scene;
+    const getGameState = () => window.GameEngine.gameState;
+    const getTHREE = () => window.GameEngine.THREE;
     
     // Building definitions
     const BUILDING_TYPES = {
@@ -21,6 +25,7 @@ window.GameBuildings = (function() {
     
     // Create building sprite material
     function createBuildingMaterial(buildingType) {
+        const THREE = getTHREE();
         const canvas = document.createElement('canvas');
         canvas.width = 64;
         canvas.height = 64;
@@ -114,6 +119,10 @@ window.GameBuildings = (function() {
     
     // Place a building on a site
     function placeBuilding(site, buildingTypeId) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        const gameState = getGameState();
+        
         const buildingType = BUILDING_TYPES[buildingTypeId];
         if (!buildingType) return null;
         
@@ -175,6 +184,7 @@ window.GameBuildings = (function() {
     
     // Queue unit production
     function queueUnit(building) {
+        const gameState = getGameState();
         const unitCost = building.typeData.unitCost;
         
         if (gameState.resources.energy < unitCost.energy) {
@@ -194,6 +204,7 @@ window.GameBuildings = (function() {
     
     // Update building production
     function updateProduction(deltaTime) {
+        const gameState = getGameState();
         gameState.buildings.forEach(building => {
             if (building.productionQueue.length > 0 && !building.isProducing) {
                 // Start producing
