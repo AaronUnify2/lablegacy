@@ -1,492 +1,1262 @@
 // ============================================
-// UI MODULE
+// UNITS MODULE - Enhanced with Woodsman & Pathfinding
 // ============================================
 
-window.GameUI = (function() {
-    console.log('ui.js loading...');
+window.GameUnits = (function() {
+    console.log('units.js loading...');
     
-    let menuContainer = null;
-    let resourceDisplay = null;
-    let menuOpenTime = 0;
-    const MENU_CLICK_DELAY = 300; // ms before clicks register
+    // Get references lazily to avoid initialization order issues
+    const getEngine = () => window.GameEngine;
+    const getScene = () => window.GameEngine?.scene;
+    const getGameState = () => window.GameEngine?.gameState;
+    const getTHREE = () => window.GameEngine?.THREE || window.THREE;
+    const getCONFIG = () => window.GameEngine?.CONFIG;
+    const getCELL = () => window.GameEngine?.CELL;
     
-    // Create the UI elements
-    function createUI() {
-        // Menu container with scroll
-        menuContainer = document.createElement('div');
-        menuContainer.id = 'game-menu';
-        menuContainer.style.cssText = `
-            position: absolute;
-            bottom: 140px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 25, 15, 0.95);
-            border: 2px solid #4a7c3f;
-            border-radius: 12px;
-            padding: 0;
-            display: none;
-            pointer-events: auto;
-            width: 280px;
-            max-height: 55vh;
-            z-index: 100;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            overflow: hidden;
-            flex-direction: column;
-        `;
-        document.getElementById('ui-overlay').appendChild(menuContainer);
+    let lastTime = Date.now();
+    let selectedUnit = null;
+    let commandMode = null; // null, 'move', 'harvest_target'
+    
+    // Unit definitions
+    const UNIT_TYPES = {
+        knight: {
+            id: 'knight',
+            name: 'Knight',
+            health: 100,
+            damage: 15,
+            speed: 0.04,
+            attackRange: 2,
+            attackSpeed: 1000,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            scale: 1.0
+        },
+        woodsman: {
+            id: 'woodsman',
+            name: 'Woodsman',
+            health: 60,
+            damage: 8,
+            speed: 0.035,
+            attackRange: 1.5,
+            attackSpeed: 1200,
+            harvestSpeed: 2000, // ms to chop one tree
+            carryCapacity: 5, // trees before returning
+            canHarvest: true,
+            scale: 1.0
+        },
+        archer: {
+            id: 'archer',
+            name: 'Archer',
+            health: 50,
+            damage: 12,
+            speed: 0.045,
+            attackRange: 12,
+            attackSpeed: 1500,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            scale: 0.9
+        },
+        botanist: {
+            id: 'botanist',
+            name: 'Botanist',
+            health: 45,
+            damage: 5,
+            speed: 0.03,
+            attackRange: 8,
+            attackSpeed: 2000,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            scale: 0.9
+        },
+        dragonfly: {
+            id: 'dragonfly',
+            name: 'Dragonfly',
+            health: 35,
+            damage: 10,
+            speed: 0.06,
+            attackRange: 3,
+            attackSpeed: 800,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            canFly: true,
+            scale: 0.85
+        },
+        mage: {
+            id: 'mage',
+            name: 'Mage',
+            health: 40,
+            damage: 25,
+            speed: 0.025,
+            attackRange: 10,
+            attackSpeed: 2500,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            scale: 1.0
+        },
+        planter: {
+            id: 'planter',
+            name: 'Planter',
+            health: 50,
+            damage: 5,
+            speed: 0.03,
+            attackRange: 1.5,
+            attackSpeed: 1500,
+            harvestSpeed: 0,
+            carryCapacity: 0,
+            canHarvest: false,
+            canPlant: true,
+            scale: 0.9
+        }
+    };
+    
+    // Woodsman upgrade definitions
+    const WOODSMAN_UPGRADES = {
+        path1: { // Harvest Speed
+            name: 'Harvest Speed',
+            levels: [
+                { name: 'Sharp Axe', description: 'Harvest 25% faster', effect: { harvestSpeedMult: 0.75 } },
+                { name: 'Rhythm', description: 'Each chop speeds up the next', effect: { rhythmBonus: true } },
+                { name: 'Clear Cutter', description: 'Damages adjacent trees while harvesting', effect: { cleave: true } }
+            ]
+        },
+        path2: { // Carry/Economy
+            name: 'Carry/Economy',
+            levels: [
+                { name: 'Deep Pockets', description: 'Carry +50% more', effect: { carryMult: 1.5 } },
+                { name: 'Efficient Routes', description: '+20% resource value on deposit', effect: { depositMult: 1.2 } },
+                { name: 'Specialist', description: 'Purple trees yield double energy', effect: { energySpecialist: true } }
+            ]
+        },
+        path3: { // Survival
+            name: 'Survival',
+            levels: [
+                { name: 'Thick Hide', description: 'Health +50%', effect: { healthMult: 1.5 } },
+                { name: 'Forester', description: 'Move through trees at half speed', effect: { forestWalk: true } },
+                { name: 'Trapper', description: 'Places snare that roots first enemy', effect: { trapAbility: true } }
+            ]
+        }
+    };
+    
+    // ============================================
+    // A* PATHFINDING
+    // ============================================
+    
+    class PriorityQueue {
+        constructor() {
+            this.elements = [];
+        }
         
-        // Resource display - cleaner design
-        resourceDisplay = document.createElement('div');
-        resourceDisplay.id = 'resource-display';
-        resourceDisplay.style.cssText = `
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(15, 25, 15, 0.9);
-            border: 2px solid #4a7c3f;
-            border-radius: 25px;
-            padding: 8px 24px;
-            display: flex;
-            gap: 24px;
-            pointer-events: auto;
-            z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        `;
-        resourceDisplay.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 16px;">🪵</span>
-                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="wood-count">500</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 16px;">⚡</span>
-                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="energy-count">300</span>
-            </div>
-        `;
-        document.getElementById('ui-overlay').appendChild(resourceDisplay);
+        enqueue(element, priority) {
+            this.elements.push({ element, priority });
+            this.elements.sort((a, b) => a.priority - b.priority);
+        }
+        
+        dequeue() {
+            return this.elements.shift()?.element;
+        }
+        
+        isEmpty() {
+            return this.elements.length === 0;
+        }
     }
     
-    // Check if enough time has passed since menu opened
-    function canClick() {
-        return Date.now() - menuOpenTime > MENU_CLICK_DELAY;
+    function heuristic(a, b) {
+        // Manhattan distance
+        return Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
     }
     
-    // Show build menu for empty site
-    function showBuildMenu(site) {
-        const buildings = window.GameBuildings ? GameBuildings.BUILDING_TYPES : {};
-        const gameState = window.GameEngine.gameState;
+    function getNeighbors(x, z, canFly = false, canForestWalk = false) {
+        const gameState = getGameState();
+        const CONFIG = getCONFIG();
+        const CELL = getCELL();
+        const neighbors = [];
         
-        let html = `
-            <div style="
-                background: rgba(74, 124, 63, 0.4);
-                padding: 12px 15px;
-                border-bottom: 1px solid #4a7c3f;
-                position: sticky;
-                top: 0;
-            ">
-                <div style="color: #7ddf64; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: bold;">
-                    Build Structure
-                </div>
-            </div>
-            <div style="
-                padding: 12px;
-                overflow-y: auto;
-                max-height: calc(55vh - 100px);
-            ">
-        `;
+        const directions = [
+            { dx: 1, dz: 0 }, { dx: -1, dz: 0 },
+            { dx: 0, dz: 1 }, { dx: 0, dz: -1 },
+            { dx: 1, dz: 1 }, { dx: -1, dz: 1 },
+            { dx: 1, dz: -1 }, { dx: -1, dz: -1 }
+        ];
         
-        Object.entries(buildings).forEach(([key, building]) => {
-            const canAfford = gameState.resources.wood >= building.cost.wood && 
-                             gameState.resources.energy >= building.cost.energy;
-            const opacity = canAfford ? '1' : '0.5';
+        for (const dir of directions) {
+            const nx = x + dir.dx;
+            const nz = z + dir.dz;
             
-            html += `
-                <div class="menu-item" data-building="${key}" data-affordable="${canAfford}" style="
-                    background: rgba(74, 124, 63, 0.25);
-                    border: 1px solid ${canAfford ? '#4a7c3f' : '#3a5a3f'};
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                    cursor: ${canAfford ? 'pointer' : 'not-allowed'};
-                    opacity: ${opacity};
-                    transition: all 0.15s ease;
-                ">
-                    <div style="color: #c8f0c8; font-weight: bold; margin-bottom: 4px; font-size: 14px;">
-                        ${building.name}
-                    </div>
-                    <div style="color: #8ab88a; font-size: 11px; margin-bottom: 8px; line-height: 1.4;">
-                        ${building.description}
-                    </div>
-                    <div style="color: #a8d5a2; font-size: 12px; display: flex; gap: 12px;">
-                        <span>🪵 ${building.cost.wood}</span>
-                        <span>⚡ ${building.cost.energy}</span>
-                    </div>
-                </div>
-            `;
-        });
-        
-        html += `</div>`;
-        
-        html += `
-            <div style="
-                padding: 10px 12px;
-                border-top: 1px solid #4a7c3f;
-                background: rgba(15, 25, 15, 0.5);
-            ">
-                <button id="menu-cancel-btn" style="
-                    width: 100%;
-                    background: rgba(100, 60, 60, 0.4);
-                    border: 1px solid #7c4a4a;
-                    border-radius: 6px;
-                    color: #d0a0a0;
-                    padding: 10px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    transition: all 0.15s ease;
-                ">Cancel</button>
-            </div>
-        `;
-        
-        menuContainer.innerHTML = html;
-        menuContainer.style.display = 'flex';
-        menuOpenTime = Date.now();
-        
-        // Add click handlers with delay check
-        menuContainer.querySelectorAll('.menu-item').forEach(item => {
-            const isAffordable = item.dataset.affordable === 'true';
-            const buildingKey = item.dataset.building;
+            // Bounds check
+            if (nx < 0 || nx >= CONFIG.GRID_WIDTH || nz < 0 || nz >= CONFIG.GRID_HEIGHT) {
+                continue;
+            }
             
-            if (isAffordable) {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (canClick()) {
-                        buildBuilding(buildingKey);
-                    }
-                });
+            const cell = gameState.grid[nx]?.[nz];
+            
+            // Flying units ignore trees
+            if (canFly) {
+                neighbors.push({ x: nx, z: nz, cost: 1 });
+                continue;
+            }
+            
+            // Check if cell is walkable
+            const isTree = cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY;
+            
+            if (isTree) {
+                if (canForestWalk) {
+                    // Forester upgrade - can walk through trees at double cost
+                    neighbors.push({ x: nx, z: nz, cost: 2 });
+                }
+                // Otherwise, trees block movement
+                continue;
+            }
+            
+            // Check for other units (soft collision)
+            const hasUnit = gameState.units.some(u => 
+                Math.floor(u.position.x) === nx && Math.floor(u.position.z) === nz
+            );
+            
+            // Slightly penalize cells with units but don't block
+            const cost = hasUnit ? 1.5 : 1;
+            neighbors.push({ x: nx, z: nz, cost });
+        }
+        
+        return neighbors;
+    }
+    
+    function findPath(startX, startZ, endX, endZ, canFly = false, canForestWalk = false, maxIterations = 1000) {
+        const start = { x: Math.floor(startX), z: Math.floor(startZ) };
+        const end = { x: Math.floor(endX), z: Math.floor(endZ) };
+        
+        // If start equals end, no path needed
+        if (start.x === end.x && start.z === end.z) {
+            return [end];
+        }
+        
+        const frontier = new PriorityQueue();
+        frontier.enqueue(start, 0);
+        
+        const cameFrom = new Map();
+        const costSoFar = new Map();
+        
+        const key = (p) => `${p.x},${p.z}`;
+        cameFrom.set(key(start), null);
+        costSoFar.set(key(start), 0);
+        
+        let iterations = 0;
+        let closestPoint = start;
+        let closestDistance = heuristic(start, end);
+        
+        while (!frontier.isEmpty() && iterations < maxIterations) {
+            iterations++;
+            const current = frontier.dequeue();
+            
+            // Track closest point in case we can't reach destination
+            const currentDist = heuristic(current, end);
+            if (currentDist < closestDistance) {
+                closestDistance = currentDist;
+                closestPoint = current;
+            }
+            
+            // Reached goal
+            if (current.x === end.x && current.z === end.z) {
+                // Reconstruct path
+                const path = [];
+                let curr = current;
+                while (curr) {
+                    path.unshift(curr);
+                    curr = cameFrom.get(key(curr));
+                }
+                return path;
+            }
+            
+            const neighbors = getNeighbors(current.x, current.z, canFly, canForestWalk);
+            
+            for (const next of neighbors) {
+                const newCost = costSoFar.get(key(current)) + next.cost;
+                const nextKey = key(next);
                 
-                item.addEventListener('mouseenter', () => {
-                    item.style.background = 'rgba(74, 124, 63, 0.45)';
-                    item.style.borderColor = '#5a9c4f';
-                });
-                item.addEventListener('mouseleave', () => {
-                    item.style.background = 'rgba(74, 124, 63, 0.25)';
-                    item.style.borderColor = '#4a7c3f';
-                });
+                if (!costSoFar.has(nextKey) || newCost < costSoFar.get(nextKey)) {
+                    costSoFar.set(nextKey, newCost);
+                    const priority = newCost + heuristic(next, end);
+                    frontier.enqueue({ x: next.x, z: next.z }, priority);
+                    cameFrom.set(nextKey, current);
+                }
             }
-        });
+        }
         
-        // Cancel button
-        document.getElementById('menu-cancel-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (canClick()) {
-                hideMenus();
+        // Couldn't reach destination - return path to closest reachable point
+        if (closestPoint.x !== start.x || closestPoint.z !== start.z) {
+            const path = [];
+            let curr = closestPoint;
+            while (curr) {
+                path.unshift(curr);
+                curr = cameFrom.get(key(curr));
             }
+            return path;
+        }
+        
+        return null; // No path at all
+    }
+    
+    // ============================================
+    // UNIT SPRITE CREATION
+    // ============================================
+    
+    function createUnitMaterial(unitType) {
+        const THREE = getTHREE();
+        
+        switch(unitType.id) {
+            case 'woodsman':
+                return createWoodsmanMaterial();
+            case 'knight':
+                return createKnightMaterial();
+            case 'archer':
+                return createArcherMaterial();
+            default:
+                return createKnightMaterial(); // Fallback
+        }
+    }
+    
+    function createKnightMaterial() {
+        const THREE = getTHREE();
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 48;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.clearRect(0, 0, 32, 48);
+        
+        // Helmet
+        ctx.fillStyle = '#708090';
+        ctx.beginPath();
+        ctx.arc(16, 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Helmet visor
+        ctx.fillStyle = '#2f4f4f';
+        ctx.fillRect(10, 8, 12, 4);
+        
+        // Plume
+        ctx.fillStyle = '#cc3333';
+        ctx.beginPath();
+        ctx.moveTo(16, 2);
+        ctx.lineTo(20, 6);
+        ctx.lineTo(16, 8);
+        ctx.lineTo(12, 6);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Body/armor
+        ctx.fillStyle = '#4169e1';
+        ctx.fillRect(10, 18, 12, 16);
+        
+        // Armor highlight
+        ctx.fillStyle = '#6a8ae1';
+        ctx.fillRect(12, 20, 4, 12);
+        
+        // Belt
+        ctx.fillStyle = '#8b4513';
+        ctx.fillRect(10, 28, 12, 3);
+        
+        // Legs
+        ctx.fillStyle = '#4a4a4a';
+        ctx.fillRect(10, 34, 5, 12);
+        ctx.fillRect(17, 34, 5, 12);
+        
+        // Feet
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(8, 44, 7, 4);
+        ctx.fillRect(17, 44, 7, 4);
+        
+        // Sword
+        ctx.fillStyle = '#c0c0c0';
+        ctx.fillRect(22, 12, 3, 20);
+        ctx.fillStyle = '#8b4513';
+        ctx.fillRect(21, 20, 5, 3);
+        
+        // Shield
+        ctx.fillStyle = '#4169e1';
+        ctx.beginPath();
+        ctx.moveTo(4, 18);
+        ctx.lineTo(10, 18);
+        ctx.lineTo(10, 30);
+        ctx.lineTo(7, 34);
+        ctx.lineTo(4, 30);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Shield emblem
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(6, 22, 2, 6);
+        
+        // Outline
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(16, 10, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeRect(10, 18, 12, 16);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        
+        return new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true
         });
     }
     
-    // Show building menu for existing building
-    function showBuildingMenu(building) {
-        const gameState = window.GameEngine.gameState;
+    function createWoodsmanMaterial() {
+        const THREE = getTHREE();
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 48;
+        const ctx = canvas.getContext('2d');
         
-        // Handle buildings without units (Sawmill, Furnace)
-        if (!building.typeData.unitType) {
-            showEconomyBuildingMenu(building);
+        ctx.clearRect(0, 0, 32, 48);
+        
+        // Head/face
+        ctx.fillStyle = '#e8c4a0';
+        ctx.beginPath();
+        ctx.arc(16, 10, 7, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Hat (brown cap)
+        ctx.fillStyle = '#5a4020';
+        ctx.beginPath();
+        ctx.arc(16, 8, 8, Math.PI, 0, false);
+        ctx.fill();
+        ctx.fillRect(6, 7, 20, 3);
+        
+        // Hat brim
+        ctx.fillStyle = '#4a3018';
+        ctx.fillRect(4, 9, 24, 2);
+        
+        // Eyes
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(12, 9, 2, 2);
+        ctx.fillRect(18, 9, 2, 2);
+        
+        // Beard
+        ctx.fillStyle = '#5a4030';
+        ctx.beginPath();
+        ctx.arc(16, 14, 5, 0, Math.PI, false);
+        ctx.fill();
+        
+        // Body (plaid shirt)
+        ctx.fillStyle = '#cc4444';
+        ctx.fillRect(9, 18, 14, 14);
+        
+        // Plaid pattern
+        ctx.fillStyle = '#aa2222';
+        ctx.fillRect(9, 20, 14, 2);
+        ctx.fillRect(9, 26, 14, 2);
+        ctx.fillRect(12, 18, 2, 14);
+        ctx.fillRect(18, 18, 2, 14);
+        
+        // Suspenders
+        ctx.fillStyle = '#4a3020';
+        ctx.fillRect(11, 18, 2, 14);
+        ctx.fillRect(19, 18, 2, 14);
+        
+        // Pants
+        ctx.fillStyle = '#3a5a3a';
+        ctx.fillRect(10, 32, 5, 12);
+        ctx.fillRect(17, 32, 5, 12);
+        
+        // Boots
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(8, 42, 7, 6);
+        ctx.fillRect(17, 42, 7, 6);
+        
+        // Axe handle
+        ctx.fillStyle = '#6a4a2a';
+        ctx.save();
+        ctx.translate(24, 16);
+        ctx.rotate(Math.PI / 6);
+        ctx.fillRect(-1, 0, 3, 24);
+        ctx.restore();
+        
+        // Axe head
+        ctx.fillStyle = '#808080';
+        ctx.beginPath();
+        ctx.moveTo(26, 12);
+        ctx.lineTo(30, 8);
+        ctx.lineTo(32, 12);
+        ctx.lineTo(28, 18);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Axe highlight
+        ctx.fillStyle = '#a0a0a0';
+        ctx.beginPath();
+        ctx.moveTo(27, 11);
+        ctx.lineTo(29, 9);
+        ctx.lineTo(30, 12);
+        ctx.lineTo(28, 14);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Outline
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(9, 18, 14, 14);
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        
+        return new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true
+        });
+    }
+    
+    function createArcherMaterial() {
+        const THREE = getTHREE();
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 48;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.clearRect(0, 0, 32, 48);
+        
+        // Head
+        ctx.fillStyle = '#e8c4a0';
+        ctx.beginPath();
+        ctx.arc(16, 10, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Hood
+        ctx.fillStyle = '#2d5a1e';
+        ctx.beginPath();
+        ctx.arc(16, 9, 7, Math.PI * 1.2, Math.PI * 1.8, false);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(9, 8);
+        ctx.lineTo(16, 2);
+        ctx.lineTo(23, 8);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Eyes
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(13, 9, 2, 2);
+        ctx.fillRect(17, 9, 2, 2);
+        
+        // Body (green tunic)
+        ctx.fillStyle = '#3d6a2e';
+        ctx.fillRect(10, 16, 12, 14);
+        
+        // Belt
+        ctx.fillStyle = '#5a4020';
+        ctx.fillRect(10, 26, 12, 3);
+        
+        // Quiver strap
+        ctx.fillStyle = '#5a4020';
+        ctx.fillRect(8, 16, 2, 14);
+        
+        // Legs
+        ctx.fillStyle = '#4a3a2a';
+        ctx.fillRect(11, 30, 4, 12);
+        ctx.fillRect(17, 30, 4, 12);
+        
+        // Boots
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(10, 40, 5, 6);
+        ctx.fillRect(17, 40, 5, 6);
+        
+        // Bow
+        ctx.strokeStyle = '#6a4a2a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(4, 24, 14, -Math.PI/3, Math.PI/3, false);
+        ctx.stroke();
+        
+        // Bow string
+        ctx.strokeStyle = '#c0c0c0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(4, 10);
+        ctx.lineTo(4, 38);
+        ctx.stroke();
+        
+        // Arrow in hand
+        ctx.fillStyle = '#6a4a2a';
+        ctx.fillRect(20, 18, 10, 2);
+        ctx.fillStyle = '#808080';
+        ctx.beginPath();
+        ctx.moveTo(30, 19);
+        ctx.lineTo(32, 17);
+        ctx.lineTo(32, 21);
+        ctx.closePath();
+        ctx.fill();
+        
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        
+        return new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true
+        });
+    }
+    
+    // ============================================
+    // UNIT SPAWNING
+    // ============================================
+    
+    function spawnUnit(unitTypeId, position, upgrades = { path1: 0, path2: 0, path3: 0 }) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        const gameState = getGameState();
+        
+        const unitType = UNIT_TYPES[unitTypeId];
+        if (!unitType) {
+            console.warn(`Unknown unit type: ${unitTypeId}`);
+            return null;
+        }
+        
+        const material = createUnitMaterial(unitType);
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(3 * unitType.scale, 4.5 * unitType.scale, 1);
+        
+        // Find valid spawn position (not on top of other units)
+        let spawnX = position.x;
+        let spawnZ = position.z + 3;
+        
+        // Adjust if position is occupied
+        const minSpacing = 1.5;
+        let attempts = 0;
+        while (attempts < 20) {
+            const occupied = gameState.units.some(u => {
+                const dx = u.position.x - spawnX;
+                const dz = u.position.z - spawnZ;
+                return Math.sqrt(dx*dx + dz*dz) < minSpacing;
+            });
+            
+            if (!occupied) break;
+            
+            // Try a different position in a spiral
+            const angle = attempts * 0.5;
+            const radius = 2 + attempts * 0.3;
+            spawnX = position.x + Math.cos(angle) * radius;
+            spawnZ = position.z + Math.sin(angle) * radius;
+            attempts++;
+        }
+        
+        sprite.position.set(spawnX, 2.25, spawnZ);
+        scene.add(sprite);
+        
+        // Calculate stats with upgrades
+        const stats = calculateStats(unitType, upgrades, unitTypeId);
+        
+        const unit = {
+            id: `unit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: unitTypeId,
+            typeData: unitType,
+            sprite: sprite,
+            position: { x: spawnX, z: spawnZ },
+            target: null,
+            targetPosition: null,
+            path: null,
+            pathIndex: 0,
+            health: stats.health,
+            maxHealth: stats.health,
+            damage: stats.damage,
+            speed: stats.speed,
+            attackRange: stats.attackRange,
+            attackSpeed: stats.attackSpeed,
+            harvestSpeed: stats.harvestSpeed,
+            carryCapacity: stats.carryCapacity,
+            lastAttackTime: 0,
+            state: 'idle', // idle, moving, harvesting, returning, attacking
+            owner: 'player',
+            upgrades: { ...upgrades },
+            
+            // Woodsman specific
+            inventory: {
+                wood: 0,
+                energy: 0
+            },
+            targetTree: null,
+            harvestProgress: 0,
+            harvestMode: unitType.canHarvest ? 'nearby' : null, // 'nearby', 'laneway', 'pathway', 'manual'
+            chopCount: 0, // For rhythm upgrade
+            
+            // Special abilities from upgrades
+            hasForestWalk: stats.forestWalk || false,
+            hasRhythm: stats.rhythm || false,
+            hasCleave: stats.cleave || false,
+            depositMult: stats.depositMult || 1,
+            energySpecialist: stats.energySpecialist || false
+        };
+        
+        // Create selection ring (hidden by default)
+        const ringGeometry = new THREE.RingGeometry(1.2, 1.5, 32);
+        const ringMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00, 
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.7
+        });
+        const selectionRing = new THREE.Mesh(ringGeometry, ringMaterial);
+        selectionRing.rotation.x = -Math.PI / 2;
+        selectionRing.position.set(spawnX, 0.1, spawnZ);
+        selectionRing.visible = false;
+        scene.add(selectionRing);
+        unit.selectionRing = selectionRing;
+        
+        gameState.units.push(unit);
+        console.log(`Spawned ${unitType.name} at (${spawnX.toFixed(1)}, ${spawnZ.toFixed(1)})`);
+        
+        // Auto-start harvesting if woodsman
+        if (unitType.canHarvest) {
+            unit.state = 'idle';
+            startHarvesting(unit);
+        }
+        
+        return unit;
+    }
+    
+    function calculateStats(unitType, upgrades, unitTypeId) {
+        let health = unitType.health;
+        let damage = unitType.damage;
+        let speed = unitType.speed;
+        let attackRange = unitType.attackRange;
+        let attackSpeed = unitType.attackSpeed;
+        let harvestSpeed = unitType.harvestSpeed;
+        let carryCapacity = unitType.carryCapacity;
+        
+        let forestWalk = false;
+        let rhythm = false;
+        let cleave = false;
+        let depositMult = 1;
+        let energySpecialist = false;
+        
+        if (unitTypeId === 'woodsman') {
+            // Path 1: Harvest Speed
+            if (upgrades.path1 >= 1) harvestSpeed *= 0.75; // Sharp Axe
+            if (upgrades.path1 >= 2) rhythm = true; // Rhythm
+            if (upgrades.path1 >= 3) cleave = true; // Clear Cutter
+            
+            // Path 2: Carry/Economy
+            if (upgrades.path2 >= 1) carryCapacity = Math.floor(carryCapacity * 1.5); // Deep Pockets
+            if (upgrades.path2 >= 2) depositMult = 1.2; // Efficient Routes
+            if (upgrades.path2 >= 3) energySpecialist = true; // Specialist
+            
+            // Path 3: Survival
+            if (upgrades.path3 >= 1) health *= 1.5; // Thick Hide
+            if (upgrades.path3 >= 2) forestWalk = true; // Forester
+            // Path 3 Level 3 (Trapper) handled separately
+        } else if (unitTypeId === 'knight') {
+            // Knight upgrades
+            if (upgrades.path1 >= 1) damage *= 1.25;
+            if (upgrades.path1 >= 2) damage *= 1.25;
+            if (upgrades.path1 >= 3) damage *= 1.25;
+            
+            if (upgrades.path2 >= 1) health *= 1.4;
+            if (upgrades.path2 >= 2) health *= 1.3;
+            if (upgrades.path2 >= 3) health *= 1.2;
+            
+            if (upgrades.path3 >= 1) attackSpeed *= 0.9;
+            if (upgrades.path3 >= 2) speed *= 1.15;
+            if (upgrades.path3 >= 3) attackSpeed *= 0.85;
+        }
+        
+        return { 
+            health, damage, speed, attackRange, attackSpeed, 
+            harvestSpeed, carryCapacity,
+            forestWalk, rhythm, cleave, depositMult, energySpecialist
+        };
+    }
+    
+    // ============================================
+    // HARVESTING SYSTEM
+    // ============================================
+    
+    function findNearestTree(unit) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        
+        let nearestTree = null;
+        let nearestDist = Infinity;
+        
+        const searchRadius = 30; // tiles
+        const ux = Math.floor(unit.position.x);
+        const uz = Math.floor(unit.position.z);
+        
+        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+            for (let dz = -searchRadius; dz <= searchRadius; dz++) {
+                const x = ux + dx;
+                const z = uz + dz;
+                
+                if (x < 0 || x >= CONFIG.GRID_WIDTH || z < 0 || z >= CONFIG.GRID_HEIGHT) continue;
+                
+                const cell = gameState.grid[x]?.[z];
+                if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                    const dist = Math.sqrt(dx*dx + dz*dz);
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestTree = { x, z, type: cell };
+                    }
+                }
+            }
+        }
+        
+        return nearestTree;
+    }
+    
+    function findNearestSawmill(unit) {
+        const gameState = getGameState();
+        
+        let nearestSawmill = null;
+        let nearestDist = Infinity;
+        
+        for (const building of gameState.buildings) {
+            if (building.typeData?.id === 'sawmill') {
+                const dx = building.position.x - unit.position.x;
+                const dz = building.position.z - unit.position.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearestSawmill = building;
+                }
+            }
+        }
+        
+        return nearestSawmill;
+    }
+    
+    function startHarvesting(unit) {
+        if (!unit.typeData.canHarvest) return;
+        
+        // Check if inventory is full
+        const totalCarried = unit.inventory.wood + unit.inventory.energy;
+        if (totalCarried >= unit.carryCapacity) {
+            // Need to return to sawmill
+            returnToSawmill(unit);
             return;
         }
         
-        const canAffordUnit = gameState.resources.energy >= building.typeData.unitCost.energy;
-        
-        // Production status
-        let productionStatus = '';
-        if (building.isProducing) {
-            const progress = Math.floor((building.productionProgress / building.typeData.productionTime) * 100);
-            productionStatus = `
-                <div style="margin: 12px 0;">
-                    <div style="color: #8ab88a; font-size: 11px; margin-bottom: 6px;">
-                        Training: ${building.typeData.unitType}
-                    </div>
-                    <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 10px; overflow: hidden; border: 1px solid #3a5a3a;">
-                        <div style="background: linear-gradient(90deg, #5a9a4a, #7ddf64); height: 100%; width: ${progress}%; transition: width 0.2s;"></div>
-                    </div>
-                </div>
-            `;
+        // Find nearest tree
+        const tree = findNearestTree(unit);
+        if (!tree) {
+            unit.state = 'idle';
+            return;
         }
         
-        // Queue status
-        let queueStatus = '';
-        if (building.productionQueue.length > 0) {
-            queueStatus = `
-                <div style="color: #8ab88a; font-size: 11px; margin-bottom: 8px;">
-                    In queue: ${building.productionQueue.length} unit(s)
-                </div>
-            `;
+        // Path to tree
+        unit.targetTree = tree;
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            tree.x, tree.z,
+            false, unit.hasForestWalk
+        );
+        
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            unit.state = 'idle';
         }
-        
-        let html = `
-            <div style="
-                background: rgba(74, 124, 63, 0.4);
-                padding: 12px 15px;
-                border-bottom: 1px solid #4a7c3f;
-            ">
-                <div style="color: #7ddf64; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: bold;">
-                    ${building.typeData.name}
-                </div>
-            </div>
-            <div style="padding: 12px;">
-                ${productionStatus}
-                ${queueStatus}
-                
-                <div class="menu-item train-btn" data-building-id="${building.id}" style="
-                    background: rgba(74, 124, 63, 0.25);
-                    border: 1px solid ${canAffordUnit ? '#4a7c3f' : '#3a5a3f'};
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                    cursor: ${canAffordUnit ? 'pointer' : 'not-allowed'};
-                    opacity: ${canAffordUnit ? '1' : '0.5'};
-                    transition: all 0.15s ease;
-                ">
-                    <div style="color: #c8f0c8; font-weight: bold; margin-bottom: 4px;">
-                        Train ${building.typeData.unitType.charAt(0).toUpperCase() + building.typeData.unitType.slice(1)}
-                    </div>
-                    <div style="color: #a8d5a2; font-size: 12px;">
-                        ⚡ ${building.typeData.unitCost.energy}
-                    </div>
-                </div>
-                
-                <div style="
-                    color: #6a8a6a;
-                    font-size: 11px;
-                    text-align: center;
-                    padding: 10px;
-                    border: 1px dashed #3a5a3a;
-                    border-radius: 6px;
-                    margin-bottom: 10px;
-                ">
-                    Upgrades coming soon...
-                </div>
-            </div>
-            <div style="
-                padding: 10px 12px;
-                border-top: 1px solid #4a7c3f;
-                background: rgba(15, 25, 15, 0.5);
-            ">
-                <button id="menu-close-btn" style="
-                    width: 100%;
-                    background: rgba(80, 80, 80, 0.4);
-                    border: 1px solid #6a6a6a;
-                    border-radius: 6px;
-                    color: #c0c0c0;
-                    padding: 10px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    transition: all 0.15s ease;
-                ">Close</button>
-            </div>
-        `;
-        
-        menuContainer.innerHTML = html;
-        menuContainer.style.display = 'flex';
-        menuOpenTime = Date.now();
-        
-        // Train button handler
-        const trainBtn = menuContainer.querySelector('.train-btn');
-        if (trainBtn && canAffordUnit) {
-            trainBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (canClick()) {
-                    trainUnit(building.id);
-                }
-            });
-            trainBtn.addEventListener('mouseenter', () => {
-                trainBtn.style.background = 'rgba(74, 124, 63, 0.45)';
-            });
-            trainBtn.addEventListener('mouseleave', () => {
-                trainBtn.style.background = 'rgba(74, 124, 63, 0.25)';
-            });
-        }
-        
-        // Close button
-        document.getElementById('menu-close-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (canClick()) {
-                hideMenus();
-            }
-        });
     }
     
-    // Show menu for economy buildings (Sawmill, Furnace)
-    function showEconomyBuildingMenu(building) {
-        let specialInfo = '';
+    function harvestTree(unit, deltaTime) {
+        const gameState = getGameState();
+        const CELL = getCELL();
         
-        if (building.typeData.isDepot) {
-            specialInfo = `
-                <div style="
-                    background: rgba(139, 105, 20, 0.2);
-                    border: 1px solid #8B6914;
-                    border-radius: 6px;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                ">
-                    <div style="color: #d4a84a; font-size: 12px;">
-                        📦 Resource Depot
-                    </div>
-                    <div style="color: #a89060; font-size: 11px; margin-top: 4px;">
-                        Woodsmen will deposit ${building.typeData.resourceType} here
-                    </div>
-                </div>
-            `;
+        if (!unit.targetTree) {
+            startHarvesting(unit);
+            return;
         }
         
-        if (building.typeData.isConverter) {
-            specialInfo = `
-                <div style="
-                    background: rgba(255, 100, 50, 0.15);
-                    border: 1px solid #ff6432;
-                    border-radius: 6px;
-                    padding: 12px;
-                    margin-bottom: 10px;
-                ">
-                    <div style="color: #ff9966; font-size: 12px;">
-                        🔥 Resource Converter
-                    </div>
-                    <div style="color: #cc8866; font-size: 11px; margin-top: 4px;">
-                        Converts 10 wood → 1 energy
-                    </div>
-                    <button id="convert-btn" style="
-                        margin-top: 10px;
-                        width: 100%;
-                        background: rgba(255, 100, 50, 0.3);
-                        border: 1px solid #ff6432;
-                        border-radius: 4px;
-                        color: #ffaa88;
-                        padding: 8px;
-                        cursor: pointer;
-                        font-family: inherit;
-                    ">Convert 10 🪵 → 1 ⚡</button>
-                </div>
-            `;
+        // Check if we're close enough to harvest
+        const dx = unit.targetTree.x - unit.position.x;
+        const dz = unit.targetTree.z - unit.position.z;
+        const dist = Math.sqrt(dx*dx + dz*dz);
+        
+        if (dist > 2) {
+            // Move closer
+            unit.state = 'moving';
+            const path = findPath(
+                unit.position.x, unit.position.z,
+                unit.targetTree.x, unit.targetTree.z,
+                false, unit.hasForestWalk
+            );
+            if (path) {
+                unit.path = path;
+                unit.pathIndex = 0;
+            }
+            return;
         }
         
-        let html = `
-            <div style="
-                background: rgba(74, 124, 63, 0.4);
-                padding: 12px 15px;
-                border-bottom: 1px solid #4a7c3f;
-            ">
-                <div style="color: #7ddf64; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: bold;">
-                    ${building.typeData.name}
-                </div>
-            </div>
-            <div style="padding: 12px;">
-                ${specialInfo}
-            </div>
-            <div style="
-                padding: 10px 12px;
-                border-top: 1px solid #4a7c3f;
-                background: rgba(15, 25, 15, 0.5);
-            ">
-                <button id="menu-close-btn" style="
-                    width: 100%;
-                    background: rgba(80, 80, 80, 0.4);
-                    border: 1px solid #6a6a6a;
-                    border-radius: 6px;
-                    color: #c0c0c0;
-                    padding: 10px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                ">Close</button>
-            </div>
-        `;
+        // Harvesting
+        unit.state = 'harvesting';
         
-        menuContainer.innerHTML = html;
-        menuContainer.style.display = 'flex';
-        menuOpenTime = Date.now();
+        // Apply rhythm bonus if applicable
+        let effectiveHarvestSpeed = unit.harvestSpeed;
+        if (unit.hasRhythm && unit.chopCount > 0) {
+            // Each tree harvested speeds up by 5%, max 50%
+            const speedBonus = Math.min(0.5, unit.chopCount * 0.05);
+            effectiveHarvestSpeed *= (1 - speedBonus);
+        }
         
-        // Convert button handler for Furnace
-        const convertBtn = document.getElementById('convert-btn');
-        if (convertBtn) {
-            convertBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (canClick()) {
-                    const gameState = window.GameEngine.gameState;
-                    if (gameState.resources.wood >= 10) {
-                        gameState.resources.wood -= 10;
-                        gameState.resources.energy += 1;
-                        updateResources();
+        unit.harvestProgress += deltaTime;
+        
+        if (unit.harvestProgress >= effectiveHarvestSpeed) {
+            // Tree harvested!
+            unit.harvestProgress = 0;
+            unit.chopCount++;
+            
+            const treeType = unit.targetTree.type;
+            const treeX = unit.targetTree.x;
+            const treeZ = unit.targetTree.z;
+            
+            // Determine resource yield
+            let woodYield = 0;
+            let energyYield = 0;
+            
+            if (treeType === CELL.TREE_NORMAL) {
+                woodYield = 10;
+            } else if (treeType === CELL.TREE_HIGH_YIELD) {
+                woodYield = 25;
+            } else if (treeType === CELL.TREE_ENERGY) {
+                energyYield = 15;
+                if (unit.energySpecialist) energyYield *= 2;
+            }
+            
+            // Add to inventory
+            unit.inventory.wood += woodYield;
+            unit.inventory.energy += energyYield;
+            
+            // Remove tree from grid
+            gameState.grid[treeX][treeZ] = CELL.EMPTY;
+            
+            // Remove tree sprite from scene
+            const treeIndex = gameState.trees.findIndex(t => 
+                Math.floor(t.position.x) === treeX && 
+                Math.floor(t.position.z) === treeZ
+            );
+            if (treeIndex !== -1) {
+                const treeSprite = gameState.trees[treeIndex];
+                getScene().remove(treeSprite);
+                gameState.trees.splice(treeIndex, 1);
+            }
+            
+            // Clear Cutter upgrade - damage adjacent trees
+            if (unit.hasCleave) {
+                damageAdjacentTrees(treeX, treeZ);
+            }
+            
+            // Update tree count display
+            const treeCountEl = document.getElementById('tree-count');
+            if (treeCountEl) {
+                treeCountEl.textContent = gameState.trees.length;
+            }
+            
+            // Check if inventory full
+            const totalCarried = unit.inventory.wood + unit.inventory.energy;
+            if (totalCarried >= unit.carryCapacity) {
+                returnToSawmill(unit);
+            } else {
+                // Continue harvesting
+                unit.targetTree = null;
+                startHarvesting(unit);
+            }
+        }
+    }
+    
+    function damageAdjacentTrees(x, z) {
+        // Placeholder for Clear Cutter upgrade
+        // Could partially damage adjacent trees or instant-kill them
+        // For now, just log
+        console.log('Clear Cutter activated at', x, z);
+    }
+    
+    function returnToSawmill(unit) {
+        const sawmill = findNearestSawmill(unit);
+        
+        if (!sawmill) {
+            // No sawmill - just drop resources at base
+            depositResources(unit);
+            return;
+        }
+        
+        // Path to sawmill
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            sawmill.position.x, sawmill.position.z,
+            false, unit.hasForestWalk
+        );
+        
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'returning';
+            unit.targetBuilding = sawmill;
+        } else {
+            // Can't reach sawmill
+            unit.state = 'idle';
+        }
+    }
+    
+    function depositResources(unit) {
+        const gameState = getGameState();
+        
+        // Apply deposit multiplier
+        const woodToDeposit = Math.floor(unit.inventory.wood * unit.depositMult);
+        const energyToDeposit = Math.floor(unit.inventory.energy * unit.depositMult);
+        
+        gameState.resources.wood += woodToDeposit;
+        gameState.resources.energy += energyToDeposit;
+        
+        console.log(`Deposited ${woodToDeposit} wood, ${energyToDeposit} energy`);
+        
+        // Clear inventory
+        unit.inventory.wood = 0;
+        unit.inventory.energy = 0;
+        
+        // Update UI
+        if (window.GameUI) {
+            GameUI.updateResources();
+        }
+        
+        // Continue harvesting
+        if (unit.harvestMode) {
+            startHarvesting(unit);
+        } else {
+            unit.state = 'idle';
+        }
+    }
+    
+    // ============================================
+    // MOVEMENT
+    // ============================================
+    
+    function moveUnit(unit, deltaTime) {
+        if (!unit.path || unit.pathIndex >= unit.path.length) {
+            // Reached destination or no path
+            unit.path = null;
+            
+            if (unit.state === 'returning' && unit.targetBuilding) {
+                // Check if close to sawmill
+                const dx = unit.targetBuilding.position.x - unit.position.x;
+                const dz = unit.targetBuilding.position.z - unit.position.z;
+                if (Math.sqrt(dx*dx + dz*dz) < 4) {
+                    depositResources(unit);
+                    unit.targetBuilding = null;
+                }
+            } else if (unit.state === 'moving' && unit.targetTree) {
+                // Start harvesting
+                harvestTree(unit, 0);
+            } else if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
+                // Auto-continue harvesting
+                startHarvesting(unit);
+            } else {
+                unit.state = 'idle';
+            }
+            return;
+        }
+        
+        const target = unit.path[unit.pathIndex];
+        const dx = target.x - unit.position.x;
+        const dz = target.z - unit.position.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        
+        if (distance < 0.3) {
+            // Reached this waypoint
+            unit.pathIndex++;
+            return;
+        }
+        
+        // Move toward waypoint
+        const moveSpeed = unit.speed * deltaTime;
+        const moveX = (dx / distance) * moveSpeed;
+        const moveZ = (dz / distance) * moveSpeed;
+        
+        // Check for collision with other units
+        const newX = unit.position.x + moveX;
+        const newZ = unit.position.z + moveZ;
+        
+        const minSpacing = 1.0;
+        let blocked = false;
+        
+        for (const other of getGameState().units) {
+            if (other.id === unit.id) continue;
+            
+            const odx = other.position.x - newX;
+            const odz = other.position.z - newZ;
+            const odist = Math.sqrt(odx*odx + odz*odz);
+            
+            if (odist < minSpacing) {
+                blocked = true;
+                break;
+            }
+        }
+        
+        if (!blocked) {
+            unit.position.x = newX;
+            unit.position.z = newZ;
+            
+            // Update sprite
+            unit.sprite.position.x = unit.position.x;
+            unit.sprite.position.z = unit.position.z;
+            
+            // Update selection ring
+            if (unit.selectionRing) {
+                unit.selectionRing.position.x = unit.position.x;
+                unit.selectionRing.position.z = unit.position.z;
+            }
+        }
+    }
+    
+    function commandMove(unit, targetX, targetZ) {
+        const canFly = unit.typeData.canFly || false;
+        
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            targetX, targetZ,
+            canFly, unit.hasForestWalk
+        );
+        
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+            unit.harvestMode = null; // Cancel auto-harvest when manually moving
+            unit.targetTree = null;
+            unit.targetBuilding = null;
+            console.log(`Moving ${unit.typeData.name} to (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
+        } else {
+            console.log('No path found!');
+        }
+    }
+    
+    // ============================================
+    // SELECTION
+    // ============================================
+    
+    function selectUnit(unit) {
+        // Deselect previous
+        if (selectedUnit && selectedUnit.selectionRing) {
+            selectedUnit.selectionRing.visible = false;
+        }
+        
+        selectedUnit = unit;
+        
+        if (unit && unit.selectionRing) {
+            unit.selectionRing.visible = true;
+        }
+        
+        // Show unit menu
+        if (window.GameUI && unit) {
+            GameUI.showUnitMenu(unit);
+        }
+    }
+    
+    function deselectUnit() {
+        if (selectedUnit && selectedUnit.selectionRing) {
+            selectedUnit.selectionRing.visible = false;
+        }
+        selectedUnit = null;
+        commandMode = null;
+        
+        if (window.GameUI) {
+            GameUI.hideMenus();
+        }
+    }
+    
+    function getSelectedUnit() {
+        return selectedUnit;
+    }
+    
+    function setCommandMode(mode) {
+        commandMode = mode;
+    }
+    
+    function getCommandMode() {
+        return commandMode;
+    }
+    
+    // ============================================
+    // UPDATE LOOP
+    // ============================================
+    
+    function update() {
+        const gameState = getGameState();
+        if (!gameState) return;
+        
+        const now = Date.now();
+        const deltaTime = now - lastTime;
+        lastTime = now;
+        
+        // Update buildings production
+        if (window.GameBuildings) {
+            GameBuildings.updateProduction(deltaTime);
+        }
+        
+        // Update units
+        for (const unit of gameState.units) {
+            switch (unit.state) {
+                case 'moving':
+                case 'returning':
+                    moveUnit(unit, deltaTime);
+                    break;
+                case 'harvesting':
+                    harvestTree(unit, deltaTime);
+                    break;
+                case 'idle':
+                    // Auto-resume harvesting if in harvest mode
+                    if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
+                        startHarvesting(unit);
                     }
-                }
-            });
-        }
-        
-        // Close button
-        document.getElementById('menu-close-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (canClick()) {
-                hideMenus();
+                    break;
             }
-        });
-    }
-    
-    // Build a building on selected site
-    function buildBuilding(buildingTypeId) {
-        const gameState = window.GameEngine.gameState;
-        if (!gameState.selectedSite) return;
-        
-        const building = GameBuildings.placeBuilding(gameState.selectedSite, buildingTypeId);
-        if (building) {
-            hideMenus();
-            gameState.selectedSite = null;
+            
+            // Idle animation - slight bob
+            if (unit.sprite) {
+                const baseY = 2.25;
+                const bobAmount = unit.state === 'harvesting' ? 0.2 : 0.1;
+                const bobSpeed = unit.state === 'harvesting' ? 0.01 : 0.003;
+                unit.sprite.position.y = baseY + Math.sin(now * bobSpeed + unit.id.length) * bobAmount;
+            }
+            
+            // Selection ring pulse
+            if (unit.selectionRing && unit.selectionRing.visible) {
+                unit.selectionRing.material.opacity = 0.5 + Math.sin(now * 0.005) * 0.2;
+            }
         }
     }
     
-    // Train a unit from a building
-    function trainUnit(buildingId) {
-        const gameState = window.GameEngine.gameState;
-        const building = gameState.buildings.find(b => b.id === buildingId);
-        if (!building) return;
-        
-        if (GameBuildings.queueUnit(building)) {
-            // Refresh menu to show updated queue
-            showBuildingMenu(building);
-        }
-    }
+    // ============================================
+    // INITIALIZATION
+    // ============================================
     
-    // Hide all menus
-    function hideMenus() {
-        if (menuContainer) {
-            menuContainer.style.display = 'none';
-        }
-        const gameState = window.GameEngine.gameState;
-        gameState.selectedSite = null;
-        gameState.selectedBuilding = null;
-    }
-    
-    // Update resource display
-    function updateResources() {
-        const gameState = window.GameEngine.gameState;
-        document.getElementById('wood-count').textContent = Math.floor(gameState.resources.wood);
-        document.getElementById('energy-count').textContent = Math.floor(gameState.resources.energy);
-    }
-    
-    // Initialize
     function init() {
-        createUI();
-        updateResources();
-        console.log('UI module initialized');
+        console.log('Units module initialized');
     }
     
     // Public API
     return {
         init,
-        showBuildMenu,
-        showBuildingMenu,
-        hideMenus,
-        buildBuilding,
-        trainUnit,
-        updateResources
+        UNIT_TYPES,
+        WOODSMAN_UPGRADES,
+        spawnUnit,
+        commandMove,
+        update,
+        selectUnit,
+        deselectUnit,
+        getSelectedUnit,
+        setCommandMode,
+        getCommandMode,
+        startHarvesting,
+        findPath
     };
 })();
