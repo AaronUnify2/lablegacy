@@ -59,10 +59,6 @@ window.GameUI = (function() {
                 <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="wood-count">500</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-size: 14px; color: #555;">Coal</span>
-                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="coal-count">100</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 16px;">⚡</span>
                 <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="energy-count">300</span>
             </div>
@@ -473,7 +469,6 @@ window.GameUI = (function() {
     function updateResources() {
         const gameState = window.GameEngine.gameState;
         document.getElementById('wood-count').textContent = Math.floor(gameState.resources.wood);
-        document.getElementById('coal-count').textContent = Math.floor(gameState.resources.coal);
         document.getElementById('energy-count').textContent = Math.floor(gameState.resources.energy);
     }
     
