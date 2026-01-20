@@ -3,7 +3,11 @@
 // ============================================
 
 window.GameUnits = (function() {
-    const { scene, gameState, CONFIG, THREE } = window.GameEngine;
+    // Get references lazily to avoid initialization order issues
+    const getEngine = () => window.GameEngine;
+    const getScene = () => window.GameEngine.scene;
+    const getGameState = () => window.GameEngine.gameState;
+    const getTHREE = () => window.GameEngine.THREE;
     
     let lastTime = Date.now();
     
@@ -24,6 +28,7 @@ window.GameUnits = (function() {
     
     // Create unit sprite material
     function createUnitMaterial(unitType) {
+        const THREE = getTHREE();
         const canvas = document.createElement('canvas');
         canvas.width = 32;
         canvas.height = 48;
@@ -115,6 +120,10 @@ window.GameUnits = (function() {
     
     // Spawn a unit from a building
     function spawnUnit(unitTypeId, position, upgrades) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        const gameState = getGameState();
+        
         const unitType = UNIT_TYPES[unitTypeId];
         if (!unitType) return null;
         
@@ -220,6 +229,7 @@ window.GameUnits = (function() {
     
     // Update all units
     function update() {
+        const gameState = getGameState();
         const now = Date.now();
         const deltaTime = now - lastTime;
         lastTime = now;
