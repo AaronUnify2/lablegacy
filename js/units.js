@@ -3,11 +3,13 @@
 // ============================================
 
 window.GameUnits = (function() {
+    console.log('units.js loading...');
+    
     // Get references lazily to avoid initialization order issues
     const getEngine = () => window.GameEngine;
-    const getScene = () => window.GameEngine.scene;
-    const getGameState = () => window.GameEngine.gameState;
-    const getTHREE = () => window.GameEngine.THREE;
+    const getScene = () => window.GameEngine?.scene;
+    const getGameState = () => window.GameEngine?.gameState;
+    const getTHREE = () => window.GameEngine?.THREE || window.THREE;
     
     let lastTime = Date.now();
     
