@@ -122,7 +122,7 @@ window.GameUI = (function() {
     // ============================================
     
     function showUnitMenu(unit) {
-        hideMenus();
+        hideMenuVisuals();
         
         const isWoodsman = unit.type === 'woodsman';
         
@@ -318,7 +318,7 @@ window.GameUI = (function() {
                     GameUnits.setCommandMode('move');
                 }
                 showCommandIndicator('Tap destination to move');
-                hideMenus();
+                hideMenuVisuals();
                 break;
                 
             case 'harvest':
@@ -352,7 +352,7 @@ window.GameUI = (function() {
     // ============================================
     
     function showBuildMenu(site) {
-        hideMenus();
+        hideMenuVisuals();
         
         const buildings = window.GameBuildings ? GameBuildings.BUILDING_TYPES : {};
         const gameState = window.GameEngine.gameState;
@@ -467,7 +467,7 @@ window.GameUI = (function() {
     }
     
     function showBuildingMenu(building) {
-        hideMenus();
+        hideMenuVisuals();
         
         const gameState = window.GameEngine.gameState;
         
@@ -879,7 +879,8 @@ window.GameUI = (function() {
         }
     }
     
-    function hideMenus() {
+    // Just hide the menu visuals without clearing game state
+    function hideMenuVisuals() {
         if (menuContainer) {
             menuContainer.style.display = 'none';
         }
@@ -887,6 +888,11 @@ window.GameUI = (function() {
             unitMenuContainer.style.display = 'none';
         }
         hideCommandIndicator();
+    }
+    
+    // Hide menus AND clear selection state (for clicking elsewhere)
+    function hideMenus() {
+        hideMenuVisuals();
         
         const gameState = window.GameEngine?.gameState;
         if (gameState) {
