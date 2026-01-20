@@ -40,7 +40,7 @@ window.GameUnits = (function() {
             speed: 0.035,
             attackRange: 1.5,
             attackSpeed: 1200,
-            harvestSpeed: 2000, // ms to chop one tree
+            harvestSpeed: 3000, // ms to chop one tree (3 seconds)
             carryCapacity: 5, // trees before returning
             canHarvest: true,
             scale: 1.0
