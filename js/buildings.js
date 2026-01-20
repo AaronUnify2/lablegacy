@@ -68,13 +68,23 @@ window.GameBuildings = (function() {
         },
         GREENHOUSE: {
             id: 'greenhouse',
-            name: 'Greenhouse',
+            name: 'Alchemist Hut',
             cost: { wood: 55, energy: 30 },
             unitType: 'botanist',
             unitCost: { energy: 18 },
             productionTime: 3500,
-            description: 'Trains Botanists to plant support plants',
+            description: 'Trains Botanists to grow magical plants',
             category: 'support'
+        },
+        HIVE: {
+            id: 'hive',
+            name: 'Hive',
+            cost: { wood: 65, energy: 35 },
+            unitType: 'dragonfly',
+            unitCost: { energy: 20 },
+            productionTime: 4000,
+            description: 'Breeds Dragonflies that fly over trees',
+            category: 'military'
         },
         MAGE_TOWER: {
             id: 'mage_tower',
@@ -93,7 +103,7 @@ window.GameBuildings = (function() {
             unitType: null,
             unitCost: null,
             productionTime: null,
-            description: 'Converts wood to energy (10:1)',
+            description: 'Burns wood to generate energy (10:1)',
             category: 'economy',
             isConverter: true,
             conversionRate: { input: 'wood', output: 'energy', ratio: 10 }
@@ -140,6 +150,9 @@ window.GameBuildings = (function() {
                 break;
             case 'greenhouse':
                 drawGreenhouse(ctx);
+                break;
+            case 'hive':
+                drawHive(ctx);
                 break;
             case 'mage_tower':
                 drawMageTower(ctx);
@@ -339,46 +352,221 @@ window.GameBuildings = (function() {
     }
     
     function drawGreenhouse(ctx) {
-        ctx.fillStyle = '#4a5a4a';
-        ctx.fillRect(6, 52, 52, 12);
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(8, 20, 48, 36);
-        ctx.fillStyle = 'rgba(100, 200, 100, 0.5)';
-        ctx.fillRect(10, 22, 14, 16);
-        ctx.fillRect(26, 22, 14, 16);
-        ctx.fillRect(42, 22, 12, 16);
-        ctx.fillRect(10, 40, 14, 14);
-        ctx.fillRect(42, 40, 12, 14);
-        ctx.fillStyle = 'rgba(150, 220, 150, 0.6)';
-        ctx.fillRect(26, 40, 14, 14);
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(26, 40, 14, 14);
-        ctx.fillStyle = 'rgba(200, 230, 255, 0.7)';
+        // Alchemist's Hut - mystical cottage with potions and vines
+        // Foundation with moss
+        ctx.fillStyle = '#3a4a3a';
+        ctx.fillRect(8, 52, 48, 12);
+        ctx.fillStyle = '#2a5a2a';
+        ctx.fillRect(10, 54, 8, 4);
+        ctx.fillRect(46, 55, 6, 3);
+        
+        // Main hut body - old wood
+        ctx.fillStyle = '#5a4a3a';
+        ctx.fillRect(12, 26, 40, 30);
+        
+        // Wood grain/planks
+        ctx.fillStyle = '#4a3a2a';
+        ctx.fillRect(12, 32, 40, 2);
+        ctx.fillRect(12, 42, 40, 2);
+        
+        // Crooked thatched roof
+        ctx.fillStyle = '#6a5a2a';
         ctx.beginPath();
-        ctx.moveTo(6, 20);
-        ctx.lineTo(32, 4);
-        ctx.lineTo(58, 20);
+        ctx.moveTo(6, 28);
+        ctx.lineTo(28, 4);
+        ctx.lineTo(34, 6);
+        ctx.lineTo(58, 28);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 2;
+        
+        // Roof thatch texture
+        ctx.fillStyle = '#5a4a1a';
+        ctx.fillRect(14, 16, 4, 8);
+        ctx.fillRect(24, 12, 4, 10);
+        ctx.fillRect(38, 14, 4, 10);
+        ctx.fillRect(46, 18, 4, 8);
+        
+        // Round door
+        ctx.fillStyle = '#3a2a1a';
         ctx.beginPath();
-        ctx.moveTo(6, 20);
-        ctx.lineTo(32, 4);
-        ctx.lineTo(58, 20);
-        ctx.stroke();
-        ctx.fillStyle = '#2a8a2a';
-        ctx.fillRect(12, 50, 6, 6);
-        ctx.fillRect(20, 48, 4, 8);
-        ctx.fillRect(44, 50, 6, 6);
-        ctx.fillStyle = '#ff69b4';
-        ctx.beginPath();
-        ctx.arc(14, 48, 3, 0, Math.PI * 2);
+        ctx.arc(32, 48, 8, Math.PI, 0, true);
+        ctx.fillRect(24, 48, 16, 8);
         ctx.fill();
-        ctx.fillStyle = '#ffff00';
+        
+        // Door handle
+        ctx.fillStyle = '#8a7a4a';
+        ctx.fillRect(36, 48, 2, 4);
+        
+        // Round window with potion glow
+        ctx.fillStyle = '#2a4a2a';
         ctx.beginPath();
-        ctx.arc(46, 48, 3, 0, Math.PI * 2);
+        ctx.arc(20, 36, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#4aea4a';
+        ctx.beginPath();
+        ctx.arc(20, 36, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bubbling cauldron outside
+        ctx.fillStyle = '#3a3a3a';
+        ctx.beginPath();
+        ctx.arc(54, 52, 6, 0, Math.PI, true);
+        ctx.fill();
+        ctx.fillStyle = '#4a2a6a';
+        ctx.beginPath();
+        ctx.arc(54, 52, 4, 0, Math.PI, true);
+        ctx.fill();
+        
+        // Bubbles
+        ctx.fillStyle = '#8a4aca';
+        ctx.beginPath();
+        ctx.arc(52, 48, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(56, 46, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(54, 44, 1, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Vines growing on building
+        ctx.fillStyle = '#2a6a2a';
+        ctx.fillRect(10, 30, 3, 26);
+        ctx.fillRect(8, 38, 3, 3);
+        ctx.fillRect(6, 44, 3, 3);
+        ctx.fillRect(50, 34, 3, 22);
+        ctx.fillRect(52, 40, 3, 3);
+        
+        // Vine leaves
+        ctx.fillStyle = '#3a8a3a';
+        ctx.beginPath();
+        ctx.arc(9, 34, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(7, 42, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(53, 38, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Chimney with colored smoke
+        ctx.fillStyle = '#4a3a2a';
+        ctx.fillRect(42, 2, 6, 12);
+        ctx.fillStyle = 'rgba(100, 50, 150, 0.5)';
+        ctx.beginPath();
+        ctx.arc(45, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(50, 150, 100, 0.4)';
+        ctx.beginPath();
+        ctx.arc(48, -2, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    function drawHive(ctx) {
+        // Giant beehive structure
+        // Ground/base
+        ctx.fillStyle = '#4a4a3a';
+        ctx.fillRect(16, 56, 32, 8);
+        
+        // Main hive body - layered dome shape
+        ctx.fillStyle = '#c9a227';
+        ctx.beginPath();
+        ctx.ellipse(32, 50, 22, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#d4aa30';
+        ctx.beginPath();
+        ctx.ellipse(32, 40, 20, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#deb838';
+        ctx.beginPath();
+        ctx.ellipse(32, 30, 17, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#e8c240';
+        ctx.beginPath();
+        ctx.ellipse(32, 22, 12, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Top point
+        ctx.fillStyle = '#d4aa30';
+        ctx.beginPath();
+        ctx.moveTo(26, 14);
+        ctx.lineTo(32, 4);
+        ctx.lineTo(38, 14);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Honeycomb pattern (hexagons)
+        ctx.fillStyle = '#b8942a';
+        // Row 1
+        drawHexagon(ctx, 26, 32, 4);
+        drawHexagon(ctx, 34, 32, 4);
+        // Row 2
+        drawHexagon(ctx, 22, 40, 4);
+        drawHexagon(ctx, 30, 40, 4);
+        drawHexagon(ctx, 38, 40, 4);
+        // Row 3
+        drawHexagon(ctx, 26, 48, 4);
+        drawHexagon(ctx, 34, 48, 4);
+        
+        // Entrance hole
+        ctx.fillStyle = '#4a3a1a';
+        ctx.beginPath();
+        ctx.ellipse(32, 52, 6, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Flying dragonflies around hive
+        drawDragonfly(ctx, 8, 20, 0.6);
+        drawDragonfly(ctx, 52, 28, 0.5);
+        drawDragonfly(ctx, 56, 12, 0.7);
+        
+        // Outline/texture lines
+        ctx.strokeStyle = '#a08020';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(32, 50, 22, 10, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(32, 40, 20, 10, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(32, 30, 17, 10, 0, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+    
+    function drawHexagon(ctx, x, y, size) {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2 - Math.PI / 2;
+            const px = x + Math.cos(angle) * size;
+            const py = y + Math.sin(angle) * size;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    function drawDragonfly(ctx, x, y, scale) {
+        // Body
+        ctx.fillStyle = '#30a0d0';
+        ctx.fillRect(x, y, 8 * scale, 3 * scale);
+        
+        // Wings
+        ctx.fillStyle = 'rgba(200, 230, 255, 0.7)';
+        ctx.beginPath();
+        ctx.ellipse(x + 2 * scale, y - 1 * scale, 4 * scale, 2 * scale, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + 2 * scale, y + 4 * scale, 4 * scale, 2 * scale, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Head
+        ctx.fillStyle = '#40b0e0';
+        ctx.beginPath();
+        ctx.arc(x + 8 * scale, y + 1.5 * scale, 2 * scale, 0, Math.PI * 2);
         ctx.fill();
     }
     
