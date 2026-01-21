@@ -181,12 +181,26 @@ window.GameUI = (function() {
                 let stateColor = '#8ab88a';
                 switch(firstUnit.state) {
                     case 'harvesting':
-                        stateText = '🪓 Harvesting...';
+                        if (firstUnit.harvestMode === 'cutPath') {
+                            stateText = '🛤️ Cutting path...';
+                        } else if (firstUnit.harvestMode === 'cutLane') {
+                            stateText = '🛣️ Cutting lane...';
+                        } else {
+                            stateText = '🪓 Harvesting...';
+                        }
                         stateColor = '#d4a84a';
                         break;
                     case 'moving':
-                        stateText = '🚶 Moving...';
-                        stateColor = '#7ddf64';
+                        if (firstUnit.harvestMode === 'cutPath') {
+                            stateText = '🛤️ Moving to cut path...';
+                            stateColor = '#d4a84a';
+                        } else if (firstUnit.harvestMode === 'cutLane') {
+                            stateText = '🛣️ Moving to cut lane...';
+                            stateColor = '#d4a84a';
+                        } else {
+                            stateText = '🚶 Moving...';
+                            stateColor = '#7ddf64';
+                        }
                         break;
                     case 'returning':
                         stateText = '📦 Returning to Sawmill...';
@@ -249,6 +263,8 @@ window.GameUI = (function() {
         if (isWoodsman) {
             // Check if any unit has harvest mode active
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
+            const anyCuttingPath = units.some(u => u.harvestMode === 'cutPath');
+            const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
             
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
@@ -268,6 +284,44 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🪓</span>
                     <span style="flex: 1; text-align: left;">Harvest Nearby</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyHarvesting ? 'ACTIVE' : 'Auto-chop'}</span>
+                </button>
+                
+                <button class="unit-cmd-btn" data-cmd="cutPath" style="
+                    background: ${anyCuttingPath ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyCuttingPath ? '#d4a84a' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🛤️</span>
+                    <span style="flex: 1; text-align: left;">Cut Path</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingPath ? 'ACTIVE' : '2 wide'}</span>
+                </button>
+                
+                <button class="unit-cmd-btn" data-cmd="cutLane" style="
+                    background: ${anyCuttingLane ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyCuttingLane ? '#d4a84a' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🛣️</span>
+                    <span style="flex: 1; text-align: left;">Cut Lane</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLane ? 'ACTIVE' : '4 wide'}</span>
                 </button>
             `;
         }
@@ -346,12 +400,18 @@ window.GameUI = (function() {
                 btn.style.background = 'rgba(74, 156, 127, 0.4)';
             });
             btn.addEventListener('mouseleave', () => {
-                if (btn.dataset.cmd === 'harvest') {
-                    const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
-                    btn.style.background = anyHarvesting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)';
-                } else {
-                    btn.style.background = 'rgba(74, 124, 63, 0.3)';
+                const cmd = btn.dataset.cmd;
+                let isActive = false;
+                
+                if (cmd === 'harvest') {
+                    isActive = units.some(u => u.harvestMode === 'nearby');
+                } else if (cmd === 'cutPath') {
+                    isActive = units.some(u => u.harvestMode === 'cutPath');
+                } else if (cmd === 'cutLane') {
+                    isActive = units.some(u => u.harvestMode === 'cutLane');
                 }
+                
+                btn.style.background = isActive ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)';
             });
         });
         
@@ -413,10 +473,12 @@ window.GameUI = (function() {
                     if (anyHarvesting) {
                         // Turn off for all
                         unit.harvestMode = null;
+                        unit.corridorTarget = null;
                         unit.state = 'idle';
                     } else {
                         // Turn on for all
                         unit.harvestMode = 'nearby';
+                        unit.corridorTarget = null;
                         if (window.GameUnits) {
                             GameUnits.startHarvesting(unit);
                         }
@@ -425,6 +487,30 @@ window.GameUI = (function() {
                 
                 // Refresh menu
                 showUnitMenu(units);
+                break;
+                
+            case 'cutPath':
+                // Enter cut path mode (2 wide)
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('cutPath');
+                }
+                const pathText = units.length > 1 
+                    ? `Tap destination for ${units.length} woodsmen to cut path`
+                    : 'Tap destination to cut path (2 wide)';
+                showCommandIndicator(pathText);
+                hideMenuVisuals();
+                break;
+                
+            case 'cutLane':
+                // Enter cut lane mode (4 wide)
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('cutLane');
+                }
+                const laneText = units.length > 1 
+                    ? `Tap destination for ${units.length} woodsmen to cut lane`
+                    : 'Tap destination to cut lane (4 wide)';
+                showCommandIndicator(laneText);
+                hideMenuVisuals();
                 break;
         }
     }
