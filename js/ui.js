@@ -103,11 +103,11 @@ window.GameUI = (function() {
         resourceDisplay.innerHTML = `
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 16px;">🪵</span>
-                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="wood-count">500</span>
+                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="wood-count">5000</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 16px;">⚡</span>
-                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="energy-count">300</span>
+                <span style="color: #c8f0c8; font-weight: bold; font-size: 14px;" id="energy-count">3000</span>
             </div>
         `;
         document.getElementById('ui-overlay').appendChild(resourceDisplay);
