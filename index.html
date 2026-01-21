@@ -1224,8 +1224,8 @@
             if (window.GameUnits) {
                 const commandMode = GameUnits.getCommandMode();
                 
-                if (commandMode === 'move') {
-                    // Get ground intersection for move command
+                if (commandMode === 'move' || commandMode === 'cutPath' || commandMode === 'cutLane') {
+                    // Get ground intersection for command
                     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
                     const intersectPoint = new THREE.Vector3();
                     raycaster.ray.intersectPlane(groundPlane, intersectPoint);
@@ -1233,8 +1233,17 @@
                     if (intersectPoint) {
                         const selectedUnits = GameUnits.getSelectedUnits();
                         if (selectedUnits && selectedUnits.length > 0) {
-                            // Use multi-select move command (handles formation)
-                            GameUnits.commandMoveMultiple(selectedUnits, intersectPoint.x, intersectPoint.z);
+                            if (commandMode === 'move') {
+                                // Use multi-select move command (handles formation)
+                                GameUnits.commandMoveMultiple(selectedUnits, intersectPoint.x, intersectPoint.z);
+                            } else if (commandMode === 'cutPath') {
+                                // Cut path (2 wide)
+                                GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 2);
+                            } else if (commandMode === 'cutLane') {
+                                // Cut lane (4 wide)
+                                GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 4);
+                            }
+                            
                             GameUnits.setCommandMode(null);
                             if (window.GameUI) {
                                 GameUI.hideCommandIndicator();
