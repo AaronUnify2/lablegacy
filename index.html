@@ -1113,13 +1113,13 @@
                             GameUnits.setCommandMode(null);
                             if (window.GameUI) {
                                 GameUI.hideCommandIndicator();
-                                const selectedUnit = GameUnits.getSelectedUnit();
-                                if (selectedUnit) {
-                                    GameUI.showUnitMenu(selectedUnit);
+                                const selectedUnits = GameUnits.getSelectedUnits();
+                                if (selectedUnits && selectedUnits.length > 0) {
+                                    GameUI.showUnitMenu(selectedUnits);
                                 }
                             }
                         } else {
-                            GameUnits.deselectUnit();
+                            GameUnits.deselectAllUnits();
                         }
                     }
                 }
@@ -1231,13 +1231,14 @@
                     raycaster.ray.intersectPlane(groundPlane, intersectPoint);
                     
                     if (intersectPoint) {
-                        const selectedUnit = GameUnits.getSelectedUnit();
-                        if (selectedUnit) {
-                            GameUnits.commandMove(selectedUnit, intersectPoint.x, intersectPoint.z);
+                        const selectedUnits = GameUnits.getSelectedUnits();
+                        if (selectedUnits && selectedUnits.length > 0) {
+                            // Use multi-select move command (handles formation)
+                            GameUnits.commandMoveMultiple(selectedUnits, intersectPoint.x, intersectPoint.z);
                             GameUnits.setCommandMode(null);
                             if (window.GameUI) {
                                 GameUI.hideCommandIndicator();
-                                GameUI.showUnitMenu(selectedUnit);
+                                GameUI.showUnitMenu(selectedUnits);
                             }
                         }
                     }
@@ -1269,7 +1270,7 @@
                 
                 // Deselect any unit first
                 if (window.GameUnits) {
-                    GameUnits.deselectUnit();
+                    GameUnits.deselectAllUnits();
                 }
                 
                 if (clickedSite.userData.building) {
@@ -1295,7 +1296,7 @@
             gameState.selectedBuilding = null;
             
             if (window.GameUnits) {
-                GameUnits.deselectUnit();
+                GameUnits.deselectAllUnits();
             }
             
             if (window.GameUI) {
