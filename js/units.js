@@ -1,5 +1,5 @@
 // ============================================
-// UNITS MODULE - Enhanced with Woodsman & Pathfinding
+// UNITS MODULE - Enhanced with Multi-Select
 // ============================================
 
 window.GameUnits = (function() {
@@ -14,8 +14,11 @@ window.GameUnits = (function() {
     const getCELL = () => window.GameEngine?.CELL;
     
     let lastTime = Date.now();
-    let selectedUnit = null;
+    let selectedUnits = []; // Changed from single selectedUnit to array
     let commandMode = null; // null, 'move', 'harvest_target'
+    
+    // Track claimed trees to prevent multiple woodsmen targeting same tree
+    let claimedTrees = new Map(); // key: "x,z" -> unit.id
     
     // Unit definitions
     const UNIT_TYPES = {
@@ -778,7 +781,7 @@ window.GameUnits = (function() {
     // HARVESTING SYSTEM
     // ============================================
     
-    function findNearestTree(unit) {
+    function findNearestTree(unit, excludeClaimed = true) {
         const gameState = getGameState();
         const CELL = getCELL();
         const CONFIG = getCONFIG();
@@ -799,6 +802,15 @@ window.GameUnits = (function() {
                 
                 const cell = gameState.grid[x]?.[z];
                 if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                    // Check if tree is already claimed by another unit
+                    if (excludeClaimed) {
+                        const treeKey = `${x},${z}`;
+                        const claimedBy = claimedTrees.get(treeKey);
+                        if (claimedBy && claimedBy !== unit.id) {
+                            continue; // Skip trees claimed by other units
+                        }
+                    }
+                    
                     const dist = Math.sqrt(dx*dx + dz*dz);
                     if (dist < nearestDist) {
                         nearestDist = dist;
@@ -809,6 +821,22 @@ window.GameUnits = (function() {
         }
         
         return nearestTree;
+    }
+    
+    function claimTree(unit, tree) {
+        if (tree) {
+            const treeKey = `${tree.x},${tree.z}`;
+            claimedTrees.set(treeKey, unit.id);
+        }
+    }
+    
+    function releaseTreeClaim(unit) {
+        // Release any tree claimed by this unit
+        for (const [key, claimerId] of claimedTrees.entries()) {
+            if (claimerId === unit.id) {
+                claimedTrees.delete(key);
+            }
+        }
     }
     
     function findNearestSawmill(unit) {
@@ -836,6 +864,9 @@ window.GameUnits = (function() {
     function startHarvesting(unit) {
         if (!unit.typeData.canHarvest) return;
         
+        // Release any previous claim
+        releaseTreeClaim(unit);
+        
         // Check if inventory is full
         const totalCarried = unit.inventory.wood + unit.inventory.energy;
         if (totalCarried >= unit.carryCapacity) {
@@ -844,12 +875,15 @@ window.GameUnits = (function() {
             return;
         }
         
-        // Find nearest tree
-        const tree = findNearestTree(unit);
+        // Find nearest unclaimed tree
+        const tree = findNearestTree(unit, true);
         if (!tree) {
             unit.state = 'idle';
             return;
         }
+        
+        // Claim this tree
+        claimTree(unit, tree);
         
         // Path to tree
         unit.targetTree = tree;
@@ -864,6 +898,7 @@ window.GameUnits = (function() {
             unit.pathIndex = 0;
             unit.state = 'moving';
         } else {
+            releaseTreeClaim(unit);
             unit.state = 'idle';
         }
     }
@@ -918,6 +953,9 @@ window.GameUnits = (function() {
             const treeType = unit.targetTree.type;
             const treeX = unit.targetTree.x;
             const treeZ = unit.targetTree.z;
+            
+            // Release the claim on this tree
+            releaseTreeClaim(unit);
             
             // Determine resource yield
             let woodYield = 0;
@@ -981,6 +1019,9 @@ window.GameUnits = (function() {
     }
     
     function returnToSawmill(unit) {
+        // Release any tree claim
+        releaseTreeClaim(unit);
+        
         const sawmill = findNearestSawmill(unit);
         
         if (!sawmill) {
@@ -1241,11 +1282,18 @@ window.GameUnits = (function() {
         }
     }
     
+    // ============================================
+    // MULTI-SELECT COMMAND MOVE WITH FORMATION
+    // ============================================
+    
     function commandMove(unit, targetX, targetZ) {
         const canFly = unit.typeData.canFly || false;
         
         // Create ripple at destination
         createRipple(targetX, targetZ);
+        
+        // Release any tree claim when manually moving
+        releaseTreeClaim(unit);
         
         const path = findPath(
             unit.position.x, unit.position.z,
@@ -1270,33 +1318,152 @@ window.GameUnits = (function() {
         }
     }
     
+    function commandMoveMultiple(units, targetX, targetZ) {
+        if (units.length === 0) return;
+        
+        if (units.length === 1) {
+            // Single unit, move directly
+            commandMove(units[0], targetX, targetZ);
+            return;
+        }
+        
+        // Multiple units - spread in formation around target
+        const spacing = 2.0; // Distance between units
+        const unitsPerRow = Math.ceil(Math.sqrt(units.length));
+        
+        // Create ripple at center destination
+        createRipple(targetX, targetZ);
+        
+        units.forEach((unit, index) => {
+            const row = Math.floor(index / unitsPerRow);
+            const col = index % unitsPerRow;
+            
+            // Center the formation around the target
+            const offsetX = (col - (unitsPerRow - 1) / 2) * spacing;
+            const offsetZ = (row - (Math.ceil(units.length / unitsPerRow) - 1) / 2) * spacing;
+            
+            const unitTargetX = targetX + offsetX;
+            const unitTargetZ = targetZ + offsetZ;
+            
+            const canFly = unit.typeData.canFly || false;
+            
+            // Release any tree claim
+            releaseTreeClaim(unit);
+            
+            const path = findPath(
+                unit.position.x, unit.position.z,
+                unitTargetX, unitTargetZ,
+                canFly, unit.hasForestWalk
+            );
+            
+            if (path && path.length > 0) {
+                unit.path = path;
+                unit.pathIndex = 0;
+                unit.state = 'moving';
+                unit.harvestMode = null;
+                unit.targetTree = null;
+                unit.targetBuilding = null;
+                
+                createPathLine(unit, path);
+            }
+        });
+        
+        console.log(`Moving ${units.length} units to formation around (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
+    }
+    
     // ============================================
-    // SELECTION
+    // MULTI-SELECTION SYSTEM
     // ============================================
     
     function selectUnit(unit) {
-        // Deselect previous
-        if (selectedUnit && selectedUnit.selectionRing) {
-            selectedUnit.selectionRing.visible = false;
+        // If clicking a unit of a different type, replace selection entirely
+        if (selectedUnits.length > 0 && selectedUnits[0].type !== unit.type) {
+            deselectAllUnits();
         }
         
-        selectedUnit = unit;
+        // Check if unit is already selected
+        if (selectedUnits.includes(unit)) {
+            // Already selected, just show menu
+            if (window.GameUI) {
+                GameUI.showUnitMenu(selectedUnits);
+            }
+            return;
+        }
         
-        if (unit && unit.selectionRing) {
+        // Deselect all first (single select by default)
+        deselectAllUnits();
+        
+        // Select this unit
+        selectedUnits = [unit];
+        
+        if (unit.selectionRing) {
             unit.selectionRing.visible = true;
         }
         
         // Show unit menu
-        if (window.GameUI && unit) {
-            GameUI.showUnitMenu(unit);
+        if (window.GameUI) {
+            GameUI.showUnitMenu(selectedUnits);
+        }
+    }
+    
+    function selectAllVisibleOfType(unitType) {
+        const gameState = getGameState();
+        const camera = window.GameEngine?.camera;
+        const THREE = getTHREE();
+        
+        if (!camera || !gameState) return;
+        
+        // Get camera frustum
+        const frustum = new THREE.Frustum();
+        const projScreenMatrix = new THREE.Matrix4();
+        projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        frustum.setFromProjectionMatrix(projScreenMatrix);
+        
+        // Find all visible units of the same type
+        const visibleUnits = gameState.units.filter(u => {
+            if (u.type !== unitType) return false;
+            if (u.owner !== 'player') return false;
+            
+            // Check if sprite is in camera frustum
+            return frustum.containsPoint(u.sprite.position);
+        });
+        
+        if (visibleUnits.length === 0) return;
+        
+        // Deselect all first
+        deselectAllUnits();
+        
+        // Select all visible units of this type
+        selectedUnits = visibleUnits;
+        
+        // Show selection rings for all
+        selectedUnits.forEach(unit => {
+            if (unit.selectionRing) {
+                unit.selectionRing.visible = true;
+            }
+        });
+        
+        console.log(`Selected ${selectedUnits.length} ${unitType}(s)`);
+        
+        // Update UI
+        if (window.GameUI) {
+            GameUI.showUnitMenu(selectedUnits);
         }
     }
     
     function deselectUnit() {
-        if (selectedUnit && selectedUnit.selectionRing) {
-            selectedUnit.selectionRing.visible = false;
-        }
-        selectedUnit = null;
+        deselectAllUnits();
+    }
+    
+    function deselectAllUnits() {
+        // Hide all selection rings
+        selectedUnits.forEach(unit => {
+            if (unit.selectionRing) {
+                unit.selectionRing.visible = false;
+            }
+        });
+        
+        selectedUnits = [];
         commandMode = null;
         
         if (window.GameUI) {
@@ -1305,7 +1472,12 @@ window.GameUnits = (function() {
     }
     
     function getSelectedUnit() {
-        return selectedUnit;
+        // For backwards compatibility, return first selected unit
+        return selectedUnits.length > 0 ? selectedUnits[0] : null;
+    }
+    
+    function getSelectedUnits() {
+        return selectedUnits;
     }
     
     function setCommandMode(mode) {
@@ -1331,6 +1503,14 @@ window.GameUnits = (function() {
         // Update buildings production
         if (window.GameBuildings) {
             GameBuildings.updateProduction(deltaTime);
+        }
+        
+        // Clean up claimed trees for dead/invalid units
+        for (const [key, unitId] of claimedTrees.entries()) {
+            const unitExists = gameState.units.some(u => u.id === unitId);
+            if (!unitExists) {
+                claimedTrees.delete(key);
+            }
         }
         
         // Update units
@@ -1394,10 +1574,14 @@ window.GameUnits = (function() {
         WOODSMAN_UPGRADES,
         spawnUnit,
         commandMove,
+        commandMoveMultiple,
         update,
         selectUnit,
+        selectAllVisibleOfType,
         deselectUnit,
+        deselectAllUnits,
         getSelectedUnit,
+        getSelectedUnits,
         setCommandMode,
         getCommandMode,
         startHarvesting,
