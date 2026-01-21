@@ -903,6 +903,228 @@ window.GameUnits = (function() {
         }
     }
     
+    // ============================================
+    // CUT PATH / LANE SYSTEM
+    // ============================================
+    
+    function startCuttingCorridor(unit, targetX, targetZ, width) {
+        if (!unit.typeData.canHarvest) return;
+        
+        // Store corridor parameters
+        unit.corridorTarget = { x: targetX, z: targetZ };
+        unit.corridorWidth = width;
+        unit.harvestMode = width === 2 ? 'cutPath' : 'cutLane';
+        
+        // Release any previous claims
+        releaseTreeClaim(unit);
+        
+        // Start cutting
+        continueCuttingCorridor(unit);
+        
+        console.log(`${unit.typeData.name} starting to cut ${width === 2 ? 'path' : 'lane'} to (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
+    }
+    
+    function continueCuttingCorridor(unit) {
+        if (!unit.corridorTarget) {
+            // No target, switch to nearby harvesting
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+            return;
+        }
+        
+        // Check if inventory is full
+        const totalCarried = unit.inventory.wood + unit.inventory.energy;
+        if (totalCarried >= unit.carryCapacity) {
+            returnToSawmill(unit);
+            return;
+        }
+        
+        // Check if we've reached the destination
+        const distToTarget = Math.sqrt(
+            Math.pow(unit.position.x - unit.corridorTarget.x, 2) +
+            Math.pow(unit.position.z - unit.corridorTarget.z, 2)
+        );
+        
+        if (distToTarget < 2) {
+            // Reached destination - switch to nearby harvest mode to create clearing
+            console.log(`${unit.typeData.name} reached corridor destination, creating clearing`);
+            unit.corridorTarget = null;
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+            return;
+        }
+        
+        // Find the next tree blocking the corridor
+        const blockingTree = findNextCorridorTree(unit);
+        
+        if (blockingTree) {
+            // Claim and path to this tree
+            claimTree(unit, blockingTree);
+            unit.targetTree = blockingTree;
+            
+            const path = findPath(
+                unit.position.x, unit.position.z,
+                blockingTree.x, blockingTree.z,
+                false, unit.hasForestWalk
+            );
+            
+            if (path && path.length > 0) {
+                unit.path = path;
+                unit.pathIndex = 0;
+                unit.state = 'moving';
+            } else {
+                // Can't reach tree, try moving closer to target first
+                moveCloserToCorridorTarget(unit);
+            }
+        } else {
+            // No blocking trees found, move toward target
+            moveCloserToCorridorTarget(unit);
+        }
+    }
+    
+    function findNextCorridorTree(unit) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        
+        if (!unit.corridorTarget) return null;
+        
+        const startX = unit.position.x;
+        const startZ = unit.position.z;
+        const endX = unit.corridorTarget.x;
+        const endZ = unit.corridorTarget.z;
+        const width = unit.corridorWidth;
+        
+        // Calculate corridor direction
+        const dx = endX - startX;
+        const dz = endZ - startZ;
+        const length = Math.sqrt(dx * dx + dz * dz);
+        
+        if (length < 1) return null;
+        
+        // Normalized direction
+        const dirX = dx / length;
+        const dirZ = dz / length;
+        
+        // Perpendicular direction for width
+        const perpX = -dirZ;
+        const perpZ = dirX;
+        
+        let nearestTree = null;
+        let nearestDist = Infinity;
+        
+        // Search along the corridor
+        const searchLength = Math.min(length, 30); // Look ahead up to 30 units
+        const halfWidth = width / 2;
+        
+        for (let along = 0; along <= searchLength; along += 0.5) {
+            for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
+                const checkX = Math.floor(startX + dirX * along + perpX * across);
+                const checkZ = Math.floor(startZ + dirZ * along + perpZ * across);
+                
+                // Bounds check
+                if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) {
+                    continue;
+                }
+                
+                const cell = gameState.grid[checkX]?.[checkZ];
+                if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                    // Check if already claimed by another unit
+                    const treeKey = `${checkX},${checkZ}`;
+                    const claimedBy = claimedTrees.get(treeKey);
+                    if (claimedBy && claimedBy !== unit.id) {
+                        continue;
+                    }
+                    
+                    // Calculate distance from unit
+                    const treeDx = checkX - unit.position.x;
+                    const treeDz = checkZ - unit.position.z;
+                    const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
+                    
+                    // Prefer trees closer to the unit (not necessarily closest to start)
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestTree = { x: checkX, z: checkZ, type: cell };
+                    }
+                }
+            }
+        }
+        
+        return nearestTree;
+    }
+    
+    function moveCloserToCorridorTarget(unit) {
+        if (!unit.corridorTarget) return;
+        
+        // Try to path toward the target
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            unit.corridorTarget.x, unit.corridorTarget.z,
+            false, unit.hasForestWalk
+        );
+        
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+            unit.targetTree = null;
+        } else {
+            // Can't path at all, go idle briefly then retry
+            unit.state = 'idle';
+        }
+    }
+    
+    function commandCutCorridor(units, targetX, targetZ, width) {
+        if (!Array.isArray(units)) {
+            units = [units];
+        }
+        
+        // Create ripple at destination
+        createRipple(targetX, targetZ);
+        
+        if (units.length === 1) {
+            // Single unit cuts the corridor
+            startCuttingCorridor(units[0], targetX, targetZ, width);
+        } else {
+            // Multiple units - spread them across the corridor width
+            const dx = targetX - units[0].position.x;
+            const dz = targetZ - units[0].position.z;
+            const length = Math.sqrt(dx * dx + dz * dz);
+            
+            if (length > 0) {
+                // Perpendicular direction
+                const perpX = -dz / length;
+                const perpZ = dx / length;
+                
+                const spacing = width / Math.max(1, units.length - 1);
+                const halfWidth = width / 2;
+                
+                units.forEach((unit, index) => {
+                    // Offset each unit across the corridor
+                    let offset;
+                    if (units.length === 1) {
+                        offset = 0;
+                    } else {
+                        offset = -halfWidth + (index * spacing);
+                    }
+                    
+                    const unitTargetX = targetX + perpX * offset;
+                    const unitTargetZ = targetZ + perpZ * offset;
+                    
+                    startCuttingCorridor(unit, unitTargetX, unitTargetZ, width);
+                });
+            } else {
+                // Units are at the target, just have them harvest nearby
+                units.forEach(unit => {
+                    unit.harvestMode = 'nearby';
+                    startHarvesting(unit);
+                });
+            }
+        }
+        
+        console.log(`${units.length} unit(s) cutting ${width === 2 ? 'path' : 'lane'} to (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
+    }
+    
     function harvestTree(unit, deltaTime) {
         const gameState = getGameState();
         const CELL = getCELL();
@@ -1003,8 +1225,12 @@ window.GameUnits = (function() {
             const totalCarried = unit.inventory.wood + unit.inventory.energy;
             if (totalCarried >= unit.carryCapacity) {
                 returnToSawmill(unit);
+            } else if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
+                // Continue cutting corridor
+                unit.targetTree = null;
+                continueCuttingCorridor(unit);
             } else {
-                // Continue harvesting
+                // Continue normal harvesting
                 unit.targetTree = null;
                 startHarvesting(unit);
             }
@@ -1069,8 +1295,10 @@ window.GameUnits = (function() {
             GameUI.updateResources();
         }
         
-        // Continue harvesting
-        if (unit.harvestMode) {
+        // Continue appropriate harvest mode
+        if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
+            continueCuttingCorridor(unit);
+        } else if (unit.harvestMode) {
             startHarvesting(unit);
         } else {
             unit.state = 'idle';
@@ -1098,6 +1326,9 @@ window.GameUnits = (function() {
             } else if (unit.state === 'moving' && unit.targetTree) {
                 // Start harvesting
                 harvestTree(unit, 0);
+            } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
+                // Continue cutting path/lane or switch to nearby when done
+                continueCuttingCorridor(unit);
             } else if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
                 // Auto-continue harvesting
                 startHarvesting(unit);
@@ -1123,10 +1354,13 @@ window.GameUnits = (function() {
         let moveX = (dx / distance) * moveSpeed;
         let moveZ = (dz / distance) * moveSpeed;
         
-        // Soft collision - push apart from other units instead of blocking
+        // Soft collision - gentler push to avoid jittering
         const gameState = getGameState();
-        const separationRadius = 1.2;
-        const pushStrength = 0.02;
+        const separationRadius = 1.0;
+        const pushStrength = 0.008; // Reduced from 0.02
+        
+        let pushX = 0;
+        let pushZ = 0;
         
         for (const other of gameState.units) {
             if (other.id === unit.id) continue;
@@ -1135,27 +1369,30 @@ window.GameUnits = (function() {
             const odz = unit.position.z - other.position.z;
             const odist = Math.sqrt(odx * odx + odz * odz);
             
-            if (odist < separationRadius && odist > 0.01) {
-                // Push away from other unit
+            if (odist < separationRadius && odist > 0.1) {
+                // Accumulate push forces
                 const pushForce = (separationRadius - odist) * pushStrength * deltaTime;
-                moveX += (odx / odist) * pushForce;
-                moveZ += (odz / odist) * pushForce;
+                pushX += (odx / odist) * pushForce;
+                pushZ += (odz / odist) * pushForce;
             }
         }
         
-        // Apply movement
-        unit.position.x += moveX;
-        unit.position.z += moveZ;
+        // Apply movement with push (clamped to avoid overshooting)
+        const maxPush = moveSpeed * 0.5;
+        pushX = Math.max(-maxPush, Math.min(maxPush, pushX));
+        pushZ = Math.max(-maxPush, Math.min(maxPush, pushZ));
         
-        // Smoothly update sprite position (lerp for less flicker)
-        const lerpFactor = 0.3;
-        unit.sprite.position.x += (unit.position.x - unit.sprite.position.x) * lerpFactor;
-        unit.sprite.position.z += (unit.position.z - unit.sprite.position.z) * lerpFactor;
+        unit.position.x += moveX + pushX;
+        unit.position.z += moveZ + pushZ;
+        
+        // Direct sprite position update (no lerp jitter)
+        unit.sprite.position.x = unit.position.x;
+        unit.sprite.position.z = unit.position.z;
         
         // Update selection ring
         if (unit.selectionRing) {
-            unit.selectionRing.position.x = unit.sprite.position.x;
-            unit.selectionRing.position.z = unit.sprite.position.z;
+            unit.selectionRing.position.x = unit.position.x;
+            unit.selectionRing.position.z = unit.position.z;
         }
     }
     
@@ -1575,6 +1812,7 @@ window.GameUnits = (function() {
         spawnUnit,
         commandMove,
         commandMoveMultiple,
+        commandCutCorridor,
         update,
         selectUnit,
         selectAllVisibleOfType,
