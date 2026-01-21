@@ -1044,6 +1044,7 @@ window.GameUnits = (function() {
         if (!unit.path || unit.pathIndex >= unit.path.length) {
             // Reached destination or no path
             unit.path = null;
+            clearPathLine(unit);
             
             if (unit.state === 'returning' && unit.targetBuilding) {
                 // Check if close to sawmill
@@ -1066,59 +1067,185 @@ window.GameUnits = (function() {
         }
         
         const target = unit.path[unit.pathIndex];
-        const dx = target.x - unit.position.x;
-        const dz = target.z - unit.position.z;
+        const dx = target.x + 0.5 - unit.position.x; // Center of tile
+        const dz = target.z + 0.5 - unit.position.z;
         const distance = Math.sqrt(dx * dx + dz * dz);
         
-        if (distance < 0.3) {
+        if (distance < 0.5) {
             // Reached this waypoint
             unit.pathIndex++;
             return;
         }
         
-        // Move toward waypoint
+        // Calculate base movement
         const moveSpeed = unit.speed * deltaTime;
-        const moveX = (dx / distance) * moveSpeed;
-        const moveZ = (dz / distance) * moveSpeed;
+        let moveX = (dx / distance) * moveSpeed;
+        let moveZ = (dz / distance) * moveSpeed;
         
-        // Check for collision with other units
-        const newX = unit.position.x + moveX;
-        const newZ = unit.position.z + moveZ;
+        // Soft collision - push apart from other units instead of blocking
+        const gameState = getGameState();
+        const separationRadius = 1.2;
+        const pushStrength = 0.02;
         
-        const minSpacing = 1.0;
-        let blocked = false;
-        
-        for (const other of getGameState().units) {
+        for (const other of gameState.units) {
             if (other.id === unit.id) continue;
             
-            const odx = other.position.x - newX;
-            const odz = other.position.z - newZ;
-            const odist = Math.sqrt(odx*odx + odz*odz);
+            const odx = unit.position.x - other.position.x;
+            const odz = unit.position.z - other.position.z;
+            const odist = Math.sqrt(odx * odx + odz * odz);
             
-            if (odist < minSpacing) {
-                blocked = true;
-                break;
+            if (odist < separationRadius && odist > 0.01) {
+                // Push away from other unit
+                const pushForce = (separationRadius - odist) * pushStrength * deltaTime;
+                moveX += (odx / odist) * pushForce;
+                moveZ += (odz / odist) * pushForce;
             }
         }
         
-        if (!blocked) {
-            unit.position.x = newX;
-            unit.position.z = newZ;
+        // Apply movement
+        unit.position.x += moveX;
+        unit.position.z += moveZ;
+        
+        // Smoothly update sprite position (lerp for less flicker)
+        const lerpFactor = 0.3;
+        unit.sprite.position.x += (unit.position.x - unit.sprite.position.x) * lerpFactor;
+        unit.sprite.position.z += (unit.position.z - unit.sprite.position.z) * lerpFactor;
+        
+        // Update selection ring
+        if (unit.selectionRing) {
+            unit.selectionRing.position.x = unit.sprite.position.x;
+            unit.selectionRing.position.z = unit.sprite.position.z;
+        }
+    }
+    
+    // ============================================
+    // PATH VISUALIZATION
+    // ============================================
+    
+    function createPathLine(unit, path) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        
+        // Clear existing path line
+        clearPathLine(unit);
+        
+        if (!path || path.length < 2) return;
+        
+        // Create points for the line
+        const points = [];
+        points.push(new THREE.Vector3(unit.position.x, 0.2, unit.position.z));
+        
+        for (const point of path) {
+            points.push(new THREE.Vector3(point.x + 0.5, 0.2, point.z + 0.5));
+        }
+        
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ 
+            color: 0x7ddf64,
+            transparent: true,
+            opacity: 0.5,
+            linewidth: 2
+        });
+        
+        const line = new THREE.Line(geometry, material);
+        scene.add(line);
+        unit.pathLine = line;
+        
+        // Create destination marker
+        const lastPoint = path[path.length - 1];
+        const markerGeometry = new THREE.RingGeometry(0.8, 1.0, 16);
+        const markerMaterial = new THREE.MeshBasicMaterial({
+            color: 0x7ddf64,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.6
+        });
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.rotation.x = -Math.PI / 2;
+        marker.position.set(lastPoint.x + 0.5, 0.15, lastPoint.z + 0.5);
+        scene.add(marker);
+        unit.destinationMarker = marker;
+    }
+    
+    function clearPathLine(unit) {
+        const scene = getScene();
+        
+        if (unit.pathLine) {
+            scene.remove(unit.pathLine);
+            unit.pathLine.geometry.dispose();
+            unit.pathLine.material.dispose();
+            unit.pathLine = null;
+        }
+        
+        if (unit.destinationMarker) {
+            scene.remove(unit.destinationMarker);
+            unit.destinationMarker.geometry.dispose();
+            unit.destinationMarker.material.dispose();
+            unit.destinationMarker = null;
+        }
+    }
+    
+    // ============================================
+    // CLICK RIPPLE EFFECT
+    // ============================================
+    
+    let ripples = [];
+    
+    function createRipple(x, z) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        
+        const geometry = new THREE.RingGeometry(0.1, 0.3, 32);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x7ddf64,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const ripple = new THREE.Mesh(geometry, material);
+        ripple.rotation.x = -Math.PI / 2;
+        ripple.position.set(x, 0.2, z);
+        scene.add(ripple);
+        
+        ripples.push({
+            mesh: ripple,
+            startTime: Date.now(),
+            x: x,
+            z: z
+        });
+    }
+    
+    function updateRipples() {
+        const THREE = getTHREE();
+        const scene = getScene();
+        const now = Date.now();
+        
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            const ripple = ripples[i];
+            const age = now - ripple.startTime;
+            const maxAge = 600; // ms
             
-            // Update sprite
-            unit.sprite.position.x = unit.position.x;
-            unit.sprite.position.z = unit.position.z;
-            
-            // Update selection ring
-            if (unit.selectionRing) {
-                unit.selectionRing.position.x = unit.position.x;
-                unit.selectionRing.position.z = unit.position.z;
+            if (age >= maxAge) {
+                scene.remove(ripple.mesh);
+                ripple.mesh.geometry.dispose();
+                ripple.mesh.material.dispose();
+                ripples.splice(i, 1);
+            } else {
+                // Expand and fade
+                const progress = age / maxAge;
+                const scale = 1 + progress * 3;
+                ripple.mesh.scale.set(scale, scale, 1);
+                ripple.mesh.material.opacity = 0.8 * (1 - progress);
             }
         }
     }
     
     function commandMove(unit, targetX, targetZ) {
         const canFly = unit.typeData.canFly || false;
+        
+        // Create ripple at destination
+        createRipple(targetX, targetZ);
         
         const path = findPath(
             unit.position.x, unit.position.z,
@@ -1133,6 +1260,10 @@ window.GameUnits = (function() {
             unit.harvestMode = null; // Cancel auto-harvest when manually moving
             unit.targetTree = null;
             unit.targetBuilding = null;
+            
+            // Show path visualization
+            createPathLine(unit, path);
+            
             console.log(`Moving ${unit.typeData.name} to (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
         } else {
             console.log('No path found!');
@@ -1232,7 +1363,20 @@ window.GameUnits = (function() {
             if (unit.selectionRing && unit.selectionRing.visible) {
                 unit.selectionRing.material.opacity = 0.5 + Math.sin(now * 0.005) * 0.2;
             }
+            
+            // Fade path line over time
+            if (unit.pathLine && unit.pathLine.material) {
+                unit.pathLine.material.opacity = Math.max(0.2, unit.pathLine.material.opacity - 0.001);
+            }
+            if (unit.destinationMarker && unit.destinationMarker.material) {
+                // Pulse the destination marker
+                unit.destinationMarker.material.opacity = 0.4 + Math.sin(now * 0.008) * 0.2;
+                unit.destinationMarker.rotation.z += 0.02;
+            }
         }
+        
+        // Update ripple effects
+        updateRipples();
     }
     
     // ============================================
@@ -1257,6 +1401,7 @@ window.GameUnits = (function() {
         setCommandMode,
         getCommandMode,
         startHarvesting,
-        findPath
+        findPath,
+        createRipple
     };
 })();
