@@ -1,5 +1,5 @@
 // ============================================
-// UI MODULE - Enhanced with Unit Selection
+// UI MODULE - Enhanced with Multi-Select Support
 // ============================================
 
 window.GameUI = (function() {
@@ -51,7 +51,7 @@ window.GameUI = (function() {
             padding: 0;
             display: none;
             pointer-events: auto;
-            width: 260px;
+            width: 280px;
             z-index: 100;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             overflow: hidden;
@@ -118,74 +118,107 @@ window.GameUI = (function() {
     }
     
     // ============================================
-    // UNIT MENU
+    // UNIT MENU - NOW SUPPORTS MULTI-SELECT
     // ============================================
     
-    function showUnitMenu(unit) {
+    function showUnitMenu(units) {
         hideMenuVisuals();
         
-        const isWoodsman = unit.type === 'woodsman';
+        // Handle both single unit and array of units
+        if (!Array.isArray(units)) {
+            units = [units];
+        }
+        
+        if (units.length === 0) return;
+        
+        const firstUnit = units[0];
+        const unitCount = units.length;
+        const isMultiSelect = unitCount > 1;
+        const isWoodsman = firstUnit.type === 'woodsman';
         
         let statusInfo = '';
         
-        // Health bar
-        const healthPercent = (unit.health / unit.maxHealth) * 100;
-        statusInfo += `
-            <div style="margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span style="color: #8ab88a; font-size: 11px;">Health</span>
-                    <span style="color: #a8d5a2; font-size: 11px;">${Math.floor(unit.health)}/${unit.maxHealth}</span>
-                </div>
-                <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid #3a5a3a;">
-                    <div style="background: linear-gradient(90deg, #5a9a4a, #7ddf64); height: 100%; width: ${healthPercent}%;"></div>
-                </div>
-            </div>
-        `;
+        // Header showing selection count
+        const headerText = isMultiSelect 
+            ? `${firstUnit.typeData.name} ×${unitCount}`
+            : firstUnit.typeData.name;
         
-        // Woodsman inventory
-        if (isWoodsman) {
-            const carryPercent = ((unit.inventory.wood + unit.inventory.energy) / unit.carryCapacity) * 100;
+        // For single selection, show detailed status
+        if (!isMultiSelect) {
+            // Health bar
+            const healthPercent = (firstUnit.health / firstUnit.maxHealth) * 100;
             statusInfo += `
                 <div style="margin-bottom: 10px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                        <span style="color: #8ab88a; font-size: 11px;">Carrying</span>
-                        <span style="color: #a8d5a2; font-size: 11px;">
-                            🪵${unit.inventory.wood} ⚡${unit.inventory.energy} / ${unit.carryCapacity}
-                        </span>
+                        <span style="color: #8ab88a; font-size: 11px;">Health</span>
+                        <span style="color: #a8d5a2; font-size: 11px;">${Math.floor(firstUnit.health)}/${firstUnit.maxHealth}</span>
                     </div>
                     <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid #3a5a3a;">
-                        <div style="background: linear-gradient(90deg, #8B6914, #d4a84a); height: 100%; width: ${carryPercent}%;"></div>
+                        <div style="background: linear-gradient(90deg, #5a9a4a, #7ddf64); height: 100%; width: ${healthPercent}%;"></div>
                     </div>
                 </div>
             `;
             
-            // State info
-            let stateText = 'Idle';
-            let stateColor = '#8ab88a';
-            switch(unit.state) {
-                case 'harvesting':
-                    stateText = '🪓 Harvesting...';
-                    stateColor = '#d4a84a';
-                    break;
-                case 'moving':
-                    stateText = '🚶 Moving...';
-                    stateColor = '#7ddf64';
-                    break;
-                case 'returning':
-                    stateText = '📦 Returning to Sawmill...';
-                    stateColor = '#a8d5a2';
-                    break;
+            // Woodsman inventory
+            if (isWoodsman) {
+                const carryPercent = ((firstUnit.inventory.wood + firstUnit.inventory.energy) / firstUnit.carryCapacity) * 100;
+                statusInfo += `
+                    <div style="margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                            <span style="color: #8ab88a; font-size: 11px;">Carrying</span>
+                            <span style="color: #a8d5a2; font-size: 11px;">
+                                🪵${firstUnit.inventory.wood} ⚡${firstUnit.inventory.energy} / ${firstUnit.carryCapacity}
+                            </span>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid #3a5a3a;">
+                            <div style="background: linear-gradient(90deg, #8B6914, #d4a84a); height: 100%; width: ${carryPercent}%;"></div>
+                        </div>
+                    </div>
+                `;
+                
+                // State info
+                let stateText = 'Idle';
+                let stateColor = '#8ab88a';
+                switch(firstUnit.state) {
+                    case 'harvesting':
+                        stateText = '🪓 Harvesting...';
+                        stateColor = '#d4a84a';
+                        break;
+                    case 'moving':
+                        stateText = '🚶 Moving...';
+                        stateColor = '#7ddf64';
+                        break;
+                    case 'returning':
+                        stateText = '📦 Returning to Sawmill...';
+                        stateColor = '#a8d5a2';
+                        break;
+                }
+                
+                statusInfo += `
+                    <div style="
+                        background: rgba(0,0,0,0.2);
+                        border-radius: 6px;
+                        padding: 8px;
+                        margin-bottom: 10px;
+                        text-align: center;
+                    ">
+                        <span style="color: ${stateColor}; font-size: 12px;">${stateText}</span>
+                    </div>
+                `;
             }
-            
+        } else {
+            // Multi-select summary
             statusInfo += `
                 <div style="
-                    background: rgba(0,0,0,0.2);
+                    background: rgba(74, 156, 127, 0.2);
                     border-radius: 6px;
-                    padding: 8px;
+                    padding: 10px;
                     margin-bottom: 10px;
                     text-align: center;
                 ">
-                    <span style="color: ${stateColor}; font-size: 12px;">${stateText}</span>
+                    <span style="color: #7ddfb4; font-size: 12px;">
+                        ${unitCount} units selected
+                    </span>
                 </div>
             `;
         }
@@ -214,11 +247,13 @@ window.GameUI = (function() {
         `;
         
         if (isWoodsman) {
-            const harvestActive = unit.harvestMode === 'nearby';
+            // Check if any unit has harvest mode active
+            const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
+            
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
-                    background: ${harvestActive ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${harvestActive ? '#d4a84a' : '#4a7c3f'};
+                    background: ${anyHarvesting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyHarvesting ? '#d4a84a' : '#4a7c3f'};
                     border-radius: 6px;
                     color: #c8f0c8;
                     padding: 12px 16px;
@@ -232,12 +267,31 @@ window.GameUI = (function() {
                 ">
                     <span style="font-size: 18px;">🪓</span>
                     <span style="flex: 1; text-align: left;">Harvest Nearby</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${harvestActive ? 'ACTIVE' : 'Auto-chop'}</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyHarvesting ? 'ACTIVE' : 'Auto-chop'}</span>
                 </button>
             `;
         }
         
         commandsHtml += '</div>';
+        
+        // Select All Visible button
+        const selectAllBtn = `
+            <button id="select-all-visible-btn" style="
+                width: 100%;
+                background: rgba(74, 156, 127, 0.3);
+                border: 1px solid #4a9c7f;
+                border-radius: 6px;
+                color: #7ddfb4;
+                padding: 10px 16px;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 12px;
+                margin-top: 8px;
+                transition: all 0.15s ease;
+            ">
+                👁️ Select All Visible ${firstUnit.typeData.name}s
+            </button>
+        `;
         
         let html = `
             <div style="
@@ -246,12 +300,13 @@ window.GameUI = (function() {
                 border-bottom: 1px solid #4a9c7f;
             ">
                 <div style="color: #7ddfb4; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; text-align: center; font-weight: bold;">
-                    ${unit.typeData.name}
+                    ${headerText}
                 </div>
             </div>
             <div style="padding: 12px;">
                 ${statusInfo}
                 ${commandsHtml}
+                ${selectAllBtn}
             </div>
             <div style="
                 padding: 10px 12px;
@@ -269,7 +324,7 @@ window.GameUI = (function() {
                     font-family: inherit;
                     font-size: 13px;
                     transition: all 0.15s ease;
-                ">Deselect</button>
+                ">Deselect${isMultiSelect ? ' All' : ''}</button>
             </div>
         `;
         
@@ -284,56 +339,92 @@ window.GameUI = (function() {
                 if (!canClick()) return;
                 
                 const cmd = btn.dataset.cmd;
-                handleUnitCommand(unit, cmd);
+                handleUnitCommand(units, cmd);
             });
             
             btn.addEventListener('mouseenter', () => {
                 btn.style.background = 'rgba(74, 156, 127, 0.4)';
             });
             btn.addEventListener('mouseleave', () => {
-                if (btn.dataset.cmd === 'harvest' && unit.harvestMode === 'nearby') {
-                    btn.style.background = 'rgba(139, 105, 20, 0.4)';
+                if (btn.dataset.cmd === 'harvest') {
+                    const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
+                    btn.style.background = anyHarvesting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)';
                 } else {
                     btn.style.background = 'rgba(74, 124, 63, 0.3)';
                 }
             });
         });
         
-        // Close button
+        // Select All Visible button handler
+        const selectAllVisibleBtn = document.getElementById('select-all-visible-btn');
+        if (selectAllVisibleBtn) {
+            selectAllVisibleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!canClick()) return;
+                
+                if (window.GameUnits) {
+                    GameUnits.selectAllVisibleOfType(firstUnit.type);
+                }
+            });
+            
+            selectAllVisibleBtn.addEventListener('mouseenter', () => {
+                selectAllVisibleBtn.style.background = 'rgba(74, 156, 127, 0.5)';
+            });
+            selectAllVisibleBtn.addEventListener('mouseleave', () => {
+                selectAllVisibleBtn.style.background = 'rgba(74, 156, 127, 0.3)';
+            });
+        }
+        
+        // Close/Deselect button
         document.getElementById('unit-menu-close').addEventListener('click', (e) => {
             e.stopPropagation();
             if (canClick()) {
                 if (window.GameUnits) {
-                    GameUnits.deselectUnit();
+                    GameUnits.deselectAllUnits();
                 }
             }
         });
     }
     
-    function handleUnitCommand(unit, cmd) {
+    function handleUnitCommand(units, cmd) {
+        // Handle both single unit and array
+        if (!Array.isArray(units)) {
+            units = [units];
+        }
+        
         switch(cmd) {
             case 'move':
                 // Enter move mode
                 if (window.GameUnits) {
                     GameUnits.setCommandMode('move');
                 }
-                showCommandIndicator('Tap destination to move');
+                const moveText = units.length > 1 
+                    ? `Tap destination for ${units.length} units`
+                    : 'Tap destination to move';
+                showCommandIndicator(moveText);
                 hideMenuVisuals();
                 break;
                 
             case 'harvest':
-                // Toggle harvest mode
-                if (unit.harvestMode === 'nearby') {
-                    unit.harvestMode = null;
-                    unit.state = 'idle';
-                } else {
-                    unit.harvestMode = 'nearby';
-                    if (window.GameUnits) {
-                        GameUnits.startHarvesting(unit);
+                // Toggle harvest mode for all selected units
+                const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
+                
+                units.forEach(unit => {
+                    if (anyHarvesting) {
+                        // Turn off for all
+                        unit.harvestMode = null;
+                        unit.state = 'idle';
+                    } else {
+                        // Turn on for all
+                        unit.harvestMode = 'nearby';
+                        if (window.GameUnits) {
+                            GameUnits.startHarvesting(unit);
+                        }
                     }
-                }
+                });
+                
                 // Refresh menu
-                showUnitMenu(unit);
+                showUnitMenu(units);
                 break;
         }
     }
@@ -499,16 +590,85 @@ window.GameUI = (function() {
         let queueStatus = '';
         if (building.productionQueue.length > 0) {
             queueStatus = `
-                <div style="color: #8ab88a; font-size: 11px; margin-bottom: 8px;">
+                <div style="color: #7a9a7a; font-size: 11px; margin-bottom: 10px;">
                     Queue: ${building.productionQueue.length} unit(s)
                 </div>
             `;
         }
         
-        // Upgrades section for Lodge
-        let upgradesSection = '';
+        // Upgrade paths (for Lodge)
+        let upgradesHtml = '';
         if (building.typeData.id === 'lodge' && window.GameUnits) {
-            upgradesSection = createUpgradesSection(building, GameUnits.WOODSMAN_UPGRADES);
+            const upgrades = GameUnits.WOODSMAN_UPGRADES;
+            upgradesHtml = `
+                <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #3a5a3a;">
+                    <div style="color: #7ddf64; font-size: 12px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;">
+                        Woodsman Upgrades
+                    </div>
+            `;
+            
+            ['path1', 'path2', 'path3'].forEach((pathKey, pathIndex) => {
+                const path = upgrades[pathKey];
+                const currentLevel = building.upgrades[pathKey] || 0;
+                const nextLevel = path.levels[currentLevel];
+                
+                if (nextLevel) {
+                    const upgradeCosts = [
+                        { wood: 30, energy: 20 },
+                        { wood: 60, energy: 40 },
+                        { wood: 100, energy: 70 }
+                    ];
+                    const cost = upgradeCosts[currentLevel];
+                    const canAfford = gameState.resources.wood >= cost.wood && gameState.resources.energy >= cost.energy;
+                    
+                    upgradesHtml += `
+                        <div class="upgrade-btn" data-path="${pathKey}" data-affordable="${canAfford}" style="
+                            background: rgba(74, 124, 63, 0.2);
+                            border: 1px solid ${canAfford ? '#4a7c3f' : '#3a5a3a'};
+                            border-radius: 6px;
+                            padding: 10px;
+                            margin-bottom: 8px;
+                            cursor: ${canAfford ? 'pointer' : 'not-allowed'};
+                            opacity: ${canAfford ? '1' : '0.6'};
+                            transition: all 0.15s ease;
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="color: #c8f0c8; font-size: 12px; font-weight: bold;">
+                                        ${nextLevel.name}
+                                    </div>
+                                    <div style="color: #8ab88a; font-size: 10px; margin-top: 2px;">
+                                        ${nextLevel.description}
+                                    </div>
+                                </div>
+                                <div style="text-align: right; color: #a8d5a2; font-size: 10px;">
+                                    🪵${cost.wood}<br>⚡${cost.energy}
+                                </div>
+                            </div>
+                            <div style="color: #5a8a5a; font-size: 9px; margin-top: 4px;">
+                                ${path.name} Level ${currentLevel + 1}/3
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    upgradesHtml += `
+                        <div style="
+                            background: rgba(74, 124, 63, 0.1);
+                            border: 1px solid #3a5a3a;
+                            border-radius: 6px;
+                            padding: 10px;
+                            margin-bottom: 8px;
+                            opacity: 0.5;
+                        ">
+                            <div style="color: #7ddf64; font-size: 12px;">
+                                ✓ ${path.name} MAXED
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            upgradesHtml += '</div>';
         }
         
         let html = `
@@ -521,29 +681,31 @@ window.GameUI = (function() {
                     ${building.typeData.name}
                 </div>
             </div>
-            <div style="padding: 12px; overflow-y: auto; max-height: calc(55vh - 100px);">
+            <div style="padding: 12px; max-height: 45vh; overflow-y: auto;">
                 ${productionStatus}
                 ${queueStatus}
                 
-                <div class="train-btn" style="
-                    background: ${canAffordUnit ? 'rgba(74, 124, 63, 0.25)' : 'rgba(60, 60, 60, 0.25)'};
+                <button id="train-unit-btn" data-building-id="${building.id}" style="
+                    width: 100%;
+                    background: ${canAffordUnit ? 'rgba(74, 124, 63, 0.4)' : 'rgba(60, 60, 60, 0.4)'};
                     border: 1px solid ${canAffordUnit ? '#4a7c3f' : '#4a4a4a'};
-                    border-radius: 8px;
-                    padding: 12px;
-                    margin-bottom: 10px;
+                    border-radius: 6px;
+                    color: ${canAffordUnit ? '#c8f0c8' : '#8a8a8a'};
+                    padding: 12px 16px;
                     cursor: ${canAffordUnit ? 'pointer' : 'not-allowed'};
-                    opacity: ${canAffordUnit ? '1' : '0.5'};
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                     transition: all 0.15s ease;
+                    opacity: ${canAffordUnit ? '1' : '0.6'};
                 ">
-                    <div style="color: #c8f0c8; font-weight: bold; margin-bottom: 4px; font-size: 14px;">
-                        Train ${building.typeData.unitType}
-                    </div>
-                    <div style="color: #a8d5a2; font-size: 12px;">
-                        ⚡ ${building.typeData.unitCost.energy}
-                    </div>
-                </div>
+                    <span>Train ${building.typeData.unitType}</span>
+                    <span>⚡ ${building.typeData.unitCost.energy}</span>
+                </button>
                 
-                ${upgradesSection}
+                ${upgradesHtml}
             </div>
             <div style="
                 padding: 10px 12px;
@@ -560,7 +722,6 @@ window.GameUI = (function() {
                     cursor: pointer;
                     font-family: inherit;
                     font-size: 13px;
-                    transition: all 0.15s ease;
                 ">Close</button>
             </div>
         `;
@@ -569,9 +730,9 @@ window.GameUI = (function() {
         menuContainer.style.display = 'flex';
         menuOpenTime = Date.now();
         
-        // Train button handler
-        const trainBtn = menuContainer.querySelector('.train-btn');
-        if (trainBtn && canAffordUnit) {
+        // Train button
+        const trainBtn = document.getElementById('train-unit-btn');
+        if (canAffordUnit) {
             trainBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (canClick()) {
@@ -579,22 +740,29 @@ window.GameUI = (function() {
                 }
             });
             trainBtn.addEventListener('mouseenter', () => {
-                trainBtn.style.background = 'rgba(74, 124, 63, 0.45)';
+                trainBtn.style.background = 'rgba(74, 124, 63, 0.6)';
             });
             trainBtn.addEventListener('mouseleave', () => {
-                trainBtn.style.background = 'rgba(74, 124, 63, 0.25)';
+                trainBtn.style.background = 'rgba(74, 124, 63, 0.4)';
             });
         }
         
-        // Upgrade button handlers
+        // Upgrade buttons
         menuContainer.querySelectorAll('.upgrade-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!canClick()) return;
-                
-                const path = btn.dataset.path;
-                purchaseUpgrade(building, path);
-            });
+            if (btn.dataset.affordable === 'true') {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (canClick()) {
+                        purchaseUpgrade(building, btn.dataset.path);
+                    }
+                });
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = 'rgba(74, 124, 63, 0.4)';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'rgba(74, 124, 63, 0.2)';
+                });
+            }
         });
         
         // Close button
@@ -606,113 +774,10 @@ window.GameUI = (function() {
         });
     }
     
-    function createUpgradesSection(building, upgradeDefinitions) {
-        const gameState = window.GameEngine.gameState;
-        
-        let html = `
-            <div style="
-                margin-top: 12px;
-                padding-top: 12px;
-                border-top: 1px solid rgba(74, 124, 63, 0.5);
-            ">
-                <div style="color: #7ddf64; font-size: 12px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;">
-                    Upgrades (apply to new units)
-                </div>
-        `;
-        
-        const upgradeCosts = [
-            { wood: 30, energy: 20 },
-            { wood: 60, energy: 40 },
-            { wood: 100, energy: 70 }
-        ];
-        
-        for (const [pathKey, pathData] of Object.entries(upgradeDefinitions)) {
-            const currentLevel = building.upgrades[pathKey] || 0;
-            const nextLevel = currentLevel + 1;
-            const isMaxed = currentLevel >= 3;
-            
-            let upgradeInfo = '';
-            let canAfford = false;
-            let cost = { wood: 0, energy: 0 };
-            
-            if (!isMaxed) {
-                const levelData = pathData.levels[currentLevel];
-                cost = upgradeCosts[currentLevel];
-                canAfford = gameState.resources.wood >= cost.wood && 
-                           gameState.resources.energy >= cost.energy;
-                
-                upgradeInfo = `
-                    <div style="color: #a8d5a2; font-size: 11px; margin-bottom: 6px;">
-                        Next: ${levelData.name}
-                    </div>
-                    <div style="color: #8ab88a; font-size: 10px; margin-bottom: 6px;">
-                        ${levelData.description}
-                    </div>
-                    <div style="color: #7a9a7a; font-size: 10px;">
-                        🪵 ${cost.wood} ⚡ ${cost.energy}
-                    </div>
-                `;
-            } else {
-                upgradeInfo = `
-                    <div style="color: #7ddf64; font-size: 11px;">
-                        ✓ MAXED
-                    </div>
-                `;
-            }
-            
-            // Show current upgrades
-            let levelDots = '';
-            for (let i = 0; i < 3; i++) {
-                const filled = i < currentLevel;
-                levelDots += `<span style="
-                    display: inline-block;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: ${filled ? '#7ddf64' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${filled ? '#5a9c4a' : '#4a7c3f'};
-                    margin-right: 4px;
-                "></span>`;
-            }
-            
-            html += `
-                <div style="
-                    background: rgba(0, 0, 0, 0.2);
-                    border-radius: 6px;
-                    padding: 10px;
-                    margin-bottom: 8px;
-                ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="color: #c8f0c8; font-size: 12px; font-weight: bold;">${pathData.name}</span>
-                        <span>${levelDots}</span>
-                    </div>
-                    ${upgradeInfo}
-                    ${!isMaxed ? `
-                        <button class="upgrade-btn" data-path="${pathKey}" style="
-                            margin-top: 8px;
-                            width: 100%;
-                            background: ${canAfford ? 'rgba(74, 124, 63, 0.4)' : 'rgba(60, 60, 60, 0.3)'};
-                            border: 1px solid ${canAfford ? '#4a7c3f' : '#4a4a4a'};
-                            border-radius: 4px;
-                            color: ${canAfford ? '#c8f0c8' : '#8a8a8a'};
-                            padding: 6px 10px;
-                            cursor: ${canAfford ? 'pointer' : 'not-allowed'};
-                            font-family: inherit;
-                            font-size: 11px;
-                        ">Upgrade</button>
-                    ` : ''}
-                </div>
-            `;
-        }
-        
-        html += '</div>';
-        return html;
-    }
-    
     function purchaseUpgrade(building, pathKey) {
         const gameState = window.GameEngine.gameState;
-        
         const currentLevel = building.upgrades[pathKey] || 0;
+        
         if (currentLevel >= 3) return;
         
         const upgradeCosts = [
@@ -927,6 +992,7 @@ window.GameUI = (function() {
         showCommandIndicator,
         hideCommandIndicator,
         hideMenus,
+        hideMenuVisuals,
         buildBuilding,
         trainUnit,
         updateResources
