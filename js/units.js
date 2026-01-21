@@ -939,10 +939,10 @@ window.GameUnits = (function() {
             // Remove tree from grid
             gameState.grid[treeX][treeZ] = CELL.EMPTY;
             
-            // Remove tree sprite from scene
+            // Remove tree sprite from scene (use userData for accurate grid matching)
             const treeIndex = gameState.trees.findIndex(t => 
-                Math.floor(t.position.x) === treeX && 
-                Math.floor(t.position.z) === treeZ
+                t.userData.gridX === treeX && 
+                t.userData.gridZ === treeZ
             );
             if (treeIndex !== -1) {
                 const treeSprite = gameState.trees[treeIndex];
