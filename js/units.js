@@ -1,5 +1,5 @@
 // ============================================
-// UNITS MODULE - Enhanced with Multi-Select
+// UNITS MODULE - Phase 1: Fixed Path Cutting, Preview, Combat
 // ============================================
 
 window.GameUnits = (function() {
@@ -14,11 +14,15 @@ window.GameUnits = (function() {
     const getCELL = () => window.GameEngine?.CELL;
     
     let lastTime = Date.now();
-    let selectedUnits = []; // Changed from single selectedUnit to array
-    let commandMode = null; // null, 'move', 'harvest_target'
+    let selectedUnits = []; // Array for multi-select
+    let commandMode = null; // null, 'move', 'cutPath', 'cutLane'
     
     // Track claimed trees to prevent multiple woodsmen targeting same tree
     let claimedTrees = new Map(); // key: "x,z" -> unit.id
+    
+    // Corridor preview markers
+    let corridorPreviewMarkers = [];
+    let previewCorridorData = null; // { startX, startZ, endX, endZ, width }
     
     // Unit definitions
     const UNIT_TYPES = {
@@ -215,14 +219,8 @@ window.GameUnits = (function() {
                 continue;
             }
             
-            // Check for other units (soft collision)
-            const hasUnit = gameState.units.some(u => 
-                Math.floor(u.position.x) === nx && Math.floor(u.position.z) === nz
-            );
-            
-            // Slightly penalize cells with units but don't block
-            const cost = hasUnit ? 1.5 : 1;
-            neighbors.push({ x: nx, z: nz, cost });
+            // Empty cells are walkable with cost 1
+            neighbors.push({ x: nx, z: nz, cost: 1 });
         }
         
         return neighbors;
@@ -301,6 +299,39 @@ window.GameUnits = (function() {
         }
         
         return null; // No path at all
+    }
+    
+    // Check if a cell is adjacent to an empty/walkable cell
+    function isTreeReachable(treeX, treeZ) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        
+        const directions = [
+            { dx: 1, dz: 0 }, { dx: -1, dz: 0 },
+            { dx: 0, dz: 1 }, { dx: 0, dz: -1 },
+            { dx: 1, dz: 1 }, { dx: -1, dz: 1 },
+            { dx: 1, dz: -1 }, { dx: -1, dz: -1 }
+        ];
+        
+        for (const dir of directions) {
+            const nx = treeX + dir.dx;
+            const nz = treeZ + dir.dz;
+            
+            if (nx < 0 || nx >= CONFIG.GRID_WIDTH || nz < 0 || nz >= CONFIG.GRID_HEIGHT) {
+                continue;
+            }
+            
+            const cell = gameState.grid[nx]?.[nz];
+            const isTree = cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY;
+            
+            if (!isTree) {
+                // This tree is adjacent to an empty cell - it's reachable
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     // ============================================
@@ -612,7 +643,7 @@ window.GameUnits = (function() {
     // UNIT SPAWNING
     // ============================================
     
-    function spawnUnit(unitTypeId, position, upgrades = { path1: 0, path2: 0, path3: 0 }) {
+    function spawnUnit(unitTypeId, position, upgrades = { path1: 0, path2: 0, path3: 0 }, owner = 'player') {
         const THREE = getTHREE();
         const scene = getScene();
         const gameState = getGameState();
@@ -677,7 +708,7 @@ window.GameUnits = (function() {
             carryCapacity: stats.carryCapacity,
             lastAttackTime: 0,
             state: 'idle', // idle, moving, harvesting, returning, attacking
-            owner: 'player',
+            owner: owner,
             upgrades: { ...upgrades },
             
             // Woodsman specific
@@ -687,8 +718,15 @@ window.GameUnits = (function() {
             },
             targetTree: null,
             harvestProgress: 0,
-            harvestMode: unitType.canHarvest ? 'nearby' : null, // 'nearby', 'laneway', 'pathway', 'manual'
+            harvestMode: unitType.canHarvest ? 'nearby' : null, // 'nearby', 'cutPath', 'cutLane', 'manual'
             chopCount: 0, // For rhythm upgrade
+            
+            // Corridor cutting specific
+            corridorTarget: null,
+            corridorWidth: 0,
+            
+            // Combat
+            attackTarget: null,
             
             // Special abilities from upgrades
             hasForestWalk: stats.forestWalk || false,
@@ -701,7 +739,7 @@ window.GameUnits = (function() {
         // Create selection ring (hidden by default)
         const ringGeometry = new THREE.RingGeometry(1.2, 1.5, 32);
         const ringMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00ff00, 
+            color: owner === 'player' ? 0x00ff00 : 0xff0000, 
             side: THREE.DoubleSide,
             transparent: true,
             opacity: 0.7
@@ -714,10 +752,10 @@ window.GameUnits = (function() {
         unit.selectionRing = selectionRing;
         
         gameState.units.push(unit);
-        console.log(`Spawned ${unitType.name} at (${spawnX.toFixed(1)}, ${spawnZ.toFixed(1)})`);
+        console.log(`Spawned ${unitType.name} (${owner}) at (${spawnX.toFixed(1)}, ${spawnZ.toFixed(1)})`);
         
         // Auto-start harvesting if woodsman
-        if (unitType.canHarvest) {
+        if (unitType.canHarvest && owner === 'player') {
             unit.state = 'idle';
             startHarvesting(unit);
         }
@@ -778,6 +816,137 @@ window.GameUnits = (function() {
     }
     
     // ============================================
+    // COMBAT SYSTEM
+    // ============================================
+    
+    function findNearestEnemy(unit) {
+        const gameState = getGameState();
+        
+        let nearestEnemy = null;
+        let nearestDist = Infinity;
+        
+        for (const other of gameState.units) {
+            if (other.owner === unit.owner) continue; // Same team
+            if (other.health <= 0) continue; // Dead
+            
+            const dx = other.position.x - unit.position.x;
+            const dz = other.position.z - unit.position.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+            
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestEnemy = other;
+            }
+        }
+        
+        return { enemy: nearestEnemy, distance: nearestDist };
+    }
+    
+    function updateCombat(unit, deltaTime) {
+        const now = Date.now();
+        
+        // Find nearest enemy
+        const { enemy, distance } = findNearestEnemy(unit);
+        
+        if (!enemy || distance > unit.attackRange) {
+            // No enemy in range - clear attack target
+            unit.attackTarget = null;
+            return false; // Not in combat
+        }
+        
+        // Enemy in range! Enter combat
+        unit.attackTarget = enemy;
+        unit.state = 'attacking';
+        
+        // Check attack cooldown
+        if (now - unit.lastAttackTime >= unit.attackSpeed) {
+            // Attack!
+            unit.lastAttackTime = now;
+            
+            // Deal damage
+            enemy.health -= unit.damage;
+            console.log(`${unit.type} dealt ${unit.damage} damage to ${enemy.type}. Enemy HP: ${enemy.health.toFixed(0)}`);
+            
+            // Check if enemy died
+            if (enemy.health <= 0) {
+                killUnit(enemy);
+                unit.attackTarget = null;
+                return false; // Combat ended
+            }
+        }
+        
+        return true; // Still in combat
+    }
+    
+    function killUnit(unit) {
+        const gameState = getGameState();
+        const scene = getScene();
+        const THREE = getTHREE();
+        
+        console.log(`${unit.type} (${unit.owner}) was killed!`);
+        
+        // Create death effect (red splotch that fades)
+        const splotchGeometry = new THREE.CircleGeometry(1.5, 16);
+        const splotchMaterial = new THREE.MeshBasicMaterial({
+            color: 0x8b0000,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide
+        });
+        const splotch = new THREE.Mesh(splotchGeometry, splotchMaterial);
+        splotch.rotation.x = -Math.PI / 2;
+        splotch.position.set(unit.position.x, 0.05, unit.position.z);
+        scene.add(splotch);
+        
+        // Fade out the splotch over 3 seconds
+        const fadeStart = Date.now();
+        const fadeDuration = 3000;
+        
+        function fadeSplotch() {
+            const elapsed = Date.now() - fadeStart;
+            const progress = elapsed / fadeDuration;
+            
+            if (progress >= 1) {
+                scene.remove(splotch);
+                splotchGeometry.dispose();
+                splotchMaterial.dispose();
+                return;
+            }
+            
+            splotchMaterial.opacity = 0.7 * (1 - progress);
+            requestAnimationFrame(fadeSplotch);
+        }
+        fadeSplotch();
+        
+        // Remove unit from game
+        scene.remove(unit.sprite);
+        if (unit.selectionRing) {
+            scene.remove(unit.selectionRing);
+        }
+        if (unit.pathLine) {
+            scene.remove(unit.pathLine);
+        }
+        if (unit.destinationMarker) {
+            scene.remove(unit.destinationMarker);
+        }
+        
+        // Remove from selected units if selected
+        const selectedIndex = selectedUnits.indexOf(unit);
+        if (selectedIndex !== -1) {
+            selectedUnits.splice(selectedIndex, 1);
+        }
+        
+        // Release any tree claims
+        releaseTreeClaim(unit);
+        
+        // Remove from gameState
+        const unitIndex = gameState.units.indexOf(unit);
+        if (unitIndex !== -1) {
+            gameState.units.splice(unitIndex, 1);
+        }
+    }
+    
+    // ============================================
     // HARVESTING SYSTEM
     // ============================================
     
@@ -809,6 +978,11 @@ window.GameUnits = (function() {
                         if (claimedBy && claimedBy !== unit.id) {
                             continue; // Skip trees claimed by other units
                         }
+                    }
+                    
+                    // Check if tree is reachable (adjacent to empty cell)
+                    if (!isTreeReachable(x, z)) {
+                        continue;
                     }
                     
                     const dist = Math.sqrt(dx*dx + dz*dz);
@@ -875,7 +1049,7 @@ window.GameUnits = (function() {
             return;
         }
         
-        // Find nearest unclaimed tree
+        // Find nearest unclaimed AND reachable tree
         const tree = findNearestTree(unit, true);
         if (!tree) {
             unit.state = 'idle';
@@ -885,7 +1059,7 @@ window.GameUnits = (function() {
         // Claim this tree
         claimTree(unit, tree);
         
-        // Path to tree
+        // Path to tree (path to adjacent cell, not the tree itself)
         unit.targetTree = tree;
         const path = findPath(
             unit.position.x, unit.position.z,
@@ -904,7 +1078,7 @@ window.GameUnits = (function() {
     }
     
     // ============================================
-    // CUT PATH / LANE SYSTEM
+    // CUT PATH / LANE SYSTEM - FIXED
     // ============================================
     
     function startCuttingCorridor(unit, targetX, targetZ, width) {
@@ -954,8 +1128,8 @@ window.GameUnits = (function() {
             return;
         }
         
-        // Find the next tree blocking the corridor
-        const blockingTree = findNextCorridorTree(unit);
+        // Find the next REACHABLE tree in the corridor (key fix!)
+        const blockingTree = findNextReachableCorridorTree(unit);
         
         if (blockingTree) {
             // Claim and path to this tree
@@ -972,17 +1146,35 @@ window.GameUnits = (function() {
                 unit.path = path;
                 unit.pathIndex = 0;
                 unit.state = 'moving';
+                createPathLine(unit, path);
             } else {
-                // Can't reach tree, try moving closer to target first
-                moveCloserToCorridorTarget(unit);
+                // Can't reach this tree (shouldn't happen with new logic)
+                releaseTreeClaim(unit);
+                unit.state = 'idle';
             }
         } else {
-            // No blocking trees found, move toward target
-            moveCloserToCorridorTarget(unit);
+            // No blocking trees found - try to move closer to target
+            const path = findPath(
+                unit.position.x, unit.position.z,
+                unit.corridorTarget.x, unit.corridorTarget.z,
+                false, unit.hasForestWalk
+            );
+            
+            if (path && path.length > 0) {
+                unit.path = path;
+                unit.pathIndex = 0;
+                unit.state = 'moving';
+                unit.targetTree = null;
+                createPathLine(unit, path);
+            } else {
+                // Can't path to target, wait and try again
+                unit.state = 'idle';
+            }
         }
     }
     
-    function findNextCorridorTree(unit) {
+    // NEW: Find corridor trees that are actually reachable (adjacent to empty cells)
+    function findNextReachableCorridorTree(unit) {
         const gameState = getGameState();
         const CELL = getCELL();
         const CONFIG = getCONFIG();
@@ -1013,11 +1205,13 @@ window.GameUnits = (function() {
         let nearestTree = null;
         let nearestDist = Infinity;
         
-        // Search along the corridor
-        const searchLength = Math.min(length, 30); // Look ahead up to 30 units
+        // Search the entire corridor for REACHABLE trees
         const halfWidth = width / 2;
         
-        for (let along = 0; along <= searchLength; along += 0.5) {
+        // Build a set of all trees in the corridor
+        const corridorTrees = [];
+        
+        for (let along = 0; along <= length; along += 0.5) {
             for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
                 const checkX = Math.floor(startX + dirX * along + perpX * across);
                 const checkZ = Math.floor(startZ + dirZ * along + perpZ * across);
@@ -1036,42 +1230,73 @@ window.GameUnits = (function() {
                         continue;
                     }
                     
-                    // Calculate distance from unit
-                    const treeDx = checkX - unit.position.x;
-                    const treeDz = checkZ - unit.position.z;
-                    const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
-                    
-                    // Prefer trees closer to the unit (not necessarily closest to start)
-                    if (dist < nearestDist) {
-                        nearestDist = dist;
-                        nearestTree = { x: checkX, z: checkZ, type: cell };
+                    // Only consider trees that are REACHABLE (adjacent to empty cell)
+                    if (!isTreeReachable(checkX, checkZ)) {
+                        continue;
                     }
+                    
+                    corridorTrees.push({ x: checkX, z: checkZ, type: cell });
                 }
+            }
+        }
+        
+        // Find the closest reachable tree to the unit
+        for (const tree of corridorTrees) {
+            const treeDx = tree.x - unit.position.x;
+            const treeDz = tree.z - unit.position.z;
+            const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
+            
+            if (dist < nearestDist) {
+                nearestDist = dist;
+                nearestTree = tree;
             }
         }
         
         return nearestTree;
     }
     
-    function moveCloserToCorridorTarget(unit) {
-        if (!unit.corridorTarget) return;
+    // Get all trees in a corridor (for preview)
+    function getCorridorTrees(startX, startZ, endX, endZ, width) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
         
-        // Try to path toward the target
-        const path = findPath(
-            unit.position.x, unit.position.z,
-            unit.corridorTarget.x, unit.corridorTarget.z,
-            false, unit.hasForestWalk
-        );
+        const dx = endX - startX;
+        const dz = endZ - startZ;
+        const length = Math.sqrt(dx * dx + dz * dz);
         
-        if (path && path.length > 0) {
-            unit.path = path;
-            unit.pathIndex = 0;
-            unit.state = 'moving';
-            unit.targetTree = null;
-        } else {
-            // Can't path at all, go idle briefly then retry
-            unit.state = 'idle';
+        if (length < 1) return [];
+        
+        const dirX = dx / length;
+        const dirZ = dz / length;
+        const perpX = -dirZ;
+        const perpZ = dirX;
+        const halfWidth = width / 2;
+        
+        const trees = [];
+        const seen = new Set();
+        
+        for (let along = 0; along <= length; along += 0.5) {
+            for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
+                const checkX = Math.floor(startX + dirX * along + perpX * across);
+                const checkZ = Math.floor(startZ + dirZ * along + perpZ * across);
+                
+                const key = `${checkX},${checkZ}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                
+                if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) {
+                    continue;
+                }
+                
+                const cell = gameState.grid[checkX]?.[checkZ];
+                if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                    trees.push({ x: checkX, z: checkZ, type: cell });
+                }
+            }
         }
+        
+        return trees;
     }
     
     function commandCutCorridor(units, targetX, targetZ, width) {
@@ -1081,6 +1306,9 @@ window.GameUnits = (function() {
         
         // Create ripple at destination
         createRipple(targetX, targetZ);
+        
+        // Clear any preview
+        clearCorridorPreview();
         
         if (units.length === 1) {
             // Single unit cuts the corridor
@@ -1125,12 +1353,97 @@ window.GameUnits = (function() {
         console.log(`${units.length} unit(s) cutting ${width === 2 ? 'path' : 'lane'} to (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
     }
     
+    // ============================================
+    // CORRIDOR PREVIEW SYSTEM
+    // ============================================
+    
+    function showCorridorPreview(startX, startZ, endX, endZ, width) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        
+        // Clear existing preview
+        clearCorridorPreview();
+        
+        // Store preview data
+        previewCorridorData = { startX, startZ, endX, endZ, width };
+        
+        // Get all trees in the corridor
+        const trees = getCorridorTrees(startX, startZ, endX, endZ, width);
+        
+        // Create markers for each tree
+        for (const tree of trees) {
+            const markerGeometry = new THREE.CircleGeometry(0.6, 8);
+            const markerMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffaa00,
+                transparent: true,
+                opacity: 0.7,
+                side: THREE.DoubleSide
+            });
+            const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+            marker.rotation.x = -Math.PI / 2;
+            marker.position.set(tree.x + 0.5, 0.3, tree.z + 0.5);
+            scene.add(marker);
+            corridorPreviewMarkers.push(marker);
+        }
+        
+        // Also show destination marker
+        const destGeometry = new THREE.RingGeometry(0.8, 1.2, 16);
+        const destMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        const destMarker = new THREE.Mesh(destGeometry, destMaterial);
+        destMarker.rotation.x = -Math.PI / 2;
+        destMarker.position.set(endX, 0.2, endZ);
+        scene.add(destMarker);
+        corridorPreviewMarkers.push(destMarker);
+    }
+    
+    function clearCorridorPreview() {
+        const scene = getScene();
+        
+        for (const marker of corridorPreviewMarkers) {
+            scene.remove(marker);
+            marker.geometry.dispose();
+            marker.material.dispose();
+        }
+        corridorPreviewMarkers = [];
+        previewCorridorData = null;
+    }
+    
+    function updateCorridorPreview(targetX, targetZ) {
+        if (!commandMode || (commandMode !== 'cutPath' && commandMode !== 'cutLane')) {
+            return;
+        }
+        
+        if (selectedUnits.length === 0) {
+            return;
+        }
+        
+        // Use first selected unit's position as start
+        const unit = selectedUnits[0];
+        const width = commandMode === 'cutPath' ? 2 : 4;
+        
+        showCorridorPreview(unit.position.x, unit.position.z, targetX, targetZ, width);
+    }
+    
+    // ============================================
+    // HARVESTING TREE
+    // ============================================
+    
     function harvestTree(unit, deltaTime) {
         const gameState = getGameState();
         const CELL = getCELL();
         
         if (!unit.targetTree) {
-            startHarvesting(unit);
+            // Continue with appropriate mode
+            if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
+                continueCuttingCorridor(unit);
+            } else {
+                startHarvesting(unit);
+            }
             return;
         }
         
@@ -1240,7 +1553,6 @@ window.GameUnits = (function() {
     function damageAdjacentTrees(x, z) {
         // Placeholder for Clear Cutter upgrade
         // Could partially damage adjacent trees or instant-kill them
-        // For now, just log
         console.log('Clear Cutter activated at', x, z);
     }
     
@@ -1268,6 +1580,7 @@ window.GameUnits = (function() {
             unit.pathIndex = 0;
             unit.state = 'returning';
             unit.targetBuilding = sawmill;
+            createPathLine(unit, path);
         } else {
             // Can't reach sawmill
             unit.state = 'idle';
@@ -1306,7 +1619,7 @@ window.GameUnits = (function() {
     }
     
     // ============================================
-    // MOVEMENT
+    // MOVEMENT - REDUCED COLLISION
     // ============================================
     
     function moveUnit(unit, deltaTime) {
@@ -1354,13 +1667,14 @@ window.GameUnits = (function() {
         let moveX = (dx / distance) * moveSpeed;
         let moveZ = (dz / distance) * moveSpeed;
         
-        // Soft collision - gentler push to avoid jittering
+        // REDUCED soft collision - only very gentle push when extremely close
         const gameState = getGameState();
-        const separationRadius = 1.0;
-        const pushStrength = 0.008; // Reduced from 0.02
+        const separationRadius = 0.5; // Much smaller
+        const pushStrength = 0.001; // Much weaker
         
         let pushX = 0;
         let pushZ = 0;
+        let nearbyCount = 0;
         
         for (const other of gameState.units) {
             if (other.id === unit.id) continue;
@@ -1370,22 +1684,21 @@ window.GameUnits = (function() {
             const odist = Math.sqrt(odx * odx + odz * odz);
             
             if (odist < separationRadius && odist > 0.1) {
-                // Accumulate push forces
-                const pushForce = (separationRadius - odist) * pushStrength * deltaTime;
-                pushX += (odx / odist) * pushForce;
-                pushZ += (odz / odist) * pushForce;
+                nearbyCount++;
+                // Only apply push if many units stacking (5+)
+                if (nearbyCount >= 5) {
+                    const pushForce = (separationRadius - odist) * pushStrength * deltaTime;
+                    pushX += (odx / odist) * pushForce;
+                    pushZ += (odz / odist) * pushForce;
+                }
             }
         }
         
-        // Apply movement with push (clamped to avoid overshooting)
-        const maxPush = moveSpeed * 0.5;
-        pushX = Math.max(-maxPush, Math.min(maxPush, pushX));
-        pushZ = Math.max(-maxPush, Math.min(maxPush, pushZ));
-        
+        // Apply movement with minimal push
         unit.position.x += moveX + pushX;
         unit.position.z += moveZ + pushZ;
         
-        // Direct sprite position update (no lerp jitter)
+        // Direct sprite position update
         unit.sprite.position.x = unit.position.x;
         unit.sprite.position.z = unit.position.z;
         
@@ -1543,6 +1856,7 @@ window.GameUnits = (function() {
             unit.pathIndex = 0;
             unit.state = 'moving';
             unit.harvestMode = null; // Cancel auto-harvest when manually moving
+            unit.corridorTarget = null;
             unit.targetTree = null;
             unit.targetBuilding = null;
             
@@ -1598,6 +1912,7 @@ window.GameUnits = (function() {
                 unit.pathIndex = 0;
                 unit.state = 'moving';
                 unit.harvestMode = null;
+                unit.corridorTarget = null;
                 unit.targetTree = null;
                 unit.targetBuilding = null;
                 
@@ -1703,6 +2018,9 @@ window.GameUnits = (function() {
         selectedUnits = [];
         commandMode = null;
         
+        // Clear any preview
+        clearCorridorPreview();
+        
         if (window.GameUI) {
             GameUI.hideMenus();
         }
@@ -1719,6 +2037,11 @@ window.GameUnits = (function() {
     
     function setCommandMode(mode) {
         commandMode = mode;
+        
+        // Clear preview if leaving corridor modes
+        if (mode !== 'cutPath' && mode !== 'cutLane') {
+            clearCorridorPreview();
+        }
     }
     
     function getCommandMode() {
@@ -1752,6 +2075,15 @@ window.GameUnits = (function() {
         
         // Update units
         for (const unit of gameState.units) {
+            // Priority 1: Combat check (auto-attack enemies in range)
+            const inCombat = updateCombat(unit, deltaTime);
+            
+            if (inCombat) {
+                // In combat - don't do other actions
+                continue;
+            }
+            
+            // Priority 2: Normal behavior
             switch (unit.state) {
                 case 'moving':
                 case 'returning':
@@ -1760,10 +2092,25 @@ window.GameUnits = (function() {
                 case 'harvesting':
                     harvestTree(unit, deltaTime);
                     break;
+                case 'attacking':
+                    // No longer attacking (combat ended)
+                    // Return to previous activity
+                    if (unit.harvestMode && unit.typeData.canHarvest) {
+                        if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
+                            continueCuttingCorridor(unit);
+                        } else {
+                            startHarvesting(unit);
+                        }
+                    } else {
+                        unit.state = 'idle';
+                    }
+                    break;
                 case 'idle':
                     // Auto-resume harvesting if in harvest mode
                     if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
                         startHarvesting(unit);
+                    } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
+                        continueCuttingCorridor(unit);
                     }
                     break;
             }
@@ -1771,8 +2118,10 @@ window.GameUnits = (function() {
             // Idle animation - slight bob
             if (unit.sprite) {
                 const baseY = 2.25;
-                const bobAmount = unit.state === 'harvesting' ? 0.2 : 0.1;
-                const bobSpeed = unit.state === 'harvesting' ? 0.01 : 0.003;
+                const bobAmount = unit.state === 'harvesting' ? 0.2 : 
+                                 unit.state === 'attacking' ? 0.3 : 0.1;
+                const bobSpeed = unit.state === 'harvesting' ? 0.01 : 
+                                unit.state === 'attacking' ? 0.015 : 0.003;
                 unit.sprite.position.y = baseY + Math.sin(now * bobSpeed + unit.id.length) * bobAmount;
             }
             
@@ -1794,6 +2143,11 @@ window.GameUnits = (function() {
         
         // Update ripple effects
         updateRipples();
+        
+        // Pulse corridor preview markers
+        for (const marker of corridorPreviewMarkers) {
+            marker.material.opacity = 0.5 + Math.sin(now * 0.006) * 0.3;
+        }
     }
     
     // ============================================
@@ -1824,6 +2178,9 @@ window.GameUnits = (function() {
         getCommandMode,
         startHarvesting,
         findPath,
-        createRipple
+        createRipple,
+        updateCorridorPreview,
+        clearCorridorPreview,
+        killUnit
     };
 })();
