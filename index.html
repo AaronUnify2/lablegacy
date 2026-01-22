@@ -602,106 +602,52 @@
             
             ctx.clearRect(0, 0, 64, 96);
             
-            // Thick trunk
+            // Thicker trunk
             ctx.fillStyle = '#2a1a0a';
-            ctx.fillRect(24, 50, 16, 46);
+            ctx.fillRect(22, 55, 20, 41);
             
-            // Trunk texture/bark lines
-            ctx.fillStyle = '#3d2a1a';
-            ctx.fillRect(26, 52, 4, 40);
-            ctx.fillRect(34, 54, 3, 38);
-            
-            // Trunk roots
-            ctx.fillStyle = '#2a1a0a';
-            ctx.beginPath();
-            ctx.moveTo(16, 96);
-            ctx.lineTo(24, 75);
-            ctx.lineTo(28, 96);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(36, 96);
-            ctx.lineTo(40, 78);
-            ctx.lineTo(48, 96);
-            ctx.fill();
-            
-            // Main canopy - cluster of round shapes (dark base)
+            // Darker, denser foliage - multiple layers
             ctx.fillStyle = '#1a3a12';
             ctx.beginPath();
-            ctx.arc(20, 38, 18, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(44, 38, 18, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(32, 28, 20, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(32, 48, 16, 0, Math.PI * 2);
+            ctx.moveTo(32, 0);
+            ctx.lineTo(2, 60);
+            ctx.lineTo(62, 60);
+            ctx.closePath();
             ctx.fill();
             
-            // Mid-tone layer
             ctx.fillStyle = '#2d4a1e';
             ctx.beginPath();
-            ctx.arc(18, 34, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(46, 34, 12, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(32, 22, 14, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(28, 44, 10, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(38, 42, 10, 0, Math.PI * 2);
+            ctx.moveTo(32, 8);
+            ctx.lineTo(10, 55);
+            ctx.lineTo(54, 55);
+            ctx.closePath();
             ctx.fill();
             
-            // Highlight puffs
-            ctx.fillStyle = '#3d5a2e';
+            // Inner highlight
+            ctx.fillStyle = '#3a6a2a';
             ctx.beginPath();
-            ctx.arc(24, 28, 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(40, 26, 7, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(32, 16, 8, 0, Math.PI * 2);
+            ctx.moveTo(32, 16);
+            ctx.lineTo(18, 48);
+            ctx.lineTo(46, 48);
+            ctx.closePath();
             ctx.fill();
             
-            // Bright spots
-            ctx.fillStyle = '#4a6a3a';
-            ctx.beginPath();
-            ctx.arc(28, 20, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(38, 18, 3, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(20, 30, 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Dark detail spots for depth
-            ctx.fillStyle = '#0f250a';
-            for (let i = 0; i < 10; i++) {
-                const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * 18;
-                const x = 32 + Math.cos(angle) * dist;
-                const y = 34 + Math.sin(angle) * dist * 0.7;
+            // Dense pixel details
+            ctx.fillStyle = '#1a3a12';
+            for (let i = 0; i < 15; i++) {
+                const x = 16 + Math.random() * 32;
+                const y = 16 + Math.random() * 35;
                 ctx.fillRect(x, y, 4, 4);
             }
             
-            // Outline
+            // Border
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(4, 44);
-            ctx.quadraticCurveTo(2, 28, 16, 14);
-            ctx.quadraticCurveTo(32, 2, 48, 14);
-            ctx.quadraticCurveTo(62, 28, 60, 44);
-            ctx.quadraticCurveTo(58, 58, 44, 58);
-            ctx.quadraticCurveTo(32, 62, 20, 58);
-            ctx.quadraticCurveTo(6, 56, 4, 44);
+            ctx.moveTo(32, 0);
+            ctx.lineTo(2, 60);
+            ctx.lineTo(62, 60);
+            ctx.closePath();
             ctx.stroke();
             
             const texture = new THREE.CanvasTexture(canvas);
@@ -722,108 +668,52 @@
             
             ctx.clearRect(0, 0, 64, 96);
             
-            // Outer glow
-            const glowGradient = ctx.createRadialGradient(32, 40, 5, 32, 40, 35);
-            glowGradient.addColorStop(0, 'rgba(180, 100, 255, 0.4)');
-            glowGradient.addColorStop(0.5, 'rgba(140, 60, 200, 0.2)');
-            glowGradient.addColorStop(1, 'rgba(100, 40, 150, 0)');
-            ctx.fillStyle = glowGradient;
-            ctx.fillRect(0, 0, 64, 80);
-            
-            // Crystal trunk
+            // Crystalline trunk
             ctx.fillStyle = '#4a2a6a';
+            ctx.fillRect(26, 60, 12, 36);
+            
+            // Glowing purple foliage
+            ctx.fillStyle = '#6b2d8a';
             ctx.beginPath();
-            ctx.moveTo(28, 55);
-            ctx.lineTo(24, 96);
-            ctx.lineTo(40, 96);
-            ctx.lineTo(36, 55);
+            ctx.moveTo(32, 4);
+            ctx.lineTo(8, 64);
+            ctx.lineTo(56, 64);
             ctx.closePath();
             ctx.fill();
             
-            // Trunk crystal facets
-            ctx.fillStyle = '#6a4a8a';
+            // Inner glow
+            ctx.fillStyle = '#9b4dca';
             ctx.beginPath();
-            ctx.moveTo(30, 58);
-            ctx.lineTo(28, 90);
-            ctx.lineTo(34, 88);
-            ctx.lineTo(33, 60);
+            ctx.moveTo(32, 14);
+            ctx.lineTo(16, 56);
+            ctx.lineTo(48, 56);
             ctx.closePath();
             ctx.fill();
             
-            // Main crystal body (outer)
-            ctx.fillStyle = '#5a2d7a';
+            // Bright core
+            ctx.fillStyle = '#bb6dea';
             ctx.beginPath();
-            ctx.moveTo(32, 2);
-            ctx.lineTo(6, 40);
-            ctx.lineTo(14, 60);
-            ctx.lineTo(50, 60);
-            ctx.lineTo(58, 40);
+            ctx.moveTo(32, 24);
+            ctx.lineTo(22, 48);
+            ctx.lineTo(42, 48);
             ctx.closePath();
             ctx.fill();
             
-            // Crystal facet left
-            ctx.fillStyle = '#7a4d9a';
-            ctx.beginPath();
-            ctx.moveTo(32, 8);
-            ctx.lineTo(12, 38);
-            ctx.lineTo(20, 55);
-            ctx.lineTo(32, 35);
-            ctx.closePath();
-            ctx.fill();
+            // Energy sparkles
+            ctx.fillStyle = '#ddaaff';
+            for (let i = 0; i < 6; i++) {
+                const x = 18 + Math.random() * 28;
+                const y = 18 + Math.random() * 32;
+                ctx.fillRect(x, y, 3, 3);
+            }
             
-            // Crystal facet right (brightest)
-            ctx.fillStyle = '#9b6dba';
-            ctx.beginPath();
-            ctx.moveTo(32, 8);
-            ctx.lineTo(32, 35);
-            ctx.lineTo(44, 55);
-            ctx.lineTo(52, 38);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Inner glow core
-            ctx.fillStyle = '#c8a0e8';
-            ctx.beginPath();
-            ctx.moveTo(32, 18);
-            ctx.lineTo(24, 38);
-            ctx.lineTo(32, 48);
-            ctx.lineTo(40, 38);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Bright center
-            ctx.fillStyle = '#e8d0ff';
-            ctx.beginPath();
-            ctx.arc(32, 35, 6, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Sparkle points
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(30, 14, 4, 4);
-            ctx.fillRect(18, 36, 3, 3);
-            ctx.fillRect(44, 32, 3, 3);
-            ctx.fillRect(32, 46, 2, 2);
-            ctx.fillRect(26, 28, 2, 2);
-            ctx.fillRect(38, 24, 2, 2);
-            
-            // Floating particles
-            ctx.fillStyle = 'rgba(200, 160, 255, 0.8)';
-            ctx.fillRect(8, 20, 3, 3);
-            ctx.fillRect(54, 28, 3, 3);
-            ctx.fillRect(12, 48, 2, 2);
-            ctx.fillRect(50, 52, 2, 2);
-            ctx.fillRect(4, 38, 2, 2);
-            ctx.fillRect(58, 44, 2, 2);
-            
-            // Crystal outline
+            // Border
             ctx.strokeStyle = '#3a1a5a';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(32, 2);
-            ctx.lineTo(6, 40);
-            ctx.lineTo(14, 60);
-            ctx.lineTo(50, 60);
-            ctx.lineTo(58, 40);
+            ctx.moveTo(32, 4);
+            ctx.lineTo(8, 64);
+            ctx.lineTo(56, 64);
             ctx.closePath();
             ctx.stroke();
             
@@ -848,7 +738,6 @@
         // ============================================
         function generateMap() {
             // Initialize grid
-            gameState.grid = [];
             for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
                 gameState.grid[x] = [];
                 for (let z = 0; z < CONFIG.GRID_HEIGHT; z++) {
@@ -856,60 +745,25 @@
                 }
             }
 
-            // Define clearing positions
-            const playerClearingCenter = {
-                x: CONFIG.GRID_WIDTH / 2,
-                z: CONFIG.CLEARING_PADDING
-            };
-            const enemyClearingCenter = {
-                x: CONFIG.GRID_WIDTH / 2,
-                z: CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING
-            };
+            // Create player clearing (bottom)
+            const playerCenterX = CONFIG.GRID_WIDTH / 2;
+            const playerCenterZ = CONFIG.CLEARING_PADDING;
+            createClearing(playerCenterX, playerCenterZ, CELL.CLEARING_PLAYER, true);
 
-            // Mark clearings
-            markClearing(playerClearingCenter, CELL.CLEARING_PLAYER);
-            markClearing(enemyClearingCenter, CELL.CLEARING_ENEMY);
+            // Create enemy clearing (top)
+            const enemyCenterX = CONFIG.GRID_WIDTH / 2;
+            const enemyCenterZ = CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING;
+            createClearing(enemyCenterX, enemyCenterZ, CELL.CLEARING_ENEMY, false);
 
-            // Create clearing visuals
-            createClearingVisual(playerClearingCenter, 0x4a6a3a, 'Player Base');
-            createClearingVisual(enemyClearingCenter, 0x6a4a3a, 'Enemy Base');
-
-            // Generate trees
-            const mapCenterZ = CONFIG.GRID_HEIGHT / 2;
-
+            // Populate trees
             for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
                 for (let z = 0; z < CONFIG.GRID_HEIGHT; z++) {
-                    // Skip if in a clearing
                     if (gameState.grid[x][z] !== CELL.EMPTY) continue;
-
-                    // Check tree density
+                    
                     if (Math.random() > CONFIG.TREE_DENSITY) continue;
-
+                    
                     // Determine tree type
-                    let treeType = CELL.TREE_NORMAL;
-
-                    // Distance from edges (for high-yield)
-                    const distFromLeftEdge = x;
-                    const distFromRightEdge = CONFIG.GRID_WIDTH - x;
-                    const minDistFromEdge = Math.min(distFromLeftEdge, distFromRightEdge);
-
-                    // Distance from center (for energy trees)
-                    const distFromCenter = Math.abs(z - mapCenterZ);
-
-                    // High-yield trees near edges
-                    if (minDistFromEdge < CONFIG.HIGH_YIELD_EDGE_DISTANCE && Math.random() < CONFIG.HIGH_YIELD_PROBABILITY) {
-                        treeType = CELL.TREE_HIGH_YIELD;
-                    }
-                    // Energy trees in center cluster
-                    else if (distFromCenter < CONFIG.ENERGY_CENTER_CLUSTER_RADIUS && Math.random() < CONFIG.ENERGY_CENTER_PROBABILITY) {
-                        treeType = CELL.TREE_ENERGY;
-                    }
-                    // Scattered energy trees elsewhere
-                    else if (Math.random() < CONFIG.ENERGY_SCATTER_PROBABILITY) {
-                        treeType = CELL.TREE_ENERGY;
-                    }
-
-                    // Mark grid and create tree
+                    const treeType = determineTreeType(x, z);
                     gameState.grid[x][z] = treeType;
                     createTree(x, z, treeType);
                 }
@@ -919,100 +773,133 @@
             document.getElementById('tree-count').textContent = gameState.trees.length;
         }
 
-        function markClearing(center, cellType) {
-            const radiusSq = CONFIG.CLEARING_RADIUS * CONFIG.CLEARING_RADIUS;
+        function createClearing(centerX, centerZ, cellType, isPlayer) {
+            const radius = CONFIG.CLEARING_RADIUS;
             
-            for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
-                for (let z = 0; z < CONFIG.GRID_HEIGHT; z++) {
-                    const dx = x - center.x;
-                    const dz = z - center.z;
-                    if (dx * dx + dz * dz < radiusSq) {
+            // Mark clearing cells
+            for (let x = Math.floor(centerX - radius); x <= Math.ceil(centerX + radius); x++) {
+                for (let z = Math.floor(centerZ - radius); z <= Math.ceil(centerZ + radius); z++) {
+                    if (x < 0 || x >= CONFIG.GRID_WIDTH || z < 0 || z >= CONFIG.GRID_HEIGHT) continue;
+                    
+                    const dist = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
+                    if (dist <= radius) {
                         gameState.grid[x][z] = cellType;
                     }
                 }
             }
-        }
 
-        function createClearingVisual(center, color, label) {
-            // Create circular clearing ground
-            const clearingGeometry = new THREE.CircleGeometry(CONFIG.CLEARING_RADIUS, 32);
-            const clearingMaterial = new THREE.MeshLambertMaterial({
-                color: color,
-                side: THREE.DoubleSide
+            // Create visual clearing indicator (subtle ground tint)
+            const clearingGeometry = new THREE.CircleGeometry(radius, 32);
+            const clearingMaterial = new THREE.MeshBasicMaterial({
+                color: isPlayer ? 0x4a6a4a : 0x6a4a4a,
+                transparent: true,
+                opacity: 0.3
             });
             const clearing = new THREE.Mesh(clearingGeometry, clearingMaterial);
             clearing.rotation.x = -Math.PI / 2;
-            clearing.position.set(center.x, 0.1, center.z);
+            clearing.position.set(centerX, 0.01, centerZ);
             scene.add(clearing);
 
-            // Add building site markers (5 sites per base)
-            const siteCount = 5;
-            const siteRadius = CONFIG.CLEARING_RADIUS * 0.6;
+            // Create building sites (10 sites in a clock pattern)
+            createBuildingSites(centerX, centerZ, isPlayer);
+        }
+
+        function createBuildingSites(centerX, centerZ, isPlayer) {
+            const siteRadius = 15; // Distance from center
+            const numSites = 10;
             
-            for (let i = 0; i < siteCount; i++) {
-                const angle = (i / siteCount) * Math.PI * 2;
-                const siteX = center.x + Math.cos(angle) * siteRadius;
-                const siteZ = center.z + Math.sin(angle) * siteRadius;
+            for (let i = 0; i < numSites; i++) {
+                // Arrange in a circle like clock numbers
+                const angle = (i / numSites) * Math.PI * 2 - Math.PI / 2; // Start from top
+                const siteX = centerX + Math.cos(angle) * siteRadius;
+                const siteZ = centerZ + Math.sin(angle) * siteRadius;
                 
-                createBuildingSite(siteX, siteZ, label === 'Player Base');
+                // Create site marker
+                const siteGeometry = new THREE.PlaneGeometry(6, 6);
+                const siteMaterial = new THREE.MeshBasicMaterial({
+                    color: isPlayer ? 0x5a8a5a : 0x8a5a5a,
+                    transparent: true,
+                    opacity: 0.5,
+                    side: THREE.DoubleSide
+                });
+                const site = new THREE.Mesh(siteGeometry, siteMaterial);
+                site.rotation.x = -Math.PI / 2;
+                site.position.set(siteX, 0.02, siteZ);
+                site.userData.isPlayer = isPlayer;
+                site.userData.siteIndex = i;
+                scene.add(site);
+
+                if (isPlayer) {
+                    gameState.playerBuildingSites.push(site);
+                } else {
+                    gameState.enemyBuildingSites.push(site);
+                }
             }
         }
 
-        function createBuildingSite(x, z, isPlayer) {
-            const geometry = new THREE.CircleGeometry(3, 6);
-            const material = new THREE.MeshLambertMaterial({
-                color: isPlayer ? 0x5a8a4a : 0x8a5a4a,
-                side: THREE.DoubleSide,
-                transparent: true,
-                opacity: 0.6
-            });
-            const site = new THREE.Mesh(geometry, material);
-            site.rotation.x = -Math.PI / 2;
-            site.position.set(x, 0.15, z);
-            site.userData = { isPlayer, building: null };
-            scene.add(site);
+        function determineTreeType(x, z) {
+            const centerX = CONFIG.GRID_WIDTH / 2;
+            const centerZ = CONFIG.GRID_HEIGHT / 2;
             
-            if (isPlayer) {
-                gameState.playerBuildingSites.push(site);
-            } else {
-                gameState.enemyBuildingSites.push(site);
+            // Distance from map center
+            const distFromCenter = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
+            
+            // Energy trees in center cluster
+            if (distFromCenter <= CONFIG.ENERGY_CENTER_CLUSTER_RADIUS) {
+                if (Math.random() < CONFIG.ENERGY_CENTER_PROBABILITY) {
+                    return CELL.TREE_ENERGY;
+                }
+            } else if (Math.random() < CONFIG.ENERGY_SCATTER_PROBABILITY) {
+                return CELL.TREE_ENERGY;
             }
+            
+            // High-yield trees near edges
+            const distFromEdgeX = Math.min(x, CONFIG.GRID_WIDTH - x);
+            const distFromEdgeZ = Math.min(z, CONFIG.GRID_HEIGHT - z);
+            const distFromEdge = Math.min(distFromEdgeX, distFromEdgeZ);
+            
+            if (distFromEdge <= CONFIG.HIGH_YIELD_EDGE_DISTANCE) {
+                if (Math.random() < CONFIG.HIGH_YIELD_PROBABILITY) {
+                    return CELL.TREE_HIGH_YIELD;
+                }
+            }
+            
+            return CELL.TREE_NORMAL;
         }
 
-        function createTree(x, z, type) {
+        function createTree(x, z, treeType) {
             let material;
-            let scale;
-            
-            switch(type) {
-                case CELL.TREE_NORMAL:
-                    material = treeMaterials.normal.clone();
-                    scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
-                    break;
+            switch (treeType) {
                 case CELL.TREE_HIGH_YIELD:
                     material = treeMaterials.highYield.clone();
-                    scale = (CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN)) * 1.3;
                     break;
                 case CELL.TREE_ENERGY:
                     material = treeMaterials.energy.clone();
-                    scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
                     break;
+                default:
+                    material = treeMaterials.normal.clone();
             }
 
             const sprite = new THREE.Sprite(material);
-            sprite.scale.set(4 * scale, 6 * scale, 1);
             
-            // Add slight random offset within cell
+            // Random scale variation
+            const scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
+            sprite.scale.set(3 * scale, 4.5 * scale, 1);
+            
+            // Position with slight randomness
             const offsetX = (Math.random() - 0.5) * 0.5;
             const offsetZ = (Math.random() - 0.5) * 0.5;
-            
             sprite.position.set(
-                x + offsetX,
-                3 * scale,
-                z + offsetZ
+                x + 0.5 + offsetX,
+                2.25 * scale,
+                z + 0.5 + offsetZ
             );
             
-            sprite.userData = { gridX: x, gridZ: z, type };
-            
+            // Store grid position for harvesting
+            sprite.userData.gridX = x;
+            sprite.userData.gridZ = z;
+            sprite.userData.treeType = treeType;
+
             scene.add(sprite);
             gameState.trees.push(sprite);
         }
@@ -1021,62 +908,78 @@
         // CAMERA CONTROLS
         // ============================================
         function updateCamera() {
-            const speed = CONFIG.CAMERA_SPEED;
-            const rotSpeed = CONFIG.ROTATE_SPEED;
-            const zoomSpeed = CONFIG.ZOOM_SPEED;
-            
-            // Keyboard input
-            if (gameState.input.keys['KeyW'] || gameState.input.keys['ArrowUp'] || gameState.input.mobileActions.up) {
-                gameState.camera.target.z -= speed * Math.cos(gameState.camera.angle);
-                gameState.camera.target.x -= speed * Math.sin(gameState.camera.angle);
-            }
-            if (gameState.input.keys['KeyS'] || gameState.input.keys['ArrowDown'] || gameState.input.mobileActions.down) {
-                gameState.camera.target.z += speed * Math.cos(gameState.camera.angle);
-                gameState.camera.target.x += speed * Math.sin(gameState.camera.angle);
-            }
-            if (gameState.input.keys['KeyA'] || gameState.input.keys['ArrowLeft'] || gameState.input.mobileActions.left) {
-                gameState.camera.target.x -= speed * Math.cos(gameState.camera.angle);
-                gameState.camera.target.z += speed * Math.sin(gameState.camera.angle);
-            }
-            if (gameState.input.keys['KeyD'] || gameState.input.keys['ArrowRight'] || gameState.input.mobileActions.right) {
-                gameState.camera.target.x += speed * Math.cos(gameState.camera.angle);
-                gameState.camera.target.z -= speed * Math.sin(gameState.camera.angle);
-            }
-            
-            // Rotation
-            if (gameState.input.keys['KeyQ'] || gameState.input.mobileActions.rotleft) {
-                gameState.camera.angle -= rotSpeed;
-            }
-            if (gameState.input.keys['KeyE'] || gameState.input.mobileActions.rotright) {
-                gameState.camera.angle += rotSpeed;
-            }
-            
+            const input = gameState.input;
+            const cam = gameState.camera;
+
+            // Pan
+            let moveX = 0, moveZ = 0;
+            if (input.keys['KeyW'] || input.keys['ArrowUp'] || input.mobileActions.up) moveZ -= 1;
+            if (input.keys['KeyS'] || input.keys['ArrowDown'] || input.mobileActions.down) moveZ += 1;
+            if (input.keys['KeyA'] || input.keys['ArrowLeft'] || input.mobileActions.left) moveX -= 1;
+            if (input.keys['KeyD'] || input.keys['ArrowRight'] || input.mobileActions.right) moveX += 1;
+
+            // Apply rotation to movement
+            const cos = Math.cos(cam.angle);
+            const sin = Math.sin(cam.angle);
+            const worldMoveX = moveX * cos - moveZ * sin;
+            const worldMoveZ = moveX * sin + moveZ * cos;
+
+            cam.target.x += worldMoveX * CONFIG.CAMERA_SPEED;
+            cam.target.z += worldMoveZ * CONFIG.CAMERA_SPEED;
+
+            // Clamp to map bounds
+            cam.target.x = Math.max(0, Math.min(CONFIG.GRID_WIDTH, cam.target.x));
+            cam.target.z = Math.max(0, Math.min(CONFIG.GRID_HEIGHT, cam.target.z));
+
+            // Rotate
+            if (input.keys['KeyQ'] || input.mobileActions.rotleft) cam.angle += CONFIG.ROTATE_SPEED;
+            if (input.keys['KeyE'] || input.mobileActions.rotright) cam.angle -= CONFIG.ROTATE_SPEED;
+
             // Zoom
-            if (gameState.input.keys['KeyR'] || gameState.input.mobileActions.zoomin) {
-                gameState.camera.distance = Math.max(20, gameState.camera.distance - zoomSpeed);
+            if (input.keys['KeyR'] || input.mobileActions.zoomin) cam.distance -= CONFIG.ZOOM_SPEED;
+            if (input.keys['KeyF'] || input.mobileActions.zoomout) cam.distance += CONFIG.ZOOM_SPEED;
+            cam.distance = Math.max(20, Math.min(200, cam.distance));
+
+            // Toggle top-down
+            if (input.keys['Space'] && !input.spacePressed) {
+                cam.isTopDown = !cam.isTopDown;
+                input.spacePressed = true;
+            } else if (!input.keys['Space']) {
+                input.spacePressed = false;
             }
-            if (gameState.input.keys['KeyF'] || gameState.input.mobileActions.zoomout) {
-                gameState.camera.distance = Math.min(200, gameState.camera.distance + zoomSpeed);
+
+            // Quick jump to bases
+            if (input.keys['Digit1'] && !input.digit1Pressed) {
+                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
+                input.digit1Pressed = true;
+            } else if (!input.keys['Digit1']) {
+                input.digit1Pressed = false;
             }
-            
-            // Clamp target position
-            gameState.camera.target.x = Math.max(0, Math.min(CONFIG.GRID_WIDTH, gameState.camera.target.x));
-            gameState.camera.target.z = Math.max(0, Math.min(CONFIG.GRID_HEIGHT, gameState.camera.target.z));
-            
+
+            if (input.keys['Digit2'] && !input.digit2Pressed) {
+                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
+                input.digit2Pressed = true;
+            } else if (!input.keys['Digit2']) {
+                input.digit2Pressed = false;
+            }
+
             // Calculate camera position
-            const pitch = gameState.camera.isTopDown ? Math.PI / 2 - 0.01 : gameState.camera.pitch;
-            
-            camera.position.x = gameState.camera.target.x + Math.sin(gameState.camera.angle) * Math.cos(pitch) * gameState.camera.distance;
-            camera.position.y = Math.sin(pitch) * gameState.camera.distance;
-            camera.position.z = gameState.camera.target.z + Math.cos(gameState.camera.angle) * Math.cos(pitch) * gameState.camera.distance;
-            
-            camera.lookAt(gameState.camera.target.x, 0, gameState.camera.target.z);
-            
-            // Update UI
-            const posDisplay = document.getElementById('camera-pos');
-            if (posDisplay) {
-                posDisplay.textContent = `${Math.floor(gameState.camera.target.x)}, ${Math.floor(gameState.camera.target.z)}`;
-            }
+            const targetPitch = cam.isTopDown ? Math.PI / 2 - 0.01 : Math.PI / 4;
+            cam.pitch += (targetPitch - cam.pitch) * 0.1;
+
+            const height = Math.sin(cam.pitch) * cam.distance;
+            const horizontalDist = Math.cos(cam.pitch) * cam.distance;
+
+            camera.position.set(
+                cam.target.x + Math.sin(cam.angle) * horizontalDist,
+                height,
+                cam.target.z + Math.cos(cam.angle) * horizontalDist
+            );
+            camera.lookAt(cam.target.x, 0, cam.target.z);
+
+            // Update debug info
+            document.getElementById('camera-pos').textContent = 
+                `${Math.floor(cam.target.x)}, ${Math.floor(cam.target.z)}`;
         }
 
         function jumpToLocation(x, z) {
@@ -1089,110 +992,79 @@
         // ============================================
         function initInput() {
             // Keyboard
-            document.addEventListener('keydown', (e) => {
+            window.addEventListener('keydown', (e) => {
                 gameState.input.keys[e.code] = true;
-                
-                // Toggle top-down view
-                if (e.code === 'Space') {
-                    gameState.camera.isTopDown = !gameState.camera.isTopDown;
-                }
-                
-                // Quick jump keys
-                if (e.code === 'Digit1') {
-                    jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
-                }
-                if (e.code === 'Digit2') {
-                    jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
-                }
-                
-                // Escape to cancel command mode
-                if (e.code === 'Escape') {
-                    if (window.GameUnits) {
-                        const mode = GameUnits.getCommandMode();
-                        if (mode) {
-                            GameUnits.setCommandMode(null);
-                            if (window.GameUI) {
-                                GameUI.hideCommandIndicator();
-                                const selectedUnits = GameUnits.getSelectedUnits();
-                                if (selectedUnits && selectedUnits.length > 0) {
-                                    GameUI.showUnitMenu(selectedUnits);
-                                }
-                            }
-                        } else {
-                            GameUnits.deselectAllUnits();
-                        }
-                    }
-                }
             });
-
-            document.addEventListener('keyup', (e) => {
+            window.addEventListener('keyup', (e) => {
                 gameState.input.keys[e.code] = false;
             });
 
             // Mobile controls
-            const mobileButtons = document.querySelectorAll('.mobile-btn');
-            mobileButtons.forEach(btn => {
+            document.querySelectorAll('.mobile-btn').forEach(btn => {
                 const action = btn.dataset.action;
                 
                 btn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     gameState.input.mobileActions[action] = true;
                 });
-                
                 btn.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     gameState.input.mobileActions[action] = false;
                 });
-                
-                btn.addEventListener('mousedown', () => {
-                    gameState.input.mobileActions[action] = true;
-                });
-                
-                btn.addEventListener('mouseup', () => {
-                    gameState.input.mobileActions[action] = false;
-                });
-                
-                btn.addEventListener('mouseleave', () => {
-                    gameState.input.mobileActions[action] = false;
-                });
             });
 
-            // Touch pan on canvas
+            // Touch controls for camera pan
             let touchStart = null;
-            let lastTapTime = 0;
-            
+            let lastTouchDistance = null;
+
             renderer.domElement.addEventListener('touchstart', (e) => {
                 if (e.touches.length === 1) {
-                    touchStart = {
-                        x: e.touches[0].clientX,
-                        y: e.touches[0].clientY,
-                        time: Date.now()
-                    };
+                    touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                } else if (e.touches.length === 2) {
+                    lastTouchDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
                 }
             });
 
             renderer.domElement.addEventListener('touchmove', (e) => {
-                if (touchStart && e.touches.length === 1) {
-                    const deltaX = e.touches[0].clientX - touchStart.x;
-                    const deltaY = e.touches[0].clientY - touchStart.y;
+                if (e.touches.length === 1 && touchStart) {
+                    const dx = e.touches[0].clientX - touchStart.x;
+                    const dy = e.touches[0].clientY - touchStart.y;
                     
                     // Only pan if moved significantly (not a tap)
-                    if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
-                        gameState.camera.target.x -= deltaX * 0.1;
-                        gameState.camera.target.z -= deltaY * 0.1;
-                        
-                        touchStart.x = e.touches[0].clientX;
-                        touchStart.y = e.touches[0].clientY;
-                        touchStart.moved = true;
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        gameState.camera.target.x -= dx * 0.1;
+                        gameState.camera.target.z -= dy * 0.1;
+                        touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                     }
+                    
+                    // Update corridor preview while in cut mode
+                    updatePreviewFromTouch(e.touches[0].clientX, e.touches[0].clientY);
+                    
+                } else if (e.touches.length === 2 && lastTouchDistance) {
+                    const newDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    const delta = lastTouchDistance - newDistance;
+                    gameState.camera.distance += delta * 0.2;
+                    gameState.camera.distance = Math.max(20, Math.min(200, gameState.camera.distance));
+                    lastTouchDistance = newDistance;
                 }
             });
 
             renderer.domElement.addEventListener('touchend', (e) => {
-                if (touchStart && !touchStart.moved && Date.now() - touchStart.time < 300) {
-                    // This was a tap, not a drag
+                if (e.changedTouches.length === 1 && touchStart) {
                     const touch = e.changedTouches[0];
-                    onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+                    const dx = touch.clientX - touchStart.x;
+                    const dy = touch.clientY - touchStart.y;
+                    
+                    // If minimal movement, it was a tap
+                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                        onCanvasClick({ clientX: touch.clientX, clientY: touch.clientY });
+                    }
                 }
                 touchStart = null;
             });
@@ -1205,6 +1077,62 @@
             
             // Click detection for building sites and units
             renderer.domElement.addEventListener('click', onCanvasClick);
+            
+            // Mouse move for corridor preview
+            renderer.domElement.addEventListener('mousemove', onCanvasMouseMove);
+        }
+
+        // ============================================
+        // CORRIDOR PREVIEW ON MOUSE MOVE
+        // ============================================
+        function onCanvasMouseMove(event) {
+            if (!window.GameUnits) return;
+            
+            const commandMode = GameUnits.getCommandMode();
+            if (commandMode !== 'cutPath' && commandMode !== 'cutLane') {
+                return;
+            }
+            
+            ensureRaycaster();
+            
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(groundPlane, intersectPoint);
+            
+            if (intersectPoint) {
+                GameUnits.updateCorridorPreview(intersectPoint.x, intersectPoint.z);
+            }
+        }
+        
+        function updatePreviewFromTouch(clientX, clientY) {
+            if (!window.GameUnits) return;
+            
+            const commandMode = GameUnits.getCommandMode();
+            if (commandMode !== 'cutPath' && commandMode !== 'cutLane') {
+                return;
+            }
+            
+            ensureRaycaster();
+            
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            
+            const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(groundPlane, intersectPoint);
+            
+            if (intersectPoint) {
+                GameUnits.updateCorridorPreview(intersectPoint.x, intersectPoint.z);
+            }
         }
 
         // ============================================
