@@ -261,7 +261,7 @@ const Bosses = (() => {
         spawnByName,
         canSpawn,
         BOSS_TYPES,
-        getBossHealth,
-        getBossDamage
+        getBossHealth: bossHP,
+        getBossDamage: bossDmg
     };
 })();
