@@ -581,13 +581,105 @@
     dirLight.position.set(50, 100, 50);
     scene.add(dirLight);
 
-    // Ground plane
+    // Ground plane — dark forest floor with leaf litter
+    const groundCanvas = document.createElement('canvas');
+    groundCanvas.width = 128; groundCanvas.height = 128;
+    const gctx = groundCanvas.getContext('2d');
+    gctx.imageSmoothingEnabled = false;
+    // Base dark earth
+    gctx.fillStyle = '#1a3a1a';
+    gctx.fillRect(0, 0, 128, 128);
+    // Earth variation
+    for (let i = 0; i < 300; i++) {
+        gctx.fillStyle = ['#162e16', '#1e4420', '#15301a', '#1b3d1b', '#122a12'][Math.floor(Math.random() * 5)];
+        gctx.fillRect(Math.floor(Math.random() * 128), Math.floor(Math.random() * 128), 2 + Math.floor(Math.random() * 3), 2 + Math.floor(Math.random() * 3));
+    }
+    // Scattered leaves — brown, orange, dark red, yellow
+    const leafColors = ['#5d4037', '#6d4c41', '#8d6e63', '#a1887f', '#4e342e', '#bf360c', '#e65100', '#f9a825', '#c62828', '#33691e'];
+    for (let i = 0; i < 80; i++) {
+        gctx.fillStyle = leafColors[Math.floor(Math.random() * leafColors.length)];
+        const x = Math.floor(Math.random() * 128);
+        const y = Math.floor(Math.random() * 128);
+        const s = 1 + Math.floor(Math.random() * 3);
+        gctx.fillRect(x, y, s, s);
+    }
+    // Tiny twigs
+    gctx.fillStyle = '#3e2723';
+    for (let i = 0; i < 15; i++) {
+        const x = Math.floor(Math.random() * 128);
+        const y = Math.floor(Math.random() * 128);
+        gctx.fillRect(x, y, 4 + Math.floor(Math.random() * 5), 1);
+    }
+    const groundTex = new THREE.CanvasTexture(groundCanvas);
+    groundTex.magFilter = THREE.NearestFilter;
+    groundTex.minFilter = THREE.NearestFilter;
+    groundTex.wrapS = THREE.RepeatWrapping;
+    groundTex.wrapT = THREE.RepeatWrapping;
+    groundTex.repeat.set(150, 150);
     const groundGeo = new THREE.PlaneGeometry(2000, 2000);
-    const groundMat = new THREE.MeshLambertMaterial({ color: 0x1a472a });
+    const groundMat = new THREE.MeshLambertMaterial({ map: groundTex });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.1;
     scene.add(ground);
+
+    // Sky — starfield dome with moon
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 512; skyCanvas.height = 256;
+    const sctx = skyCanvas.getContext('2d');
+    // Night sky gradient
+    const skyGrad = sctx.createLinearGradient(0, 0, 0, 256);
+    skyGrad.addColorStop(0, '#020810');
+    skyGrad.addColorStop(0.4, '#0a1628');
+    skyGrad.addColorStop(0.7, '#0f1f3a');
+    skyGrad.addColorStop(1, '#1a2a44');
+    sctx.fillStyle = skyGrad;
+    sctx.fillRect(0, 0, 512, 256);
+    // Stars — varied sizes and brightness
+    for (let i = 0; i < 900; i++) {
+        const x = Math.floor(Math.random() * 512);
+        const y = Math.floor(Math.random() * 220);
+        const brightness = 0.2 + Math.random() * 0.8;
+        const size = Math.random() < 0.92 ? 1 : 2;
+        sctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+        sctx.fillRect(x, y, size, size);
+    }
+    // Bright stars with warm/cool tints
+    for (let i = 0; i < 40; i++) {
+        const x = Math.floor(Math.random() * 512);
+        const y = Math.floor(Math.random() * 200);
+        const colors = ['#fff', '#ffe4b5', '#b0c4de', '#ffd700', '#add8e6'];
+        sctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+        sctx.fillRect(x, y, 2, 2);
+        // Tiny glow
+        sctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        sctx.fillRect(x - 1, y - 1, 4, 4);
+    }
+    // Moon — soft white circle with craters
+    const mx = 380, my = 170, mr = 20;
+    sctx.fillStyle = '#e8e8d0';
+    sctx.beginPath(); sctx.arc(mx, my, mr, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#d4d4b8';
+    sctx.beginPath(); sctx.arc(mx, my, mr - 2, 0, Math.PI * 2); sctx.fill();
+    // Craters
+    sctx.fillStyle = '#c0c0a8';
+    sctx.beginPath(); sctx.arc(mx - 6, my - 4, 4, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx + 5, my + 6, 3, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx + 2, my - 8, 2.5, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx - 4, my + 7, 2, 0, Math.PI * 2); sctx.fill();
+    // Moon glow
+    sctx.fillStyle = 'rgba(232, 232, 208, 0.08)';
+    sctx.beginPath(); sctx.arc(mx, my, mr + 15, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = 'rgba(232, 232, 208, 0.04)';
+    sctx.beginPath(); sctx.arc(mx, my, mr + 30, 0, Math.PI * 2); sctx.fill();
+
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    skyTex.magFilter = THREE.NearestFilter;
+    skyTex.minFilter = THREE.NearestFilter;
+    const skyGeo = new THREE.SphereGeometry(CONFIG.renderDistance * 1.2, 32, 16);
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
+    const skyDome = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyDome);
 
     // ===================== PIXEL TEXTURE HELPER =================
     // Shared by ALL modules — defined once here
@@ -946,6 +1038,9 @@
         camera.rotation.order = 'YXZ';
         camera.rotation.y = p.yaw;
         camera.rotation.x = p.pitch;
+
+        // Sky dome follows player
+        skyDome.position.set(p.position.x, 0, p.position.z);
 
         // Smooth zoom
         gameState.cameraZoom += (gameState.targetCameraZoom - gameState.cameraZoom) * 0.02;
