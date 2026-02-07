@@ -566,10 +566,10 @@
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x0a1628);
+    renderer.setClearColor(0x030610);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0a1628, CONFIG.fogNear, CONFIG.fogFar);
+    scene.fog = new THREE.Fog(0x030610, CONFIG.fogNear, CONFIG.fogFar);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, CONFIG.renderDistance * 1.5);
     camera.position.set(0, 2, 0);
@@ -623,59 +623,172 @@
     ground.position.y = -0.1;
     scene.add(ground);
 
-    // Sky — starfield dome with moon
+    // Sky — spectacular night sky dome
     const skyCanvas = document.createElement('canvas');
-    skyCanvas.width = 512; skyCanvas.height = 256;
+    skyCanvas.width = 1024; skyCanvas.height = 512;
     const sctx = skyCanvas.getContext('2d');
-    // Night sky gradient
-    const skyGrad = sctx.createLinearGradient(0, 0, 0, 256);
-    skyGrad.addColorStop(0, '#020810');
-    skyGrad.addColorStop(0.4, '#0a1628');
-    skyGrad.addColorStop(0.7, '#0f1f3a');
-    skyGrad.addColorStop(1, '#1a2a44');
+
+    // Very dark base — almost black everywhere so stars pop
+    const skyGrad = sctx.createLinearGradient(0, 0, 0, 512);
+    skyGrad.addColorStop(0, '#010208');
+    skyGrad.addColorStop(0.5, '#030610');
+    skyGrad.addColorStop(0.8, '#060c18');
+    skyGrad.addColorStop(0.95, '#0a1225');
+    skyGrad.addColorStop(1, '#0c1428');
     sctx.fillStyle = skyGrad;
-    sctx.fillRect(0, 0, 512, 256);
-    // Stars — varied sizes and brightness
-    for (let i = 0; i < 900; i++) {
-        const x = Math.floor(Math.random() * 512);
-        const y = Math.floor(Math.random() * 220);
-        const brightness = 0.2 + Math.random() * 0.8;
-        const size = Math.random() < 0.92 ? 1 : 2;
-        sctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
-        sctx.fillRect(x, y, size, size);
+    sctx.fillRect(0, 0, 1024, 512);
+
+    // Milky way band — subtle diagonal glow
+    sctx.save();
+    sctx.translate(512, 256);
+    sctx.rotate(-0.4);
+    for (let i = 0; i < 6; i++) {
+        sctx.fillStyle = `rgba(180, 190, 220, ${0.015 - i * 0.002})`;
+        sctx.beginPath();
+        sctx.ellipse(0, 0, 500, 30 + i * 15, 0, 0, Math.PI * 2);
+        sctx.fill();
     }
-    // Bright stars with warm/cool tints
-    for (let i = 0; i < 40; i++) {
-        const x = Math.floor(Math.random() * 512);
-        const y = Math.floor(Math.random() * 200);
-        const colors = ['#fff', '#ffe4b5', '#b0c4de', '#ffd700', '#add8e6'];
-        sctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+    // Milky way star clusters
+    for (let i = 0; i < 400; i++) {
+        const a = (Math.random() - 0.5) * 1000;
+        const b = (Math.random() - 0.5) * 50;
+        sctx.fillStyle = `rgba(200, 210, 240, ${0.2 + Math.random() * 0.5})`;
+        sctx.fillRect(a, b, 1, 1);
+    }
+    sctx.restore();
+
+    // Dense starfield — dim stars everywhere
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.floor(Math.random() * 1024);
+        const y = Math.floor(Math.random() * 460);
+        const brightness = 0.15 + Math.random() * 0.6;
+        sctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+        sctx.fillRect(x, y, 1, 1);
+    }
+
+    // Medium stars
+    for (let i = 0; i < 300; i++) {
+        const x = Math.floor(Math.random() * 1024);
+        const y = Math.floor(Math.random() * 440);
+        const brightness = 0.4 + Math.random() * 0.6;
+        sctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+        sctx.fillRect(x, y, 2, 1);
+    }
+
+    // Bright colored stars with glow
+    const starColors = ['#ffffff', '#ffe4b5', '#b0c4de', '#ffd700', '#add8e6', '#ffcccc', '#ccffcc', '#ffa07a'];
+    for (let i = 0; i < 80; i++) {
+        const x = Math.floor(Math.random() * 1024);
+        const y = Math.floor(Math.random() * 420);
+        sctx.fillStyle = starColors[Math.floor(Math.random() * starColors.length)];
         sctx.fillRect(x, y, 2, 2);
-        // Tiny glow
-        sctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        // Cross glow on brightest
+        if (Math.random() < 0.3) {
+            sctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            sctx.fillRect(x - 2, y, 6, 1);
+            sctx.fillRect(x, y - 2, 1, 6);
+        }
+        // Soft glow
+        sctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
         sctx.fillRect(x - 1, y - 1, 4, 4);
     }
-    // Moon — soft white circle with craters
-    const mx = 380, my = 170, mr = 20;
+
+    // Aurora borealis — shimmering curtains on one side
+    const auroraX = 120;
+    for (let col = 0; col < 200; col++) {
+        const x = auroraX + col;
+        // Wavy height per column
+        const wave1 = Math.sin(col * 0.03) * 40;
+        const wave2 = Math.sin(col * 0.07 + 2) * 20;
+        const wave3 = Math.sin(col * 0.01 + 1) * 30;
+        const top = 280 + wave1 + wave2;
+        const height = 60 + wave3;
+
+        // Green to teal to purple gradient per column
+        const t = col / 200;
+        const r = Math.floor(20 + t * 80);
+        const g = Math.floor(200 - t * 120);
+        const b = Math.floor(100 + t * 120);
+
+        for (let dy = 0; dy < height; dy++) {
+            const fade = 1 - (dy / height);
+            const alpha = fade * fade * (0.03 + Math.random() * 0.02);
+            sctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            sctx.fillRect(x, top + dy, 1, 1);
+        }
+    }
+    // Aurora bright streaks
+    for (let i = 0; i < 30; i++) {
+        const x = auroraX + Math.floor(Math.random() * 200);
+        const baseY = 290 + Math.sin(x * 0.03) * 40;
+        sctx.fillStyle = 'rgba(100, 255, 180, 0.06)';
+        sctx.fillRect(x, baseY, 1, 30 + Math.floor(Math.random() * 30));
+    }
+
+    // Main moon — large, low on horizon
+    const mx = 750, my = 360, mr = 22;
+    // Outer glow layers
+    sctx.fillStyle = 'rgba(232, 232, 208, 0.03)';
+    sctx.beginPath(); sctx.arc(mx, my, mr + 40, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = 'rgba(232, 232, 208, 0.05)';
+    sctx.beginPath(); sctx.arc(mx, my, mr + 25, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = 'rgba(232, 232, 208, 0.08)';
+    sctx.beginPath(); sctx.arc(mx, my, mr + 12, 0, Math.PI * 2); sctx.fill();
+    // Moon body
     sctx.fillStyle = '#e8e8d0';
     sctx.beginPath(); sctx.arc(mx, my, mr, 0, Math.PI * 2); sctx.fill();
-    sctx.fillStyle = '#d4d4b8';
+    sctx.fillStyle = '#d8d8c0';
     sctx.beginPath(); sctx.arc(mx, my, mr - 2, 0, Math.PI * 2); sctx.fill();
     // Craters
     sctx.fillStyle = '#c0c0a8';
-    sctx.beginPath(); sctx.arc(mx - 6, my - 4, 4, 0, Math.PI * 2); sctx.fill();
-    sctx.beginPath(); sctx.arc(mx + 5, my + 6, 3, 0, Math.PI * 2); sctx.fill();
-    sctx.beginPath(); sctx.arc(mx + 2, my - 8, 2.5, 0, Math.PI * 2); sctx.fill();
-    sctx.beginPath(); sctx.arc(mx - 4, my + 7, 2, 0, Math.PI * 2); sctx.fill();
-    // Moon glow
-    sctx.fillStyle = 'rgba(232, 232, 208, 0.08)';
-    sctx.beginPath(); sctx.arc(mx, my, mr + 15, 0, Math.PI * 2); sctx.fill();
-    sctx.fillStyle = 'rgba(232, 232, 208, 0.04)';
-    sctx.beginPath(); sctx.arc(mx, my, mr + 30, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx - 7, my - 5, 4, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx + 6, my + 7, 3.5, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx + 3, my - 9, 2.5, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx - 5, my + 8, 2, 0, Math.PI * 2); sctx.fill();
+    sctx.beginPath(); sctx.arc(mx + 10, my - 2, 2, 0, Math.PI * 2); sctx.fill();
+    // Highlight
+    sctx.fillStyle = 'rgba(255, 255, 240, 0.3)';
+    sctx.beginPath(); sctx.arc(mx - 5, my - 6, 8, 0, Math.PI * 2); sctx.fill();
+
+    // Second moon — smaller, distant, reddish
+    const m2x = 500, m2y = 200, m2r = 8;
+    sctx.fillStyle = 'rgba(200, 140, 120, 0.04)';
+    sctx.beginPath(); sctx.arc(m2x, m2y, m2r + 12, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#c8a090';
+    sctx.beginPath(); sctx.arc(m2x, m2y, m2r, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#b89080';
+    sctx.beginPath(); sctx.arc(m2x, m2y, m2r - 1.5, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#a08070';
+    sctx.beginPath(); sctx.arc(m2x - 2, m2y + 1, 2, 0, Math.PI * 2); sctx.fill();
+
+    // Planet — bright dot with ring (Saturn-like)
+    const px = 200, py = 150;
+    sctx.fillStyle = 'rgba(210, 180, 140, 0.06)';
+    sctx.beginPath(); sctx.arc(px, py, 10, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#d4b896';
+    sctx.beginPath(); sctx.arc(px, py, 4, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#c0a882';
+    sctx.beginPath(); sctx.arc(px, py, 3, 0, Math.PI * 2); sctx.fill();
+    // Ring
+    sctx.strokeStyle = 'rgba(210, 190, 160, 0.5)';
+    sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.ellipse(px, py, 9, 2.5, 0.2, 0, Math.PI * 2); sctx.stroke();
+    sctx.strokeStyle = 'rgba(210, 190, 160, 0.25)';
+    sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.ellipse(px, py, 11, 3, 0.2, 0, Math.PI * 2); sctx.stroke();
+
+    // Second planet — bluish, opposite side
+    const p2x = 850, p2y = 120;
+    sctx.fillStyle = 'rgba(100, 150, 220, 0.05)';
+    sctx.beginPath(); sctx.arc(p2x, p2y, 8, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#7090d0';
+    sctx.beginPath(); sctx.arc(p2x, p2y, 3, 0, Math.PI * 2); sctx.fill();
+    sctx.fillStyle = '#6080c0';
+    sctx.beginPath(); sctx.arc(p2x, p2y, 2.5, 0, Math.PI * 2); sctx.fill();
 
     const skyTex = new THREE.CanvasTexture(skyCanvas);
-    skyTex.magFilter = THREE.NearestFilter;
-    skyTex.minFilter = THREE.NearestFilter;
+    skyTex.magFilter = THREE.LinearFilter;
+    skyTex.minFilter = THREE.LinearFilter;
     const skyGeo = new THREE.SphereGeometry(CONFIG.renderDistance * 1.2, 32, 16);
     const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
     const skyDome = new THREE.Mesh(skyGeo, skyMat);
