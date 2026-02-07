@@ -790,7 +790,7 @@
     skyTex.magFilter = THREE.LinearFilter;
     skyTex.minFilter = THREE.LinearFilter;
     const skyGeo = new THREE.SphereGeometry(CONFIG.renderDistance * 1.2, 32, 16);
-    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false });
     const skyDome = new THREE.Mesh(skyGeo, skyMat);
     scene.add(skyDome);
 
