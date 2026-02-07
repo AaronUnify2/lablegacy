@@ -328,11 +328,13 @@
 
         /* ===== DEBUG ===== */
         #debugDisplay {
-            display: none; position: fixed; bottom: 120px; left: 10px;
+            display: block; position: fixed; bottom: 10px; left: 10px;
             color: #0f0; font-size: 8px; font-family: monospace;
-            background: rgba(0,0,0,0.7); padding: 5px;
-            max-width: 300px; z-index: 9999; pointer-events: none;
-            white-space: pre-wrap;
+            background: rgba(0,0,0,0.85); padding: 8px;
+            max-width: 350px; max-height: 200px;
+            z-index: 99999; pointer-events: none;
+            white-space: pre-wrap; overflow: hidden;
+            border: 1px solid #0f0; border-radius: 4px;
         }
     </style>
 </head>
@@ -406,13 +408,44 @@
     <!-- THREE.JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-    <!-- MODULE SCRIPTS -->
-    <script src="js/forest.js"></script>
-    <script src="js/enemies.js"></script>
-    <script src="js/bosses.js"></script>
-    <script src="js/forestEncounters.js"></script>
-    <script src="js/town.js"></script>
-    <script src="js/townEncounters.js"></script>
+    <!-- DEBUG BOOTSTRAP - catches script load errors -->
+    <script>
+    const _dbgLog = [];
+    const _dbgEl = document.getElementById('debugDisplay');
+    function dbg(msg) {
+        const line = (performance.now()/1000).toFixed(2) + 's ' + msg;
+        _dbgLog.push(line);
+        if (_dbgLog.length > 20) _dbgLog.shift();
+        if (_dbgEl) _dbgEl.textContent = _dbgLog.join('\n');
+        console.log('[DBG] ' + msg);
+    }
+    window.onerror = function(msg, url, line, col, err) {
+        const short = (url||'').split('/').pop();
+        dbg('❌ ERROR: ' + msg + ' (' + short + ':' + line + ')');
+        return false;
+    };
+    dbg('THREE.js loaded: ' + (typeof THREE !== 'undefined'));
+    if (typeof THREE === 'undefined') dbg('⚠️ THREE.js FAILED TO LOAD');
+    </script>
+
+    <!-- MODULE SCRIPTS with load tracking -->
+    <script src="js/forest.js" onerror="dbg('❌ FAILED: forest.js')"></script>
+    <script>dbg('forest.js: ' + (typeof Forest !== 'undefined' ? '✅' : '❌ undefined'))</script>
+
+    <script src="js/enemies.js" onerror="dbg('❌ FAILED: enemies.js')"></script>
+    <script>dbg('enemies.js: ' + (typeof Enemies !== 'undefined' ? '✅' : '❌ undefined'))</script>
+
+    <script src="js/bosses.js" onerror="dbg('❌ FAILED: bosses.js')"></script>
+    <script>dbg('bosses.js: ' + (typeof Bosses !== 'undefined' ? '✅' : '❌ undefined'))</script>
+
+    <script src="js/forestEncounters.js" onerror="dbg('❌ FAILED: forestEncounters.js')"></script>
+    <script>dbg('forestEncounters.js: ' + (typeof ForestEncounters !== 'undefined' ? '✅' : '❌ undefined'))</script>
+
+    <script src="js/town.js" onerror="dbg('❌ FAILED: town.js')"></script>
+    <script>dbg('town.js: ' + (typeof Town !== 'undefined' ? '✅' : '❌ undefined'))</script>
+
+    <script src="js/townEncounters.js" onerror="dbg('❌ FAILED: townEncounters.js')"></script>
+    <script>dbg('townEncounters.js: ' + (typeof TownEncounters !== 'undefined' ? '✅' : '❌ undefined'))</script>
 
     <script>
     // ============================================================
@@ -1258,6 +1291,7 @@
         requestAnimationFrame(animate);
         if (gameState.isGameOver || gameState.isPaused) return;
 
+        try {
         const delta = Math.min((time - lastTime) / 16.67, 3); // cap at 3x
         lastTime = time;
         frameCount++;
@@ -1335,22 +1369,59 @@
 
         // --- Render ---
         renderer.render(scene, camera);
+
+        // Debug frame counter (first 5 frames, then every 300)
+        if (frameCount <= 5 || frameCount % 300 === 0) {
+            dbg('Frame ' + frameCount + ' | enemies:' + gameState.enemies.length + ' | chunks:' + gameState.chunks.size);
+        }
+
+        } catch(e) {
+            // Only log first error to avoid spam
+            if (!animate._errLogged) {
+                dbg('❌ LOOP ERROR: ' + e.message + '\n' + (e.stack||'').split('\n')[1]);
+                animate._errLogged = true;
+            }
+        }
     }
 
     // ===================== INIT =================================
     function init() {
-        console.log('🎮 Mystic Forest Crawler - Initializing...');
+        dbg('🎮 init() called');
 
-        // Initialize modules
-        if (typeof Forest !== 'undefined' && Forest.init) Forest.init();
-        if (typeof Enemies !== 'undefined' && Enemies.init) Enemies.init();
-        if (typeof Bosses !== 'undefined' && Bosses.init) Bosses.init();
-        if (typeof ForestEncounters !== 'undefined' && ForestEncounters.init) ForestEncounters.init();
-        if (typeof Town !== 'undefined' && Town.init) Town.init();
-        if (typeof TownEncounters !== 'undefined' && TownEncounters.init) TownEncounters.init();
+        try {
+            dbg('Scene objects: ' + scene.children.length);
+            dbg('Camera pos: ' + camera.position.toArray().map(v=>v.toFixed(1)));
+        } catch(e) { dbg('❌ Scene/Camera error: ' + e.message); }
 
-        console.log('✅ All modules initialized');
-        updateHUD();
+        // Initialize modules with individual try/catch
+        const modules = [
+            ['Forest', typeof Forest !== 'undefined' ? Forest : null],
+            ['Enemies', typeof Enemies !== 'undefined' ? Enemies : null],
+            ['Bosses', typeof Bosses !== 'undefined' ? Bosses : null],
+            ['ForestEncounters', typeof ForestEncounters !== 'undefined' ? ForestEncounters : null],
+            ['Town', typeof Town !== 'undefined' ? Town : null],
+            ['TownEncounters', typeof TownEncounters !== 'undefined' ? TownEncounters : null]
+        ];
+
+        for (const [name, mod] of modules) {
+            if (mod && mod.init) {
+                try {
+                    mod.init();
+                    dbg('  ✅ ' + name + '.init()');
+                } catch(e) {
+                    dbg('  ❌ ' + name + '.init() FAILED: ' + e.message);
+                }
+            } else {
+                dbg('  ⚠️ ' + name + ': ' + (mod ? 'no init()' : 'NOT LOADED'));
+            }
+        }
+
+        try {
+            updateHUD();
+            dbg('✅ HUD updated');
+        } catch(e) { dbg('❌ HUD error: ' + e.message); }
+
+        dbg('🚀 Starting game loop...');
         animate(0);
     }
 
