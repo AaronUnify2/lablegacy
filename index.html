@@ -641,17 +641,43 @@
     }
 
     function createSlashTexture() {
-        return createPixelTexture(32, 32, (ctx) => {
+        return createPixelTexture(64, 64, (ctx) => {
+            // Bright aggressive arc slash
+            ctx.save();
+            ctx.translate(32, 32);
+
+            // Outer glow
+            ctx.strokeStyle = 'rgba(255, 200, 50, 0.4)';
+            ctx.lineWidth = 12;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, -1.2, 1.2);
+            ctx.stroke();
+
+            // Main slash
             ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(0, 0, 24, -1.0, 1.0);
+            ctx.stroke();
+
+            // Hot center
+            ctx.strokeStyle = 'rgba(255, 255, 200, 0.9)';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(16, 16, 12, -0.8, 0.8);
+            ctx.arc(0, 0, 24, -0.8, 0.8);
             ctx.stroke();
-            ctx.strokeStyle = 'rgba(255,200,50,0.6)';
-            ctx.lineWidth = 5;
-            ctx.beginPath();
-            ctx.arc(16, 16, 10, -0.6, 0.6);
-            ctx.stroke();
+
+            // Sparks at tips
+            ctx.fillStyle = '#fff';
+            for (let a = -1.0; a <= 1.0; a += 2.0) {
+                const sx = Math.cos(a) * 24;
+                const sy = Math.sin(a) * 24;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
         });
     }
 
@@ -891,18 +917,32 @@
         input.lookDY = 0;
 
         // Movement relative to camera yaw
+        // Joystick: moveX = right(+)/left(-), moveZ = down(+)/up(-)
+        // We want: joystick up = move in camera forward direction
         if (Math.abs(mx) > 0.1 || Math.abs(mz) > 0.1) {
-            const sin = Math.sin(p.yaw);
-            const cos = Math.cos(p.yaw);
-            const worldX = mx * cos - mz * sin;
-            const worldZ = mx * sin + mz * cos;
-            const len = Math.sqrt(worldX * worldX + worldZ * worldZ);
+            // Forward direction from yaw (camera looks along -Z in local space)
+            const fwdX = -Math.sin(p.yaw);
+            const fwdZ = -Math.cos(p.yaw);
+            // Right direction
+            const rightX = Math.cos(p.yaw);
+            const rightZ = -Math.sin(p.yaw);
+            // Combine: joystick up (mz negative) = forward, joystick right (mx positive) = right
+            const worldX = rightX * mx + fwdX * (-mz);
+            const worldZ = rightZ * mx + fwdZ * (-mz);
+            const len = Math.sqrt(worldX * worldX + worldZ * worldZ) || 1;
             p.position.x += (worldX / len) * CONFIG.playerSpeed;
             p.position.z += (worldZ / len) * CONFIG.playerSpeed;
         }
 
-        // Camera follow
-        camera.position.set(p.position.x, 2, p.position.z);
+        // Camera follow — offset slightly behind player
+        const camBack = 1.5; // units behind
+        const camFwdX = -Math.sin(p.yaw);
+        const camFwdZ = -Math.cos(p.yaw);
+        camera.position.set(
+            p.position.x - camFwdX * camBack,
+            2.3,
+            p.position.z - camFwdZ * camBack
+        );
         camera.rotation.order = 'YXZ';
         camera.rotation.y = p.yaw;
         camera.rotation.x = p.pitch;
@@ -924,15 +964,34 @@
         p.meleeCooldown = CONFIG.playerMeleeCooldown;
 
         const damage = CONFIG.playerMeleeDamage * (1 + p.level * 0.3) * (1 + p.swordLevel * 0.15);
-
-        // Slash visual
-        const mat = new THREE.SpriteMaterial({ map: TEX.slash, transparent: true, blending: THREE.AdditiveBlending });
-        const slash = new THREE.Sprite(mat);
-        slash.scale.set(3, 3, 1);
         const fwd = getCameraForward();
-        slash.position.set(p.position.x + fwd.x * 2, 1.5, p.position.z + fwd.z * 2);
+
+        // Slash visual — big, aggressive, random angle
+        const slashAngle = (Math.random() * 1.2 - 0.6); // Random between vertical and horizontal
+        const mat = new THREE.SpriteMaterial({
+            map: TEX.slash, transparent: true,
+            blending: THREE.AdditiveBlending,
+            rotation: slashAngle
+        });
+        const slash = new THREE.Sprite(mat);
+        slash.scale.set(0.5, 0.5, 1);
+        slash.position.set(p.position.x + fwd.x * 2.5, 1.5, p.position.z + fwd.z * 2.5);
         scene.add(slash);
-        setTimeout(() => scene.remove(slash), 200);
+
+        // Animate: fast scale-up then fade
+        let slashFrame = 0;
+        const slashAnim = setInterval(() => {
+            slashFrame++;
+            const t = slashFrame / 10; // 0 to ~1.5 over 15 frames
+            const s = 5 + t * 4; // scales from 5 to 9
+            slash.scale.set(s, s, 1);
+            slash.material.opacity = Math.max(0, 1 - (t * 0.8));
+            slash.material.rotation = slashAngle + (slashFrame * 0.08); // slight spin
+            if (slashFrame >= 12) {
+                clearInterval(slashAnim);
+                scene.remove(slash);
+            }
+        }, 16);
 
         // Hit enemies in front
         const hitTargets = [...gameState.enemies, ...gameState.encounters.guards, ...gameState.bosses];
