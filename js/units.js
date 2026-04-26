@@ -503,6 +503,7 @@ window.GameUnits = (function() {
             chopCount: 0,
             corridorTarget: null,
             corridorWidth: 0,
+            pathId: null,             // ID of assigned loop path (for cutLoop mode)
             attackTarget: null,
             hasForestWalk: stats.forestWalk || false,
             hasRhythm: stats.rhythm || false,
@@ -1213,6 +1214,415 @@ window.GameUnits = (function() {
     }
 
     // ============================================
+    // LOOP PATHS - persistent multi-waypoint paths (polygons)
+    //   - Player taps to add waypoints. Polygon is drawn closed (last
+    //     waypoint always connects back to first).
+    //   - Confirm assigns selected woodsmen to cut along all polygon edges.
+    //   - Path stays in gameState.paths as a yellow polygon while being cut,
+    //     turns purple when all corridor trees on its edges are gone.
+    //   - Each path object: { id, waypoints, width, state, owner, lineMeshes }
+    //     state = 'draft' | 'under-construction' | 'complete'
+    // ============================================
+
+    let nextPathId = 1;
+    let draftLoopPath = null;  // path being built up by tap-tap-tap input
+
+    function createLoopPath(waypoints, width, owner = 'player') {
+        const gameState = getGameState();
+        if (!gameState.paths) gameState.paths = [];
+
+        const path = {
+            id: `path_${nextPathId++}`,
+            waypoints: waypoints.map(p => ({ x: p.x, z: p.z })),
+            width: width,
+            state: 'draft',
+            owner: owner,
+            lineMeshes: [],          // THREE.Line objects rendering the polygon
+            closed: true             // loops are always closed (last → first)
+        };
+
+        gameState.paths.push(path);
+        renderPath(path);
+        return path;
+    }
+
+    // Returns array of segment objects: { startX, startZ, endX, endZ, width }
+    // For a closed polygon with N waypoints, that's N segments.
+    function getPathSegments(path) {
+        const segments = [];
+        const n = path.waypoints.length;
+        if (n < 2) return segments;
+
+        for (let i = 0; i < n; i++) {
+            const a = path.waypoints[i];
+            const b = path.waypoints[(i + 1) % n];
+            segments.push({
+                startX: a.x, startZ: a.z,
+                endX: b.x, endZ: b.z,
+                width: path.width
+            });
+        }
+        return segments;
+    }
+
+    // Find the closest reachable, unclaimed tree across all segments of `path`,
+    // measured from the unit's current position. This is what makes multiple
+    // woodsmen distribute work across the loop naturally.
+    function findNextReachablePathTree(unit, path) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        const segments = getPathSegments(path);
+
+        let nearestTree = null;
+        let nearestDist = Infinity;
+        const seen = new Set();
+
+        for (const seg of segments) {
+            const dx = seg.endX - seg.startX;
+            const dz = seg.endZ - seg.startZ;
+            const length = Math.sqrt(dx * dx + dz * dz);
+            if (length < 1) continue;
+
+            const dirX = dx / length;
+            const dirZ = dz / length;
+            const perpX = -dirZ;
+            const perpZ = dirX;
+            const halfWidth = seg.width / 2;
+
+            for (let along = 0; along <= length; along += 0.5) {
+                for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
+                    const checkX = Math.floor(seg.startX + dirX * along + perpX * across);
+                    const checkZ = Math.floor(seg.startZ + dirZ * along + perpZ * across);
+                    const key = `${checkX},${checkZ}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+
+                    if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
+
+                    const cell = gameState.grid[checkX]?.[checkZ];
+                    if (cell !== CELL.TREE_NORMAL && cell !== CELL.TREE_HIGH_YIELD && cell !== CELL.TREE_ENERGY) continue;
+
+                    const claimedBy = claimedTrees.get(key);
+                    if (claimedBy && claimedBy !== unit.id) continue;
+
+                    if (!isTreeReachable(checkX, checkZ)) continue;
+
+                    const treeDx = checkX - unit.position.x;
+                    const treeDz = checkZ - unit.position.z;
+                    const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
+
+                    if (dist < nearestDist) {
+                        nearestDist = dist;
+                        nearestTree = { x: checkX, z: checkZ, type: cell };
+                    }
+                }
+            }
+        }
+
+        return nearestTree;
+    }
+
+    // Same logic but returns ALL trees on the path (for visualization / completion check)
+    function getAllPathTrees(path) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        const segments = getPathSegments(path);
+
+        const trees = [];
+        const seen = new Set();
+
+        for (const seg of segments) {
+            const dx = seg.endX - seg.startX;
+            const dz = seg.endZ - seg.startZ;
+            const length = Math.sqrt(dx * dx + dz * dz);
+            if (length < 1) continue;
+
+            const dirX = dx / length;
+            const dirZ = dz / length;
+            const perpX = -dirZ;
+            const perpZ = dirX;
+            const halfWidth = seg.width / 2;
+
+            for (let along = 0; along <= length; along += 0.5) {
+                for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
+                    const checkX = Math.floor(seg.startX + dirX * along + perpX * across);
+                    const checkZ = Math.floor(seg.startZ + dirZ * along + perpZ * across);
+                    const key = `${checkX},${checkZ}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+
+                    if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
+
+                    const cell = gameState.grid[checkX]?.[checkZ];
+                    if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                        trees.push({ x: checkX, z: checkZ, type: cell });
+                    }
+                }
+            }
+        }
+
+        return trees;
+    }
+
+    // Render the polygon as line segments. Color depends on state.
+    //   draft / under-construction → yellow
+    //   complete → purple
+    function renderPath(path) {
+        const THREE = getTHREE();
+        const scene = getScene();
+        clearPathRender(path);
+
+        if (path.waypoints.length < 1) return;
+
+        const color = path.state === 'complete' ? 0xb060e0 : 0xffd040;
+        const opacity = path.state === 'complete' ? 0.85 : 0.75;
+
+        const material = new THREE.LineBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: opacity,
+            linewidth: 3
+        });
+
+        const n = path.waypoints.length;
+
+        // Render each segment as its own line so we can see edges clearly.
+        // For a single waypoint, just draw a small marker.
+        if (n === 1) {
+            const p = path.waypoints[0];
+            const ringGeo = new THREE.RingGeometry(0.6, 0.9, 16);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: color, transparent: true, opacity: 0.8, side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.set(p.x, 0.3, p.z);
+            scene.add(ring);
+            path.lineMeshes.push(ring);
+        } else {
+            for (let i = 0; i < n; i++) {
+                const a = path.waypoints[i];
+                const b = path.waypoints[(i + 1) % n];
+                // For draft polygons with 2 waypoints, the closing edge is the
+                // same as the forward edge - skip the duplicate.
+                if (n === 2 && i === 1) continue;
+
+                const points = [
+                    new THREE.Vector3(a.x, 0.3, a.z),
+                    new THREE.Vector3(b.x, 0.3, b.z)
+                ];
+                const geom = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geom, material.clone());
+                scene.add(line);
+                path.lineMeshes.push(line);
+            }
+        }
+
+        // Waypoint dots so the player can see the corners they tapped
+        for (const wp of path.waypoints) {
+            const dotGeo = new THREE.CircleGeometry(0.4, 12);
+            const dotMat = new THREE.MeshBasicMaterial({
+                color: color, transparent: true, opacity: 0.9, side: THREE.DoubleSide
+            });
+            const dot = new THREE.Mesh(dotGeo, dotMat);
+            dot.rotation.x = -Math.PI / 2;
+            dot.position.set(wp.x, 0.32, wp.z);
+            scene.add(dot);
+            path.lineMeshes.push(dot);
+        }
+    }
+
+    function clearPathRender(path) {
+        const scene = getScene();
+        for (const mesh of path.lineMeshes) {
+            scene.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) mesh.material.dispose();
+        }
+        path.lineMeshes = [];
+    }
+
+    function destroyPath(path) {
+        const gameState = getGameState();
+        clearPathRender(path);
+        if (gameState.paths) {
+            const idx = gameState.paths.indexOf(path);
+            if (idx !== -1) gameState.paths.splice(idx, 1);
+        }
+    }
+
+    function findPathById(pathId) {
+        const gameState = getGameState();
+        if (!gameState.paths) return null;
+        return gameState.paths.find(p => p.id === pathId) || null;
+    }
+
+    // ----- Multi-waypoint input flow -----
+
+    // Each tap while in cutLoop mode adds a waypoint to the draft path.
+    function addLoopWaypoint(targetX, targetZ, width) {
+        if (selectedUnits.length === 0) return;
+
+        if (!draftLoopPath) {
+            // First tap - create the path
+            draftLoopPath = createLoopPath([{ x: targetX, z: targetZ }], width);
+            createRipple(targetX, targetZ);
+            if (window.GameUI) GameUI.showLoopConfirm(width);
+        } else {
+            // Append a waypoint and re-render
+            draftLoopPath.waypoints.push({ x: targetX, z: targetZ });
+            createRipple(targetX, targetZ);
+            renderPath(draftLoopPath);
+        }
+    }
+
+    // User hit Confirm - assign units, transition draft → under-construction.
+    function confirmLoopCommand() {
+        if (!draftLoopPath || selectedUnits.length === 0) {
+            cancelLoopCommand();
+            return;
+        }
+
+        if (draftLoopPath.waypoints.length < 2) {
+            // Not enough waypoints to form a path - cancel
+            cancelLoopCommand();
+            return;
+        }
+
+        draftLoopPath.state = 'under-construction';
+        renderPath(draftLoopPath);  // re-render with under-construction style
+
+        const pathRef = draftLoopPath;
+        for (const unit of selectedUnits) {
+            assignUnitToPath(unit, pathRef);
+        }
+
+        draftLoopPath = null;
+        commandMode = null;
+
+        if (window.GameUI) {
+            GameUI.hideCommandIndicator();
+            GameUI.hideLoopConfirm();
+            GameUI.showUnitMenu(selectedUnits);
+        }
+    }
+
+    function cancelLoopCommand() {
+        if (draftLoopPath) {
+            destroyPath(draftLoopPath);
+            draftLoopPath = null;
+        }
+        commandMode = null;
+
+        if (window.GameUI) {
+            GameUI.hideCommandIndicator();
+            GameUI.hideLoopConfirm();
+            if (selectedUnits.length > 0) {
+                GameUI.showUnitMenu(selectedUnits);
+            }
+        }
+    }
+
+    function hasDraftLoopPath() {
+        return draftLoopPath !== null;
+    }
+
+    // ----- Unit cutting behavior on a path -----
+
+    function assignUnitToPath(unit, path) {
+        if (!unit.typeData.canHarvest) return;
+
+        unit.pathId = path.id;
+        unit.harvestMode = 'cutLoop';
+        unit.corridorTarget = null;  // clear any old corridor target
+        releaseTreeClaim(unit);
+
+        continueCuttingPath(unit);
+    }
+
+    function continueCuttingPath(unit) {
+        const path = findPathById(unit.pathId);
+        if (!path) {
+            // Path was destroyed - fall back to nearby
+            unit.pathId = null;
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+            return;
+        }
+
+        // Inventory full?
+        const totalCarried = unit.inventory.wood + unit.inventory.energy;
+        if (totalCarried >= unit.carryCapacity) {
+            returnToSawmill(unit);
+            return;
+        }
+
+        // Find next reachable tree on any segment of the path
+        const blockingTree = findNextReachablePathTree(unit, path);
+
+        if (blockingTree) {
+            claimTree(unit, blockingTree);
+            unit.targetTree = blockingTree;
+
+            const adjacentCell = findAdjacentCellToTree(
+                blockingTree.x, blockingTree.z,
+                unit.position.x, unit.position.z
+            );
+
+            if (adjacentCell) {
+                const newPath = findPath(
+                    unit.position.x, unit.position.z,
+                    adjacentCell.x, adjacentCell.z,
+                    false, unit.hasForestWalk
+                );
+                if (newPath && newPath.length > 0) {
+                    unit.path = newPath;
+                    unit.pathIndex = 0;
+                    unit.state = 'moving';
+                    createPathLine(unit, newPath);
+                    return;
+                }
+            }
+
+            releaseTreeClaim(unit);
+            unit.state = 'idle';
+        } else {
+            // No more trees on this path - it's done!
+            // Mark path complete (will be checked in updatePaths too, but do it now)
+            if (path.state !== 'complete') {
+                path.state = 'complete';
+                renderPath(path);
+                console.log(`Path ${path.id} complete - now patrollable`);
+            }
+
+            // Unit done with this path - revert to nearby harvest
+            unit.pathId = null;
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+        }
+    }
+
+    // Run periodically to check if any under-construction paths are done
+    // (covers the case where ALL trees on a path get cut by means other
+    // than assigned woodsmen, e.g. a cleave upgrade or hero blasts).
+    function updatePaths() {
+        const gameState = getGameState();
+        if (!gameState.paths) return;
+
+        for (const path of gameState.paths) {
+            if (path.state !== 'under-construction') continue;
+            const remaining = getAllPathTrees(path);
+            if (remaining.length === 0) {
+                path.state = 'complete';
+                renderPath(path);
+                console.log(`Path ${path.id} complete (auto-detected)`);
+            }
+        }
+    }
+
+    // ============================================
     // HARVESTING TREE (the chopping action)
     // ============================================
 
@@ -1223,6 +1633,8 @@ window.GameUnits = (function() {
         if (!unit.targetTree) {
             if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                 continueCuttingCorridor(unit);
+            } else if (unit.harvestMode === 'cutLoop') {
+                continueCuttingPath(unit);
             } else {
                 startHarvesting(unit);
             }
@@ -1315,6 +1727,9 @@ window.GameUnits = (function() {
             } else if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                 unit.targetTree = null;
                 continueCuttingCorridor(unit);
+            } else if (unit.harvestMode === 'cutLoop') {
+                unit.targetTree = null;
+                continueCuttingPath(unit);
             } else {
                 unit.targetTree = null;
                 startHarvesting(unit);
@@ -1361,6 +1776,8 @@ window.GameUnits = (function() {
 
         if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
             continueCuttingCorridor(unit);
+        } else if (unit.harvestMode === 'cutLoop') {
+            continueCuttingPath(unit);
         } else if (unit.harvestMode) {
             startHarvesting(unit);
         } else {
@@ -1394,6 +1811,8 @@ window.GameUnits = (function() {
                 harvestTree(unit, 0);
             } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
                 continueCuttingCorridor(unit);
+            } else if (unit.harvestMode === 'cutLoop' && unit.typeData.canHarvest) {
+                continueCuttingPath(unit);
             } else if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
                 startHarvesting(unit);
             } else {
@@ -1569,6 +1988,7 @@ window.GameUnits = (function() {
             unit.state = 'moving';
             unit.harvestMode = null;
             unit.corridorTarget = null;
+            unit.pathId = null;
             unit.targetTree = null;
             unit.targetBuilding = null;
             createPathLine(unit, path);
@@ -1611,6 +2031,7 @@ window.GameUnits = (function() {
                 unit.state = 'moving';
                 unit.harvestMode = null;
                 unit.corridorTarget = null;
+                unit.pathId = null;
                 unit.targetTree = null;
                 unit.targetBuilding = null;
                 createPathLine(unit, path);
@@ -1679,6 +2100,13 @@ window.GameUnits = (function() {
         selectedUnits = [];
         commandMode = null;
         clearCorridorPreview();
+        // Discard any in-progress loop draft - the user is no longer
+        // engaged with the woodsman that started it.
+        if (draftLoopPath) {
+            destroyPath(draftLoopPath);
+            draftLoopPath = null;
+            if (window.GameUI) GameUI.hideLoopConfirm();
+        }
         if (window.GameUI) GameUI.hideMenus();
     }
 
@@ -1692,6 +2120,12 @@ window.GameUnits = (function() {
         commandMode = mode;
         if (mode !== 'cutPath' && mode !== 'cutLane') {
             clearCorridorPreview();
+        }
+        // Leaving cutLoop mode without committing → drop the draft.
+        if (mode !== 'cutLoop' && draftLoopPath) {
+            destroyPath(draftLoopPath);
+            draftLoopPath = null;
+            if (window.GameUI) GameUI.hideLoopConfirm();
         }
     }
 
@@ -1742,6 +2176,8 @@ window.GameUnits = (function() {
                     if (unit.harvestMode && unit.typeData.canHarvest) {
                         if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                             continueCuttingCorridor(unit);
+                        } else if (unit.harvestMode === 'cutLoop') {
+                            continueCuttingPath(unit);
                         } else {
                             startHarvesting(unit);
                         }
@@ -1754,6 +2190,8 @@ window.GameUnits = (function() {
                         startHarvesting(unit);
                     } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
                         continueCuttingCorridor(unit);
+                    } else if (unit.harvestMode === 'cutLoop' && unit.typeData.canHarvest) {
+                        continueCuttingPath(unit);
                     }
                     break;
             }
@@ -1791,6 +2229,10 @@ window.GameUnits = (function() {
                 marker.material.opacity = 0.5 + Math.sin(now * 0.006) * 0.3;
             }
         }
+
+        // Auto-detect path completion (e.g. trees on a path were cut by
+        // some other means than assigned units).
+        updatePaths();
     }
 
     function init() {
@@ -1823,6 +2265,11 @@ window.GameUnits = (function() {
         confirmCorridorCommand,
         cancelCorridorCommand,
         hasPendingCorridorCommand,
+        // Loop paths
+        addLoopWaypoint,
+        confirmLoopCommand,
+        cancelLoopCommand,
+        hasDraftLoopPath,
         killUnit
     };
 })();
