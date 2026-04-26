@@ -1359,7 +1359,13 @@ window.GameUnits = (function() {
 
     // ============================================
     // MOVEMENT (no soft-collision push - units can overlap)
+    // Smooth movement: carries leftover distance across waypoints in a
+    // single frame so the unit doesn't stall every time it reaches one.
     // ============================================
+
+    // Maximum allowed deltaTime per frame in ms. Prevents huge jumps after
+    // tab-switches, debugger pauses, or a slow first frame after init.
+    const MAX_DELTA_MS = 50;
 
     function moveUnit(unit, deltaTime) {
         if (!unit.path || unit.pathIndex >= unit.path.length) {
@@ -1385,22 +1391,44 @@ window.GameUnits = (function() {
             return;
         }
 
-        const target = unit.path[unit.pathIndex];
-        const dx = target.x + 0.5 - unit.position.x;
-        const dz = target.z + 0.5 - unit.position.z;
-        const distance = Math.sqrt(dx * dx + dz * dz);
+        // deltaTime is already clamped to MAX_DELTA_MS in update().
+        let remainingMove = unit.speed * deltaTime;
 
-        if (distance < 0.5) {
-            unit.pathIndex++;
-            return;
+        // Walk through waypoints, consuming the full frame's movement budget.
+        // If we reach a waypoint mid-frame, snap to it and continue toward
+        // the next one with the leftover distance. This is what gives the
+        // motion its smoothness - no per-waypoint stalls.
+        while (remainingMove > 0 && unit.pathIndex < unit.path.length) {
+            const target = unit.path[unit.pathIndex];
+            const targetX = target.x + 0.5;
+            const targetZ = target.z + 0.5;
+            const dx = targetX - unit.position.x;
+            const dz = targetZ - unit.position.z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+
+            if (distance < 0.001) {
+                // Already at this waypoint (degenerate first node)
+                unit.pathIndex++;
+                continue;
+            }
+
+            if (distance <= remainingMove) {
+                // We can reach this waypoint this frame - snap to it,
+                // spend the distance, advance to the next one.
+                unit.position.x = targetX;
+                unit.position.z = targetZ;
+                remainingMove -= distance;
+                unit.pathIndex++;
+            } else {
+                // Not enough movement to reach this waypoint - partial move.
+                const t = remainingMove / distance;
+                unit.position.x += dx * t;
+                unit.position.z += dz * t;
+                remainingMove = 0;
+            }
         }
 
-        const moveSpeed = unit.speed * deltaTime;
-        const moveX = (dx / distance) * moveSpeed;
-        const moveZ = (dz / distance) * moveSpeed;
-
-        unit.position.x += moveX;
-        unit.position.z += moveZ;
+        // Sync visuals
         unit.sprite.position.x = unit.position.x;
         unit.sprite.position.z = unit.position.z;
 
@@ -1671,7 +1699,10 @@ window.GameUnits = (function() {
         if (!gameState) return;
 
         const now = Date.now();
-        const deltaTime = now - lastTime;
+        // Clamp deltaTime - protects against huge jumps after tab backgrounding,
+        // debugger pauses, or a slow first frame. Without this, units can teleport
+        // and harvest progress can leap forward unrealistically.
+        const deltaTime = Math.min(now - lastTime, MAX_DELTA_MS);
         lastTime = now;
 
         if (window.GameBuildings) GameBuildings.updateProduction(deltaTime);
