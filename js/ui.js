@@ -288,6 +288,7 @@ window.GameUI = (function() {
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
             const anyCuttingPath = units.some(u => u.harvestMode === 'cutPath');
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
+            const anyCuttingLoop = units.some(u => u.harvestMode === 'cutLoop');
             
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
@@ -345,6 +346,25 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🛣️</span>
                     <span style="flex: 1; text-align: left;">Cut Lane</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLane ? 'ACTIVE' : '4 wide'}</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="cutLoop" style="
+                    background: ${anyCuttingLoop ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyCuttingLoop ? '#d4a84a' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🔁</span>
+                    <span style="flex: 1; text-align: left;">Cut Loop</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLoop ? 'ACTIVE' : 'Polygon'}</span>
                 </button>
             `;
         }
@@ -432,6 +452,8 @@ window.GameUI = (function() {
                     isActive = units.some(u => u.harvestMode === 'cutPath');
                 } else if (cmd === 'cutLane') {
                     isActive = units.some(u => u.harvestMode === 'cutLane');
+                } else if (cmd === 'cutLoop') {
+                    isActive = units.some(u => u.harvestMode === 'cutLoop');
                 }
                 
                 btn.style.background = isActive ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)';
@@ -533,6 +555,18 @@ window.GameUI = (function() {
                     ? `Tap destination for ${units.length} woodsmen to cut lane`
                     : 'Tap destination to cut lane (4 wide)';
                 showCommandIndicator(laneText);
+                hideMenuVisuals();
+                break;
+
+            case 'cutLoop':
+                // Enter cut loop mode - tap multiple points to draw a polygon
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('cutLoop');
+                }
+                const loopText = units.length > 1
+                    ? `Tap waypoints for ${units.length} woodsmen to cut loop`
+                    : 'Tap waypoints to draw loop. Confirm when done.';
+                showCommandIndicator(loopText);
                 hideMenuVisuals();
                 break;
         }
@@ -653,6 +687,107 @@ window.GameUI = (function() {
     }
     
     function hideCorridorConfirm() {
+        if (corridorConfirmPanel) {
+            corridorConfirmPanel.style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // LOOP PATH CONFIRM PANEL
+    // Same panel as corridor confirm but stays open across multiple taps,
+    // and the user keeps adding waypoints until they hit Confirm.
+    // ============================================
+
+    function showLoopConfirm(width) {
+        if (!corridorConfirmPanel) return;
+
+        corridorConfirmPanel.innerHTML = `
+            <div style="
+                color: #ffcc66;
+                font-size: 12px;
+                text-align: center;
+                padding: 4px 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            ">
+                🔁 Drawing Loop
+            </div>
+            <div style="
+                color: #a8d5a2;
+                font-size: 11px;
+                text-align: center;
+                padding-bottom: 6px;
+            ">
+                Keep tapping to add waypoints. Confirm when shape looks right.
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="loop-cancel-btn" style="
+                    flex: 1;
+                    background: rgba(120, 50, 50, 0.4);
+                    border: 1px solid #aa5555;
+                    border-radius: 6px;
+                    color: #f0c8c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✕ Cancel
+                </button>
+                <button id="loop-confirm-btn" style="
+                    flex: 1;
+                    background: rgba(74, 124, 63, 0.6);
+                    border: 1px solid #7ddf64;
+                    border-radius: 6px;
+                    color: #ffffff;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✓ Confirm
+                </button>
+            </div>
+        `;
+
+        corridorConfirmPanel.style.display = 'flex';
+
+        // Hide the regular unit menu while showing confirm
+        if (unitMenuContainer) {
+            unitMenuContainer.style.display = 'none';
+        }
+
+        const confirmBtn = document.getElementById('loop-confirm-btn');
+        const cancelBtn = document.getElementById('loop-cancel-btn');
+
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.confirmLoopCommand();
+            });
+            confirmBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.confirmLoopCommand();
+            });
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.cancelLoopCommand();
+            });
+            cancelBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.cancelLoopCommand();
+            });
+        }
+    }
+
+    function hideLoopConfirm() {
         if (corridorConfirmPanel) {
             corridorConfirmPanel.style.display = 'none';
         }
@@ -1174,6 +1309,7 @@ window.GameUI = (function() {
         }
         hideCommandIndicator();
         hideCorridorConfirm();
+        hideLoopConfirm();
     }
     
     // Hide menus AND clear selection state (for clicking elsewhere)
@@ -1214,6 +1350,8 @@ window.GameUI = (function() {
         hideCommandIndicator,
         showCorridorConfirm,
         hideCorridorConfirm,
+        showLoopConfirm,
+        hideLoopConfirm,
         hideMenus,
         hideMenuVisuals,
         buildBuilding,
