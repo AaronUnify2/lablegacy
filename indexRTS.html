@@ -1040,9 +1040,6 @@
                         touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                     }
                     
-                    // Update corridor preview while in cut mode
-                    updatePreviewFromTouch(e.touches[0].clientX, e.touches[0].clientY);
-                    
                 } else if (e.touches.length === 2 && lastTouchDistance) {
                     const newDistance = Math.hypot(
                         e.touches[0].clientX - e.touches[1].clientX,
@@ -1077,62 +1074,6 @@
             
             // Click detection for building sites and units
             renderer.domElement.addEventListener('click', onCanvasClick);
-            
-            // Mouse move for corridor preview
-            renderer.domElement.addEventListener('mousemove', onCanvasMouseMove);
-        }
-
-        // ============================================
-        // CORRIDOR PREVIEW ON MOUSE MOVE
-        // ============================================
-        function onCanvasMouseMove(event) {
-            if (!window.GameUnits) return;
-            
-            const commandMode = GameUnits.getCommandMode();
-            if (commandMode !== 'cutPath' && commandMode !== 'cutLane') {
-                return;
-            }
-            
-            ensureRaycaster();
-            
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            
-            raycaster.setFromCamera(mouse, camera);
-            
-            const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-            const intersectPoint = new THREE.Vector3();
-            raycaster.ray.intersectPlane(groundPlane, intersectPoint);
-            
-            if (intersectPoint) {
-                GameUnits.updateCorridorPreview(intersectPoint.x, intersectPoint.z);
-            }
-        }
-        
-        function updatePreviewFromTouch(clientX, clientY) {
-            if (!window.GameUnits) return;
-            
-            const commandMode = GameUnits.getCommandMode();
-            if (commandMode !== 'cutPath' && commandMode !== 'cutLane') {
-                return;
-            }
-            
-            ensureRaycaster();
-            
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-            
-            raycaster.setFromCamera(mouse, camera);
-            
-            const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-            const intersectPoint = new THREE.Vector3();
-            raycaster.ray.intersectPlane(groundPlane, intersectPoint);
-            
-            if (intersectPoint) {
-                GameUnits.updateCorridorPreview(intersectPoint.x, intersectPoint.z);
-            }
         }
 
         // ============================================
@@ -1162,20 +1103,19 @@
                         const selectedUnits = GameUnits.getSelectedUnits();
                         if (selectedUnits && selectedUnits.length > 0) {
                             if (commandMode === 'move') {
-                                // Use multi-select move command (handles formation)
+                                // Move command executes immediately
                                 GameUnits.commandMoveMultiple(selectedUnits, intersectPoint.x, intersectPoint.z);
+                                GameUnits.setCommandMode(null);
+                                if (window.GameUI) {
+                                    GameUI.hideCommandIndicator();
+                                    GameUI.showUnitMenu(selectedUnits);
+                                }
                             } else if (commandMode === 'cutPath') {
-                                // Cut path (2 wide)
+                                // Show preview - waits for user to confirm
+                                // Stay in command mode so re-tap moves the target
                                 GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 2);
                             } else if (commandMode === 'cutLane') {
-                                // Cut lane (4 wide)
                                 GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 4);
-                            }
-                            
-                            GameUnits.setCommandMode(null);
-                            if (window.GameUI) {
-                                GameUI.hideCommandIndicator();
-                                GameUI.showUnitMenu(selectedUnits);
                             }
                         }
                     }
