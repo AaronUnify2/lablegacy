@@ -1094,7 +1094,7 @@
             if (window.GameUnits) {
                 const commandMode = GameUnits.getCommandMode();
                 
-                if (commandMode === 'move' || commandMode === 'cutPath' || commandMode === 'cutLane' || commandMode === 'cutLoop') {
+                if (commandMode === 'move' || commandMode === 'cutLane' || commandMode === 'cutLoop') {
                     // Get ground intersection for command
                     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
                     const intersectPoint = new THREE.Vector3();
@@ -1111,17 +1111,17 @@
                                     GameUI.hideCommandIndicator();
                                     GameUI.showUnitMenu(selectedUnits);
                                 }
-                            } else if (commandMode === 'cutPath') {
+                            } else if (commandMode === 'cutLane') {
                                 // Show preview - waits for user to confirm
                                 // Stay in command mode so re-tap moves the target
-                                GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 2);
-                            } else if (commandMode === 'cutLane') {
                                 GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 4);
                             } else if (commandMode === 'cutLoop') {
                                 // Add a waypoint to the loop being drawn.
                                 // First tap creates the path; subsequent taps add corners.
                                 // Stays in command mode until user hits Confirm.
-                                GameUnits.addLoopWaypoint(intersectPoint.x, intersectPoint.z, 2);
+                                // Loop paths are lane-width (4) so they're visually
+                                // pleasing and wide enough to patrol comfortably.
+                                GameUnits.addLoopWaypoint(intersectPoint.x, intersectPoint.z, 4);
                             }
                         }
                     }
