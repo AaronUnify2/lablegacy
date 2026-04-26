@@ -48,7 +48,7 @@ window.GameUnits = (function() {
             id: 'woodsman', name: 'Woodsman',
             health: 60, damage: 8, speed: 0.035,
             attackRange: 1.5, attackSpeed: 1200,
-            harvestSpeed: 3000, carryCapacity: 5,
+            harvestSpeed: 1500, carryCapacity: 5,
             canHarvest: true, scale: 1.0
         },
         archer: {
@@ -1377,58 +1377,88 @@ window.GameUnits = (function() {
         if (path.waypoints.length < 1) return;
 
         const color = path.state === 'complete' ? 0xb060e0 : 0xffd040;
-        const opacity = path.state === 'complete' ? 0.85 : 0.75;
-
-        const material = new THREE.LineBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: opacity,
-            linewidth: 3
-        });
+        const opacity = path.state === 'complete' ? 0.95 : 0.9;
 
         const n = path.waypoints.length;
 
-        // Render each segment as its own line so we can see edges clearly.
-        // For a single waypoint, just draw a small marker.
-        if (n === 1) {
-            const p = path.waypoints[0];
-            const ringGeo = new THREE.RingGeometry(0.6, 0.9, 16);
-            const ringMat = new THREE.MeshBasicMaterial({
-                color: color, transparent: true, opacity: 0.8, side: THREE.DoubleSide
+        // Render polygon as flat ribbons (PlaneGeometry strips) above the canopy.
+        // Two key tricks for visibility through dense forest:
+        //   1. depthTest: false  — always draw, even when behind tree sprites
+        //   2. renderOrder: 999  — draw last, so it overlays everything
+        // Tree sprites are ~4.5 tall from their y=2.25 pivot, so we float at y=6
+        // for a clear margin. Ribbons are wide enough to read at RTS zoom levels.
+        const Y_LINE = 6.0;
+        const RIBBON_WIDTH = 1.4;       // matches lane width visually
+        const DOT_RADIUS = 1.2;
+
+        function makeRibbon(ax, az, bx, bz) {
+            const dx = bx - ax;
+            const dz = bz - az;
+            const len = Math.sqrt(dx * dx + dz * dz);
+            if (len < 0.001) return null;
+
+            const geom = new THREE.PlaneGeometry(len, RIBBON_WIDTH);
+            const mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: opacity,
+                side: THREE.DoubleSide,
+                depthTest: false,        // always visible through trees
+                depthWrite: false
             });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI / 2;
-            ring.position.set(p.x, 0.3, p.z);
-            scene.add(ring);
-            path.lineMeshes.push(ring);
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.renderOrder = 999;       // draw after everything else
+
+            // Position at midpoint, lay flat on XZ plane
+            mesh.position.set((ax + bx) / 2, Y_LINE, (az + bz) / 2);
+            mesh.rotation.x = -Math.PI / 2;
+            // PlaneGeometry's local x-axis is the length direction. After
+            // rotating onto XZ, that local x maps to world X. We need to
+            // rotate around Y to align with the actual segment direction.
+            mesh.rotation.z = -Math.atan2(dz, dx);
+            return mesh;
+        }
+
+        function makeDot(x, z) {
+            const geom = new THREE.CircleGeometry(DOT_RADIUS, 24);
+            const mat = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: Math.min(1, opacity + 0.05),
+                side: THREE.DoubleSide,
+                depthTest: false,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.renderOrder = 1000;      // draw above the ribbons
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.set(x, Y_LINE + 0.05, z);
+            return mesh;
+        }
+
+        if (n === 1) {
+            // Single waypoint - just show the dot
+            const dot = makeDot(path.waypoints[0].x, path.waypoints[0].z);
+            scene.add(dot);
+            path.lineMeshes.push(dot);
         } else {
+            // Closed polygon - draw each segment as a ribbon
             for (let i = 0; i < n; i++) {
                 const a = path.waypoints[i];
                 const b = path.waypoints[(i + 1) % n];
-                // For draft polygons with 2 waypoints, the closing edge is the
-                // same as the forward edge - skip the duplicate.
+                // Two-waypoint draft: closing edge is the same as forward edge
                 if (n === 2 && i === 1) continue;
-
-                const points = [
-                    new THREE.Vector3(a.x, 0.3, a.z),
-                    new THREE.Vector3(b.x, 0.3, b.z)
-                ];
-                const geom = new THREE.BufferGeometry().setFromPoints(points);
-                const line = new THREE.Line(geom, material.clone());
-                scene.add(line);
-                path.lineMeshes.push(line);
+                const ribbon = makeRibbon(a.x, a.z, b.x, b.z);
+                if (ribbon) {
+                    scene.add(ribbon);
+                    path.lineMeshes.push(ribbon);
+                }
             }
         }
 
-        // Waypoint dots so the player can see the corners they tapped
+        // Waypoint corner dots — bigger and rendered above ribbons
         for (const wp of path.waypoints) {
-            const dotGeo = new THREE.CircleGeometry(0.4, 12);
-            const dotMat = new THREE.MeshBasicMaterial({
-                color: color, transparent: true, opacity: 0.9, side: THREE.DoubleSide
-            });
-            const dot = new THREE.Mesh(dotGeo, dotMat);
-            dot.rotation.x = -Math.PI / 2;
-            dot.position.set(wp.x, 0.32, wp.z);
+            const dot = makeDot(wp.x, wp.z);
             scene.add(dot);
             path.lineMeshes.push(dot);
         }
@@ -1590,17 +1620,22 @@ window.GameUnits = (function() {
             unit.state = 'idle';
         } else {
             // No more trees on this path - it's done!
-            // Mark path complete (will be checked in updatePaths too, but do it now)
             if (path.state !== 'complete') {
                 path.state = 'complete';
                 renderPath(path);
                 console.log(`Path ${path.id} complete - now patrollable`);
             }
 
-            // Unit done with this path - revert to nearby harvest
+            // Loop is done. Don't auto-drift into "nearby harvest" — that
+            // would pull the woodsman deep into the forest from inside the
+            // corridor he just cut, which feels like wandering off. Instead,
+            // stop and wait for orders. Player can re-issue Harvest Nearby
+            // or another command.
             unit.pathId = null;
-            unit.harvestMode = 'nearby';
-            startHarvesting(unit);
+            unit.harvestMode = null;
+            unit.targetTree = null;
+            unit.state = 'idle';
+            clearPathLine(unit);
         }
     }
 
