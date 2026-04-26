@@ -9,6 +9,7 @@ window.GameUI = (function() {
     let resourceDisplay = null;
     let unitMenuContainer = null;
     let commandIndicator = null;
+    let corridorConfirmPanel = null;
     let menuOpenTime = 0;
     const MENU_CLICK_DELAY = 300; // ms before clicks register
     
@@ -81,6 +82,28 @@ window.GameUI = (function() {
             letter-spacing: 1px;
         `;
         document.getElementById('ui-overlay').appendChild(commandIndicator);
+        
+        // Corridor confirm panel (Confirm/Cancel buttons after tap-to-preview)
+        corridorConfirmPanel = document.createElement('div');
+        corridorConfirmPanel.id = 'corridor-confirm-panel';
+        corridorConfirmPanel.style.cssText = `
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 25, 15, 0.95);
+            border: 2px solid #ffaa00;
+            border-radius: 12px;
+            padding: 12px;
+            display: none;
+            pointer-events: auto;
+            width: 280px;
+            z-index: 110;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            flex-direction: column;
+            gap: 8px;
+        `;
+        document.getElementById('ui-overlay').appendChild(corridorConfirmPanel);
         
         // Resource display
         resourceDisplay = document.createElement('div');
@@ -522,6 +545,117 @@ window.GameUI = (function() {
     
     function hideCommandIndicator() {
         commandIndicator.style.display = 'none';
+    }
+    
+    // ============================================
+    // CORRIDOR CONFIRM PANEL
+    // ============================================
+    
+    function showCorridorConfirm(width) {
+        if (!corridorConfirmPanel) return;
+        
+        const widthLabel = width === 2 ? 'Path (2 wide)' : 'Lane (4 wide)';
+        const icon = width === 2 ? '🛤️' : '🛣️';
+        
+        corridorConfirmPanel.innerHTML = `
+            <div style="
+                color: #ffcc66;
+                font-size: 12px;
+                text-align: center;
+                padding: 4px 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            ">
+                ${icon} Cut ${widthLabel}?
+            </div>
+            <div style="
+                color: #a8d5a2;
+                font-size: 11px;
+                text-align: center;
+                padding-bottom: 6px;
+            ">
+                Tap elsewhere to move target, or:
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="corridor-cancel-btn" style="
+                    flex: 1;
+                    background: rgba(120, 50, 50, 0.4);
+                    border: 1px solid #aa5555;
+                    border-radius: 6px;
+                    color: #f0c8c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✕ Cancel
+                </button>
+                <button id="corridor-confirm-btn" style="
+                    flex: 1;
+                    background: rgba(74, 124, 63, 0.6);
+                    border: 1px solid #7ddf64;
+                    border-radius: 6px;
+                    color: #ffffff;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✓ Confirm
+                </button>
+            </div>
+        `;
+        
+        corridorConfirmPanel.style.display = 'flex';
+        
+        // Hide the regular unit menu while showing confirm
+        if (unitMenuContainer) {
+            unitMenuContainer.style.display = 'none';
+        }
+        
+        // Wire up buttons
+        const confirmBtn = document.getElementById('corridor-confirm-btn');
+        const cancelBtn = document.getElementById('corridor-cancel-btn');
+        
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) {
+                    GameUnits.confirmCorridorCommand();
+                }
+            });
+            confirmBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) {
+                    GameUnits.confirmCorridorCommand();
+                }
+            });
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) {
+                    GameUnits.cancelCorridorCommand();
+                }
+            });
+            cancelBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) {
+                    GameUnits.cancelCorridorCommand();
+                }
+            });
+        }
+    }
+    
+    function hideCorridorConfirm() {
+        if (corridorConfirmPanel) {
+            corridorConfirmPanel.style.display = 'none';
+        }
     }
     
     // ============================================
@@ -1039,6 +1173,7 @@ window.GameUI = (function() {
             unitMenuContainer.style.display = 'none';
         }
         hideCommandIndicator();
+        hideCorridorConfirm();
     }
     
     // Hide menus AND clear selection state (for clicking elsewhere)
@@ -1077,6 +1212,8 @@ window.GameUI = (function() {
         showUnitMenu,
         showCommandIndicator,
         hideCommandIndicator,
+        showCorridorConfirm,
+        hideCorridorConfirm,
         hideMenus,
         hideMenuVisuals,
         buildBuilding,
