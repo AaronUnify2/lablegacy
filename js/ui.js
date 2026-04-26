@@ -12,6 +12,11 @@ window.GameUI = (function() {
     let corridorConfirmPanel = null;
     let menuOpenTime = 0;
     const MENU_CLICK_DELAY = 300; // ms before clicks register
+
+    // Tracks the building whose menu is currently visible, so the live update
+    // tick (called from the main animation loop via tick()) can keep the
+    // production progress bar and queue counter in sync as time passes.
+    let currentBuildingMenu = null;
     
     // Create the UI elements
     function createUI() {
@@ -891,31 +896,20 @@ window.GameUI = (function() {
         
         const canAffordUnit = gameState.resources.energy >= building.typeData.unitCost.energy;
         
-        // Production status
-        let productionStatus = '';
-        if (building.isProducing) {
-            const progress = Math.floor((building.productionProgress / building.typeData.productionTime) * 100);
-            productionStatus = `
-                <div style="margin: 12px 0;">
-                    <div style="color: #8ab88a; font-size: 11px; margin-bottom: 6px;">
-                        Training: ${building.typeData.unitType}
-                    </div>
-                    <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 10px; overflow: hidden; border: 1px solid #3a5a3a;">
-                        <div style="background: linear-gradient(90deg, #5a9a4a, #7ddf64); height: 100%; width: ${progress}%; transition: width 0.2s;"></div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Queue status
-        let queueStatus = '';
-        if (building.productionQueue.length > 0) {
-            queueStatus = `
-                <div style="color: #7a9a7a; font-size: 11px; margin-bottom: 10px;">
-                    Queue: ${building.productionQueue.length} unit(s)
-                </div>
-            `;
-        }
+        // Production status — wrapped in a container we can update live.
+        // The tick() function rewrites the inner contents each frame so the
+        // progress bar and queue count reflect the actual building state.
+        const productionStatus = `
+            <div id="building-production-status" style="margin: 12px 0;">
+                ${renderProductionStatus(building)}
+            </div>
+        `;
+
+        const queueStatus = `
+            <div id="building-queue-status" style="color: #7a9a7a; font-size: 11px; margin-bottom: 10px;">
+                ${renderQueueStatus(building)}
+            </div>
+        `;
         
         // Upgrade paths (for Lodge)
         let upgradesHtml = '';
@@ -1093,6 +1087,58 @@ window.GameUI = (function() {
                 hideMenus();
             }
         });
+
+        // Track this building so tick() can keep its progress bar live
+        currentBuildingMenu = building;
+    }
+
+    // ============================================
+    // LIVE BUILDING-MENU UPDATES
+    //   These render fragments are pulled out so tick() can rewrite them
+    //   in place each frame without rebuilding the whole menu (which would
+    //   reset scroll position and steal focus from buttons).
+    // ============================================
+
+    function renderProductionStatus(building) {
+        if (!building.isProducing) return '';
+        const time = building.typeData.productionTime;
+        const progress = Math.floor((building.productionProgress / time) * 100);
+        return `
+            <div style="color: #8ab88a; font-size: 11px; margin-bottom: 6px;">
+                Training: ${building.typeData.unitType}
+            </div>
+            <div style="background: rgba(0,0,0,0.4); border-radius: 4px; height: 10px; overflow: hidden; border: 1px solid #3a5a3a;">
+                <div style="background: linear-gradient(90deg, #5a9a4a, #7ddf64); height: 100%; width: ${progress}%;"></div>
+            </div>
+        `;
+    }
+
+    function renderQueueStatus(building) {
+        if (!building.productionQueue || building.productionQueue.length === 0) return '';
+        return `Queue: ${building.productionQueue.length} unit(s)`;
+    }
+
+    // Called from the main animation loop. Cheap no-op when no building menu
+    // is showing. When one is, rewrites the production-status and queue text
+    // in place so the player sees the bar fill up live.
+    function tick() {
+        if (!currentBuildingMenu) return;
+
+        // If the building was destroyed or its menu was replaced, bail out.
+        const gameState = window.GameEngine?.gameState;
+        if (!gameState || !gameState.buildings.includes(currentBuildingMenu)) {
+            currentBuildingMenu = null;
+            return;
+        }
+
+        const prodEl = document.getElementById('building-production-status');
+        if (prodEl) {
+            prodEl.innerHTML = renderProductionStatus(currentBuildingMenu);
+        }
+        const queueEl = document.getElementById('building-queue-status');
+        if (queueEl) {
+            queueEl.innerHTML = renderQueueStatus(currentBuildingMenu);
+        }
     }
     
     function purchaseUpgrade(building, pathKey) {
@@ -1276,6 +1322,7 @@ window.GameUI = (function() {
         hideCommandIndicator();
         hideCorridorConfirm();
         hideLoopConfirm();
+        currentBuildingMenu = null;
     }
     
     // Hide menus AND clear selection state (for clicking elsewhere)
@@ -1322,6 +1369,7 @@ window.GameUI = (function() {
         hideMenuVisuals,
         buildBuilding,
         trainUnit,
-        updateResources
+        updateResources,
+        tick
     };
 })();
