@@ -204,21 +204,21 @@ window.GameUI = (function() {
                 let stateColor = '#8ab88a';
                 switch(firstUnit.state) {
                     case 'harvesting':
-                        if (firstUnit.harvestMode === 'cutPath') {
-                            stateText = '🛤️ Cutting path...';
-                        } else if (firstUnit.harvestMode === 'cutLane') {
+                        if (firstUnit.harvestMode === 'cutLane') {
                             stateText = '🛣️ Cutting lane...';
+                        } else if (firstUnit.harvestMode === 'cutLoop') {
+                            stateText = '🔁 Cutting loop...';
                         } else {
                             stateText = '🪓 Harvesting...';
                         }
                         stateColor = '#d4a84a';
                         break;
                     case 'moving':
-                        if (firstUnit.harvestMode === 'cutPath') {
-                            stateText = '🛤️ Moving to cut path...';
-                            stateColor = '#d4a84a';
-                        } else if (firstUnit.harvestMode === 'cutLane') {
+                        if (firstUnit.harvestMode === 'cutLane') {
                             stateText = '🛣️ Moving to cut lane...';
+                            stateColor = '#d4a84a';
+                        } else if (firstUnit.harvestMode === 'cutLoop') {
+                            stateText = '🔁 Moving to cut loop...';
                             stateColor = '#d4a84a';
                         } else {
                             stateText = '🚶 Moving...';
@@ -286,7 +286,6 @@ window.GameUI = (function() {
         if (isWoodsman) {
             // Check if any unit has harvest mode active
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
-            const anyCuttingPath = units.some(u => u.harvestMode === 'cutPath');
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
             const anyCuttingLoop = units.some(u => u.harvestMode === 'cutLoop');
             
@@ -308,25 +307,6 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🪓</span>
                     <span style="flex: 1; text-align: left;">Harvest Nearby</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyHarvesting ? 'ACTIVE' : 'Auto-chop'}</span>
-                </button>
-                
-                <button class="unit-cmd-btn" data-cmd="cutPath" style="
-                    background: ${anyCuttingPath ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${anyCuttingPath ? '#d4a84a' : '#4a7c3f'};
-                    border-radius: 6px;
-                    color: #c8f0c8;
-                    padding: 12px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    transition: all 0.15s ease;
-                ">
-                    <span style="font-size: 18px;">🛤️</span>
-                    <span style="flex: 1; text-align: left;">Cut Path</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingPath ? 'ACTIVE' : '2 wide'}</span>
                 </button>
                 
                 <button class="unit-cmd-btn" data-cmd="cutLane" style="
@@ -448,8 +428,6 @@ window.GameUI = (function() {
                 
                 if (cmd === 'harvest') {
                     isActive = units.some(u => u.harvestMode === 'nearby');
-                } else if (cmd === 'cutPath') {
-                    isActive = units.some(u => u.harvestMode === 'cutPath');
                 } else if (cmd === 'cutLane') {
                     isActive = units.some(u => u.harvestMode === 'cutLane');
                 } else if (cmd === 'cutLoop') {
@@ -532,18 +510,6 @@ window.GameUI = (function() {
                 
                 // Refresh menu
                 showUnitMenu(units);
-                break;
-                
-            case 'cutPath':
-                // Enter cut path mode (2 wide)
-                if (window.GameUnits) {
-                    GameUnits.setCommandMode('cutPath');
-                }
-                const pathText = units.length > 1 
-                    ? `Tap destination for ${units.length} woodsmen to cut path`
-                    : 'Tap destination to cut path (2 wide)';
-                showCommandIndicator(pathText);
-                hideMenuVisuals();
                 break;
                 
             case 'cutLane':
