@@ -1198,6 +1198,11 @@
             if (window.GameUnits) {
                 GameUnits.update();
             }
+
+            // Live UI updates (production progress bars, queue counts, etc.)
+            if (window.GameUI && window.GameUI.tick) {
+                GameUI.tick();
+            }
             
             renderer.render(scene, camera);
         }
