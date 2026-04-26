@@ -999,7 +999,9 @@ window.GameUnits = (function() {
     function showCorridorPreview(startX, startZ, endX, endZ, width) {
         const THREE = getTHREE();
         const scene = getScene();
-        clearCorridorPreview();
+        // Clear ONLY the visual markers - not pendingCorridorCommand, which
+        // previewCorridorCommand has just set and we still need.
+        clearCorridorVisuals();
 
         const dx = endX - startX;
         const dz = endZ - startZ;
@@ -1091,7 +1093,9 @@ window.GameUnits = (function() {
         corridorPreviewMarkers.push(destMarker);
     }
 
-    function clearCorridorPreview() {
+    // Visual-only cleanup. Used internally by showCorridorPreview when it
+    // wants to wipe the existing markers but keep the pending command state.
+    function clearCorridorVisuals() {
         const scene = getScene();
         for (const marker of corridorPreviewMarkers) {
             scene.remove(marker);
@@ -1105,6 +1109,13 @@ window.GameUnits = (function() {
             if (line.material) line.material.dispose();
         }
         corridorPreviewLines = [];
+    }
+
+    // Full cleanup. Wipes visuals AND clears the pending command state.
+    // Use this when ending the corridor command flow (cancel, deselect,
+    // change command mode).
+    function clearCorridorPreview() {
+        clearCorridorVisuals();
         pendingCorridorCommand = null;
     }
 
