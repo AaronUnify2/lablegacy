@@ -504,6 +504,7 @@ window.GameUnits = (function() {
             corridorTarget: null,
             corridorWidth: 0,
             pathId: null,             // ID of assigned loop path (for cutLoop mode)
+            cutWaypointIndex: 0,      // Position around the loop (for cutLoop mode)
             patrolPathId: null,       // ID of path being patrolled (knights/archers)
             patrolWaypointIndex: 0,   // current waypoint in patrol cycle
             guardPosition: null,      // { x, z } when on guard duty
@@ -1657,9 +1658,126 @@ window.GameUnits = (function() {
         unit.pathId = path.id;
         unit.harvestMode = 'cutLoop';
         unit.corridorTarget = null;  // clear any old corridor target
+        // Start at the nearest waypoint - this becomes our anchor point.
+        // continueCuttingPath walks around the polygon from here looking
+        // for trees, advancing the index when a segment is cleared.
+        unit.cutWaypointIndex = nearestWaypointIndex(unit, path);
         releaseTreeClaim(unit);
 
         continueCuttingPath(unit);
+    }
+
+    // Get all candidate trees on a single segment, sorted by distance from
+    // the unit. Caller can iterate through these to find the closest
+    // *actually reachable* one.
+    function getCandidateTreesOnSegment(unit, seg) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+
+        const dx = seg.endX - seg.startX;
+        const dz = seg.endZ - seg.startZ;
+        const length = Math.sqrt(dx * dx + dz * dz);
+        if (length < 1) return [];
+
+        const dirX = dx / length;
+        const dirZ = dz / length;
+        const perpX = -dirZ;
+        const perpZ = dirX;
+        const halfWidth = seg.width / 2;
+        const seen = new Set();
+        const candidates = [];
+
+        for (let along = 0; along <= length; along += 0.5) {
+            for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
+                const checkX = Math.floor(seg.startX + dirX * along + perpX * across);
+                const checkZ = Math.floor(seg.startZ + dirZ * along + perpZ * across);
+                const key = `${checkX},${checkZ}`;
+                if (seen.has(key)) continue;
+                seen.add(key);
+
+                if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
+
+                const cell = gameState.grid[checkX]?.[checkZ];
+                if (cell !== CELL.TREE_NORMAL && cell !== CELL.TREE_HIGH_YIELD && cell !== CELL.TREE_ENERGY) continue;
+
+                const claimedBy = claimedTrees.get(key);
+                if (claimedBy && claimedBy !== unit.id) continue;
+
+                if (!isTreeReachable(checkX, checkZ)) continue;
+
+                const treeDx = checkX - unit.position.x;
+                const treeDz = checkZ - unit.position.z;
+                const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
+                candidates.push({ x: checkX, z: checkZ, type: cell, dist });
+            }
+        }
+
+        candidates.sort((a, b) => a.dist - b.dist);
+        return candidates;
+    }
+
+    // Try to start the woodsman cutting trees on a specific segment of the
+    // loop. Iterates through candidate trees from closest to farthest,
+    // picking the first one we can ACTUALLY pathfind to (rejects trees
+    // surrounded by uncut forest). Returns true if a tree was found and
+    // the woodsman is heading toward it; false if the segment is clear or
+    // all candidates are unreachable.
+    function tryCutSegment(unit, seg) {
+        const candidates = getCandidateTreesOnSegment(unit, seg);
+
+        for (const tree of candidates) {
+            const adjacentCell = findAdjacentCellToTree(
+                tree.x, tree.z, unit.position.x, unit.position.z
+            );
+            if (!adjacentCell) continue;
+
+            const newPath = findPath(
+                unit.position.x, unit.position.z,
+                adjacentCell.x, adjacentCell.z,
+                false
+            );
+
+            // findPath returns the closest reachable point if the
+            // destination is unreachable. Verify the LAST node of the
+            // returned path actually equals the destination.
+            if (!newPath || newPath.length === 0) continue;
+            const last = newPath[newPath.length - 1];
+            if (last.x !== adjacentCell.x || last.z !== adjacentCell.z) continue;
+
+            // Found a reachable tree - go cut it.
+            claimTree(unit, tree);
+            unit.targetTree = tree;
+            unit.path = newPath;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+            createPathLine(unit, newPath);
+            return true;
+        }
+
+        return false;
+    }
+
+    // Walks the woodsman to a specific waypoint of the loop, going through
+    // the already-cut corridor. Returns true if a path was found that
+    // actually reaches the waypoint.
+    function walkToWaypoint(unit, path, idx) {
+        const wp = path.waypoints[idx];
+        const newPath = findPath(
+            unit.position.x, unit.position.z,
+            Math.floor(wp.x), Math.floor(wp.z),
+            false
+        );
+        if (!newPath || newPath.length === 0) return false;
+        const last = newPath[newPath.length - 1];
+        if (last.x !== Math.floor(wp.x) || last.z !== Math.floor(wp.z)) {
+            return false;
+        }
+        unit.path = newPath;
+        unit.pathIndex = 0;
+        unit.state = 'moving';
+        createPathLine(unit, newPath);
+        return true;
     }
 
     function continueCuttingPath(unit) {
@@ -1679,54 +1797,115 @@ window.GameUnits = (function() {
             return;
         }
 
-        // Find next reachable tree on any segment of the path
-        const blockingTree = findNextReachablePathTree(unit, path);
-
-        if (blockingTree) {
-            claimTree(unit, blockingTree);
-            unit.targetTree = blockingTree;
-
-            const adjacentCell = findAdjacentCellToTree(
-                blockingTree.x, blockingTree.z,
-                unit.position.x, unit.position.z
-            );
-
-            if (adjacentCell) {
-                const newPath = findPath(
-                    unit.position.x, unit.position.z,
-                    adjacentCell.x, adjacentCell.z,
-                    false
-                );
-                if (newPath && newPath.length > 0) {
-                    unit.path = newPath;
-                    unit.pathIndex = 0;
-                    unit.state = 'moving';
-                    createPathLine(unit, newPath);
-                    return;
-                }
-            }
-
-            releaseTreeClaim(unit);
+        const n = path.waypoints.length;
+        if (n < 2) {
             unit.state = 'idle';
-        } else {
-            // No more trees on this path - it's done!
-            if (path.state !== 'complete') {
-                path.state = 'complete';
-                renderPath(path);
-                console.log(`Path ${path.id} complete - now patrollable`);
-            }
-
-            // Loop is done. Don't auto-drift into "nearby harvest" — that
-            // would pull the woodsman deep into the forest from inside the
-            // corridor he just cut, which feels like wandering off. Instead,
-            // stop and wait for orders. Player can re-issue Harvest Nearby
-            // or another command.
-            unit.pathId = null;
-            unit.harvestMode = null;
-            unit.targetTree = null;
-            unit.state = 'idle';
-            clearPathLine(unit);
+            return;
         }
+
+        // STEP 1: Make sure we're actually on (or near) the loop. After a
+        // sawmill deposit the woodsman is at the sawmill, far from the
+        // loop. They need to walk to the nearest waypoint first - the
+        // sawmill is in the base clearing, the nearest waypoint is at the
+        // edge of the cut corridor, and there's a path between them.
+        // Without this step, tryCutSegment would call findPath to a tree
+        // surrounded by uncut forest, get a partial path back, and the
+        // woodsman would walk into the trees and get stuck.
+        const nearestIdx = nearestWaypointIndex(unit, path);
+        const nearestWp = path.waypoints[nearestIdx];
+        const distToLoop = Math.sqrt(
+            Math.pow(unit.position.x - nearestWp.x, 2) +
+            Math.pow(unit.position.z - nearestWp.z, 2)
+        );
+
+        // Threshold: if we're more than 3 tiles from the closest waypoint,
+        // we're "off the loop" and need to walk back.
+        if (distToLoop > 3) {
+            if (walkToWaypoint(unit, path, nearestIdx)) {
+                unit.cutWaypointIndex = nearestIdx;
+                return;
+            }
+            // Couldn't even reach the loop - fall through and try cutting
+            // anyway as a last-ditch attempt.
+        }
+
+        // STEP 2: Walk the polygon segment-by-segment, starting from our
+        // current waypoint anchor. tryCutSegment now verifies the path
+        // actually reaches each tree (rejects partial paths into uncut
+        // forest), so unreachable trees are skipped automatically.
+        //
+        // KEY INSIGHT: this naturally retraces the cut corridor instead
+        // of trying to pathfind through uncut forest. After a sawmill
+        // deposit, the woodsman walks to nearestWaypoint (still in cut
+        // territory) above, then advances along the polygon here.
+
+        const startIdx = unit.cutWaypointIndex || 0;
+
+        for (let step = 0; step < n; step++) {
+            const i = (startIdx + step) % n;
+            const seg = {
+                startX: path.waypoints[i].x,
+                startZ: path.waypoints[i].z,
+                endX: path.waypoints[(i + 1) % n].x,
+                endZ: path.waypoints[(i + 1) % n].z,
+                width: path.width
+            };
+
+            // Is this segment still uncut? Try to find a tree on it.
+            if (tryCutSegment(unit, seg)) {
+                unit.cutWaypointIndex = i;  // remember where we are on the loop
+                return;
+            }
+
+            // Segment clear - walk to its end waypoint via the cut corridor,
+            // then continue searching from there. If we can already pathfind
+            // there we don't need to actually walk - we just advance the
+            // index and try the next segment.
+        }
+
+        // We made a full circuit and didn't find any trees. But before
+        // declaring the loop complete, double-check there are no remaining
+        // trees anywhere on the polygon (covers edge cases where width
+        // overlap leaves a tree we missed via segment-only search).
+        const remaining = getAllPathTrees(path);
+        if (remaining.length > 0) {
+            // There ARE trees somewhere - try the global search as a fallback.
+            // Walk to the closest waypoint to the nearest remaining tree.
+            const tree = remaining[0];
+            let bestIdx = 0;
+            let bestDist = Infinity;
+            for (let i = 0; i < n; i++) {
+                const wp = path.waypoints[i];
+                const d = Math.sqrt((wp.x - tree.x) ** 2 + (wp.z - tree.z) ** 2);
+                if (d < bestDist) { bestDist = d; bestIdx = i; }
+            }
+            // Walk to that waypoint and resume cutting from there.
+            if (walkToWaypoint(unit, path, bestIdx)) {
+                unit.cutWaypointIndex = bestIdx;
+                return;
+            }
+
+            // Couldn't even path to a waypoint - give up gracefully.
+            unit.state = 'idle';
+            return;
+        }
+
+        // Truly no trees left. Mark complete.
+        if (path.state !== 'complete') {
+            path.state = 'complete';
+            renderPath(path);
+            console.log(`Path ${path.id} complete - now patrollable`);
+        }
+
+        // Loop is done. Don't auto-drift into "nearby harvest" — that
+        // would pull the woodsman deep into the forest from inside the
+        // corridor he just cut, which feels like wandering off. Instead,
+        // stop and wait for orders.
+        unit.pathId = null;
+        unit.harvestMode = null;
+        unit.targetTree = null;
+        unit.state = 'idle';
+        clearPathLine(unit);
     }
 
     // Run periodically to check if any under-construction paths are done
