@@ -870,6 +870,8 @@ window.GameUnits = (function() {
             if (btn) btn.classList.remove('active');
             const crosshair = document.getElementById('crosshair');
             if (crosshair) crosshair.classList.remove('active');
+            const magicBtn = document.getElementById('magic-btn');
+            if (magicBtn) magicBtn.classList.remove('active');
             console.log('Hero died — reverted to RTS view');
         }
     }
@@ -2179,15 +2181,9 @@ window.GameUnits = (function() {
             unit.inventory.wood += woodYield;
             unit.inventory.energy += energyYield;
 
-            gameState.grid[treeX][treeZ] = CELL.EMPTY;
-
-            const treeIndex = gameState.trees.findIndex(t =>
-                t.userData.gridX === treeX && t.userData.gridZ === treeZ
-            );
-            if (treeIndex !== -1) {
-                getScene().remove(gameState.trees[treeIndex]);
-                gameState.trees.splice(treeIndex, 1);
-            }
+            // Woodsmen fell trees instantly regardless of HP — only the
+            // hero's magic blast respects per-tree HP.
+            removeTreeAt(treeX, treeZ);
 
             if (unit.hasCleave) {
                 console.log('Clear Cutter activated at', treeX, treeZ);
@@ -2211,6 +2207,104 @@ window.GameUnits = (function() {
             }
         }
     }
+
+    // ============================================
+    // TREE HP & DAMAGE (used by hero magic blasts)
+    //   Shared resource pool: tree cells live in gameState.grid as
+    //   CELL.TREE_* values (no per-tree object). HP lives in a parallel
+    //   map keyed by `${x},${z}`. Lazily populated — first time a tree
+    //   is damaged we record its max HP based on type.
+    //
+    //   Woodsmen ignore HP and fell trees in one harvest cycle; only
+    //   hero blasts decrement HP. This keeps existing harvest pacing
+    //   intact while making the magic blast's "2/4/6 hits" tunable.
+    // ============================================
+
+    function getTreeMaxHP(treeType) {
+        const CELL = getCELL();
+        if (treeType === CELL.TREE_NORMAL) return 2;
+        if (treeType === CELL.TREE_HIGH_YIELD) return 4;
+        if (treeType === CELL.TREE_ENERGY) return 6;
+        return 1;
+    }
+
+    function getTreeAt(x, z) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        const cx = Math.floor(x);
+        const cz = Math.floor(z);
+        if (cx < 0 || cx >= CONFIG.GRID_WIDTH || cz < 0 || cz >= CONFIG.GRID_HEIGHT) return null;
+        const cell = gameState.grid[cx]?.[cz];
+        if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+            return { x: cx, z: cz, type: cell };
+        }
+        return null;
+    }
+
+    // Apply magic-blast damage to a tree. Returns `true` if the tree
+    // was destroyed by this hit. The caller decides what to do with
+    // the resources via `awardTreeResources`.
+    function damageTree(x, z, amount = 1) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const tree = getTreeAt(x, z);
+        if (!tree) return false;
+
+        if (!gameState.treeHP) gameState.treeHP = {};
+        const key = `${tree.x},${tree.z}`;
+        if (gameState.treeHP[key] == null) {
+            gameState.treeHP[key] = getTreeMaxHP(tree.type);
+        }
+
+        gameState.treeHP[key] -= amount;
+        if (gameState.treeHP[key] <= 0) {
+            delete gameState.treeHP[key];
+            removeTreeAt(tree.x, tree.z);
+            return true;
+        }
+        return false;
+    }
+
+    // Award resources for a tree felled by the hero. Drops straight
+    // into the player's resource pool (no inventory, no walk back).
+    // Yields match the woodsman's harvest yields.
+    function awardTreeResources(treeType) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        let woodYield = 0, energyYield = 0;
+        if (treeType === CELL.TREE_NORMAL) woodYield = 10;
+        else if (treeType === CELL.TREE_HIGH_YIELD) woodYield = 25;
+        else if (treeType === CELL.TREE_ENERGY) energyYield = 15;
+        gameState.resources.wood += woodYield;
+        gameState.resources.energy += energyYield;
+        if (window.GameUI && GameUI.updateResources) GameUI.updateResources();
+    }
+
+    // Remove a tree's grid cell + sprite. Shared by woodsman harvest
+    // and hero blast paths so the cleanup logic lives in one place.
+    function removeTreeAt(treeX, treeZ) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const scene = getScene();
+
+        gameState.grid[treeX][treeZ] = CELL.EMPTY;
+
+        const treeIndex = gameState.trees.findIndex(t =>
+            t.userData.gridX === treeX && t.userData.gridZ === treeZ
+        );
+        if (treeIndex !== -1) {
+            scene.remove(gameState.trees[treeIndex]);
+            gameState.trees.splice(treeIndex, 1);
+        }
+
+        // Clear any HP entry so a tree replanted in this spot starts fresh.
+        if (gameState.treeHP) delete gameState.treeHP[`${treeX},${treeZ}`];
+
+        const treeCountEl = document.getElementById('tree-count');
+        if (treeCountEl) treeCountEl.textContent = gameState.trees.length;
+    }
+
 
     function returnToSawmill(unit) {
         releaseTreeClaim(unit);
@@ -2777,6 +2871,11 @@ window.GameUnits = (function() {
         assignUnitToGuard,
         findPathAtPoint,
         isPatrollable,
+        // Tree HP & damage (used by hero magic blasts in Slice C)
+        damageTree,
+        awardTreeResources,
+        getTreeAt,
+        getTreeMaxHP,
         killUnit
     };
 })();
