@@ -89,6 +89,105 @@
             border-radius: 2px;
         }
 
+        /* Mode toggle button - top right, below the minimap */
+        #fps-toggle-btn {
+            position: absolute;
+            top: 120px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: rgba(15, 25, 15, 0.9);
+            border: 2px solid #4a7c3f;
+            border-radius: 8px;
+            color: #c8f0c8;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: auto;
+            transition: all 0.15s ease;
+        }
+        #fps-toggle-btn:active,
+        #fps-toggle-btn.active {
+            background: rgba(74, 124, 63, 0.7);
+            border-color: #7ddf64;
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(125, 223, 100, 0.5);
+        }
+        #fps-toggle-btn .label {
+            font-size: 9px;
+            margin-top: 2px;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+            display: block;
+        }
+        #fps-toggle-btn .icon {
+            font-size: 20px;
+        }
+        #fps-toggle-btn-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Return-to-base prompt panel (shown on FPS→RTS swap) */
+        #return-prompt {
+            position: absolute;
+            bottom: 140px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 25, 15, 0.95);
+            border: 2px solid #7ddf64;
+            border-radius: 12px;
+            padding: 14px;
+            display: none;
+            pointer-events: auto;
+            width: 300px;
+            z-index: 110;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            color: #c8f0c8;
+            font-family: 'Courier New', monospace;
+        }
+        #return-prompt .title {
+            color: #7ddf64;
+            font-size: 12px;
+            text-align: center;
+            padding: 4px 0 8px 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #return-prompt .body {
+            font-size: 11px;
+            text-align: center;
+            padding-bottom: 10px;
+            color: #a8d5a2;
+        }
+        #return-prompt .buttons {
+            display: flex;
+            gap: 8px;
+        }
+        #return-prompt button {
+            flex: 1;
+            border-radius: 6px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        #return-stay-btn {
+            background: rgba(60, 60, 80, 0.5);
+            border: 1px solid #888;
+        }
+        #return-go-btn {
+            background: rgba(74, 124, 63, 0.6);
+            border: 1px solid #7ddf64;
+        }
+
         #info-panel {
             position: absolute;
             top: 20px;
@@ -244,6 +343,28 @@
             <canvas id="minimap-canvas"></canvas>
             <div id="minimap">
                 <canvas id="minimap-canvas"></canvas>
+            </div>
+
+            <!-- Mode toggle: RTS overhead view ↔ FPS hero view.
+                 Slice A only swaps the camera. Slices B+C wire up
+                 actual FPS controls and the magic blast. -->
+            <div id="fps-toggle-btn" title="Toggle FPS view">
+                <div id="fps-toggle-btn-stack">
+                    <span class="icon">👁</span>
+                    <span class="label">FPS</span>
+                </div>
+            </div>
+
+            <!-- Shown when player swaps from FPS back to RTS -->
+            <div id="return-prompt">
+                <div class="title">🧙 Return Hero to Base?</div>
+                <div class="body">
+                    Walk the wizard back to the Royal Tent, or leave him where he is?
+                </div>
+                <div class="buttons">
+                    <button id="return-stay-btn">Leave him here</button>
+                    <button id="return-go-btn">Return to base</button>
+                </div>
             </div>
 
             <div id="debug-panel" style="
@@ -402,6 +523,15 @@
                 pitch: Math.PI / 4,
                 isTopDown: false
             },
+            // The player's possessable wizard. Spawned once at init in the
+            // base clearing (eventually next to the Royal Tent once
+            // building autospawn lands). Set in init() below.
+            hero: null,
+            // FPS mode toggle. When true, the hero is the camera and the
+            // d-pad/drag input drives him. Slice A wires up the toggle
+            // and over-the-shoulder camera; the actual FPS controls
+            // arrive in Slice B.
+            fpsMode: false,
             input: {
                 keys: {},
                 mobileActions: {}
@@ -912,6 +1042,40 @@
             const input = gameState.input;
             const cam = gameState.camera;
 
+            // FPS mode short-circuit. The hero is the camera. We don't pan
+            // the world, we don't rotate around a target — we sit just
+            // behind the wizard and look forward along his facing.
+            // Slice A uses a third-person "over the shoulder" placement so
+            // the player can see the wizard. Slice B will switch this to
+            // true first-person (camera at eye level, sprite hidden).
+            if (gameState.fpsMode && gameState.hero) {
+                const hero = gameState.hero;
+                const rot = hero.rotation || 0;       // facing yaw
+                // Position camera slightly behind and above the hero's
+                // sprite. Hero sprite center is at y≈2.25, scale 1.3 so
+                // it reaches ~5. We sit the camera at y=4, 6 units behind.
+                const back = 6;
+                const camY = 4;
+                camera.position.set(
+                    hero.position.x + Math.sin(rot) * back,
+                    camY,
+                    hero.position.z + Math.cos(rot) * back
+                );
+                camera.lookAt(
+                    hero.position.x - Math.sin(rot) * 6,
+                    2,
+                    hero.position.z - Math.cos(rot) * 6
+                );
+
+                // Update debug readout but otherwise skip the rest of
+                // updateCamera (no pan, no rotate, no zoom — the FPS
+                // controls in Slice B will own movement entirely).
+                const dbg = document.getElementById('camera-pos');
+                if (dbg) dbg.textContent =
+                    `FPS @ ${Math.floor(hero.position.x)}, ${Math.floor(hero.position.z)}`;
+                return;
+            }
+
             // Pan
             let moveX = 0, moveZ = 0;
             if (input.keys['KeyW'] || input.keys['ArrowUp'] || input.mobileActions.up) moveZ -= 1;
@@ -1250,6 +1414,127 @@
         }
 
         // ============================================
+        // FPS MODE TOGGLE (Slice A)
+        // ============================================
+        // Wires up the eye-icon button in the top-right HUD. Clicking it
+        // flips gameState.fpsMode. The camera change is handled in
+        // updateCamera (FPS branch at the top). On the way back to RTS
+        // we show a "Return hero to base?" prompt so the player can
+        // either send the wizard home or leave him where he is.
+
+        function enterFpsMode() {
+            if (!gameState.hero) {
+                console.warn('No hero to enter FPS as');
+                return;
+            }
+            // Initialize hero's facing rotation if not set yet. Default
+            // to facing "south" (toward enemy base) so the player isn't
+            // staring at their own buildings on first toggle.
+            if (gameState.hero.rotation == null) {
+                gameState.hero.rotation = Math.PI;
+            }
+            gameState.fpsMode = true;
+
+            const btn = document.getElementById('fps-toggle-btn');
+            if (btn) btn.classList.add('active');
+
+            // Hide RTS-only menus / hints to keep the FPS view clean
+            if (window.GameUI) GameUI.hideMenus();
+        }
+
+        function exitFpsMode() {
+            // Snap the RTS camera target onto the hero's last position
+            // so when the player swaps back they see where the wizard
+            // actually is, not wherever they panned to before entering.
+            if (gameState.hero) {
+                gameState.camera.target.x = gameState.hero.position.x;
+                gameState.camera.target.z = gameState.hero.position.z;
+            }
+            gameState.fpsMode = false;
+
+            const btn = document.getElementById('fps-toggle-btn');
+            if (btn) btn.classList.remove('active');
+
+            // Ask whether to walk the wizard home. The prompt's two
+            // buttons resolve in handleReturnPrompt below.
+            showReturnPrompt();
+        }
+
+        function toggleFpsMode() {
+            if (gameState.fpsMode) {
+                exitFpsMode();
+            } else {
+                enterFpsMode();
+            }
+        }
+
+        function showReturnPrompt() {
+            const prompt = document.getElementById('return-prompt');
+            if (prompt) prompt.style.display = 'block';
+        }
+
+        function hideReturnPrompt() {
+            const prompt = document.getElementById('return-prompt');
+            if (prompt) prompt.style.display = 'none';
+        }
+
+        function handleReturnPrompt(walkHome) {
+            hideReturnPrompt();
+            if (!walkHome || !gameState.hero || !window.GameUnits) return;
+
+            // Send the wizard back to his spawn point in the base
+            // clearing. (Once we have a Royal Tent we can target that
+            // building's location specifically.)
+            const homeX = CONFIG.GRID_WIDTH / 2;
+            const homeZ = CONFIG.CLEARING_PADDING + 5;
+            GameUnits.commandMove(gameState.hero, homeX, homeZ);
+        }
+
+        function setupFpsToggleButton() {
+            const btn = document.getElementById('fps-toggle-btn');
+            if (btn) {
+                // Both touch and click — touch for mobile, click for
+                // desktop testing. preventDefault on touchstart blocks
+                // the synthetic mouse event so we don't double-fire.
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleFpsMode();
+                });
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleFpsMode();
+                });
+            }
+
+            const stayBtn = document.getElementById('return-stay-btn');
+            const goBtn = document.getElementById('return-go-btn');
+            if (stayBtn) {
+                stayBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleReturnPrompt(false);
+                });
+                stayBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleReturnPrompt(false);
+                });
+            }
+            if (goBtn) {
+                goBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleReturnPrompt(true);
+                });
+                goBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleReturnPrompt(true);
+                });
+            }
+        }
+
+        // ============================================
         // INITIALIZATION
         // ============================================
         function init() {
@@ -1323,6 +1608,42 @@
                 debug('6. Modules done');
             } catch(e) {
                 debug('ERROR modules: ' + e.message);
+            }
+
+            // Spawn the hero at game start. Position him in the player
+            // base clearing for now; once we add Royal Tent autospawn
+            // we can position him next to it instead.
+            try {
+                debug('6d. Spawning hero...');
+                if (window.GameUnits) {
+                    const heroSpawn = {
+                        x: CONFIG.GRID_WIDTH / 2,
+                        z: CONFIG.CLEARING_PADDING + 5
+                    };
+                    const hero = GameUnits.spawnUnit('hero', heroSpawn,
+                        { path1: 0, path2: 0, path3: 0 }, 'player');
+                    if (hero) {
+                        gameState.hero = hero;
+                        // Hero stays put unless the player moves him.
+                        hero.harvestMode = null;
+                        hero.state = 'idle';
+                        // Initial facing: south, toward the enemy base.
+                        // Used by FPS camera in updateCamera().
+                        hero.rotation = Math.PI;
+                        debug('6d. Hero spawned');
+                    }
+                }
+            } catch(e) {
+                debug('ERROR hero spawn: ' + e.message);
+            }
+
+            // Wire up the eye-icon button to toggle FPS mode.
+            try {
+                debug('6e. FPS toggle button...');
+                setupFpsToggleButton();
+                debug('6e. FPS toggle wired');
+            } catch(e) {
+                debug('ERROR fps toggle: ' + e.message);
             }
             
             debug('7. Starting animate...');
