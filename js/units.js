@@ -109,7 +109,7 @@ window.GameUnits = (function() {
             name: 'Survival',
             levels: [
                 { name: 'Thick Hide', description: 'Health +50%', effect: { healthMult: 1.5 } },
-                { name: 'Forester', description: 'Move through trees at half speed', effect: { forestWalk: true } },
+                { name: 'Swift Boots', description: 'Move 30% faster', effect: { speedMult: 1.3 } },
                 { name: 'Trapper', description: 'Places snare that roots first enemy', effect: { trapAbility: true } }
             ]
         }
@@ -504,8 +504,10 @@ window.GameUnits = (function() {
             corridorTarget: null,
             corridorWidth: 0,
             pathId: null,             // ID of assigned loop path (for cutLoop mode)
+            patrolPathId: null,       // ID of path being patrolled (knights/archers)
+            patrolWaypointIndex: 0,   // current waypoint in patrol cycle
+            guardPosition: null,      // { x, z } when on guard duty
             attackTarget: null,
-            hasForestWalk: stats.forestWalk || false,
             hasRhythm: stats.rhythm || false,
             hasCleave: stats.cleave || false,
             depositMult: stats.depositMult || 1,
@@ -547,7 +549,7 @@ window.GameUnits = (function() {
         let harvestSpeed = unitType.harvestSpeed;
         let carryCapacity = unitType.carryCapacity;
 
-        let forestWalk = false, rhythm = false, cleave = false;
+        let rhythm = false, cleave = false;
         let depositMult = 1, energySpecialist = false;
 
         if (unitTypeId === 'woodsman') {
@@ -558,7 +560,7 @@ window.GameUnits = (function() {
             if (upgrades.path2 >= 2) depositMult = 1.2;
             if (upgrades.path2 >= 3) energySpecialist = true;
             if (upgrades.path3 >= 1) health *= 1.5;
-            if (upgrades.path3 >= 2) forestWalk = true;
+            if (upgrades.path3 >= 2) speed *= 1.3;     // Swift Boots (replaces Forester)
         } else if (unitTypeId === 'knight') {
             if (upgrades.path1 >= 1) damage *= 1.25;
             if (upgrades.path1 >= 2) damage *= 1.25;
@@ -574,7 +576,7 @@ window.GameUnits = (function() {
         return {
             health, damage, speed, attackRange, attackSpeed,
             harvestSpeed, carryCapacity,
-            forestWalk, rhythm, cleave, depositMult, energySpecialist
+            rhythm, cleave, depositMult, energySpecialist
         };
     }
 
@@ -606,26 +608,58 @@ window.GameUnits = (function() {
         const now = Date.now();
         const { enemy, distance } = findNearestEnemy(unit);
 
-        if (!enemy || distance > unit.attackRange) {
+        if (!enemy) {
             unit.attackTarget = null;
             return false;
         }
 
-        unit.attackTarget = enemy;
-        unit.state = 'attacking';
+        // Within attack range — actually fight.
+        if (distance <= unit.attackRange) {
+            unit.attackTarget = enemy;
+            unit.state = 'attacking';
 
-        if (now - unit.lastAttackTime >= unit.attackSpeed) {
-            unit.lastAttackTime = now;
-            enemy.health -= unit.damage;
-            console.log(`${unit.type} dealt ${unit.damage} damage to ${enemy.type}. Enemy HP: ${enemy.health.toFixed(0)}`);
-            if (enemy.health <= 0) {
-                killUnit(enemy);
-                unit.attackTarget = null;
-                return false;
+            if (now - unit.lastAttackTime >= unit.attackSpeed) {
+                unit.lastAttackTime = now;
+                enemy.health -= unit.damage;
+                console.log(`${unit.type} dealt ${unit.damage} damage to ${enemy.type}. Enemy HP: ${enemy.health.toFixed(0)}`);
+                if (enemy.health <= 0) {
+                    killUnit(enemy);
+                    unit.attackTarget = null;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // Out of attack range, but within leash radius for a patrol/guard unit?
+        // Then chase the enemy down. Combat code will take over once we're
+        // close enough to actually swing.
+        if (hasPatrolOrGuard(unit) && distance <= LEASH_RADIUS) {
+            // Chase the enemy by re-pathing toward them every once in a while
+            // (re-pathing every frame would thrash; we re-path when the unit
+            // is idle or has finished its current path).
+            const needsNewPath = !unit.path || unit.pathIndex >= unit.path.length;
+            if (needsNewPath) {
+                const newPath = findPath(
+                    unit.position.x, unit.position.z,
+                    enemy.position.x, enemy.position.z,
+                    false, false
+                );
+                if (newPath && newPath.length > 0) {
+                    unit.path = newPath;
+                    unit.pathIndex = 0;
+                    unit.state = 'moving';
+                    unit.attackTarget = enemy;
+                    return true;     // Chasing - skip default behavior
+                }
+            } else if (unit.attackTarget === enemy) {
+                // Already chasing this enemy, keep going
+                return true;
             }
         }
 
-        return true;
+        unit.attackTarget = null;
+        return false;
     }
 
     function killUnit(unit) {
@@ -784,7 +818,7 @@ window.GameUnits = (function() {
         const path = findPath(
             unit.position.x, unit.position.z,
             adjacentCell.x, adjacentCell.z,
-            false, unit.hasForestWalk
+            false
         );
 
         if (path && path.length > 0) {
@@ -857,7 +891,7 @@ window.GameUnits = (function() {
                 const path = findPath(
                     unit.position.x, unit.position.z,
                     adjacentCell.x, adjacentCell.z,
-                    false, unit.hasForestWalk
+                    false
                 );
 
                 if (path && path.length > 0) {
@@ -876,7 +910,7 @@ window.GameUnits = (function() {
             const path = findPath(
                 unit.position.x, unit.position.z,
                 unit.corridorTarget.x, unit.corridorTarget.z,
-                false, unit.hasForestWalk
+                false
             );
 
             if (path && path.length > 0) {
@@ -1376,8 +1410,17 @@ window.GameUnits = (function() {
 
         if (path.waypoints.length < 1) return;
 
-        const color = path.state === 'complete' ? 0xb060e0 : 0xffd040;
-        const opacity = path.state === 'complete' ? 0.95 : 0.9;
+        // Path color/style depends on state:
+        //   draft / under-construction → yellow chunky ribbons (cut targets)
+        //   complete                   → purple chunky ribbons (cut + patrollable)
+        //   custom-patrol-draft        → faint purple thin ribbons (drafting)
+        //   custom-patrol              → solid purple thin ribbons (patrol-only)
+        const isCustomPatrol = path.state === 'custom-patrol' || path.state === 'custom-patrol-draft';
+        const isComplete = path.state === 'complete' || path.state === 'custom-patrol';
+        const isDraftCustomPatrol = path.state === 'custom-patrol-draft';
+
+        const color = isComplete || isCustomPatrol ? 0xb060e0 : 0xffd040;
+        const opacity = isDraftCustomPatrol ? 0.6 : (isComplete ? 0.95 : 0.9);
 
         const n = path.waypoints.length;
 
@@ -1388,8 +1431,10 @@ window.GameUnits = (function() {
         // Tree sprites are ~4.5 tall from their y=2.25 pivot, so we float at y=6
         // for a clear margin. Ribbons are wide enough to read at RTS zoom levels.
         const Y_LINE = 6.0;
-        const RIBBON_WIDTH = 1.4;       // matches lane width visually
-        const DOT_RADIUS = 1.2;
+        // Custom patrols are single-file paths - render thinner so they read
+        // visually distinct from cut paths/loops.
+        const RIBBON_WIDTH = isCustomPatrol ? 0.5 : 1.4;
+        const DOT_RADIUS = isCustomPatrol ? 0.7 : 1.2;
 
         function makeRibbon(ax, az, bx, bz) {
             const dx = bx - ax;
@@ -1487,6 +1532,51 @@ window.GameUnits = (function() {
         const gameState = getGameState();
         if (!gameState.paths) return null;
         return gameState.paths.find(p => p.id === pathId) || null;
+    }
+
+    // Returns the closest patrollable path within `tolerance` tiles of (x, z),
+    // or null. Used by the tap-on-path assignment flow — we don't have a way
+    // to raycast against ribbon meshes reliably, so we test in 2D against
+    // every segment of every path.
+    function findPathAtPoint(x, z, tolerance = 2.5) {
+        const gameState = getGameState();
+        if (!gameState.paths) return null;
+
+        let best = null;
+        let bestDist = tolerance;
+
+        for (const path of gameState.paths) {
+            if (!isPatrollable(path)) continue;
+            const n = path.waypoints.length;
+            if (n < 2) continue;
+
+            // Distance from (x,z) to closest point on each segment
+            for (let i = 0; i < n; i++) {
+                const a = path.waypoints[i];
+                const b = path.waypoints[(i + 1) % n];
+                const d = pointToSegmentDistance(x, z, a.x, a.z, b.x, b.z);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = path;
+                }
+            }
+        }
+        return best;
+    }
+
+    function pointToSegmentDistance(px, pz, ax, az, bx, bz) {
+        const dx = bx - ax;
+        const dz = bz - az;
+        const len2 = dx * dx + dz * dz;
+        if (len2 < 0.001) {
+            // Degenerate segment - just return distance to point a
+            return Math.sqrt((px - ax) ** 2 + (pz - az) ** 2);
+        }
+        let t = ((px - ax) * dx + (pz - az) * dz) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const closestX = ax + t * dx;
+        const closestZ = az + t * dz;
+        return Math.sqrt((px - closestX) ** 2 + (pz - closestZ) ** 2);
     }
 
     // ----- Multi-waypoint input flow -----
@@ -1605,7 +1695,7 @@ window.GameUnits = (function() {
                 const newPath = findPath(
                     unit.position.x, unit.position.z,
                     adjacentCell.x, adjacentCell.z,
-                    false, unit.hasForestWalk
+                    false
                 );
                 if (newPath && newPath.length > 0) {
                     unit.path = newPath;
@@ -1658,6 +1748,230 @@ window.GameUnits = (function() {
     }
 
     // ============================================
+    // CUSTOM PATROL PATHS - thin purple loops drawn by knights/archers
+    //   Same input UX as Cut Loop, but no cutting involved. The path is
+    //   purely a movement guide. Waypoints must each be on walkable terrain.
+    //   We model these as path objects with state='custom-patrol' so they
+    //   share the same rendering machinery and can be selected like any
+    //   other path. Width=1 means single-file walking.
+    // ============================================
+
+    let draftPatrolPath = null;  // Patrol-path-being-drawn (mirrors draftLoopPath)
+
+    function addPatrolWaypoint(targetX, targetZ) {
+        if (selectedUnits.length === 0) return;
+
+        if (!draftPatrolPath) {
+            draftPatrolPath = createLoopPath([{ x: targetX, z: targetZ }], 1);
+            draftPatrolPath.state = 'custom-patrol-draft';
+            renderPath(draftPatrolPath);
+            createRipple(targetX, targetZ);
+            if (window.GameUI) GameUI.showPatrolConfirm();
+        } else {
+            draftPatrolPath.waypoints.push({ x: targetX, z: targetZ });
+            createRipple(targetX, targetZ);
+            renderPath(draftPatrolPath);
+        }
+    }
+
+    function confirmPatrolCommand() {
+        if (!draftPatrolPath || selectedUnits.length === 0) {
+            cancelPatrolCommand();
+            return;
+        }
+        if (draftPatrolPath.waypoints.length < 2) {
+            cancelPatrolCommand();
+            return;
+        }
+
+        // Lock it in as a custom-patrol-ready path (purple from the start,
+        // since there's nothing to cut).
+        draftPatrolPath.state = 'custom-patrol';
+        renderPath(draftPatrolPath);
+
+        const pathRef = draftPatrolPath;
+        for (const unit of selectedUnits) {
+            assignUnitToPatrol(unit, pathRef);
+        }
+
+        draftPatrolPath = null;
+        commandMode = null;
+        if (window.GameUI) {
+            GameUI.hideCommandIndicator();
+            GameUI.hidePatrolConfirm();
+            GameUI.showUnitMenu(selectedUnits);
+        }
+    }
+
+    function cancelPatrolCommand() {
+        if (draftPatrolPath) {
+            destroyPath(draftPatrolPath);
+            draftPatrolPath = null;
+        }
+        commandMode = null;
+        if (window.GameUI) {
+            GameUI.hideCommandIndicator();
+            GameUI.hidePatrolConfirm();
+            if (selectedUnits.length > 0) GameUI.showUnitMenu(selectedUnits);
+        }
+    }
+
+    function hasDraftPatrolPath() {
+        return draftPatrolPath !== null;
+    }
+
+    // ============================================
+    // PATROL & GUARD BEHAVIOR
+    //   Patrolling units cycle through a path's waypoints in order,
+    //   advancing to the next waypoint when they get close enough.
+    //   When an enemy enters their leash radius (8 tiles), they peel
+    //   off to engage — combat code already handles the actual fighting.
+    //   When the enemy is dead/gone, they path back to their nearest
+    //   waypoint and resume.
+    //
+    //   Guard units stand at a spot. If an enemy enters the leash,
+    //   they engage. After combat, they walk back to the guard spot.
+    // ============================================
+
+    const LEASH_RADIUS = 8;  // tiles - how far a guard/patroller will chase
+
+    // Find a path that's eligible for patrolling (complete cut loops,
+    // or custom patrol paths). Returns null if path is in draft/under-
+    // construction state.
+    function isPatrollable(path) {
+        return path && (path.state === 'complete' || path.state === 'custom-patrol');
+    }
+
+    function assignUnitToPatrol(unit, path) {
+        if (!isPatrollable(path)) {
+            console.warn(`Cannot patrol path ${path?.id} in state ${path?.state}`);
+            return;
+        }
+
+        unit.patrolPathId = path.id;
+        unit.guardPosition = null;       // patrol overrides guard
+        unit.harvestMode = null;
+        unit.targetTree = null;
+
+        // Pick the closest waypoint as our entry point and head for it.
+        // From there the patrol cycles through subsequent waypoints in order.
+        const startIdx = nearestWaypointIndex(unit, path);
+        unit.patrolWaypointIndex = startIdx;
+        unit.state = 'idle';   // update() will pick this up and start moving
+        releaseTreeClaim(unit);
+        clearPathLine(unit);
+        console.log(`${unit.typeData.name} assigned to patrol ${path.id} (entering at WP ${startIdx})`);
+    }
+
+    function assignUnitToGuard(unit, x, z) {
+        unit.guardPosition = { x, z };
+        unit.patrolPathId = null;
+        unit.harvestMode = null;
+        unit.targetTree = null;
+
+        // Walk to the guard spot. Once arrived, update() will keep them there.
+        const newPath = findPath(unit.position.x, unit.position.z, x, z, false, false);
+        if (newPath && newPath.length > 0) {
+            unit.path = newPath;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+            createPathLine(unit, newPath);
+        } else {
+            // Couldn't path - just plant them where they are
+            unit.guardPosition = { x: unit.position.x, z: unit.position.z };
+            unit.state = 'idle';
+        }
+        console.log(`${unit.typeData.name} guarding (${x.toFixed(1)}, ${z.toFixed(1)})`);
+    }
+
+    function clearPatrolGuard(unit) {
+        unit.patrolPathId = null;
+        unit.patrolWaypointIndex = 0;
+        unit.guardPosition = null;
+    }
+
+    function nearestWaypointIndex(unit, path) {
+        let best = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < path.waypoints.length; i++) {
+            const wp = path.waypoints[i];
+            const dx = wp.x - unit.position.x;
+            const dz = wp.z - unit.position.z;
+            const d = Math.sqrt(dx * dx + dz * dz);
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
+
+    // Called from update() when a patrolling unit is idle (between waypoints
+    // or after returning from combat). Picks the next waypoint and walks there.
+    function continuePatrol(unit) {
+        const path = findPathById(unit.patrolPathId);
+        if (!isPatrollable(path)) {
+            // Path was destroyed or not yet complete - drop the patrol assignment
+            clearPatrolGuard(unit);
+            unit.state = 'idle';
+            return;
+        }
+
+        // Where are we now? If we're close to the current waypoint, advance.
+        const wp = path.waypoints[unit.patrolWaypointIndex];
+        const dx = wp.x - unit.position.x;
+        const dz = wp.z - unit.position.z;
+        const distToWp = Math.sqrt(dx * dx + dz * dz);
+
+        if (distToWp < 1.5) {
+            // Reached this waypoint - advance to next (looping)
+            unit.patrolWaypointIndex = (unit.patrolWaypointIndex + 1) % path.waypoints.length;
+        }
+
+        const target = path.waypoints[unit.patrolWaypointIndex];
+        const newPath = findPath(unit.position.x, unit.position.z, target.x, target.z, false, false);
+        if (newPath && newPath.length > 0) {
+            unit.path = newPath;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            // Path blocked - try advancing to the next waypoint instead
+            unit.patrolWaypointIndex = (unit.patrolWaypointIndex + 1) % path.waypoints.length;
+            unit.state = 'idle';  // try again next tick
+        }
+    }
+
+    // Called from update() when a guarding unit is idle. If the unit is
+    // away from its guard spot, walk back. Otherwise, stay put.
+    function continueGuard(unit) {
+        if (!unit.guardPosition) {
+            unit.state = 'idle';
+            return;
+        }
+        const dx = unit.guardPosition.x - unit.position.x;
+        const dz = unit.guardPosition.z - unit.position.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+
+        if (dist < 1.0) {
+            // Already at guard spot - stay idle
+            unit.state = 'idle';
+            return;
+        }
+
+        const newPath = findPath(unit.position.x, unit.position.z, unit.guardPosition.x, unit.guardPosition.z, false, false);
+        if (newPath && newPath.length > 0) {
+            unit.path = newPath;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            unit.state = 'idle';
+        }
+    }
+
+    // For combat to know when to engage. Returns true if the unit has any
+    // patrol/guard assignment that justifies a wider engagement leash.
+    function hasPatrolOrGuard(unit) {
+        return unit.patrolPathId != null || unit.guardPosition != null;
+    }
+
+    // ============================================
     // HARVESTING TREE (the chopping action)
     // ============================================
 
@@ -1691,7 +2005,7 @@ window.GameUnits = (function() {
                 const path = findPath(
                     unit.position.x, unit.position.z,
                     adjacentCell.x, adjacentCell.z,
-                    false, unit.hasForestWalk
+                    false
                 );
                 if (path && path.length > 0) {
                     unit.path = path;
@@ -1783,7 +2097,7 @@ window.GameUnits = (function() {
         const path = findPath(
             unit.position.x, unit.position.z,
             sawmill.position.x, sawmill.position.z,
-            false, unit.hasForestWalk
+            false
         );
 
         if (path && path.length > 0) {
@@ -2014,7 +2328,7 @@ window.GameUnits = (function() {
         const path = findPath(
             unit.position.x, unit.position.z,
             targetX, targetZ,
-            canFly, unit.hasForestWalk
+            canFly
         );
 
         if (path && path.length > 0) {
@@ -2024,6 +2338,8 @@ window.GameUnits = (function() {
             unit.harvestMode = null;
             unit.corridorTarget = null;
             unit.pathId = null;
+            unit.patrolPathId = null;
+            unit.guardPosition = null;
             unit.targetTree = null;
             unit.targetBuilding = null;
             createPathLine(unit, path);
@@ -2057,7 +2373,7 @@ window.GameUnits = (function() {
             const path = findPath(
                 unit.position.x, unit.position.z,
                 unitTargetX, unitTargetZ,
-                canFly, unit.hasForestWalk
+                canFly
             );
 
             if (path && path.length > 0) {
@@ -2067,6 +2383,8 @@ window.GameUnits = (function() {
                 unit.harvestMode = null;
                 unit.corridorTarget = null;
                 unit.pathId = null;
+                unit.patrolPathId = null;
+                unit.guardPosition = null;
                 unit.targetTree = null;
                 unit.targetBuilding = null;
                 createPathLine(unit, path);
@@ -2135,12 +2453,17 @@ window.GameUnits = (function() {
         selectedUnits = [];
         commandMode = null;
         clearCorridorPreview();
-        // Discard any in-progress loop draft - the user is no longer
-        // engaged with the woodsman that started it.
+        // Discard any in-progress drafts - the user is no longer engaged
+        // with the unit that started them.
         if (draftLoopPath) {
             destroyPath(draftLoopPath);
             draftLoopPath = null;
             if (window.GameUI) GameUI.hideLoopConfirm();
+        }
+        if (draftPatrolPath) {
+            destroyPath(draftPatrolPath);
+            draftPatrolPath = null;
+            if (window.GameUI) GameUI.hidePatrolConfirm();
         }
         if (window.GameUI) GameUI.hideMenus();
     }
@@ -2156,11 +2479,17 @@ window.GameUnits = (function() {
         if (mode !== 'cutPath' && mode !== 'cutLane') {
             clearCorridorPreview();
         }
-        // Leaving cutLoop mode without committing → drop the draft.
+        // Leaving cutLoop without committing → drop draft.
         if (mode !== 'cutLoop' && draftLoopPath) {
             destroyPath(draftLoopPath);
             draftLoopPath = null;
             if (window.GameUI) GameUI.hideLoopConfirm();
+        }
+        // Leaving customPatrol without committing → drop draft.
+        if (mode !== 'customPatrol' && draftPatrolPath) {
+            destroyPath(draftPatrolPath);
+            draftPatrolPath = null;
+            if (window.GameUI) GameUI.hidePatrolConfirm();
         }
     }
 
@@ -2216,6 +2545,10 @@ window.GameUnits = (function() {
                         } else {
                             startHarvesting(unit);
                         }
+                    } else if (unit.patrolPathId) {
+                        continuePatrol(unit);
+                    } else if (unit.guardPosition) {
+                        continueGuard(unit);
                     } else {
                         unit.state = 'idle';
                     }
@@ -2227,6 +2560,10 @@ window.GameUnits = (function() {
                         continueCuttingCorridor(unit);
                     } else if (unit.harvestMode === 'cutLoop' && unit.typeData.canHarvest) {
                         continueCuttingPath(unit);
+                    } else if (unit.patrolPathId) {
+                        continuePatrol(unit);
+                    } else if (unit.guardPosition) {
+                        continueGuard(unit);
                     }
                     break;
             }
@@ -2305,6 +2642,15 @@ window.GameUnits = (function() {
         confirmLoopCommand,
         cancelLoopCommand,
         hasDraftLoopPath,
+        // Patrol & guard
+        addPatrolWaypoint,
+        confirmPatrolCommand,
+        cancelPatrolCommand,
+        hasDraftPatrolPath,
+        assignUnitToPatrol,
+        assignUnitToGuard,
+        findPathAtPoint,
+        isPatrollable,
         killUnit
     };
 })();
