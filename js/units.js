@@ -503,8 +503,8 @@ window.GameUnits = (function() {
             chopCount: 0,
             corridorTarget: null,
             corridorWidth: 0,
-            pathId: null,             // ID of assigned loop path (for cutLoop mode)
-            cutWaypointIndex: 0,      // Position around the loop (for cutLoop mode)
+            pathId: null,             // ID of assigned chain path (for cutChain mode)
+            chainSegmentIndex: 0,     // Current segment index (for cutChain mode)
             patrolPathId: null,       // ID of path being patrolled (knights/archers)
             patrolWaypointIndex: 0,   // current waypoint in patrol cycle
             guardPosition: null,      // { x, z } when on guard duty
@@ -869,9 +869,13 @@ window.GameUnits = (function() {
         );
 
         if (distToTarget < 2) {
-            console.log(`${unit.typeData.name} reached corridor destination, switching to nearby harvest`);
+            console.log(`${unit.typeData.name} reached corridor destination`);
             unit.corridorTarget = null;
             unit.harvestMode = 'nearby';
+            // If this corridor was part of a multi-waypoint chain, advance
+            // to the next segment instead of falling back to nearby harvest.
+            // onCorridorSegmentComplete returns true if it took control.
+            if (onCorridorSegmentComplete(unit)) return;
             startHarvesting(unit);
             return;
         }
@@ -1249,20 +1253,24 @@ window.GameUnits = (function() {
     }
 
     // ============================================
-    // LOOP PATHS - persistent multi-waypoint paths (polygons)
-    //   - Player taps to add waypoints. Polygon is drawn closed (last
-    //     waypoint always connects back to first).
-    //   - Confirm assigns selected woodsmen to cut along all polygon edges.
-    //   - Path stays in gameState.paths as a yellow polygon while being cut,
-    //     turns purple when all corridor trees on its edges are gone.
-    //   - Each path object: { id, waypoints, width, state, owner, lineMeshes }
-    //     state = 'draft' | 'under-construction' | 'complete'
+    // PATH DATA MODEL & RENDERING
+    //   Persistent multi-waypoint paths used by both cut paths (chains
+    //   cleared by woodsmen) and custom patrols (movement-only loops
+    //   for knights/archers). Path objects share rendering and tap-to-
+    //   select logic; they differ in state and width.
+    //   - state = 'draft' | 'under-construction' | 'complete'
+    //              | 'custom-patrol-draft' | 'custom-patrol'
+    //   - closed = true (loop) | false (open chain)
+    //   - Each object: { id, waypoints, width, state, owner, lineMeshes, closed }
     // ============================================
 
     let nextPathId = 1;
-    let draftLoopPath = null;  // path being built up by tap-tap-tap input
 
-    function createLoopPath(waypoints, width, owner = 'player') {
+    // Create a path. A path is a chain of waypoints with optional closing
+    // edge (last→first). Cut paths are open chains. Custom patrols are
+    // open chains too. (Closed loops were the polygon mode that was
+    // ripped out; the flag is kept in case patrols want it later.)
+    function createLoopPath(waypoints, width, owner = 'player', closed = false) {
         const gameState = getGameState();
         if (!gameState.paths) gameState.paths = [];
 
@@ -1272,8 +1280,8 @@ window.GameUnits = (function() {
             width: width,
             state: 'draft',
             owner: owner,
-            lineMeshes: [],          // THREE.Line objects rendering the polygon
-            closed: true             // loops are always closed (last → first)
+            lineMeshes: [],          // THREE.Line objects rendering the chain
+            closed: closed
         };
 
         gameState.paths.push(path);
@@ -1282,13 +1290,15 @@ window.GameUnits = (function() {
     }
 
     // Returns array of segment objects: { startX, startZ, endX, endZ, width }
-    // For a closed polygon with N waypoints, that's N segments.
+    // Open paths produce N-1 segments; closed paths produce N (with the
+    // last segment wrapping back to waypoint 0).
     function getPathSegments(path) {
         const segments = [];
         const n = path.waypoints.length;
         if (n < 2) return segments;
 
-        for (let i = 0; i < n; i++) {
+        const segCount = path.closed ? n : n - 1;
+        for (let i = 0; i < segCount; i++) {
             const a = path.waypoints[i];
             const b = path.waypoints[(i + 1) % n];
             segments.push({
@@ -1300,106 +1310,6 @@ window.GameUnits = (function() {
         return segments;
     }
 
-    // Find the closest reachable, unclaimed tree across all segments of `path`,
-    // measured from the unit's current position. This is what makes multiple
-    // woodsmen distribute work across the loop naturally.
-    function findNextReachablePathTree(unit, path) {
-        const gameState = getGameState();
-        const CELL = getCELL();
-        const CONFIG = getCONFIG();
-        const segments = getPathSegments(path);
-
-        let nearestTree = null;
-        let nearestDist = Infinity;
-        const seen = new Set();
-
-        for (const seg of segments) {
-            const dx = seg.endX - seg.startX;
-            const dz = seg.endZ - seg.startZ;
-            const length = Math.sqrt(dx * dx + dz * dz);
-            if (length < 1) continue;
-
-            const dirX = dx / length;
-            const dirZ = dz / length;
-            const perpX = -dirZ;
-            const perpZ = dirX;
-            const halfWidth = seg.width / 2;
-
-            for (let along = 0; along <= length; along += 0.5) {
-                for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
-                    const checkX = Math.floor(seg.startX + dirX * along + perpX * across);
-                    const checkZ = Math.floor(seg.startZ + dirZ * along + perpZ * across);
-                    const key = `${checkX},${checkZ}`;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-
-                    if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
-
-                    const cell = gameState.grid[checkX]?.[checkZ];
-                    if (cell !== CELL.TREE_NORMAL && cell !== CELL.TREE_HIGH_YIELD && cell !== CELL.TREE_ENERGY) continue;
-
-                    const claimedBy = claimedTrees.get(key);
-                    if (claimedBy && claimedBy !== unit.id) continue;
-
-                    if (!isTreeReachable(checkX, checkZ)) continue;
-
-                    const treeDx = checkX - unit.position.x;
-                    const treeDz = checkZ - unit.position.z;
-                    const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
-
-                    if (dist < nearestDist) {
-                        nearestDist = dist;
-                        nearestTree = { x: checkX, z: checkZ, type: cell };
-                    }
-                }
-            }
-        }
-
-        return nearestTree;
-    }
-
-    // Same logic but returns ALL trees on the path (for visualization / completion check)
-    function getAllPathTrees(path) {
-        const gameState = getGameState();
-        const CELL = getCELL();
-        const CONFIG = getCONFIG();
-        const segments = getPathSegments(path);
-
-        const trees = [];
-        const seen = new Set();
-
-        for (const seg of segments) {
-            const dx = seg.endX - seg.startX;
-            const dz = seg.endZ - seg.startZ;
-            const length = Math.sqrt(dx * dx + dz * dz);
-            if (length < 1) continue;
-
-            const dirX = dx / length;
-            const dirZ = dz / length;
-            const perpX = -dirZ;
-            const perpZ = dirX;
-            const halfWidth = seg.width / 2;
-
-            for (let along = 0; along <= length; along += 0.5) {
-                for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
-                    const checkX = Math.floor(seg.startX + dirX * along + perpX * across);
-                    const checkZ = Math.floor(seg.startZ + dirZ * along + perpZ * across);
-                    const key = `${checkX},${checkZ}`;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-
-                    if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
-
-                    const cell = gameState.grid[checkX]?.[checkZ];
-                    if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
-                        trees.push({ x: checkX, z: checkZ, type: cell });
-                    }
-                }
-            }
-        }
-
-        return trees;
-    }
 
     // Render the polygon as line segments. Color depends on state.
     //   draft / under-construction → yellow
@@ -1488,12 +1398,12 @@ window.GameUnits = (function() {
             scene.add(dot);
             path.lineMeshes.push(dot);
         } else {
-            // Closed polygon - draw each segment as a ribbon
-            for (let i = 0; i < n; i++) {
+            // Draw each segment as a ribbon. For open paths there are
+            // n-1 segments; closed paths have n (closing edge included).
+            const segCount = path.closed ? n : n - 1;
+            for (let i = 0; i < segCount; i++) {
                 const a = path.waypoints[i];
                 const b = path.waypoints[(i + 1) % n];
-                // Two-waypoint draft: closing edge is the same as forward edge
-                if (n === 2 && i === 1) continue;
                 const ribbon = makeRibbon(a.x, a.z, b.x, b.z);
                 if (ribbon) {
                     scene.add(ribbon);
@@ -1551,8 +1461,10 @@ window.GameUnits = (function() {
             const n = path.waypoints.length;
             if (n < 2) continue;
 
-            // Distance from (x,z) to closest point on each segment
-            for (let i = 0; i < n; i++) {
+            // Distance from (x,z) to closest point on each segment.
+            // Skip the closing edge for open paths.
+            const segCount = path.closed ? n : n - 1;
+            for (let i = 0; i < segCount; i++) {
                 const a = path.waypoints[i];
                 const b = path.waypoints[(i + 1) % n];
                 const d = pointToSegmentDistance(x, z, a.x, a.z, b.x, b.z);
@@ -1580,97 +1492,194 @@ window.GameUnits = (function() {
         return Math.sqrt((px - closestX) ** 2 + (pz - closestZ) ** 2);
     }
 
-    // ----- Multi-waypoint input flow -----
 
-    // Each tap while in cutLoop mode adds a waypoint to the draft path.
-    function addLoopWaypoint(targetX, targetZ, width) {
+    // ============================================
+    // CUT PATH (CHAIN) - open multi-waypoint paths
+    //   Player taps to drop waypoints A, B, C, D... Confirm.
+    //   Each adjacent pair is cut as an independent lane (A→B, then B→C,
+    //   etc.) using the SAME proven machinery as the single-tap Cut Lane
+    //   command. This sidesteps all the polygon-pathfinding-through-uncut-
+    //   forest issues we hit before: each segment is cut start-to-finish
+    //   before the next one begins, so the woodsman is always working on
+    //   a corridor reachable from the cleared area behind them.
+    // ============================================
+
+    let draftChainPath = null;        // path being built up by tap-tap-tap
+
+    // Each tap while in 'cutPath' mode appends a waypoint.
+    function addChainWaypoint(targetX, targetZ, width) {
         if (selectedUnits.length === 0) return;
 
-        if (!draftLoopPath) {
-            // First tap - create the path
-            draftLoopPath = createLoopPath([{ x: targetX, z: targetZ }], width);
+        if (!draftChainPath) {
+            draftChainPath = createLoopPath([{ x: targetX, z: targetZ }], width, 'player', false);
             createRipple(targetX, targetZ);
-            if (window.GameUI) GameUI.showLoopConfirm(width);
+            if (window.GameUI) GameUI.showChainConfirm(width);
         } else {
-            // Append a waypoint and re-render
-            draftLoopPath.waypoints.push({ x: targetX, z: targetZ });
+            draftChainPath.waypoints.push({ x: targetX, z: targetZ });
             createRipple(targetX, targetZ);
-            renderPath(draftLoopPath);
+            renderPath(draftChainPath);
         }
     }
 
-    // User hit Confirm - assign units, transition draft → under-construction.
-    function confirmLoopCommand() {
-        if (!draftLoopPath || selectedUnits.length === 0) {
-            cancelLoopCommand();
+    // User hit Confirm - lock in the chain and assign units to start cutting.
+    function confirmChainCommand() {
+        if (!draftChainPath || selectedUnits.length === 0) {
+            cancelChainCommand();
+            return;
+        }
+        if (draftChainPath.waypoints.length < 2) {
+            cancelChainCommand();
             return;
         }
 
-        if (draftLoopPath.waypoints.length < 2) {
-            // Not enough waypoints to form a path - cancel
-            cancelLoopCommand();
-            return;
-        }
+        draftChainPath.state = 'under-construction';
+        renderPath(draftChainPath);
 
-        draftLoopPath.state = 'under-construction';
-        renderPath(draftLoopPath);  // re-render with under-construction style
-
-        const pathRef = draftLoopPath;
+        const pathRef = draftChainPath;
         for (const unit of selectedUnits) {
-            assignUnitToPath(unit, pathRef);
+            assignUnitToChain(unit, pathRef);
         }
 
-        draftLoopPath = null;
+        draftChainPath = null;
         commandMode = null;
-
         if (window.GameUI) {
             GameUI.hideCommandIndicator();
-            GameUI.hideLoopConfirm();
+            GameUI.hideChainConfirm();
             GameUI.showUnitMenu(selectedUnits);
         }
     }
 
-    function cancelLoopCommand() {
-        if (draftLoopPath) {
-            destroyPath(draftLoopPath);
-            draftLoopPath = null;
+    function cancelChainCommand() {
+        if (draftChainPath) {
+            destroyPath(draftChainPath);
+            draftChainPath = null;
         }
         commandMode = null;
-
         if (window.GameUI) {
             GameUI.hideCommandIndicator();
-            GameUI.hideLoopConfirm();
-            if (selectedUnits.length > 0) {
-                GameUI.showUnitMenu(selectedUnits);
+            GameUI.hideChainConfirm();
+            if (selectedUnits.length > 0) GameUI.showUnitMenu(selectedUnits);
+        }
+    }
+
+    function hasDraftChainPath() {
+        return draftChainPath !== null;
+    }
+
+    // ----- Unit cutting behavior on a chain -----
+
+    function assignUnitToChain(unit, path) {
+        if (!unit.typeData.canHarvest) return;
+
+        unit.pathId = path.id;
+        unit.harvestMode = 'cutChain';
+        unit.corridorTarget = null;
+        unit.chainSegmentIndex = 0;     // which segment of the chain we're on
+        releaseTreeClaim(unit);
+
+        continueCuttingChain(unit);
+    }
+
+    // Drives cutting along a chain. We treat each segment exactly like a
+    // single-tap Cut Lane command - set corridorTarget/Width and let the
+    // existing continueCuttingCorridor flow chew through trees one at a
+    // time. When a segment is done (woodsman reaches the endpoint), we
+    // advance to the next segment and start that one. When all segments
+    // are cut, the path is complete.
+    function continueCuttingChain(unit) {
+        const path = findPathById(unit.pathId);
+        if (!path) {
+            unit.pathId = null;
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+            return;
+        }
+
+        // Inventory full? Drop wood off first, resume on return.
+        const totalCarried = unit.inventory.wood + unit.inventory.energy;
+        if (totalCarried >= unit.carryCapacity) {
+            returnToSawmill(unit);
+            return;
+        }
+
+        const segments = getPathSegments(path);
+        if (segments.length === 0) {
+            unit.state = 'idle';
+            return;
+        }
+
+        // Clamp segment index in case the path was edited or units share it.
+        if (unit.chainSegmentIndex >= segments.length) {
+            // All segments done → chain complete.
+            if (path.state !== 'complete') {
+                path.state = 'complete';
+                renderPath(path);
+                console.log(`Path ${path.id} complete - now patrollable`);
+            }
+            unit.pathId = null;
+            unit.harvestMode = null;
+            unit.targetTree = null;
+            unit.chainSegmentIndex = 0;
+            unit.state = 'idle';
+            clearPathLine(unit);
+            return;
+        }
+
+        const seg = segments[unit.chainSegmentIndex];
+
+        // Set up the woodsman to cut this single segment using the proven
+        // single-lane logic. corridorTarget points at segment endpoint;
+        // continueCuttingCorridor will chew toward it tree by tree.
+        unit.corridorTarget = { x: seg.endX, z: seg.endZ };
+        unit.corridorWidth = seg.width;
+        unit.harvestMode = 'cutLane';     // reuse lane mode for the heavy lifting
+
+        // When the lane finishes, continueCuttingCorridor sets harvestMode
+        // back to 'nearby' and clears corridorTarget. We intercept that in
+        // the update loop and advance the chain (see the 'idle' branch
+        // and the post-deposit hook).
+        continueCuttingCorridor(unit);
+    }
+
+    // Hook called when a unit finishes cutting a corridor (or after deposit
+    // returns them to the field). If they're on a chain, advance to the
+    // next segment instead of switching to nearby harvest.
+    function onCorridorSegmentComplete(unit) {
+        if (unit.harvestMode === 'nearby' && unit.pathId) {
+            // continueCuttingCorridor finished the segment and reverted to
+            // nearby. We override that: bump segment index and continue.
+            unit.chainSegmentIndex = (unit.chainSegmentIndex || 0) + 1;
+            continueCuttingChain(unit);
+            return true;
+        }
+        return false;
+    }
+
+    // Periodic check: are all segments of any under-construction chain
+    // cleared? Marks chains complete even if every woodsman wandered off.
+    function updatePaths() {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        if (!gameState.paths) return;
+
+        for (const path of gameState.paths) {
+            if (path.state !== 'under-construction') continue;
+            const segments = getPathSegments(path);
+            let allClear = true;
+            for (const seg of segments) {
+                if (segmentHasTrees(seg)) { allClear = false; break; }
+            }
+            if (allClear) {
+                path.state = 'complete';
+                renderPath(path);
+                console.log(`Path ${path.id} complete (auto-detected)`);
             }
         }
     }
 
-    function hasDraftLoopPath() {
-        return draftLoopPath !== null;
-    }
-
-    // ----- Unit cutting behavior on a path -----
-
-    function assignUnitToPath(unit, path) {
-        if (!unit.typeData.canHarvest) return;
-
-        unit.pathId = path.id;
-        unit.harvestMode = 'cutLoop';
-        unit.corridorTarget = null;  // clear any old corridor target
-        // Start at the nearest waypoint - this becomes our anchor point.
-        // continueCuttingPath walks around the polygon from here looking
-        // for trees, advancing the index when a segment is cleared.
-        unit.cutWaypointIndex = nearestWaypointIndex(unit, path);
-        releaseTreeClaim(unit);
-
-        continueCuttingPath(unit);
-    }
-
-    // Get all candidate trees on a single segment, sorted by distance from
-    // the unit. Caller can iterate through these to find the closest
-    // *actually reachable* one.
-    function getCandidateTreesOnSegment(unit, seg) {
+    // Helper for updatePaths - is there any tree blocking this segment?
+    function segmentHasTrees(seg) {
         const gameState = getGameState();
         const CELL = getCELL();
         const CONFIG = getCONFIG();
@@ -1678,7 +1687,7 @@ window.GameUnits = (function() {
         const dx = seg.endX - seg.startX;
         const dz = seg.endZ - seg.startZ;
         const length = Math.sqrt(dx * dx + dz * dz);
-        if (length < 1) return [];
+        if (length < 1) return false;
 
         const dirX = dx / length;
         const dirZ = dz / length;
@@ -1686,7 +1695,6 @@ window.GameUnits = (function() {
         const perpZ = dirX;
         const halfWidth = seg.width / 2;
         const seen = new Set();
-        const candidates = [];
 
         for (let along = 0; along <= length; along += 0.5) {
             for (let across = -halfWidth; across <= halfWidth; across += 0.5) {
@@ -1697,233 +1705,13 @@ window.GameUnits = (function() {
                 seen.add(key);
 
                 if (checkX < 0 || checkX >= CONFIG.GRID_WIDTH || checkZ < 0 || checkZ >= CONFIG.GRID_HEIGHT) continue;
-
                 const cell = gameState.grid[checkX]?.[checkZ];
-                if (cell !== CELL.TREE_NORMAL && cell !== CELL.TREE_HIGH_YIELD && cell !== CELL.TREE_ENERGY) continue;
-
-                const claimedBy = claimedTrees.get(key);
-                if (claimedBy && claimedBy !== unit.id) continue;
-
-                if (!isTreeReachable(checkX, checkZ)) continue;
-
-                const treeDx = checkX - unit.position.x;
-                const treeDz = checkZ - unit.position.z;
-                const dist = Math.sqrt(treeDx * treeDx + treeDz * treeDz);
-                candidates.push({ x: checkX, z: checkZ, type: cell, dist });
+                if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
+                    return true;
+                }
             }
         }
-
-        candidates.sort((a, b) => a.dist - b.dist);
-        return candidates;
-    }
-
-    // Try to start the woodsman cutting trees on a specific segment of the
-    // loop. Iterates through candidate trees from closest to farthest,
-    // picking the first one we can ACTUALLY pathfind to (rejects trees
-    // surrounded by uncut forest). Returns true if a tree was found and
-    // the woodsman is heading toward it; false if the segment is clear or
-    // all candidates are unreachable.
-    function tryCutSegment(unit, seg) {
-        const candidates = getCandidateTreesOnSegment(unit, seg);
-
-        for (const tree of candidates) {
-            const adjacentCell = findAdjacentCellToTree(
-                tree.x, tree.z, unit.position.x, unit.position.z
-            );
-            if (!adjacentCell) continue;
-
-            const newPath = findPath(
-                unit.position.x, unit.position.z,
-                adjacentCell.x, adjacentCell.z,
-                false
-            );
-
-            // findPath returns the closest reachable point if the
-            // destination is unreachable. Verify the LAST node of the
-            // returned path actually equals the destination.
-            if (!newPath || newPath.length === 0) continue;
-            const last = newPath[newPath.length - 1];
-            if (last.x !== adjacentCell.x || last.z !== adjacentCell.z) continue;
-
-            // Found a reachable tree - go cut it.
-            claimTree(unit, tree);
-            unit.targetTree = tree;
-            unit.path = newPath;
-            unit.pathIndex = 0;
-            unit.state = 'moving';
-            createPathLine(unit, newPath);
-            return true;
-        }
-
         return false;
-    }
-
-    // Walks the woodsman to a specific waypoint of the loop, going through
-    // the already-cut corridor. Returns true if a path was found that
-    // actually reaches the waypoint.
-    function walkToWaypoint(unit, path, idx) {
-        const wp = path.waypoints[idx];
-        const newPath = findPath(
-            unit.position.x, unit.position.z,
-            Math.floor(wp.x), Math.floor(wp.z),
-            false
-        );
-        if (!newPath || newPath.length === 0) return false;
-        const last = newPath[newPath.length - 1];
-        if (last.x !== Math.floor(wp.x) || last.z !== Math.floor(wp.z)) {
-            return false;
-        }
-        unit.path = newPath;
-        unit.pathIndex = 0;
-        unit.state = 'moving';
-        createPathLine(unit, newPath);
-        return true;
-    }
-
-    function continueCuttingPath(unit) {
-        const path = findPathById(unit.pathId);
-        if (!path) {
-            // Path was destroyed - fall back to nearby
-            unit.pathId = null;
-            unit.harvestMode = 'nearby';
-            startHarvesting(unit);
-            return;
-        }
-
-        // Inventory full?
-        const totalCarried = unit.inventory.wood + unit.inventory.energy;
-        if (totalCarried >= unit.carryCapacity) {
-            returnToSawmill(unit);
-            return;
-        }
-
-        const n = path.waypoints.length;
-        if (n < 2) {
-            unit.state = 'idle';
-            return;
-        }
-
-        // STEP 1: Make sure we're actually on (or near) the loop. After a
-        // sawmill deposit the woodsman is at the sawmill, far from the
-        // loop. They need to walk to the nearest waypoint first - the
-        // sawmill is in the base clearing, the nearest waypoint is at the
-        // edge of the cut corridor, and there's a path between them.
-        // Without this step, tryCutSegment would call findPath to a tree
-        // surrounded by uncut forest, get a partial path back, and the
-        // woodsman would walk into the trees and get stuck.
-        const nearestIdx = nearestWaypointIndex(unit, path);
-        const nearestWp = path.waypoints[nearestIdx];
-        const distToLoop = Math.sqrt(
-            Math.pow(unit.position.x - nearestWp.x, 2) +
-            Math.pow(unit.position.z - nearestWp.z, 2)
-        );
-
-        // Threshold: if we're more than 3 tiles from the closest waypoint,
-        // we're "off the loop" and need to walk back.
-        if (distToLoop > 3) {
-            if (walkToWaypoint(unit, path, nearestIdx)) {
-                unit.cutWaypointIndex = nearestIdx;
-                return;
-            }
-            // Couldn't even reach the loop - fall through and try cutting
-            // anyway as a last-ditch attempt.
-        }
-
-        // STEP 2: Walk the polygon segment-by-segment, starting from our
-        // current waypoint anchor. tryCutSegment now verifies the path
-        // actually reaches each tree (rejects partial paths into uncut
-        // forest), so unreachable trees are skipped automatically.
-        //
-        // KEY INSIGHT: this naturally retraces the cut corridor instead
-        // of trying to pathfind through uncut forest. After a sawmill
-        // deposit, the woodsman walks to nearestWaypoint (still in cut
-        // territory) above, then advances along the polygon here.
-
-        const startIdx = unit.cutWaypointIndex || 0;
-
-        for (let step = 0; step < n; step++) {
-            const i = (startIdx + step) % n;
-            const seg = {
-                startX: path.waypoints[i].x,
-                startZ: path.waypoints[i].z,
-                endX: path.waypoints[(i + 1) % n].x,
-                endZ: path.waypoints[(i + 1) % n].z,
-                width: path.width
-            };
-
-            // Is this segment still uncut? Try to find a tree on it.
-            if (tryCutSegment(unit, seg)) {
-                unit.cutWaypointIndex = i;  // remember where we are on the loop
-                return;
-            }
-
-            // Segment clear - walk to its end waypoint via the cut corridor,
-            // then continue searching from there. If we can already pathfind
-            // there we don't need to actually walk - we just advance the
-            // index and try the next segment.
-        }
-
-        // We made a full circuit and didn't find any trees. But before
-        // declaring the loop complete, double-check there are no remaining
-        // trees anywhere on the polygon (covers edge cases where width
-        // overlap leaves a tree we missed via segment-only search).
-        const remaining = getAllPathTrees(path);
-        if (remaining.length > 0) {
-            // There ARE trees somewhere - try the global search as a fallback.
-            // Walk to the closest waypoint to the nearest remaining tree.
-            const tree = remaining[0];
-            let bestIdx = 0;
-            let bestDist = Infinity;
-            for (let i = 0; i < n; i++) {
-                const wp = path.waypoints[i];
-                const d = Math.sqrt((wp.x - tree.x) ** 2 + (wp.z - tree.z) ** 2);
-                if (d < bestDist) { bestDist = d; bestIdx = i; }
-            }
-            // Walk to that waypoint and resume cutting from there.
-            if (walkToWaypoint(unit, path, bestIdx)) {
-                unit.cutWaypointIndex = bestIdx;
-                return;
-            }
-
-            // Couldn't even path to a waypoint - give up gracefully.
-            unit.state = 'idle';
-            return;
-        }
-
-        // Truly no trees left. Mark complete.
-        if (path.state !== 'complete') {
-            path.state = 'complete';
-            renderPath(path);
-            console.log(`Path ${path.id} complete - now patrollable`);
-        }
-
-        // Loop is done. Don't auto-drift into "nearby harvest" — that
-        // would pull the woodsman deep into the forest from inside the
-        // corridor he just cut, which feels like wandering off. Instead,
-        // stop and wait for orders.
-        unit.pathId = null;
-        unit.harvestMode = null;
-        unit.targetTree = null;
-        unit.state = 'idle';
-        clearPathLine(unit);
-    }
-
-    // Run periodically to check if any under-construction paths are done
-    // (covers the case where ALL trees on a path get cut by means other
-    // than assigned woodsmen, e.g. a cleave upgrade or hero blasts).
-    function updatePaths() {
-        const gameState = getGameState();
-        if (!gameState.paths) return;
-
-        for (const path of gameState.paths) {
-            if (path.state !== 'under-construction') continue;
-            const remaining = getAllPathTrees(path);
-            if (remaining.length === 0) {
-                path.state = 'complete';
-                renderPath(path);
-                console.log(`Path ${path.id} complete (auto-detected)`);
-            }
-        }
     }
 
     // ============================================
@@ -1935,7 +1723,7 @@ window.GameUnits = (function() {
     //   other path. Width=1 means single-file walking.
     // ============================================
 
-    let draftPatrolPath = null;  // Patrol-path-being-drawn (mirrors draftLoopPath)
+    let draftPatrolPath = null;  // Patrol-path-being-drawn (mirrors draftChainPath)
 
     function addPatrolWaypoint(targetX, targetZ) {
         if (selectedUnits.length === 0) return;
@@ -2161,8 +1949,8 @@ window.GameUnits = (function() {
         if (!unit.targetTree) {
             if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                 continueCuttingCorridor(unit);
-            } else if (unit.harvestMode === 'cutLoop') {
-                continueCuttingPath(unit);
+            } else if (unit.harvestMode === 'cutChain') {
+                continueCuttingChain(unit);
             } else {
                 startHarvesting(unit);
             }
@@ -2255,9 +2043,9 @@ window.GameUnits = (function() {
             } else if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                 unit.targetTree = null;
                 continueCuttingCorridor(unit);
-            } else if (unit.harvestMode === 'cutLoop') {
+            } else if (unit.harvestMode === 'cutChain') {
                 unit.targetTree = null;
-                continueCuttingPath(unit);
+                continueCuttingChain(unit);
             } else {
                 unit.targetTree = null;
                 startHarvesting(unit);
@@ -2304,8 +2092,8 @@ window.GameUnits = (function() {
 
         if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
             continueCuttingCorridor(unit);
-        } else if (unit.harvestMode === 'cutLoop') {
-            continueCuttingPath(unit);
+        } else if (unit.harvestMode === 'cutChain') {
+            continueCuttingChain(unit);
         } else if (unit.harvestMode) {
             startHarvesting(unit);
         } else {
@@ -2339,8 +2127,8 @@ window.GameUnits = (function() {
                 harvestTree(unit, 0);
             } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
                 continueCuttingCorridor(unit);
-            } else if (unit.harvestMode === 'cutLoop' && unit.typeData.canHarvest) {
-                continueCuttingPath(unit);
+            } else if (unit.harvestMode === 'cutChain' && unit.typeData.canHarvest) {
+                continueCuttingChain(unit);
             } else if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
                 startHarvesting(unit);
             } else {
@@ -2634,9 +2422,9 @@ window.GameUnits = (function() {
         clearCorridorPreview();
         // Discard any in-progress drafts - the user is no longer engaged
         // with the unit that started them.
-        if (draftLoopPath) {
-            destroyPath(draftLoopPath);
-            draftLoopPath = null;
+        if (draftChainPath) {
+            destroyPath(draftChainPath);
+            draftChainPath = null;
             if (window.GameUI) GameUI.hideLoopConfirm();
         }
         if (draftPatrolPath) {
@@ -2658,10 +2446,10 @@ window.GameUnits = (function() {
         if (mode !== 'cutPath' && mode !== 'cutLane') {
             clearCorridorPreview();
         }
-        // Leaving cutLoop without committing → drop draft.
-        if (mode !== 'cutLoop' && draftLoopPath) {
-            destroyPath(draftLoopPath);
-            draftLoopPath = null;
+        // Leaving cutChain without committing → drop draft.
+        if (mode !== 'cutChain' && draftChainPath) {
+            destroyPath(draftChainPath);
+            draftChainPath = null;
             if (window.GameUI) GameUI.hideLoopConfirm();
         }
         // Leaving customPatrol without committing → drop draft.
@@ -2719,8 +2507,8 @@ window.GameUnits = (function() {
                     if (unit.harvestMode && unit.typeData.canHarvest) {
                         if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                             continueCuttingCorridor(unit);
-                        } else if (unit.harvestMode === 'cutLoop') {
-                            continueCuttingPath(unit);
+                        } else if (unit.harvestMode === 'cutChain') {
+                            continueCuttingChain(unit);
                         } else {
                             startHarvesting(unit);
                         }
@@ -2737,8 +2525,8 @@ window.GameUnits = (function() {
                         startHarvesting(unit);
                     } else if ((unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') && unit.typeData.canHarvest) {
                         continueCuttingCorridor(unit);
-                    } else if (unit.harvestMode === 'cutLoop' && unit.typeData.canHarvest) {
-                        continueCuttingPath(unit);
+                    } else if (unit.harvestMode === 'cutChain' && unit.typeData.canHarvest) {
+                        continueCuttingChain(unit);
                     } else if (unit.patrolPathId) {
                         continuePatrol(unit);
                     } else if (unit.guardPosition) {
@@ -2817,10 +2605,10 @@ window.GameUnits = (function() {
         cancelCorridorCommand,
         hasPendingCorridorCommand,
         // Loop paths
-        addLoopWaypoint,
-        confirmLoopCommand,
-        cancelLoopCommand,
-        hasDraftLoopPath,
+        addChainWaypoint,
+        confirmChainCommand,
+        cancelChainCommand,
+        hasDraftChainPath,
         // Patrol & guard
         addPatrolWaypoint,
         confirmPatrolCommand,
