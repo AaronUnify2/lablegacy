@@ -163,6 +163,9 @@ window.GameUI = (function() {
         const unitCount = units.length;
         const isMultiSelect = unitCount > 1;
         const isWoodsman = firstUnit.type === 'woodsman';
+        const isKnight = firstUnit.type === 'knight';
+        const isArcher = firstUnit.type === 'archer';
+        const isCombatUnit = isKnight || isArcher;
         
         let statusInfo = '';
         
@@ -225,6 +228,12 @@ window.GameUI = (function() {
                         } else if (firstUnit.harvestMode === 'cutLoop') {
                             stateText = '🔁 Moving to cut loop...';
                             stateColor = '#d4a84a';
+                        } else if (firstUnit.patrolPathId) {
+                            stateText = '🛡️ Patrolling...';
+                            stateColor = '#b070f0';
+                        } else if (firstUnit.guardPosition) {
+                            stateText = '🛡️ Moving to guard post...';
+                            stateColor = '#b070f0';
                         } else {
                             stateText = '🚶 Moving...';
                             stateColor = '#7ddf64';
@@ -233,6 +242,19 @@ window.GameUI = (function() {
                     case 'returning':
                         stateText = '📦 Returning to Sawmill...';
                         stateColor = '#a8d5a2';
+                        break;
+                    case 'attacking':
+                        stateText = '⚔️ Engaging enemy!';
+                        stateColor = '#ff8060';
+                        break;
+                    case 'idle':
+                        if (firstUnit.patrolPathId) {
+                            stateText = '🛡️ On patrol';
+                            stateColor = '#b070f0';
+                        } else if (firstUnit.guardPosition) {
+                            stateText = '🛡️ On guard';
+                            stateColor = '#b070f0';
+                        }
                         break;
                 }
                 
@@ -350,6 +372,70 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🔁</span>
                     <span style="flex: 1; text-align: left;">Cut Loop</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLoop ? 'ACTIVE' : 'Polygon'}</span>
+                </button>
+            `;
+        }
+
+        if (isCombatUnit) {
+            const anyPatrolling = units.some(u => u.patrolPathId);
+            const anyGuarding = units.some(u => u.guardPosition);
+
+            commandsHtml += `
+                <button class="unit-cmd-btn" data-cmd="patrolPath" style="
+                    background: ${anyPatrolling ? 'rgba(139, 80, 200, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyPatrolling ? '#b070f0' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🛡️</span>
+                    <span style="flex: 1; text-align: left;">Patrol Path</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyPatrolling ? 'ACTIVE' : 'Tap a path'}</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="customPatrol" style="
+                    background: rgba(74, 124, 63, 0.3);
+                    border: 1px solid #4a7c3f;
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">📍</span>
+                    <span style="flex: 1; text-align: left;">Custom Patrol</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">Draw a loop</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="guard" style="
+                    background: ${anyGuarding ? 'rgba(139, 80, 200, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyGuarding ? '#b070f0' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🚩</span>
+                    <span style="flex: 1; text-align: left;">Guard Spot</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyGuarding ? 'ACTIVE' : 'Tap a spot'}</span>
                 </button>
             `;
         }
@@ -538,6 +624,43 @@ window.GameUI = (function() {
                     ? `Tap waypoints for ${units.length} woodsmen to cut loop`
                     : 'Tap waypoints to draw loop. Confirm when done.';
                 showCommandIndicator(loopText);
+                hideMenuVisuals();
+                break;
+
+            case 'patrolPath':
+                // Tap a yellow/purple path on the map to assign these units
+                // to patrol it. Path-search is in 2D, no raycasting needed.
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('patrolPath');
+                }
+                const patrolText = units.length > 1
+                    ? `Tap an existing path for ${units.length} units to patrol`
+                    : 'Tap an existing path to patrol it';
+                showCommandIndicator(patrolText);
+                hideMenuVisuals();
+                break;
+
+            case 'customPatrol':
+                // Like cutLoop but doesn't cut - just draws a movement path.
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('customPatrol');
+                }
+                const customText = units.length > 1
+                    ? `Tap waypoints to draw a patrol loop for ${units.length} units`
+                    : 'Tap waypoints to draw a patrol loop. Confirm when done.';
+                showCommandIndicator(customText);
+                hideMenuVisuals();
+                break;
+
+            case 'guard':
+                // Tap a spot - unit walks there and engages enemies in leash range
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('guard');
+                }
+                const guardText = units.length > 1
+                    ? `Tap a spot for ${units.length} units to guard`
+                    : 'Tap a spot to guard';
+                showCommandIndicator(guardText);
                 hideMenuVisuals();
                 break;
         }
@@ -759,6 +882,101 @@ window.GameUI = (function() {
     }
 
     function hideLoopConfirm() {
+        if (corridorConfirmPanel) {
+            corridorConfirmPanel.style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // CUSTOM PATROL CONFIRM PANEL
+    // Same panel as loop confirm but with patrol-specific copy and wires
+    // up to GameUnits.confirmPatrolCommand / cancelPatrolCommand.
+    // ============================================
+
+    function showPatrolConfirm() {
+        if (!corridorConfirmPanel) return;
+
+        corridorConfirmPanel.innerHTML = `
+            <div style="
+                color: #cc99ff;
+                font-size: 12px;
+                text-align: center;
+                padding: 4px 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            ">
+                🛡️ Drawing Patrol
+            </div>
+            <div style="
+                color: #a8d5a2;
+                font-size: 11px;
+                text-align: center;
+                padding-bottom: 6px;
+            ">
+                Keep tapping to add waypoints. Confirm when shape looks right.
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button id="patrol-cancel-btn" style="
+                    flex: 1;
+                    background: rgba(120, 50, 50, 0.4);
+                    border: 1px solid #aa5555;
+                    border-radius: 6px;
+                    color: #f0c8c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✕ Cancel
+                </button>
+                <button id="patrol-confirm-btn" style="
+                    flex: 1;
+                    background: rgba(120, 80, 200, 0.5);
+                    border: 1px solid #b070f0;
+                    border-radius: 6px;
+                    color: #ffffff;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: bold;
+                ">
+                    ✓ Confirm
+                </button>
+            </div>
+        `;
+
+        corridorConfirmPanel.style.display = 'flex';
+        if (unitMenuContainer) unitMenuContainer.style.display = 'none';
+
+        const confirmBtn = document.getElementById('patrol-confirm-btn');
+        const cancelBtn = document.getElementById('patrol-cancel-btn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.confirmPatrolCommand();
+            });
+            confirmBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.confirmPatrolCommand();
+            });
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.cancelPatrolCommand();
+            });
+            cancelBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.GameUnits) GameUnits.cancelPatrolCommand();
+            });
+        }
+    }
+
+    function hidePatrolConfirm() {
         if (corridorConfirmPanel) {
             corridorConfirmPanel.style.display = 'none';
         }
@@ -1322,6 +1540,7 @@ window.GameUI = (function() {
         hideCommandIndicator();
         hideCorridorConfirm();
         hideLoopConfirm();
+        hidePatrolConfirm();
         currentBuildingMenu = null;
     }
     
@@ -1365,6 +1584,8 @@ window.GameUI = (function() {
         hideCorridorConfirm,
         showLoopConfirm,
         hideLoopConfirm,
+        showPatrolConfirm,
+        hidePatrolConfirm,
         hideMenus,
         hideMenuVisuals,
         buildBuilding,
