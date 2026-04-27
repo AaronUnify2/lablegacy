@@ -87,16 +87,17 @@ window.GameUnits = (function() {
             canHarvest: false, canPlant: true, scale: 0.9
         },
         // The player's possessable hero. Spawns once at game start at
-        // the Royal Tent. Beefier than a knight, bigger sprite (scale
-        // 1.3) but still smaller than a tree (~4.5 high). The player
-        // pilots him in FPS mode; in RTS he stands idle (or walks back
-        // to base if the player chose that on swap).
+        // the Royal Tent. Slightly bigger than a knight (scale 1.05)
+        // but clearly under tree height — trees range 3.6-6.3 tall, so
+        // hero at 4.7 tall reads as "important but in the world."
+        // The player pilots him in FPS mode; in RTS he stands idle (or
+        // walks back to base if the player chose that on swap).
         hero: {
             id: 'hero', name: 'Wizard',
             health: 200, damage: 20, speed: 0.06,
             attackRange: 2, attackSpeed: 800,
             harvestSpeed: 0, carryCapacity: 0,
-            canHarvest: false, scale: 1.3
+            canHarvest: false, scale: 1.05
         }
     };
 
@@ -857,6 +858,20 @@ window.GameUnits = (function() {
 
         const unitIndex = gameState.units.indexOf(unit);
         if (unitIndex !== -1) gameState.units.splice(unitIndex, 1);
+
+        // Hero death: kick the player back to RTS view and clear the
+        // hero reference so updateCamera doesn't try to follow a dead
+        // unit. The actual respawn flow (cost at Royal Tent, etc.) is
+        // for a later slice; for now the wizard is just gone.
+        if (unit.type === 'hero') {
+            gameState.hero = null;
+            gameState.fpsMode = false;
+            const btn = document.getElementById('fps-toggle-btn');
+            if (btn) btn.classList.remove('active');
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair) crosshair.classList.remove('active');
+            console.log('Hero died — reverted to RTS view');
+        }
     }
 
     // ============================================
