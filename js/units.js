@@ -85,6 +85,18 @@ window.GameUnits = (function() {
             attackRange: 1.5, attackSpeed: 1500,
             harvestSpeed: 0, carryCapacity: 0,
             canHarvest: false, canPlant: true, scale: 0.9
+        },
+        // The player's possessable hero. Spawns once at game start at
+        // the Royal Tent. Beefier than a knight, bigger sprite (scale
+        // 1.3) but still smaller than a tree (~4.5 high). The player
+        // pilots him in FPS mode; in RTS he stands idle (or walks back
+        // to base if the player chose that on swap).
+        hero: {
+            id: 'hero', name: 'Wizard',
+            health: 200, damage: 20, speed: 0.06,
+            attackRange: 2, attackSpeed: 800,
+            harvestSpeed: 0, carryCapacity: 0,
+            canHarvest: false, scale: 1.3
         }
     };
 
@@ -306,6 +318,7 @@ window.GameUnits = (function() {
             case 'woodsman': return createWoodsmanMaterial();
             case 'knight': return createKnightMaterial();
             case 'archer': return createArcherMaterial();
+            case 'hero': return createHeroMaterial();
             default: return createKnightMaterial();
         }
     }
@@ -424,6 +437,133 @@ window.GameUnits = (function() {
         ctx.fillStyle = '#808080';
         ctx.beginPath();
         ctx.moveTo(30, 19); ctx.lineTo(32, 17); ctx.lineTo(32, 21); ctx.closePath(); ctx.fill();
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        return new THREE.SpriteMaterial({ map: texture, transparent: true });
+    }
+
+    // The player's possessable hero. Tall pointed hat, blue robe with stars,
+    // long beard, glowing staff. Same 32x48 canvas as other units so the
+    // sprite scaling math stays consistent.
+    function createHeroMaterial() {
+        const THREE = getTHREE();
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 48;
+        const ctx = canvas.getContext('2d');
+
+        ctx.clearRect(0, 0, 32, 48);
+
+        // ----- Pointy wizard hat -----
+        // Brim
+        ctx.fillStyle = '#1a1a4a';
+        ctx.fillRect(6, 10, 20, 2);
+        // Cone (triangle)
+        ctx.fillStyle = '#2a2a6a';
+        ctx.beginPath();
+        ctx.moveTo(16, 0);
+        ctx.lineTo(8, 11);
+        ctx.lineTo(24, 11);
+        ctx.closePath();
+        ctx.fill();
+        // Hat highlight (a star)
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(15, 5, 2, 2);
+        ctx.fillRect(14, 6, 4, 1);
+        ctx.fillRect(15, 7, 2, 1);
+
+        // ----- Face (small, mostly beard) -----
+        ctx.fillStyle = '#e8c4a0';
+        ctx.beginPath();
+        ctx.arc(16, 14, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(13, 13, 2, 2);
+        ctx.fillRect(17, 13, 2, 2);
+
+        // ----- Long flowing beard -----
+        ctx.fillStyle = '#e8e8e8';
+        ctx.beginPath();
+        ctx.moveTo(11, 16);
+        ctx.lineTo(9, 28);
+        ctx.lineTo(13, 30);
+        ctx.lineTo(16, 26);
+        ctx.lineTo(19, 30);
+        ctx.lineTo(23, 28);
+        ctx.lineTo(21, 16);
+        ctx.closePath();
+        ctx.fill();
+        // Beard outline / shadow
+        ctx.fillStyle = '#bbbbbb';
+        ctx.fillRect(11, 18, 1, 8);
+        ctx.fillRect(20, 18, 1, 8);
+
+        // ----- Robe body (deep blue, flares out) -----
+        ctx.fillStyle = '#2a2a8a';
+        ctx.beginPath();
+        ctx.moveTo(8, 26);
+        ctx.lineTo(6, 46);
+        ctx.lineTo(26, 46);
+        ctx.lineTo(24, 26);
+        ctx.closePath();
+        ctx.fill();
+
+        // Robe shadow
+        ctx.fillStyle = '#1a1a5a';
+        ctx.fillRect(7, 28, 2, 17);
+        ctx.fillRect(23, 28, 2, 17);
+
+        // Robe stars (constellation)
+        ctx.fillStyle = '#ffe066';
+        ctx.fillRect(11, 32, 1, 1);
+        ctx.fillRect(15, 36, 1, 1);
+        ctx.fillRect(19, 33, 1, 1);
+        ctx.fillRect(13, 40, 1, 1);
+        ctx.fillRect(20, 41, 1, 1);
+
+        // Belt
+        ctx.fillStyle = '#5a3a1a';
+        ctx.fillRect(8, 30, 16, 2);
+        // Belt buckle
+        ctx.fillStyle = '#ffd700';
+        ctx.fillRect(15, 30, 2, 2);
+
+        // ----- Staff -----
+        // Shaft (right side)
+        ctx.fillStyle = '#5a3a1a';
+        ctx.fillRect(26, 8, 2, 36);
+        // Wood knot
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(26, 22, 2, 2);
+        // Glowing orb on top
+        ctx.fillStyle = '#9b6dff';
+        ctx.beginPath();
+        ctx.arc(27, 6, 3, 0, Math.PI * 2);
+        ctx.fill();
+        // Orb highlight
+        ctx.fillStyle = '#d8b4ff';
+        ctx.beginPath();
+        ctx.arc(26, 5, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        // Subtle glow halo (faint outer ring)
+        ctx.fillStyle = 'rgba(155, 109, 255, 0.35)';
+        ctx.beginPath();
+        ctx.arc(27, 6, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // ----- Visible robe edges (outline) -----
+        ctx.strokeStyle = '#0a0a3a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(8, 26);
+        ctx.lineTo(6, 46);
+        ctx.lineTo(26, 46);
+        ctx.lineTo(24, 26);
+        ctx.closePath();
+        ctx.stroke();
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.magFilter = THREE.NearestFilter;
@@ -606,6 +746,10 @@ window.GameUnits = (function() {
     }
 
     function updateCombat(unit, deltaTime) {
+        // Hero is driven by the player - no auto-combat. The magic
+        // blast (Slice C) is the only way the hero deals damage.
+        if (unit.type === 'hero') return false;
+
         const now = Date.now();
         const { enemy, distance } = findNearestEnemy(unit);
 
