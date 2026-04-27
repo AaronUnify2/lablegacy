@@ -81,6 +81,7 @@
             border: 2px solid #4a7c3f;
             border-radius: 4px;
             pointer-events: auto;
+            display: none;     /* Hidden for now - may not need it */
         }
 
         #minimap-canvas {
@@ -174,7 +175,7 @@
 
         #fps-toggle-btn {
             position: absolute;
-            top: 120px;
+            top: 20px;
             right: 20px;
             width: 60px;
             height: 60px;
@@ -339,6 +340,14 @@
             right: 20px;
             display: none;
             pointer-events: auto;
+            transition: right 0.2s ease, left 0.2s ease;
+        }
+
+        /* In FPS mode, slide the d-pad to the left so it doesn't
+           overlap the magic button (which lives bottom-right). */
+        body.fps-mode #mobile-controls {
+            right: auto;
+            left: 20px;
         }
 
         @media (max-width: 768px) {
@@ -763,8 +772,8 @@
             
             ctx.clearRect(0, 0, 64, 96);
             
-            // Trunk
-            ctx.fillStyle = '#1a3a12';
+            // Trunk - brown, matches the high-yield tree's trunk
+            ctx.fillStyle = '#2a1a0a';
             ctx.fillRect(26, 60, 12, 36);
             
             // Tree outline (darker)
@@ -1188,15 +1197,15 @@
                 const rot = hero.rotation || 0;
 
                 // ----- Input (d-pad) → desired movement -----
-                // Sign convention matches the existing RTS pan code:
-                //   up    → -z (north)
-                //   down  → +z
-                //   left  → -x  (here used as strafe-left)
-                //   right → +x
-                let inForward = 0;   // -1 = forward, +1 = back
+                // FPS convention is opposite to RTS pan:
+                //   up    → forward (along facing)
+                //   down  → backward
+                //   left  → strafe left
+                //   right → strafe right
+                let inForward = 0;   // +1 = forward, -1 = back
                 let inStrafe  = 0;   // -1 = strafe left, +1 = strafe right
-                if (input.keys['KeyW'] || input.keys['ArrowUp']    || input.mobileActions.up)    inForward -= 1;
-                if (input.keys['KeyS'] || input.keys['ArrowDown']  || input.mobileActions.down)  inForward += 1;
+                if (input.keys['KeyW'] || input.keys['ArrowUp']    || input.mobileActions.up)    inForward += 1;
+                if (input.keys['KeyS'] || input.keys['ArrowDown']  || input.mobileActions.down)  inForward -= 1;
                 if (input.keys['KeyA'] || input.keys['ArrowLeft']  || input.mobileActions.left)  inStrafe  -= 1;
                 if (input.keys['KeyD'] || input.keys['ArrowRight'] || input.mobileActions.right) inStrafe  += 1;
 
@@ -1762,6 +1771,10 @@
             const magicBtn = document.getElementById('magic-btn');
             if (magicBtn) magicBtn.classList.add('active');
 
+            // Adds a body-level class so CSS can rearrange UI elements
+            // for FPS layout (d-pad moves to the left, etc.).
+            document.body.classList.add('fps-mode');
+
             // Hide RTS-only menus / hints to keep the FPS view clean
             if (window.GameUI) GameUI.hideMenus();
         }
@@ -1784,6 +1797,8 @@
 
             const magicBtn = document.getElementById('magic-btn');
             if (magicBtn) magicBtn.classList.remove('active');
+
+            document.body.classList.remove('fps-mode');
 
             // Ask whether to walk the wizard home. The prompt's two
             // buttons resolve in handleReturnPrompt below.
