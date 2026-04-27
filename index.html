@@ -89,6 +89,51 @@
             border-radius: 2px;
         }
 
+        /* Magic blast button — bottom-right thumb area, only in FPS mode.
+           The d-pad is at bottom-left; this gives the player a comfortable
+           two-thumb layout without overlapping anything. */
+        #magic-btn {
+            position: absolute;
+            bottom: 90px;
+            right: 30px;
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle at 35% 30%,
+                rgba(216, 180, 255, 0.95),
+                rgba(155, 109, 255, 0.85) 50%,
+                rgba(80, 40, 140, 0.85) 100%);
+            border: 2px solid #d8b4ff;
+            border-radius: 50%;
+            color: #ffffff;
+            font-size: 32px;
+            display: none;          /* hidden in RTS, shown in FPS */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            pointer-events: auto;
+            box-shadow: 0 0 16px rgba(155, 109, 255, 0.6);
+            z-index: 60;
+            transition: transform 0.08s ease, box-shadow 0.15s ease;
+        }
+        #magic-btn.active {
+            display: flex;
+        }
+        #magic-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 0 24px rgba(216, 180, 255, 0.95);
+        }
+        /* Brief flash effect when the button fires (toggled in JS) */
+        #magic-btn.firing {
+            animation: magicPulse 0.18s ease-out;
+        }
+        @keyframes magicPulse {
+            0%   { box-shadow: 0 0 16px rgba(155, 109, 255, 0.6); }
+            50%  { box-shadow: 0 0 32px rgba(255, 255, 255, 1.0); }
+            100% { box-shadow: 0 0 16px rgba(155, 109, 255, 0.6); }
+        }
+
         /* Crosshair shown only in FPS mode. Tiny dot in the screen center,
            plus a thin ring so it reads against any background. */
         #crosshair {
@@ -384,6 +429,9 @@
 
             <!-- Crosshair: only visible in FPS mode -->
             <div id="crosshair"></div>
+
+            <!-- Magic blast button: only visible in FPS mode -->
+            <div id="magic-btn">✦</div>
 
             <!-- Mode toggle: RTS overhead view ↔ FPS hero view.
                  Slice A only swaps the camera. Slices B+C wire up
@@ -1155,9 +1203,9 @@
                 if (inForward !== 0 || inStrafe !== 0) {
                     // Per-frame speed. Hero's RTS speed (0.06) is a per-
                     // pathfinding-tick value; in FPS we apply it every
-                    // frame so we multiply up. ~3-4× feels right for
-                    // mobile screens. Tune after playtest.
-                    const FPS_SPEED_MULT = 3.5;
+                    // frame so we multiply up. 12× lands him at brisk
+                    // walking pace per playtest.
+                    const FPS_SPEED_MULT = 12;
                     const speed = (hero.typeData?.speed || 0.06) * FPS_SPEED_MULT;
 
                     // Hero "forward" vector. rotation=0 → looking -z.
@@ -1656,6 +1704,11 @@
                 GameUnits.update();
             }
 
+            // Step projectiles, check hits
+            if (window.GameMagic) {
+                GameMagic.update();
+            }
+
             // Live UI updates (production progress bars, queue counts, etc.)
             if (window.GameUI && window.GameUI.tick) {
                 GameUI.tick();
@@ -1686,11 +1739,28 @@
             }
             gameState.fpsMode = true;
 
+            // Cancel any RTS movement the hero was doing — direct FPS
+            // input owns his position now. Otherwise the path-walker
+            // would fight the d-pad.
+            if (gameState.hero) {
+                gameState.hero.path = null;
+                gameState.hero.state = 'idle';
+                gameState.hero.targetTree = null;
+                gameState.hero.targetBuilding = null;
+                if (gameState.hero.pathLine) {
+                    scene.remove(gameState.hero.pathLine);
+                    gameState.hero.pathLine = null;
+                }
+            }
+
             const btn = document.getElementById('fps-toggle-btn');
             if (btn) btn.classList.add('active');
 
             const crosshair = document.getElementById('crosshair');
             if (crosshair) crosshair.classList.add('active');
+
+            const magicBtn = document.getElementById('magic-btn');
+            if (magicBtn) magicBtn.classList.add('active');
 
             // Hide RTS-only menus / hints to keep the FPS view clean
             if (window.GameUI) GameUI.hideMenus();
@@ -1711,6 +1781,9 @@
 
             const crosshair = document.getElementById('crosshair');
             if (crosshair) crosshair.classList.remove('active');
+
+            const magicBtn = document.getElementById('magic-btn');
+            if (magicBtn) magicBtn.classList.remove('active');
 
             // Ask whether to walk the wizard home. The prompt's two
             // buttons resolve in handleReturnPrompt below.
@@ -1789,6 +1862,30 @@
                     handleReturnPrompt(true);
                 });
             }
+
+            // Magic button — fires a blast when tapped. Triggered on
+            // touchstart for snappy response (FPS feel). Visual flash
+            // animation plays on every fire.
+            const magicBtn = document.getElementById('magic-btn');
+            if (magicBtn) {
+                const fire = () => {
+                    if (window.GameMagic) GameMagic.fireFromHero();
+                    magicBtn.classList.remove('firing');
+                    // Re-trigger the CSS animation
+                    void magicBtn.offsetWidth;
+                    magicBtn.classList.add('firing');
+                };
+                magicBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fire();
+                });
+                magicBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fire();
+                });
+            }
         }
 
         // ============================================
@@ -1862,6 +1959,12 @@
                 } else {
                     debug('6c. GameUnits NOT FOUND');
                 }
+                if (window.GameMagic) {
+                    debug('6c2. GameMagic.init()...');
+                    GameMagic.init();
+                } else {
+                    debug('6c2. GameMagic NOT FOUND');
+                }
                 debug('6. Modules done');
             } catch(e) {
                 debug('ERROR modules: ' + e.message);
@@ -1918,5 +2021,6 @@
     <script src="js/buildings.js" onerror="debug('FAILED to load buildings.js')"></script>
     <script src="js/units.js" onerror="debug('FAILED to load units.js')"></script>
     <script src="js/ui.js" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js" onerror="debug('FAILED to load magic.js')"></script>
 </body>
 </html>
