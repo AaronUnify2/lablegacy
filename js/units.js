@@ -872,6 +872,7 @@ window.GameUnits = (function() {
             if (crosshair) crosshair.classList.remove('active');
             const magicBtn = document.getElementById('magic-btn');
             if (magicBtn) magicBtn.classList.remove('active');
+            document.body.classList.remove('fps-mode');
             console.log('Hero died — reverted to RTS view');
         }
     }
@@ -2222,9 +2223,10 @@ window.GameUnits = (function() {
 
     function getTreeMaxHP(treeType) {
         const CELL = getCELL();
-        if (treeType === CELL.TREE_NORMAL) return 2;
-        if (treeType === CELL.TREE_HIGH_YIELD) return 4;
-        if (treeType === CELL.TREE_ENERGY) return 6;
+        // 1-2 hits max for satisfying magic-blast pacing.
+        if (treeType === CELL.TREE_NORMAL) return 1;
+        if (treeType === CELL.TREE_HIGH_YIELD) return 2;
+        if (treeType === CELL.TREE_ENERGY) return 2;
         return 1;
     }
 
