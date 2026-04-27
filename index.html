@@ -89,7 +89,44 @@
             border-radius: 2px;
         }
 
-        /* Mode toggle button - top right, below the minimap */
+        /* Crosshair shown only in FPS mode. Tiny dot in the screen center,
+           plus a thin ring so it reads against any background. */
+        #crosshair {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 18px;
+            height: 18px;
+            display: none;
+            pointer-events: none;
+            z-index: 50;
+        }
+        #crosshair.active {
+            display: block;
+        }
+        #crosshair::before {
+            content: '';
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+        }
+
+
         #fps-toggle-btn {
             position: absolute;
             top: 120px;
@@ -344,6 +381,9 @@
             <div id="minimap">
                 <canvas id="minimap-canvas"></canvas>
             </div>
+
+            <!-- Crosshair: only visible in FPS mode -->
+            <div id="crosshair"></div>
 
             <!-- Mode toggle: RTS overhead view ↔ FPS hero view.
                  Slice A only swaps the camera. Slices B+C wire up
@@ -1038,6 +1078,45 @@
         // ============================================
         // CAMERA CONTROLS
         // ============================================
+        // Returns true if `el` is part of the on-screen UI (mobile
+        // controls, FPS toggle, return prompt, menus etc.) so drag-to-
+        // rotate can ignore touches that start on a button instead of
+        // the world.
+        function isUIElement(el) {
+            if (!el) return false;
+            return !!el.closest(
+                '#mobile-controls,' +
+                '#fps-toggle-btn,' +
+                '#return-prompt,' +
+                '#minimap,' +
+                '#info-panel,' +
+                '#game-menu,' +
+                '#unit-menu,' +
+                '#building-menu,' +
+                '#corridor-confirm-panel,' +
+                '#magic-btn,' +
+                '#crosshair'
+            );
+        }
+
+        // Walkability test for the FPS-mode hero. Returns true if (x, z)
+        // is on the map and not on a tree cell. Use floor()→cell lookup
+        // so we treat grid cells as 1×1 tiles centered on integer coords.
+        // Note: this is independent from the RTS pathfinder's getNeighbors
+        // — that one is for AI units moving along grid steps; this is
+        // continuous-position collision for direct input.
+        function canStandAt(x, z) {
+            if (x < 0 || x >= CONFIG.GRID_WIDTH) return false;
+            if (z < 0 || z >= CONFIG.GRID_HEIGHT) return false;
+            const cx = Math.floor(x);
+            const cz = Math.floor(z);
+            const cell = gameState.grid[cx]?.[cz];
+            if (cell === CELL.TREE_NORMAL) return false;
+            if (cell === CELL.TREE_HIGH_YIELD) return false;
+            if (cell === CELL.TREE_ENERGY) return false;
+            return true;
+        }
+
         function updateCamera() {
             const input = gameState.input;
             const cam = gameState.camera;
@@ -1048,32 +1127,117 @@
             // Slice A uses a third-person "over the shoulder" placement so
             // the player can see the wizard. Slice B will switch this to
             // true first-person (camera at eye level, sprite hidden).
+            // FPS mode short-circuit. The hero IS the camera. The d-pad
+            // (already pushing into input.mobileActions) drives him
+            // relative to his facing — up=forward, down=back, left/right
+            // strafe. Drag-to-rotate updates hero.rotation separately
+            // (handled in setupFpsLook() below). Collision against trees
+            // uses X/Z component sliding so the wizard slides along the
+            // forest edge instead of hard-stopping when a diagonal walk
+            // happens to clip a tree.
             if (gameState.fpsMode && gameState.hero) {
                 const hero = gameState.hero;
-                const rot = hero.rotation || 0;       // facing yaw
-                // Position camera slightly behind and above the hero's
-                // sprite. Hero sprite center is at y≈2.25, scale 1.3 so
-                // it reaches ~5. We sit the camera at y=4, 6 units behind.
-                const back = 6;
-                const camY = 4;
-                camera.position.set(
-                    hero.position.x + Math.sin(rot) * back,
-                    camY,
-                    hero.position.z + Math.cos(rot) * back
-                );
+                const rot = hero.rotation || 0;
+
+                // ----- Input (d-pad) → desired movement -----
+                // Sign convention matches the existing RTS pan code:
+                //   up    → -z (north)
+                //   down  → +z
+                //   left  → -x  (here used as strafe-left)
+                //   right → +x
+                let inForward = 0;   // -1 = forward, +1 = back
+                let inStrafe  = 0;   // -1 = strafe left, +1 = strafe right
+                if (input.keys['KeyW'] || input.keys['ArrowUp']    || input.mobileActions.up)    inForward -= 1;
+                if (input.keys['KeyS'] || input.keys['ArrowDown']  || input.mobileActions.down)  inForward += 1;
+                if (input.keys['KeyA'] || input.keys['ArrowLeft']  || input.mobileActions.left)  inStrafe  -= 1;
+                if (input.keys['KeyD'] || input.keys['ArrowRight'] || input.mobileActions.right) inStrafe  += 1;
+
+                if (inForward !== 0 || inStrafe !== 0) {
+                    // Per-frame speed. Hero's RTS speed (0.06) is a per-
+                    // pathfinding-tick value; in FPS we apply it every
+                    // frame so we multiply up. ~3-4× feels right for
+                    // mobile screens. Tune after playtest.
+                    const FPS_SPEED_MULT = 3.5;
+                    const speed = (hero.typeData?.speed || 0.06) * FPS_SPEED_MULT;
+
+                    // Hero "forward" vector. rotation=0 → looking -z.
+                    // (Same convention as the camera.lookAt math below.)
+                    const fwdX = -Math.sin(rot);
+                    const fwdZ = -Math.cos(rot);
+                    // Strafe is forward rotated +90° on the y axis.
+                    const strX = -Math.cos(rot);
+                    const strZ =  Math.sin(rot);
+
+                    let dx = (fwdX * inForward + strX * inStrafe) * speed;
+                    let dz = (fwdZ * inForward + strZ * inStrafe) * speed;
+
+                    // Normalize diagonal speed so forward+strafe doesn't
+                    // walk faster than pure forward.
+                    if (inForward !== 0 && inStrafe !== 0) {
+                        dx *= 0.7071;
+                        dz *= 0.7071;
+                    }
+
+                    // Tree collision with axis sliding. Try the full
+                    // move; if it lands the hero on a tree cell, retry
+                    // each axis separately so he slides along the
+                    // forest edge instead of hard-stopping. canStandAt
+                    // also clamps to map bounds.
+                    const px = hero.position.x;
+                    const pz = hero.position.z;
+                    if (canStandAt(px + dx, pz + dz)) {
+                        hero.position.x = px + dx;
+                        hero.position.z = pz + dz;
+                    } else {
+                        // Try X-only
+                        if (canStandAt(px + dx, pz)) {
+                            hero.position.x = px + dx;
+                        } else if (canStandAt(px, pz + dz)) {
+                            // Try Z-only
+                            hero.position.z = pz + dz;
+                        }
+                        // Else: blocked on both axes; stand still.
+                    }
+
+                    // Keep the sprite mesh in sync (mostly relevant for
+                    // the moment we exit FPS — sprite reappears at the
+                    // current world position).
+                    if (hero.sprite) {
+                        hero.sprite.position.x = hero.position.x;
+                        hero.sprite.position.z = hero.position.z;
+                    }
+                    if (hero.selectionRing) {
+                        hero.selectionRing.position.x = hero.position.x;
+                        hero.selectionRing.position.z = hero.position.z;
+                    }
+                }
+
+                // ----- First-person camera placement -----
+                // Hero sprite is 4.5 * 1.05 ≈ 4.7 tall, pivot at y=2.25.
+                // Eye height ~2.5 sits a bit above the sprite center,
+                // roughly where his face is.
+                const EYE_HEIGHT = 2.5;
+                const LOOK_DIST  = 10;
+                camera.position.set(hero.position.x, EYE_HEIGHT, hero.position.z);
                 camera.lookAt(
-                    hero.position.x - Math.sin(rot) * 6,
-                    2,
-                    hero.position.z - Math.cos(rot) * 6
+                    hero.position.x - Math.sin(rot) * LOOK_DIST,
+                    EYE_HEIGHT,
+                    hero.position.z - Math.cos(rot) * LOOK_DIST
                 );
 
-                // Update debug readout but otherwise skip the rest of
-                // updateCamera (no pan, no rotate, no zoom — the FPS
-                // controls in Slice B will own movement entirely).
+                // Hide the hero sprite while we're inside his head.
+                if (hero.sprite) hero.sprite.visible = false;
+                if (hero.selectionRing) hero.selectionRing.visible = false;
+
                 const dbg = document.getElementById('camera-pos');
                 if (dbg) dbg.textContent =
                     `FPS @ ${Math.floor(hero.position.x)}, ${Math.floor(hero.position.z)}`;
                 return;
+            }
+
+            // Restore hero sprite when we're back in RTS view
+            if (gameState.hero?.sprite) {
+                gameState.hero.sprite.visible = true;
             }
 
             // Pan
@@ -1164,25 +1328,106 @@
                 gameState.input.keys[e.code] = false;
             });
 
+            // Multi-touch tracking. dpadTouches holds the touch.identifier
+            // of every finger currently pressing a d-pad button. The FPS
+            // drag-to-rotate handler (further down) ignores these touches
+            // so the player can hold "forward" with one thumb and rotate
+            // the camera with the other. cameraTouch is the single touch
+            // currently driving rotation (one rotation drag at a time).
+            const dpadTouches = new Set();
+            let cameraTouch = null;
+            let cameraLastX = 0;
+
             // Mobile controls
             document.querySelectorAll('.mobile-btn').forEach(btn => {
                 const action = btn.dataset.action;
-                
+
                 btn.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     gameState.input.mobileActions[action] = true;
+                    for (const t of e.changedTouches) dpadTouches.add(t.identifier);
                 });
                 btn.addEventListener('touchend', (e) => {
                     e.preventDefault();
                     gameState.input.mobileActions[action] = false;
+                    for (const t of e.changedTouches) dpadTouches.delete(t.identifier);
+                });
+                btn.addEventListener('touchcancel', (e) => {
+                    gameState.input.mobileActions[action] = false;
+                    for (const t of e.changedTouches) dpadTouches.delete(t.identifier);
                 });
             });
 
-            // Touch controls for camera pan
+            // FPS drag-to-rotate. Listens on the document so a drag that
+            // starts anywhere outside the d-pad rotates the hero. Sensible
+            // touchstart-on-canvas already exists below for the RTS pan
+            // gesture; we sit alongside it and gate on fpsMode.
+            document.addEventListener('touchstart', (e) => {
+                if (!gameState.fpsMode) return;
+                if (cameraTouch !== null) return;     // already tracking a drag
+                for (const t of e.changedTouches) {
+                    if (dpadTouches.has(t.identifier)) continue;     // d-pad finger
+                    // Reject touches that started on a UI element (FPS
+                    // toggle button, magic button, return prompt etc.).
+                    const el = document.elementFromPoint(t.clientX, t.clientY);
+                    if (isUIElement(el)) continue;
+                    cameraTouch = t.identifier;
+                    cameraLastX = t.clientX;
+                    break;
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!gameState.fpsMode || cameraTouch === null) return;
+                for (const t of e.changedTouches) {
+                    if (t.identifier !== cameraTouch) continue;
+                    const dx = t.clientX - cameraLastX;
+                    cameraLastX = t.clientX;
+                    if (gameState.hero) {
+                        // Sensitivity copied from the reference project.
+                        gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * 0.004;
+                    }
+                    break;
+                }
+            }, { passive: true });
+
+            const releaseCameraTouch = (e) => {
+                if (cameraTouch === null) return;
+                for (const t of e.changedTouches) {
+                    if (t.identifier === cameraTouch) {
+                        cameraTouch = null;
+                        break;
+                    }
+                }
+            };
+            document.addEventListener('touchend', releaseCameraTouch, { passive: true });
+            document.addEventListener('touchcancel', releaseCameraTouch, { passive: true });
+
+            // Desktop mouse drag to rotate (FPS mode only).
+            let mouseRotating = false;
+            let mouseLastX = 0;
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                if (!gameState.fpsMode) return;
+                if (isUIElement(e.target)) return;
+                mouseRotating = true;
+                mouseLastX = e.clientX;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!mouseRotating || !gameState.fpsMode) return;
+                const dx = e.clientX - mouseLastX;
+                mouseLastX = e.clientX;
+                if (gameState.hero) {
+                    gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * 0.004;
+                }
+            });
+            window.addEventListener('mouseup', () => { mouseRotating = false; });
+
+            // Touch controls for camera pan (RTS only - gated below).
             let touchStart = null;
             let lastTouchDistance = null;
 
             renderer.domElement.addEventListener('touchstart', (e) => {
+                if (gameState.fpsMode) return;     // FPS owns drag in FPS mode
                 if (e.touches.length === 1) {
                     touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 } else if (e.touches.length === 2) {
@@ -1194,6 +1439,7 @@
             });
 
             renderer.domElement.addEventListener('touchmove', (e) => {
+                if (gameState.fpsMode) return;     // FPS owns drag
                 if (e.touches.length === 1 && touchStart) {
                     const dx = e.touches[0].clientX - touchStart.x;
                     const dy = e.touches[0].clientY - touchStart.y;
@@ -1218,6 +1464,7 @@
             });
 
             renderer.domElement.addEventListener('touchend', (e) => {
+                if (gameState.fpsMode) { touchStart = null; return; }
                 if (e.changedTouches.length === 1 && touchStart) {
                     const touch = e.changedTouches[0];
                     const dx = touch.clientX - touchStart.x;
@@ -1245,6 +1492,10 @@
         // CLICK DETECTION
         // ============================================
         function onCanvasClick(event) {
+            // FPS mode: canvas taps don't select units. The drag handlers
+            // own canvas input now; selecting is an RTS-only operation.
+            if (gameState.fpsMode) return;
+
             ensureRaycaster();
             
             // Calculate mouse position
@@ -1438,6 +1689,9 @@
             const btn = document.getElementById('fps-toggle-btn');
             if (btn) btn.classList.add('active');
 
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair) crosshair.classList.add('active');
+
             // Hide RTS-only menus / hints to keep the FPS view clean
             if (window.GameUI) GameUI.hideMenus();
         }
@@ -1454,6 +1708,9 @@
 
             const btn = document.getElementById('fps-toggle-btn');
             if (btn) btn.classList.remove('active');
+
+            const crosshair = document.getElementById('crosshair');
+            if (crosshair) crosshair.classList.remove('active');
 
             // Ask whether to walk the wizard home. The prompt's two
             // buttons resolve in handleReturnPrompt below.
