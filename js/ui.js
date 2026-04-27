@@ -214,8 +214,8 @@ window.GameUI = (function() {
                     case 'harvesting':
                         if (firstUnit.harvestMode === 'cutLane') {
                             stateText = '🛣️ Cutting lane...';
-                        } else if (firstUnit.harvestMode === 'cutLoop') {
-                            stateText = '🔁 Cutting loop...';
+                        } else if (firstUnit.harvestMode === 'cutChain') {
+                            stateText = '🪚 Cutting path...';
                         } else {
                             stateText = '🪓 Harvesting...';
                         }
@@ -225,8 +225,8 @@ window.GameUI = (function() {
                         if (firstUnit.harvestMode === 'cutLane') {
                             stateText = '🛣️ Moving to cut lane...';
                             stateColor = '#d4a84a';
-                        } else if (firstUnit.harvestMode === 'cutLoop') {
-                            stateText = '🔁 Moving to cut loop...';
+                        } else if (firstUnit.harvestMode === 'cutChain') {
+                            stateText = '🪚 Moving to cut path...';
                             stateColor = '#d4a84a';
                         } else if (firstUnit.patrolPathId) {
                             stateText = '🛡️ Patrolling...';
@@ -314,7 +314,7 @@ window.GameUI = (function() {
             // Check if any unit has harvest mode active
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
-            const anyCuttingLoop = units.some(u => u.harvestMode === 'cutLoop');
+            const anyCuttingChain = units.some(u => u.harvestMode === 'cutChain');
             
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
@@ -355,9 +355,9 @@ window.GameUI = (function() {
                     <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLane ? 'ACTIVE' : '4 wide'}</span>
                 </button>
 
-                <button class="unit-cmd-btn" data-cmd="cutLoop" style="
-                    background: ${anyCuttingLoop ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${anyCuttingLoop ? '#d4a84a' : '#4a7c3f'};
+                <button class="unit-cmd-btn" data-cmd="cutChain" style="
+                    background: ${anyCuttingChain ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyCuttingChain ? '#d4a84a' : '#4a7c3f'};
                     border-radius: 6px;
                     color: #c8f0c8;
                     padding: 12px 16px;
@@ -370,8 +370,8 @@ window.GameUI = (function() {
                     transition: all 0.15s ease;
                 ">
                     <span style="font-size: 18px;">🔁</span>
-                    <span style="flex: 1; text-align: left;">Cut Loop</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLoop ? 'ACTIVE' : 'Polygon'}</span>
+                    <span style="flex: 1; text-align: left;">Cut Path</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingChain ? 'ACTIVE' : 'Multi-tap'}</span>
                 </button>
             `;
         }
@@ -521,8 +521,8 @@ window.GameUI = (function() {
                     isActive = units.some(u => u.harvestMode === 'nearby');
                 } else if (cmd === 'cutLane') {
                     isActive = units.some(u => u.harvestMode === 'cutLane');
-                } else if (cmd === 'cutLoop') {
-                    isActive = units.some(u => u.harvestMode === 'cutLoop');
+                } else if (cmd === 'cutChain') {
+                    isActive = units.some(u => u.harvestMode === 'cutChain');
                 }
                 
                 btn.style.background = isActive ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)';
@@ -615,15 +615,15 @@ window.GameUI = (function() {
                 hideMenuVisuals();
                 break;
 
-            case 'cutLoop':
-                // Enter cut loop mode - tap multiple points to draw a polygon
+            case 'cutChain':
+                // Enter cut path mode - tap multiple points to draw an open chain
                 if (window.GameUnits) {
-                    GameUnits.setCommandMode('cutLoop');
+                    GameUnits.setCommandMode('cutChain');
                 }
-                const loopText = units.length > 1
-                    ? `Tap waypoints for ${units.length} woodsmen to cut loop`
-                    : 'Tap waypoints to draw loop. Confirm when done.';
-                showCommandIndicator(loopText);
+                const chainText = units.length > 1
+                    ? `Tap waypoints for ${units.length} woodsmen to cut path`
+                    : 'Tap waypoints to draw path. Confirm when done.';
+                showCommandIndicator(chainText);
                 hideMenuVisuals();
                 break;
 
@@ -792,7 +792,7 @@ window.GameUI = (function() {
     // and the user keeps adding waypoints until they hit Confirm.
     // ============================================
 
-    function showLoopConfirm(width) {
+    function showChainConfirm(width) {
         if (!corridorConfirmPanel) return;
 
         corridorConfirmPanel.innerHTML = `
@@ -804,7 +804,7 @@ window.GameUI = (function() {
                 text-transform: uppercase;
                 letter-spacing: 1px;
             ">
-                🔁 Drawing Loop
+                🪚 Drawing Cut Path
             </div>
             <div style="
                 color: #a8d5a2;
@@ -815,7 +815,7 @@ window.GameUI = (function() {
                 Keep tapping to add waypoints. Confirm when shape looks right.
             </div>
             <div style="display: flex; gap: 8px;">
-                <button id="loop-cancel-btn" style="
+                <button id="chain-cancel-btn" style="
                     flex: 1;
                     background: rgba(120, 50, 50, 0.4);
                     border: 1px solid #aa5555;
@@ -829,7 +829,7 @@ window.GameUI = (function() {
                 ">
                     ✕ Cancel
                 </button>
-                <button id="loop-confirm-btn" style="
+                <button id="chain-confirm-btn" style="
                     flex: 1;
                     background: rgba(74, 124, 63, 0.6);
                     border: 1px solid #7ddf64;
@@ -853,35 +853,35 @@ window.GameUI = (function() {
             unitMenuContainer.style.display = 'none';
         }
 
-        const confirmBtn = document.getElementById('loop-confirm-btn');
-        const cancelBtn = document.getElementById('loop-cancel-btn');
+        const confirmBtn = document.getElementById('chain-confirm-btn');
+        const cancelBtn = document.getElementById('chain-cancel-btn');
 
         if (confirmBtn) {
             confirmBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (window.GameUnits) GameUnits.confirmLoopCommand();
+                if (window.GameUnits) GameUnits.confirmChainCommand();
             });
             confirmBtn.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (window.GameUnits) GameUnits.confirmLoopCommand();
+                if (window.GameUnits) GameUnits.confirmChainCommand();
             });
         }
 
         if (cancelBtn) {
             cancelBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (window.GameUnits) GameUnits.cancelLoopCommand();
+                if (window.GameUnits) GameUnits.cancelChainCommand();
             });
             cancelBtn.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (window.GameUnits) GameUnits.cancelLoopCommand();
+                if (window.GameUnits) GameUnits.cancelChainCommand();
             });
         }
     }
 
-    function hideLoopConfirm() {
+    function hideChainConfirm() {
         if (corridorConfirmPanel) {
             corridorConfirmPanel.style.display = 'none';
         }
@@ -1539,7 +1539,7 @@ window.GameUI = (function() {
         }
         hideCommandIndicator();
         hideCorridorConfirm();
-        hideLoopConfirm();
+        hideChainConfirm();
         hidePatrolConfirm();
         currentBuildingMenu = null;
     }
@@ -1582,8 +1582,8 @@ window.GameUI = (function() {
         hideCommandIndicator,
         showCorridorConfirm,
         hideCorridorConfirm,
-        showLoopConfirm,
-        hideLoopConfirm,
+        showChainConfirm,
+        hideChainConfirm,
         showPatrolConfirm,
         hidePatrolConfirm,
         hideMenus,
