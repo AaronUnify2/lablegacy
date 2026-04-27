@@ -1096,7 +1096,7 @@
                 
                 const isCommandMode = commandMode === 'move' ||
                                       commandMode === 'cutLane' ||
-                                      commandMode === 'cutLoop' ||
+                                      commandMode === 'cutChain' ||
                                       commandMode === 'patrolPath' ||
                                       commandMode === 'customPatrol' ||
                                       commandMode === 'guard';
@@ -1122,9 +1122,11 @@
                                 // Show preview - waits for user to confirm
                                 // Stay in command mode so re-tap moves the target
                                 GameUnits.commandCutCorridor(selectedUnits, intersectPoint.x, intersectPoint.z, 4);
-                            } else if (commandMode === 'cutLoop') {
-                                // Add a waypoint to the loop being drawn.
-                                GameUnits.addLoopWaypoint(intersectPoint.x, intersectPoint.z, 4);
+                            } else if (commandMode === 'cutChain') {
+                                // Add a waypoint to the cut path chain.
+                                // Each tap appends a new waypoint; on Confirm
+                                // the woodsmen cut each segment in order.
+                                GameUnits.addChainWaypoint(intersectPoint.x, intersectPoint.z, 4);
                             } else if (commandMode === 'patrolPath') {
                                 // Tap an existing yellow/purple path to assign these
                                 // units to patrol it. We do a 2D segment-distance
@@ -1148,7 +1150,7 @@
                                     }
                                 }
                             } else if (commandMode === 'customPatrol') {
-                                // Like cutLoop but for patrol-only paths.
+                                // Like cutChain but for patrol-only paths.
                                 GameUnits.addPatrolWaypoint(intersectPoint.x, intersectPoint.z);
                             } else if (commandMode === 'guard') {
                                 // Plant the unit at this spot. They walk there and
