@@ -27,10 +27,16 @@ window.GameMagic = (function() {
     const PROJECTILE_SPEED_PER_SEC = 35;     // world units per second
     const PROJECTILE_LIFE_SEC      = 1.5;    // seconds before despawn (range = speed × life)
     const PROJECTILE_RADIUS        = 0.5;    // for collision
-    const COOLDOWN_MS              = 400;    // between shots
+    const COOLDOWN_MS              = 500;    // between blasts (bumped for 5-shot spread)
     const HERO_DAMAGE_PER_BLAST    = 20;     // applied to enemies on hit
     const AIM_ASSIST_RANGE         = 25;     // tiles, max range to consider an enemy
     const AIM_ASSIST_CONE_DEG      = 30;     // half-angle of forward cone
+
+    // Shotgun spread. 5 shots spanning 30° total (so ±15° around the
+    // center direction) reads as a clear "fan" — wide enough to carve
+    // through forest, tight enough that aim still matters.
+    const SHOT_COUNT               = 5;
+    const SHOT_SPREAD_DEG          = 30;
 
     let projectiles = [];
     let lastFireTime = 0;
@@ -98,9 +104,12 @@ window.GameMagic = (function() {
     // FIRING
     // ============================================
 
-    // Called by the magic button. Spawns one projectile from the
-    // hero's eye-level position, traveling along the camera/crosshair
-    // direction unless aim assist redirects toward an enemy.
+    // Called by the magic button. Spawns SHOT_COUNT projectiles in a
+    // horizontal fan from the hero's eye-level position. The center
+    // shot honors aim assist (locks onto an enemy in front if one
+    // exists); the other shots fan out around that center direction.
+    // Projectile direction also honors the hero's pitch, so looking
+    // up arcs the blast skyward.
     function fireFromHero() {
         if (!gameState || !gameState.hero) return;
         if (!gameState.fpsMode) return;
@@ -109,44 +118,71 @@ window.GameMagic = (function() {
         lastFireTime = now;
 
         const hero = gameState.hero;
-        const rot = hero.rotation || 0;
+        const rot   = hero.rotation || 0;
+        const pitch = hero.pitch    || 0;
 
-        // Strict crosshair direction (no aim assist).
-        // Matches the camera.lookAt() math in updateCamera's FPS branch.
+        // Forward direction = camera's full view ray. Horizontal
+        // component shrinks as we pitch up/down (cos(pitch)), and the
+        // y component rises (sin(pitch)). Same math the FPS camera
+        // lookAt uses.
+        const horiz = Math.cos(pitch);
         const fwd = {
+            x: -Math.sin(rot) * horiz,
+            y:  Math.sin(pitch),
+            z: -Math.cos(rot) * horiz
+        };
+
+        // Aim-assist target search uses the horizontal projection of
+        // the forward vector — enemies are on the ground, not in the
+        // sky, so we don't want pitch to throw the cone off.
+        const horizFwd = {
             x: -Math.sin(rot),
             y: 0,
             z: -Math.cos(rot)
         };
+        const target = findAimAssistTarget(hero, horizFwd);
 
-        // Aim-assist target search. Look for the closest enemy unit
-        // within AIM_ASSIST_RANGE that's inside a forward cone of
-        // 2 × AIM_ASSIST_CONE_DEG degrees.
-        const target = findAimAssistTarget(hero, fwd);
-
-        // Origin: hero's eye level, slightly forward so the orb
-        // doesn't spawn inside his hat.
+        // Origin: hero's eye level, slightly forward so the orbs
+        // don't spawn inside his hat.
         const origin = {
             x: hero.position.x + fwd.x * 0.5,
             y: 2.5,
             z: hero.position.z + fwd.z * 0.5
         };
 
-        // Direction: aim at the assisted target, or use the strict
-        // forward direction.
-        let dir;
+        // Determine the CENTER direction. If aim assist found a target,
+        // the center shot aims at them. Otherwise, the strict camera
+        // forward vector. The four side shots fan out around this.
+        let centerDir;
         if (target) {
             const tx = target.position.x - origin.x;
             const tz = target.position.z - origin.z;
-            // Aim at center mass (~y=2 for a knight-sized unit)
             const ty = 2 - origin.y;
             const len = Math.sqrt(tx * tx + ty * ty + tz * tz) || 1;
-            dir = { x: tx / len, y: ty / len, z: tz / len };
+            centerDir = { x: tx / len, y: ty / len, z: tz / len };
         } else {
-            dir = { x: fwd.x, y: 0, z: fwd.z };
+            centerDir = fwd;
         }
 
-        spawnProjectile(origin, dir);
+        // Spawn the fan. Spread is purely horizontal: rotate the
+        // center direction around the world Y axis by symmetric
+        // angles. With SHOT_COUNT=5 and SHOT_SPREAD_DEG=30, offsets
+        // are -15°, -7.5°, 0°, +7.5°, +15° (linear distribution).
+        const halfSpread = (SHOT_SPREAD_DEG / 2) * Math.PI / 180;
+        for (let i = 0; i < SHOT_COUNT; i++) {
+            const t = SHOT_COUNT === 1 ? 0
+                    : (i / (SHOT_COUNT - 1)) * 2 - 1;     // -1 .. +1
+            const angle = t * halfSpread;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+            // Rotate centerDir around Y by `angle`
+            const dir = {
+                x: centerDir.x * cosA + centerDir.z * sinA,
+                y: centerDir.y,
+                z: -centerDir.x * sinA + centerDir.z * cosA
+            };
+            spawnProjectile(origin, dir);
+        }
     }
 
     function findAimAssistTarget(hero, fwd) {
