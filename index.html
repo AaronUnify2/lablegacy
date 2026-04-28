@@ -123,7 +123,7 @@
             border-radius: 50%;
             color: #ffffff;
             font-size: 32px;
-            display: none;          /* hidden in RTS, shown in FPS */
+            display: none;          /* hidden in RTS */
             align-items: center;
             justify-content: center;
             cursor: pointer;
@@ -134,7 +134,9 @@
             z-index: 60;
             transition: transform 0.08s ease, box-shadow 0.15s ease;
         }
-        #magic-btn.active {
+        /* Show in FPS mode. Class is .fps-on (not .active) to avoid
+           collision with the built-in :active pseudo-class. */
+        #magic-btn.fps-on {
             display: flex;
         }
         #magic-btn:active {
@@ -1830,7 +1832,7 @@
             if (crosshair) crosshair.classList.add('active');
 
             const magicBtn = document.getElementById('magic-btn');
-            if (magicBtn) magicBtn.classList.add('active');
+            if (magicBtn) magicBtn.classList.add('fps-on');
 
             // Adds a body-level class so CSS can rearrange UI elements
             // for FPS layout (d-pad moves to the left, etc.).
@@ -1857,7 +1859,7 @@
             if (crosshair) crosshair.classList.remove('active');
 
             const magicBtn = document.getElementById('magic-btn');
-            if (magicBtn) magicBtn.classList.remove('active');
+            if (magicBtn) magicBtn.classList.remove('fps-on');
 
             document.body.classList.remove('fps-mode');
 
