@@ -871,7 +871,7 @@ window.GameUnits = (function() {
             const crosshair = document.getElementById('crosshair');
             if (crosshair) crosshair.classList.remove('active');
             const magicBtn = document.getElementById('magic-btn');
-            if (magicBtn) magicBtn.classList.remove('fps-on');
+            if (magicBtn) magicBtn.classList.remove('active');
             document.body.classList.remove('fps-mode');
             console.log('Hero died — reverted to RTS view');
         }
