@@ -291,9 +291,10 @@ window.GameMagic = (function() {
         const cz = Math.floor(p.z);
         if (cx < 0 || cx >= CONFIG.GRID_WIDTH || cz < 0 || cz >= CONFIG.GRID_HEIGHT) return null;
         // Don't damage trees if the projectile is high above the canopy
-        // (the player aimed up over the forest). Trees reach ~5-7 high,
-        // so under y=6.5 counts.
-        if (p.y > 6.5) return null;
+        // (the player aimed up over the forest). Trees now reach ~13.5
+        // high (3× original height), so under y=14 counts as "still in
+        // the forest".
+        if (p.y > 14) return null;
         const cell = gameState.grid[cx]?.[cz];
         if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
             return { x: cx, z: cz, type: cell };
