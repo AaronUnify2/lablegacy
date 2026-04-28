@@ -1316,13 +1316,21 @@
                 // Hero sprite is 4.5 * 1.05 ≈ 4.7 tall, pivot at y=2.25.
                 // Eye height ~2.5 sits a bit above the sprite center,
                 // roughly where his face is.
+                // Pitch tilts the look-at vector vertically:
+                //   pitch=0   → looking straight ahead, full LOOK_DIST forward
+                //   pitch=+1  → looking up; horizontal reach shrinks (cos),
+                //               vertical lift grows (sin)
+                //   pitch=-1  → looking down
                 const EYE_HEIGHT = 2.5;
                 const LOOK_DIST  = 10;
+                const pitch = hero.pitch || 0;
+                const horizReach = LOOK_DIST * Math.cos(pitch);
+                const vertReach  = LOOK_DIST * Math.sin(pitch);
                 camera.position.set(hero.position.x, EYE_HEIGHT, hero.position.z);
                 camera.lookAt(
-                    hero.position.x - Math.sin(rot) * LOOK_DIST,
-                    EYE_HEIGHT,
-                    hero.position.z - Math.cos(rot) * LOOK_DIST
+                    hero.position.x - Math.sin(rot) * horizReach,
+                    EYE_HEIGHT + vertReach,
+                    hero.position.z - Math.cos(rot) * horizReach
                 );
 
                 // Hide the hero sprite while we're inside his head.
@@ -1442,6 +1450,16 @@
             const dpadTouches = new Set();
             let cameraTouch = null;
             let cameraLastX = 0;
+            let cameraLastY = 0;
+
+            // Pitch limits (radians). 80° in either direction prevents
+            // gimbal flip and the disorienting "look at your own feet"
+            // problem. ~1.4 rad = 80°.
+            const PITCH_MIN = -1.4;
+            const PITCH_MAX =  1.4;
+            // Drag sensitivity. Same value as horizontal so vertical
+            // and horizontal feel identical.
+            const LOOK_SENS = 0.004;
 
             // Mobile controls
             document.querySelectorAll('.mobile-btn').forEach(btn => {
@@ -1463,21 +1481,21 @@
                 });
             });
 
-            // FPS drag-to-rotate. Listens on the document so a drag that
-            // starts anywhere outside the d-pad rotates the hero. Sensible
-            // touchstart-on-canvas already exists below for the RTS pan
-            // gesture; we sit alongside it and gate on fpsMode.
+            // FPS drag-to-look. Tracks both axes:
+            //   horizontal drag → yaw (hero.rotation, turn left/right)
+            //   vertical drag   → pitch (hero.pitch, look up/down)
+            // Drag-DOWN looks UP (natural inverse mapping, matches
+            // every shooter convention).
             document.addEventListener('touchstart', (e) => {
                 if (!gameState.fpsMode) return;
-                if (cameraTouch !== null) return;     // already tracking a drag
+                if (cameraTouch !== null) return;
                 for (const t of e.changedTouches) {
-                    if (dpadTouches.has(t.identifier)) continue;     // d-pad finger
-                    // Reject touches that started on a UI element (FPS
-                    // toggle button, magic button, return prompt etc.).
+                    if (dpadTouches.has(t.identifier)) continue;
                     const el = document.elementFromPoint(t.clientX, t.clientY);
                     if (isUIElement(el)) continue;
                     cameraTouch = t.identifier;
                     cameraLastX = t.clientX;
+                    cameraLastY = t.clientY;
                     break;
                 }
             }, { passive: true });
@@ -1487,10 +1505,19 @@
                 for (const t of e.changedTouches) {
                     if (t.identifier !== cameraTouch) continue;
                     const dx = t.clientX - cameraLastX;
+                    const dy = t.clientY - cameraLastY;
                     cameraLastX = t.clientX;
+                    cameraLastY = t.clientY;
                     if (gameState.hero) {
-                        // Sensitivity copied from the reference project.
-                        gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * 0.004;
+                        gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * LOOK_SENS;
+                        // Drag UP looks UP. dy < 0 when finger moves up,
+                        // and we want pitch (where + = up) to increase, so
+                        // we SUBTRACT dy. Matches the "tilting a controller"
+                        // model used by most touch shooters.
+                        let pitch = (gameState.hero.pitch || 0) - dy * LOOK_SENS;
+                        if (pitch < PITCH_MIN) pitch = PITCH_MIN;
+                        if (pitch > PITCH_MAX) pitch = PITCH_MAX;
+                        gameState.hero.pitch = pitch;
                     }
                     break;
                 }
@@ -1508,21 +1535,30 @@
             document.addEventListener('touchend', releaseCameraTouch, { passive: true });
             document.addEventListener('touchcancel', releaseCameraTouch, { passive: true });
 
-            // Desktop mouse drag to rotate (FPS mode only).
+            // Desktop mouse drag — same yaw + pitch logic.
             let mouseRotating = false;
             let mouseLastX = 0;
+            let mouseLastY = 0;
             renderer.domElement.addEventListener('mousedown', (e) => {
                 if (!gameState.fpsMode) return;
                 if (isUIElement(e.target)) return;
                 mouseRotating = true;
                 mouseLastX = e.clientX;
+                mouseLastY = e.clientY;
             });
             window.addEventListener('mousemove', (e) => {
                 if (!mouseRotating || !gameState.fpsMode) return;
                 const dx = e.clientX - mouseLastX;
+                const dy = e.clientY - mouseLastY;
                 mouseLastX = e.clientX;
+                mouseLastY = e.clientY;
                 if (gameState.hero) {
-                    gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * 0.004;
+                    gameState.hero.rotation = (gameState.hero.rotation || 0) + dx * LOOK_SENS;
+                    // Drag UP looks UP — see touchmove handler above.
+                    let pitch = (gameState.hero.pitch || 0) - dy * LOOK_SENS;
+                    if (pitch < PITCH_MIN) pitch = PITCH_MIN;
+                    if (pitch > PITCH_MAX) pitch = PITCH_MAX;
+                    gameState.hero.pitch = pitch;
                 }
             });
             window.addEventListener('mouseup', () => { mouseRotating = false; });
@@ -1825,6 +1861,10 @@
             if (gameState.hero.rotation == null) {
                 gameState.hero.rotation = Math.PI;
             }
+            // Reset pitch each time we enter so re-entering FPS always
+            // starts looking horizontally, not at whatever angle the
+            // player ended on last time.
+            gameState.hero.pitch = 0;
             gameState.fpsMode = true;
 
             // Cancel any RTS movement the hero was doing — direct FPS
@@ -2127,10 +2167,10 @@
     </script>
     <!-- ?v= query strings bust the browser cache when JS changes.
          Bump these numbers anytime a JS file changes meaningfully. -->
-    <script src="js/buildings.js?v=4" onerror="debug('FAILED to load buildings.js')"></script>
-    <script src="js/units.js?v=4" onerror="debug('FAILED to load units.js')"></script>
-    <script src="js/ui.js?v=4" onerror="debug('FAILED to load ui.js')"></script>
-    <script src="js/magic.js?v=4" onerror="debug('FAILED to load magic.js')"></script>
-    <script src="js/sky.js?v=4" onerror="debug('FAILED to load sky.js')"></script>
+    <script src="js/buildings.js?v=5" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js?v=5" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js?v=5" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js?v=5" onerror="debug('FAILED to load magic.js')"></script>
+    <script src="js/sky.js?v=5" onerror="debug('FAILED to load sky.js')"></script>
 </body>
 </html>
