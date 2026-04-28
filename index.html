@@ -689,10 +689,13 @@
         let treeGeometry, treeMaterials;
 
         function initThree() {
-            // Scene
+            // Scene. Background color is a fallback — the GameSky
+            // module covers the entire view with a gradient skydome
+            // once initialized. Fog color matches the sky's horizon
+            // tone so the world fades into the sky at distance.
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a2a1a);
-            scene.fog = new THREE.Fog(0x1a2a1a, 50, 200);
+            scene.background = new THREE.Color(0x05050f);
+            scene.fog = new THREE.Fog(0x2a1040, 50, 200);
 
             // Camera. Far plane is moderately large; updateCamera()
             // adjusts it dynamically per mode (tight for FPS where
@@ -714,11 +717,14 @@
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
 
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            // Lighting tuned for night. Cool blue ambient (moonlight)
+            // plus a dim cool directional from "above" for shape. Was
+            // warm/bright daylight before — too cheerful for the
+            // wizard-in-the-dark-forest vibe we're going for now.
+            const ambientLight = new THREE.AmbientLight(0x6080a0, 0.6);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffcc, 0.8);
+            const directionalLight = new THREE.DirectionalLight(0xb8c8ff, 0.6);
             directionalLight.position.set(50, 100, 50);
             scene.add(directionalLight);
 
@@ -1133,14 +1139,18 @@
             
             // Random scale variation
             const scale = CONFIG.TREE_SCALE_MIN + Math.random() * (CONFIG.TREE_SCALE_MAX - CONFIG.TREE_SCALE_MIN);
-            sprite.scale.set(3 * scale, 4.5 * scale, 1);
+            // Trees are 3× taller than the original. Width stays the
+            // same so they look slim and tall — denser forest feel.
+            // Height = 13.5 (was 4.5), pivot offset = 6.75 (was 2.25)
+            // so the trunk base still sits on the ground.
+            sprite.scale.set(3 * scale, 13.5 * scale, 1);
             
             // Position with slight randomness
             const offsetX = (Math.random() - 0.5) * 0.5;
             const offsetZ = (Math.random() - 0.5) * 0.5;
             sprite.position.set(
                 x + 0.5 + offsetX,
-                2.25 * scale,
+                6.75 * scale,
                 z + 0.5 + offsetZ
             );
             
@@ -1236,8 +1246,11 @@
                 let inStrafe  = 0;   // -1 = strafe left, +1 = strafe right
                 if (input.keys['KeyW'] || input.keys['ArrowUp']    || input.mobileActions.up)    inForward += 1;
                 if (input.keys['KeyS'] || input.keys['ArrowDown']  || input.mobileActions.down)  inForward -= 1;
-                if (input.keys['KeyA'] || input.keys['ArrowLeft']  || input.mobileActions.left)  inStrafe  -= 1;
-                if (input.keys['KeyD'] || input.keys['ArrowRight'] || input.mobileActions.right) inStrafe  += 1;
+                // Left button strafes left in screen space (which means
+                // moving in the opposite direction we'd compute from the
+                // strafe vector), so we flip the sign here.
+                if (input.keys['KeyA'] || input.keys['ArrowLeft']  || input.mobileActions.left)  inStrafe  += 1;
+                if (input.keys['KeyD'] || input.keys['ArrowRight'] || input.mobileActions.right) inStrafe  -= 1;
 
                 if (inForward !== 0 || inStrafe !== 0) {
                     // Per-frame speed. Hero's RTS speed (0.06) is a per-
@@ -1759,6 +1772,11 @@
                 GameMagic.update();
             }
 
+            // Animate twinkling stars + slow celestial rotation
+            if (window.GameSky) {
+                GameSky.update();
+            }
+
             // Live UI updates (production progress bars, queue counts, etc.)
             if (window.GameUI && window.GameUI.tick) {
                 GameUI.tick();
@@ -1836,6 +1854,10 @@
             // for FPS layout (d-pad moves to the left, etc.).
             document.body.classList.add('fps-mode');
 
+            // Tell the sky module to swap to its FPS-sized dome so
+            // the stars and gradient stay inside the FPS far plane.
+            if (window.GameSky) GameSky.updateForMode(true);
+
             // Hide RTS-only menus / hints to keep the FPS view clean
             if (window.GameUI) GameUI.hideMenus();
         }
@@ -1860,6 +1882,9 @@
             if (magicBtn) magicBtn.classList.remove('active');
 
             document.body.classList.remove('fps-mode');
+
+            // Sky goes back to its big RTS radius
+            if (window.GameSky) GameSky.updateForMode(false);
 
             // Ask whether to walk the wizard home. The prompt's two
             // buttons resolve in handleReturnPrompt below.
@@ -2041,6 +2066,12 @@
                 } else {
                     debug('6c2. GameMagic NOT FOUND');
                 }
+                if (window.GameSky) {
+                    debug('6c3. GameSky.init()...');
+                    GameSky.init();
+                } else {
+                    debug('6c3. GameSky NOT FOUND');
+                }
                 debug('6. Modules done');
             } catch(e) {
                 debug('ERROR modules: ' + e.message);
@@ -2096,9 +2127,10 @@
     </script>
     <!-- ?v= query strings bust the browser cache when JS changes.
          Bump these numbers anytime a JS file changes meaningfully. -->
-    <script src="js/buildings.js?v=2" onerror="debug('FAILED to load buildings.js')"></script>
-    <script src="js/units.js?v=2" onerror="debug('FAILED to load units.js')"></script>
-    <script src="js/ui.js?v=2" onerror="debug('FAILED to load ui.js')"></script>
-    <script src="js/magic.js?v=2" onerror="debug('FAILED to load magic.js')"></script>
+    <script src="js/buildings.js?v=4" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js?v=4" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js?v=4" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js?v=4" onerror="debug('FAILED to load magic.js')"></script>
+    <script src="js/sky.js?v=4" onerror="debug('FAILED to load sky.js')"></script>
 </body>
 </html>
