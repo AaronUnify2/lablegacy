@@ -19,17 +19,22 @@
 window.GameMagic = (function() {
     console.log('magic.js loading...');
 
-    // Tunable constants — adjust after playtest
-    const PROJECTILE_SPEED       = 0.35;     // world units per frame
-    const PROJECTILE_LIFE_FRAMES = 120;      // ~2 seconds at 60fps
-    const PROJECTILE_RADIUS      = 0.5;      // for collision
-    const COOLDOWN_MS            = 400;      // between shots
-    const HERO_DAMAGE_PER_BLAST  = 20;       // applied to enemies on hit
-    const AIM_ASSIST_RANGE       = 25;       // tiles, max range to consider an enemy
-    const AIM_ASSIST_CONE_DEG    = 30;       // half-angle of forward cone
+    // Tunable constants — adjust after playtest.
+    // Speed and life are time-based, NOT frame-based. This matters
+    // because FPS-view frame rates differ from RTS-view frame rates
+    // (the dense forest renders slower in FPS), and frame-based
+    // motion would make projectiles crawl in FPS and fly fast in RTS.
+    const PROJECTILE_SPEED_PER_SEC = 35;     // world units per second
+    const PROJECTILE_LIFE_SEC      = 1.5;    // seconds before despawn (range = speed × life)
+    const PROJECTILE_RADIUS        = 0.5;    // for collision
+    const COOLDOWN_MS              = 400;    // between shots
+    const HERO_DAMAGE_PER_BLAST    = 20;     // applied to enemies on hit
+    const AIM_ASSIST_RANGE         = 25;     // tiles, max range to consider an enemy
+    const AIM_ASSIST_CONE_DEG      = 30;     // half-angle of forward cone
 
     let projectiles = [];
     let lastFireTime = 0;
+    let lastUpdateTime = 0;     // for computing deltaSeconds in update()
 
     // Resolved engine refs (set in init)
     let scene = null;
@@ -187,11 +192,9 @@ window.GameMagic = (function() {
             sprite: sprite,
             x: origin.x, y: origin.y, z: origin.z,
             dx: dir.x, dy: dir.y, dz: dir.z,
-            life: PROJECTILE_LIFE_FRAMES,
-            // If aim assist locked an enemy, store them so we can
-            // home in even if they shift slightly. (Soft homing —
-            // we don't bend the trajectory, but we accept a hit on
-            // them at slightly looser collision range.)
+            // Life is wall-clock seconds remaining, not frames.
+            // update() decrements by deltaSeconds.
+            life: PROJECTILE_LIFE_SEC
         });
     }
 
@@ -199,17 +202,35 @@ window.GameMagic = (function() {
     // UPDATE LOOP
     // ============================================
 
-    function update(deltaMS) {
+    function update() {
         if (!scene || !gameState) return;
+
+        // Compute deltaSeconds since the last call. First frame is a
+        // no-op (we don't have a previous timestamp yet). Cap to 0.1s
+        // to avoid teleporting projectiles after a tab-switch pause.
+        const now = performance.now();
+        if (lastUpdateTime === 0) {
+            lastUpdateTime = now;
+            return;
+        }
+        let deltaSec = (now - lastUpdateTime) / 1000;
+        lastUpdateTime = now;
+        // Cap deltaSec to prevent teleport-through-walls when the tab
+        // was backgrounded for a while. 0.5s is loose enough that
+        // normal-but-laggy framerates (down to ~3fps) still produce
+        // accurate projectile motion, while a tab-switch (delta of
+        // many seconds) gets clamped.
+        if (deltaSec > 0.5) deltaSec = 0.5;
 
         for (let i = projectiles.length - 1; i >= 0; i--) {
             const p = projectiles[i];
 
-            // Step
-            p.x += p.dx * PROJECTILE_SPEED;
-            p.y += p.dy * PROJECTILE_SPEED;
-            p.z += p.dz * PROJECTILE_SPEED;
-            p.life--;
+            // Step (time-based)
+            const step = PROJECTILE_SPEED_PER_SEC * deltaSec;
+            p.x += p.dx * step;
+            p.y += p.dy * step;
+            p.z += p.dz * step;
+            p.life -= deltaSec;
 
             p.sprite.position.set(p.x, p.y, p.z);
 
@@ -232,9 +253,9 @@ window.GameMagic = (function() {
             }
 
             // Collision: trees. We sample the projectile's current
-            // grid cell (and its neighbors at high speed). Each hit
-            // applies 1 HP of damage. damageTree returns true when
-            // the tree falls; we award resources and despawn.
+            // grid cell. Each hit applies 1 HP of damage. damageTree
+            // returns true when the tree falls; we award resources
+            // and despawn.
             const hitTree = checkTreeHit(p);
             if (hitTree) {
                 if (window.GameUnits) {
