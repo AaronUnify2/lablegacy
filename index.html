@@ -106,7 +106,7 @@
             z-index: 100;
         }
 
-
+        /* Magic blast button — bottom-right thumb area, only in FPS mode.
            The d-pad is at bottom-left; this gives the player a comfortable
            two-thumb layout without overlapping anything. */
         #magic-btn {
@@ -123,7 +123,7 @@
             border-radius: 50%;
             color: #ffffff;
             font-size: 32px;
-            display: none;          /* hidden in RTS */
+            display: none;          /* hidden in RTS, shown in FPS */
             align-items: center;
             justify-content: center;
             cursor: pointer;
@@ -134,9 +134,7 @@
             z-index: 60;
             transition: transform 0.08s ease, box-shadow 0.15s ease;
         }
-        /* Show in FPS mode. Class is .fps-on (not .active) to avoid
-           collision with the built-in :active pseudo-class. */
-        #magic-btn.fps-on {
+        #magic-btn.active {
             display: flex;
         }
         #magic-btn:active {
@@ -1832,7 +1830,7 @@
             if (crosshair) crosshair.classList.add('active');
 
             const magicBtn = document.getElementById('magic-btn');
-            if (magicBtn) magicBtn.classList.add('fps-on');
+            if (magicBtn) magicBtn.classList.add('active');
 
             // Adds a body-level class so CSS can rearrange UI elements
             // for FPS layout (d-pad moves to the left, etc.).
@@ -1859,7 +1857,7 @@
             if (crosshair) crosshair.classList.remove('active');
 
             const magicBtn = document.getElementById('magic-btn');
-            if (magicBtn) magicBtn.classList.remove('fps-on');
+            if (magicBtn) magicBtn.classList.remove('active');
 
             document.body.classList.remove('fps-mode');
 
@@ -2096,9 +2094,11 @@
         debug('Script loaded, waiting for window.load event...');
         debug('THREE.js available: ' + (typeof THREE !== 'undefined'));
     </script>
-    <script src="js/buildings.js" onerror="debug('FAILED to load buildings.js')"></script>
-    <script src="js/units.js" onerror="debug('FAILED to load units.js')"></script>
-    <script src="js/ui.js" onerror="debug('FAILED to load ui.js')"></script>
-    <script src="js/magic.js" onerror="debug('FAILED to load magic.js')"></script>
+    <!-- ?v= query strings bust the browser cache when JS changes.
+         Bump these numbers anytime a JS file changes meaningfully. -->
+    <script src="js/buildings.js?v=2" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js?v=2" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js?v=2" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js?v=2" onerror="debug('FAILED to load magic.js')"></script>
 </body>
 </html>
