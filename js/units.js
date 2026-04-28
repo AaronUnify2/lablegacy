@@ -1501,9 +1501,10 @@ window.GameUnits = (function() {
         // Two key tricks for visibility through dense forest:
         //   1. depthTest: false  — always draw, even when behind tree sprites
         //   2. renderOrder: 999  — draw last, so it overlays everything
-        // Tree sprites are ~4.5 tall from their y=2.25 pivot, so we float at y=6
-        // for a clear margin. Ribbons are wide enough to read at RTS zoom levels.
-        const Y_LINE = 6.0;
+        // Trees are now ~13.5 tall (3× original) with their pivot at y=6.75,
+        // so the canopy reaches y=13.5. We float at y=15 for a clear margin
+        // above the tallest tree.
+        const Y_LINE = 15.0;
         // Custom patrols are single-file paths - render thinner so they read
         // visually distinct from cut paths/loops.
         const RIBBON_WIDTH = isCustomPatrol ? 0.5 : 1.4;
