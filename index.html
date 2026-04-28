@@ -90,7 +90,23 @@
             border-radius: 2px;
         }
 
-        /* Magic blast button — bottom-right thumb area, only in FPS mode.
+        /* Simple FPS counter overlay - top-left, small, only for debugging.
+           Remove the element later when perf is dialed in. */
+        #fps-counter {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #7ddf64;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+
            The d-pad is at bottom-left; this gives the player a comfortable
            two-thumb layout without overlapping anything. */
         #magic-btn {
@@ -439,6 +455,9 @@
             <!-- Crosshair: only visible in FPS mode -->
             <div id="crosshair"></div>
 
+            <!-- Simple FPS counter for performance diagnosis -->
+            <div id="fps-counter">FPS: --</div>
+
             <!-- Magic blast button: only visible in FPS mode -->
             <div id="magic-btn">✦</div>
 
@@ -675,12 +694,14 @@
             scene.background = new THREE.Color(0x1a2a1a);
             scene.fog = new THREE.Fog(0x1a2a1a, 50, 200);
 
-            // Camera
+            // Camera. Far plane is moderately large; updateCamera()
+            // adjusts it dynamically per mode (tight for FPS where
+            // close fill rate matters, larger for RTS overhead view).
             camera = new THREE.PerspectiveCamera(
                 60,
                 window.innerWidth / window.innerHeight,
                 0.1,
-                1000
+                300
             );
 
             // Renderer
@@ -1193,6 +1214,15 @@
             // forest edge instead of hard-stopping when a diagonal walk
             // happens to clip a tree.
             if (gameState.fpsMode && gameState.hero) {
+                // Performance: tight far plane in FPS so we don't
+                // render the entire far side of the map through dense
+                // forest. 80 units is plenty - past that everything
+                // is occluded by trees anyway.
+                if (camera.far !== 80) {
+                    camera.far = 80;
+                    camera.updateProjectionMatrix();
+                }
+
                 const hero = gameState.hero;
                 const rot = hero.rotation || 0;
 
@@ -1295,6 +1325,11 @@
             // Restore hero sprite when we're back in RTS view
             if (gameState.hero?.sprite) {
                 gameState.hero.sprite.visible = true;
+            }
+            // Restore the wider far plane for overhead RTS view.
+            if (camera.far !== 300) {
+                camera.far = 300;
+                camera.updateProjectionMatrix();
             }
 
             // Pan
@@ -1704,6 +1739,12 @@
         // ============================================
         // ANIMATION LOOP
         // ============================================
+        // FPS counter state - smoothed average over a 500ms window so
+        // the readout doesn't jitter every frame.
+        let _fpsFrameCount = 0;
+        let _fpsLastSampleTime = 0;
+        let _fpsLastDisplayedValue = 0;
+
         function animate() {
             requestAnimationFrame(animate);
             updateCamera();
@@ -1724,6 +1765,26 @@
             }
             
             renderer.render(scene, camera);
+
+            // ----- FPS counter -----
+            _fpsFrameCount++;
+            const _now = performance.now();
+            if (_fpsLastSampleTime === 0) _fpsLastSampleTime = _now;
+            const _elapsed = _now - _fpsLastSampleTime;
+            if (_elapsed >= 500) {
+                _fpsLastDisplayedValue = Math.round((_fpsFrameCount * 1000) / _elapsed);
+                _fpsFrameCount = 0;
+                _fpsLastSampleTime = _now;
+                const fpsEl = document.getElementById('fps-counter');
+                if (fpsEl) {
+                    const mode = gameState.fpsMode ? 'FPS' : 'RTS';
+                    fpsEl.textContent = `${mode} | ${_fpsLastDisplayedValue} fps`;
+                    // Color the readout: green ≥50, yellow ≥30, red below.
+                    fpsEl.style.color =
+                        _fpsLastDisplayedValue >= 50 ? '#7ddf64' :
+                        _fpsLastDisplayedValue >= 30 ? '#ffd066' : '#ff6666';
+                }
+            }
         }
 
         // ============================================
