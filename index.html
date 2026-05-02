@@ -1000,14 +1000,16 @@
                 }
             }
 
-            // Create player clearing (bottom)
+            // Player clearing — south end of the map. (Used to be north;
+            // swapped to put the friendly base at the bottom of the
+            // overhead view, which feels more natural.)
             const playerCenterX = CONFIG.GRID_WIDTH / 2;
-            const playerCenterZ = CONFIG.CLEARING_PADDING;
+            const playerCenterZ = CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING;
             createClearing(playerCenterX, playerCenterZ, CELL.CLEARING_PLAYER, true);
 
-            // Create enemy clearing (top)
+            // Enemy clearing — north end (opposite the player).
             const enemyCenterX = CONFIG.GRID_WIDTH / 2;
-            const enemyCenterZ = CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING;
+            const enemyCenterZ = CONFIG.CLEARING_PADDING;
             createClearing(enemyCenterX, enemyCenterZ, CELL.CLEARING_ENEMY, false);
 
             // Populate trees
@@ -1390,16 +1392,16 @@
                 input.spacePressed = false;
             }
 
-            // Quick jump to bases
+            // Quick jump to bases. 1 = player base (now south), 2 = enemy base (now north).
             if (input.keys['Digit1'] && !input.digit1Pressed) {
-                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
+                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
                 input.digit1Pressed = true;
             } else if (!input.keys['Digit1']) {
                 input.digit1Pressed = false;
             }
 
             if (input.keys['Digit2'] && !input.digit2Pressed) {
-                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
+                jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
                 input.digit2Pressed = true;
             } else if (!input.keys['Digit2']) {
                 input.digit2Pressed = false;
@@ -1856,10 +1858,10 @@
                 return;
             }
             // Initialize hero's facing rotation if not set yet. Default
-            // to facing "south" (toward enemy base) so the player isn't
-            // staring at their own buildings on first toggle.
+            // to 0 (facing "north", toward the enemy base) so the player
+            // isn't staring at their own buildings on first toggle.
             if (gameState.hero.rotation == null) {
-                gameState.hero.rotation = Math.PI;
+                gameState.hero.rotation = 0;
             }
             // Reset pitch each time we enter so re-entering FPS always
             // starts looking horizontally, not at whatever angle the
@@ -1954,10 +1956,10 @@
             if (!walkHome || !gameState.hero || !window.GameUnits) return;
 
             // Send the wizard back to his spawn point in the base
-            // clearing. (Once we have a Royal Tent we can target that
-            // building's location specifically.)
+            // clearing (south). The "-5" puts him just inside the
+            // clearing edge, not dead center.
             const homeX = CONFIG.GRID_WIDTH / 2;
-            const homeZ = CONFIG.CLEARING_PADDING + 5;
+            const homeZ = CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING - 5;
             GameUnits.commandMove(gameState.hero, homeX, homeZ);
         }
 
@@ -2075,9 +2077,9 @@
             };
             debug('4. GameEngine OK');
             
-            // Start at player base
+            // Start at player base (south)
             debug('5. Jump to player base...');
-            jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.CLEARING_PADDING);
+            jumpToLocation(CONFIG.GRID_WIDTH / 2, CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING);
             
             // Initialize modules after DOM ready
             try {
@@ -2125,7 +2127,7 @@
                 if (window.GameUnits) {
                     const heroSpawn = {
                         x: CONFIG.GRID_WIDTH / 2,
-                        z: CONFIG.CLEARING_PADDING + 5
+                        z: CONFIG.GRID_HEIGHT - CONFIG.CLEARING_PADDING - 5
                     };
                     const hero = GameUnits.spawnUnit('hero', heroSpawn,
                         { path1: 0, path2: 0, path3: 0 }, 'player');
@@ -2134,9 +2136,10 @@
                         // Hero stays put unless the player moves him.
                         hero.harvestMode = null;
                         hero.state = 'idle';
-                        // Initial facing: south, toward the enemy base.
-                        // Used by FPS camera in updateCamera().
-                        hero.rotation = Math.PI;
+                        // Initial facing: north, toward the enemy base
+                        // (which is now at the top of the map). rotation=0
+                        // means looking in -z direction in our convention.
+                        hero.rotation = 0;
                         debug('6d. Hero spawned');
                     }
                 }
@@ -2167,10 +2170,10 @@
     </script>
     <!-- ?v= query strings bust the browser cache when JS changes.
          Bump these numbers anytime a JS file changes meaningfully. -->
-    <script src="js/buildings.js?v=6" onerror="debug('FAILED to load buildings.js')"></script>
-    <script src="js/units.js?v=6" onerror="debug('FAILED to load units.js')"></script>
-    <script src="js/ui.js?v=6" onerror="debug('FAILED to load ui.js')"></script>
-    <script src="js/magic.js?v=6" onerror="debug('FAILED to load magic.js')"></script>
-    <script src="js/sky.js?v=6" onerror="debug('FAILED to load sky.js')"></script>
+    <script src="js/buildings.js?v=7" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js?v=7" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js?v=7" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js?v=7" onerror="debug('FAILED to load magic.js')"></script>
+    <script src="js/sky.js?v=7" onerror="debug('FAILED to load sky.js')"></script>
 </body>
 </html>
