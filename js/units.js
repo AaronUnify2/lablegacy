@@ -36,6 +36,14 @@ window.GameUnits = (function() {
     // ============================================
     // UNIT TYPE DEFINITIONS
     // ============================================
+    // Unit roster:
+    //   woodsman   — basic worker. Harvests trees. Weak combat.
+    //   scout      — (added in Slice 3) upgraded woodsman variant.
+    //   knight     — front-line melee combat unit.
+    //   archer     — ranged combat unit.
+    //   hero       — wizard, FPS-only. Spawned once at start.
+    // Other classes (botanist, dragonfly, mage, planter) were
+    // experimental and removed in Slice 1 of the unit refactor.
     const UNIT_TYPES = {
         knight: {
             id: 'knight', name: 'Knight',
@@ -58,40 +66,9 @@ window.GameUnits = (function() {
             harvestSpeed: 0, carryCapacity: 0,
             canHarvest: false, scale: 0.9
         },
-        botanist: {
-            id: 'botanist', name: 'Botanist',
-            health: 45, damage: 5, speed: 0.03,
-            attackRange: 8, attackSpeed: 2000,
-            harvestSpeed: 0, carryCapacity: 0,
-            canHarvest: false, scale: 0.9
-        },
-        dragonfly: {
-            id: 'dragonfly', name: 'Dragonfly',
-            health: 35, damage: 10, speed: 0.06,
-            attackRange: 3, attackSpeed: 800,
-            harvestSpeed: 0, carryCapacity: 0,
-            canHarvest: false, canFly: true, scale: 0.85
-        },
-        mage: {
-            id: 'mage', name: 'Mage',
-            health: 40, damage: 25, speed: 0.025,
-            attackRange: 10, attackSpeed: 2500,
-            harvestSpeed: 0, carryCapacity: 0,
-            canHarvest: false, scale: 1.0
-        },
-        planter: {
-            id: 'planter', name: 'Planter',
-            health: 50, damage: 5, speed: 0.03,
-            attackRange: 1.5, attackSpeed: 1500,
-            harvestSpeed: 0, carryCapacity: 0,
-            canHarvest: false, canPlant: true, scale: 0.9
-        },
-        // The player's possessable hero. Spawns once at game start at
-        // the Royal Tent. Slightly bigger than a knight (scale 1.05)
-        // but clearly under tree height — trees range 3.6-6.3 tall, so
-        // hero at 4.7 tall reads as "important but in the world."
-        // The player pilots him in FPS mode; in RTS he stands idle (or
-        // walks back to base if the player chose that on swap).
+        // The player's possessable hero. Spawns once at game start.
+        // Slightly bigger than a knight (scale 1.05) but clearly under
+        // tree height so the world feels real around him.
         hero: {
             id: 'hero', name: 'Wizard',
             health: 200, damage: 20, speed: 0.06,
@@ -361,7 +338,14 @@ window.GameUnits = (function() {
         return new THREE.SpriteMaterial({ map: texture, transparent: true });
     }
 
-    function createWoodsmanMaterial() {
+    // Renders the woodsman pixel sprite. The shirt color is
+    // parameterizable so we can reuse the same artwork for scouts
+    // (blue), veteran woodsmen (dark red), and veteran scouts (dark
+    // blue) without duplicating the canvas code. Default is the
+    // standard red woodsman.
+    function createWoodsmanMaterial(opts = {}) {
+        const shirtColor      = opts.shirtColor      || '#cc4444';
+        const shirtShadow     = opts.shirtShadow     || '#aa2222';
         const THREE = getTHREE();
         const canvas = document.createElement('canvas');
         canvas.width = 32; canvas.height = 48;
@@ -378,8 +362,9 @@ window.GameUnits = (function() {
         ctx.fillRect(12, 9, 2, 2); ctx.fillRect(18, 9, 2, 2);
         ctx.fillStyle = '#5a4030';
         ctx.beginPath(); ctx.arc(16, 14, 5, 0, Math.PI, false); ctx.fill();
-        ctx.fillStyle = '#cc4444'; ctx.fillRect(9, 18, 14, 14);
-        ctx.fillStyle = '#aa2222';
+        // Shirt — main color and shadow trim are parameterized.
+        ctx.fillStyle = shirtColor; ctx.fillRect(9, 18, 14, 14);
+        ctx.fillStyle = shirtShadow;
         ctx.fillRect(9, 20, 14, 2); ctx.fillRect(9, 26, 14, 2);
         ctx.fillRect(12, 18, 2, 14); ctx.fillRect(18, 18, 2, 14);
         ctx.fillStyle = '#4a3020';
@@ -650,10 +635,15 @@ window.GameUnits = (function() {
             patrolWaypointIndex: 0,   // current waypoint in patrol cycle
             guardPosition: null,      // { x, z } when on guard duty
             attackTarget: null,
-            hasRhythm: stats.rhythm || false,
-            hasCleave: stats.cleave || false,
-            depositMult: stats.depositMult || 1,
-            energySpecialist: stats.energySpecialist || false
+            // Unified ability system. `abilities` is a Set<string> of
+            // capability tags. Code that previously checked `unit.hasRhythm`
+            // now checks `unit.abilities.has('rhythm')`. This lets ANY
+            // upgrade tree grant ANY ability to ANY unit type — a knight
+            // tree could grant a unit `rhythm` if it ever wanted to.
+            // Numeric multipliers (depositMult etc.) stay as numbers, not
+            // abilities, since they're scalars not on/off switches.
+            abilities: new Set(stats.abilities || []),
+            depositMult: stats.depositMult || 1
         };
 
         // Selection ring
@@ -691,18 +681,23 @@ window.GameUnits = (function() {
         let harvestSpeed = unitType.harvestSpeed;
         let carryCapacity = unitType.carryCapacity;
 
-        let rhythm = false, cleave = false;
-        let depositMult = 1, energySpecialist = false;
+        // Abilities are tags collected from the unit's upgrade choices.
+        // These will be passed to the unit object as a Set, replacing
+        // the old per-flag booleans. Order matters only for human
+        // readability (Set membership is unordered).
+        const abilities = [];
+        let depositMult = 1;
 
         if (unitTypeId === 'woodsman') {
             if (upgrades.path1 >= 1) harvestSpeed *= 0.75;
-            if (upgrades.path1 >= 2) rhythm = true;
-            if (upgrades.path1 >= 3) cleave = true;
+            if (upgrades.path1 >= 2) abilities.push('rhythm');           // chops 2 trees per swing
+            if (upgrades.path1 >= 3) abilities.push('cleave');           // damages adjacent trees
             if (upgrades.path2 >= 1) carryCapacity = Math.floor(carryCapacity * 1.5);
             if (upgrades.path2 >= 2) depositMult = 1.2;
-            if (upgrades.path2 >= 3) energySpecialist = true;
+            if (upgrades.path2 >= 3) abilities.push('energySpecialist'); // 2× yield from energy trees
             if (upgrades.path3 >= 1) health *= 1.5;
-            if (upgrades.path3 >= 2) speed *= 1.3;     // Swift Boots (replaces Forester)
+            if (upgrades.path3 >= 2) speed *= 1.3;                       // Swift Boots
+            // (path3 lvl 3 - Trapper - is a deferred ability we'll wire in later)
         } else if (unitTypeId === 'knight') {
             if (upgrades.path1 >= 1) damage *= 1.25;
             if (upgrades.path1 >= 2) damage *= 1.25;
@@ -718,7 +713,7 @@ window.GameUnits = (function() {
         return {
             health, damage, speed, attackRange, attackSpeed,
             harvestSpeed, carryCapacity,
-            rhythm, cleave, depositMult, energySpecialist
+            abilities, depositMult
         };
     }
 
@@ -2155,7 +2150,7 @@ window.GameUnits = (function() {
         unit.state = 'harvesting';
 
         let effectiveHarvestSpeed = unit.harvestSpeed;
-        if (unit.hasRhythm && unit.chopCount > 0) {
+        if (unit.abilities.has('rhythm') && unit.chopCount > 0) {
             const speedBonus = Math.min(0.5, unit.chopCount * 0.05);
             effectiveHarvestSpeed *= (1 - speedBonus);
         }
@@ -2177,7 +2172,7 @@ window.GameUnits = (function() {
             else if (treeType === CELL.TREE_HIGH_YIELD) woodYield = 25;
             else if (treeType === CELL.TREE_ENERGY) {
                 energyYield = 15;
-                if (unit.energySpecialist) energyYield *= 2;
+                if (unit.abilities.has('energySpecialist')) energyYield *= 2;
             }
 
             unit.inventory.wood += woodYield;
@@ -2187,7 +2182,7 @@ window.GameUnits = (function() {
             // hero's magic blast respects per-tree HP.
             removeTreeAt(treeX, treeZ);
 
-            if (unit.hasCleave) {
+            if (unit.abilities.has('cleave')) {
                 console.log('Clear Cutter activated at', treeX, treeZ);
             }
 
@@ -2544,6 +2539,8 @@ window.GameUnits = (function() {
     // ============================================
 
     function commandMove(unit, targetX, targetZ) {
+        // canFly is unused now (dragonfly was removed) but kept as an
+        // API parameter on findPath in case we add flying units later.
         const canFly = unit.typeData.canFly || false;
         createRipple(targetX, targetZ);
         releaseTreeClaim(unit);
