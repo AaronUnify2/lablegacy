@@ -23,6 +23,22 @@ window.GameBuildings = (function() {
             description: 'Trains Woodsmen to harvest trees',
             category: 'economy'
         },
+        TAVERN: {
+            id: 'tavern',
+            name: 'Tavern',
+            cost: { wood: 60, energy: 25 },
+            unitType: 'scout',
+            // Scouts cost more than woodsmen (10 wood + 20 energy vs
+            // the woodsman's 10 energy) — they're an upgrade tier with
+            // bigger vision and combat-capable. Easy to revisit later.
+            unitCost: { wood: 10, energy: 20 },
+            productionTime: 3000,
+            description: 'Trains Scouts (bigger vision, combat-capable)',
+            category: 'economy',
+            // Prerequisite: must own a Lodge first. Enforced in
+            // ui.js#showBuildMenu via playerOwnsBuilding().
+            requires: 'LODGE'
+        },
         SAWMILL: {
             id: 'sawmill',
             name: 'Sawmill',
@@ -98,6 +114,9 @@ window.GameBuildings = (function() {
                 break;
             case 'lodge':
                 drawLodge(ctx);
+                break;
+            case 'tavern':
+                drawTavern(ctx);
                 break;
             case 'archer_range':
                 // Renamed from 'arrow_tower' but reuses the existing
@@ -185,6 +204,62 @@ window.GameBuildings = (function() {
         ctx.beginPath();
         ctx.arc(48, 0, 4, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(8, 28, 48, 26);
+    }
+
+    // Tavern — warmer-toned wood with a hanging sign on a post.
+    // Visually distinct from the Lodge: lighter wood, taller door,
+    // small sign hanging from a horizontal beam at the top corner.
+    function drawTavern(ctx) {
+        // Foundation (darker stone trim)
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(6, 50, 52, 14);
+        // Body — warm honey-pine logs (lighter than Lodge)
+        for (let i = 0; i < 5; i++) {
+            ctx.fillStyle = i % 2 === 0 ? '#a87a32' : '#c89244';
+            ctx.fillRect(8, 28 + i * 5, 48, 4);
+        }
+        // Roof — slate blue tile, contrasts with the warm logs
+        ctx.fillStyle = '#3a4a6a';
+        ctx.beginPath();
+        ctx.moveTo(2, 28);
+        ctx.lineTo(32, 8);
+        ctx.lineTo(62, 28);
+        ctx.closePath();
+        ctx.fill();
+        // Roof shadow line
+        ctx.fillStyle = '#2a3a5a';
+        ctx.fillRect(2, 28, 60, 2);
+        // Door — taller, darker, with a yellow window glow above it
+        ctx.fillStyle = '#3a2010';
+        ctx.fillRect(26, 32, 12, 22);
+        // Door planks
+        ctx.fillStyle = '#5a3520';
+        ctx.fillRect(28, 34, 3, 18);
+        ctx.fillRect(33, 34, 3, 18);
+        // Tiny lit window above the door
+        ctx.fillStyle = '#f0c860';
+        ctx.fillRect(28, 24, 8, 4);
+        ctx.fillStyle = '#a08020';
+        ctx.fillRect(28, 24, 8, 1);
+        // Hanging sign post (top-right corner)
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(48, 6, 2, 14);
+        ctx.fillRect(40, 6, 10, 2);
+        // The sign itself
+        ctx.fillStyle = '#7a4a2a';
+        ctx.fillRect(38, 10, 10, 8);
+        ctx.strokeStyle = '#3a2010';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(38, 10, 10, 8);
+        // Mug shape on the sign
+        ctx.fillStyle = '#e0c080';
+        ctx.fillRect(41, 12, 4, 5);
+        ctx.fillStyle = '#fff5d0';
+        ctx.fillRect(41, 12, 4, 1);
+        // Outer outline
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
         ctx.strokeRect(8, 28, 48, 26);
@@ -655,6 +730,19 @@ window.GameBuildings = (function() {
         }
     }
     
+    // Returns true if the player has at least one completed building
+    // of the given type key (e.g. 'LODGE'). Used to gate prerequisites
+    // — a building with `requires: 'LODGE'` won't appear in the build
+    // menu until this returns true.
+    function playerOwnsBuilding(typeKey) {
+        const gameState = getGameState();
+        if (!gameState || !gameState.buildings) return false;
+        for (const b of gameState.buildings) {
+            if (b.type === typeKey) return true;
+        }
+        return false;
+    }
+
     // Initialize
     function init() {
         console.log('Buildings module initialized');
@@ -667,6 +755,7 @@ window.GameBuildings = (function() {
         placeBuilding,
         queueUnit,
         updateProduction,
-        createBuildingMaterial
+        createBuildingMaterial,
+        playerOwnsBuilding
     };
 })();
