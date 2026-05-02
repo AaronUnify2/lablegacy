@@ -1028,6 +1028,15 @@ window.GameUnits = (function() {
         if (distToTarget < 2) {
             console.log(`${unit.typeData.name} reached corridor destination`);
             unit.corridorTarget = null;
+            // If this woodsman was running a "Harvest at Point" command,
+            // the corridor was just the path TO the harvest area. Now
+            // switch into pointHarvest mode and start clearing the
+            // radius around harvestPoint.
+            if (unit.harvestPoint) {
+                unit.harvestMode = 'pointHarvest';
+                startPointHarvest(unit);
+                return;
+            }
             unit.harvestMode = 'nearby';
             // If this corridor was part of a multi-waypoint chain, advance
             // to the next segment instead of falling back to nearby harvest.
@@ -1084,6 +1093,191 @@ window.GameUnits = (function() {
             } else {
                 unit.state = 'idle';
             }
+        }
+    }
+
+    // ============================================
+    // HARVEST AT POINT (Slice 2)
+    //   "Harvest at Point" combines Cut Path + Harvest Nearby into a
+    //   single command. The player taps a destination; each selected
+    //   woodsman cuts a 2-wide path to that destination, then clears
+    //   every tree within HARVEST_POINT_RADIUS of the destination,
+    //   then walks to the destination center and goes idle.
+    //
+    //   This is the productivity-loop command: set it up, glance away,
+    //   come back to find a fresh clearing and idle units signaling
+    //   they need a higher-value task.
+    // ============================================
+
+    const HARVEST_POINT_RADIUS = 8;       // tiles around the tap point
+
+    // Public command: kick off Harvest at Point for the given units
+    // toward (targetX, targetZ). Each unit gets its own corridor; once
+    // any of them arrives at the destination, they switch into
+    // pointHarvest mode and start clearing the radius.
+    function commandHarvestAtPoint(units, targetX, targetZ) {
+        for (const unit of units) {
+            if (!unit.typeData.canHarvest) continue;
+            // Mark the harvest point first — startCuttingCorridor will
+            // store its own corridorTarget. When the corridor finishes,
+            // continueCuttingCorridor sees harvestPoint is set and
+            // switches the unit into pointHarvest mode (see above).
+            unit.harvestPoint = { x: targetX, z: targetZ };
+            unit.harvestRadius = HARVEST_POINT_RADIUS;
+            // Clean any existing path/patrol/guard state so there's no
+            // fighting between the old assignment and the new one.
+            unit.patrolPathId = null;
+            unit.guardPosition = null;
+            unit.attackTarget = null;
+            // Start cutting the corridor with width 2 (a thin lane,
+            // narrower than Cut Lane's 4 — the goal here is just a
+            // walking path, not an army-sized highway).
+            startCuttingCorridor(unit, targetX, targetZ, 2);
+        }
+    }
+
+    // Find the closest tree within `radius` of `point` that this unit
+    // can actually reach. Distance is measured from the UNIT (not the
+    // point) so multiple woodsmen working the same circle don't all
+    // converge on the same far tree — they each pick their nearest.
+    function findNearestTreeNearPoint(unit, point, radius, excludeClaimed = true) {
+        const gameState = getGameState();
+        const CELL = getCELL();
+        const CONFIG = getCONFIG();
+        const r2 = radius * radius;
+
+        let best = null;
+        let bestDist = Infinity;
+
+        const minX = Math.max(0, Math.floor(point.x - radius));
+        const maxX = Math.min(CONFIG.GRID_WIDTH - 1, Math.ceil(point.x + radius));
+        const minZ = Math.max(0, Math.floor(point.z - radius));
+        const maxZ = Math.min(CONFIG.GRID_HEIGHT - 1, Math.ceil(point.z + radius));
+
+        for (let x = minX; x <= maxX; x++) {
+            for (let z = minZ; z <= maxZ; z++) {
+                // First filter: must be a tree
+                const cell = gameState.grid[x]?.[z];
+                if (cell !== CELL.TREE_NORMAL &&
+                    cell !== CELL.TREE_HIGH_YIELD &&
+                    cell !== CELL.TREE_ENERGY) continue;
+
+                // Must be inside the harvest circle (Euclidean from point)
+                const pdx = (x + 0.5) - point.x;
+                const pdz = (z + 0.5) - point.z;
+                if (pdx * pdx + pdz * pdz > r2) continue;
+
+                // Skip claimed by other units
+                if (excludeClaimed) {
+                    const treeKey = `${x},${z}`;
+                    const claimedBy = claimedTrees.get(treeKey);
+                    if (claimedBy && claimedBy !== unit.id) continue;
+                }
+
+                if (!isTreeReachable(x, z)) continue;
+
+                // Distance from unit, not from point — distributes work
+                const udx = (x + 0.5) - unit.position.x;
+                const udz = (z + 0.5) - unit.position.z;
+                const distFromUnit = udx * udx + udz * udz;
+                if (distFromUnit < bestDist) {
+                    bestDist = distFromUnit;
+                    best = { x, z, type: cell };
+                }
+            }
+        }
+        return best;
+    }
+
+    // Once a unit has reached the corridor destination and entered
+    // pointHarvest mode, this is what gets called repeatedly: find
+    // the next tree in the radius, harvest it. When none remain,
+    // walk to the center and idle.
+    function startPointHarvest(unit) {
+        if (!unit.typeData.canHarvest) return;
+        if (!unit.harvestPoint) {
+            // Shouldn't happen in normal flow, but if it does, fall
+            // through to plain nearby harvest as a safe default.
+            unit.harvestMode = 'nearby';
+            startHarvesting(unit);
+            return;
+        }
+
+        releaseTreeClaim(unit);
+
+        // Inventory full → deposit first, then come back to the point.
+        // We DON'T clear unit.harvestPoint here, so after depositing
+        // returnToSawmill's followup will see it and resume.
+        const totalCarried = unit.inventory.wood + unit.inventory.energy;
+        if (totalCarried >= unit.carryCapacity) {
+            returnToSawmill(unit);
+            return;
+        }
+
+        const tree = findNearestTreeNearPoint(unit, unit.harvestPoint, unit.harvestRadius || HARVEST_POINT_RADIUS);
+        if (!tree) {
+            // No more trees in the radius — circle is cleared. Walk
+            // to the center and go idle. This is the "signal me"
+            // moment for the player.
+            finishPointHarvest(unit);
+            return;
+        }
+
+        claimTree(unit, tree);
+        unit.targetTree = tree;
+
+        const adjacentCell = findAdjacentCellToTree(tree.x, tree.z, unit.position.x, unit.position.z);
+        if (!adjacentCell) {
+            releaseTreeClaim(unit);
+            // Couldn't path to this tree right now; come back next tick.
+            // (Most likely it's surrounded by other trees that will be
+            // cleared as adjacent ones fall.)
+            unit.state = 'idle';
+            return;
+        }
+
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            adjacentCell.x, adjacentCell.z,
+            false
+        );
+
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            releaseTreeClaim(unit);
+            unit.state = 'idle';
+        }
+    }
+
+    // Walk the unit to the harvest point center and clear the harvest
+    // assignment. They'll go idle there until the player gives them
+    // a new task — that idle stack at the destination IS the signal.
+    function finishPointHarvest(unit) {
+        const dest = unit.harvestPoint;
+        unit.harvestMode = null;
+        unit.harvestPoint = null;
+        unit.harvestRadius = null;
+        unit.targetTree = null;
+
+        if (!dest) {
+            unit.state = 'idle';
+            return;
+        }
+
+        const path = findPath(
+            unit.position.x, unit.position.z,
+            dest.x, dest.z,
+            false
+        );
+        if (path && path.length > 0) {
+            unit.path = path;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            unit.state = 'idle';
         }
     }
 
@@ -2109,6 +2303,8 @@ window.GameUnits = (function() {
                 continueCuttingCorridor(unit);
             } else if (unit.harvestMode === 'cutChain') {
                 continueCuttingChain(unit);
+            } else if (unit.harvestMode === 'pointHarvest') {
+                startPointHarvest(unit);
             } else {
                 startHarvesting(unit);
             }
@@ -2198,6 +2394,9 @@ window.GameUnits = (function() {
             } else if (unit.harvestMode === 'cutChain') {
                 unit.targetTree = null;
                 continueCuttingChain(unit);
+            } else if (unit.harvestMode === 'pointHarvest') {
+                unit.targetTree = null;
+                startPointHarvest(unit);
             } else {
                 unit.targetTree = null;
                 startHarvesting(unit);
@@ -2345,6 +2544,8 @@ window.GameUnits = (function() {
             continueCuttingCorridor(unit);
         } else if (unit.harvestMode === 'cutChain') {
             continueCuttingChain(unit);
+        } else if (unit.harvestMode === 'pointHarvest') {
+            startPointHarvest(unit);
         } else if (unit.harvestMode) {
             startHarvesting(unit);
         } else {
@@ -2380,6 +2581,16 @@ window.GameUnits = (function() {
                 continueCuttingCorridor(unit);
             } else if (unit.harvestMode === 'cutChain' && unit.typeData.canHarvest) {
                 continueCuttingChain(unit);
+            } else if (unit.harvestMode === 'pointHarvest' && unit.typeData.canHarvest) {
+                // Just arrived at a tree (or at the harvest area).
+                // pointHarvest path-tree-then-harvest cycle is driven by
+                // startPointHarvest. After arriving from movement we
+                // simply re-enter that loop to pick the next target.
+                if (unit.targetTree) {
+                    harvestTree(unit, 0);
+                } else {
+                    startPointHarvest(unit);
+                }
             } else if (unit.harvestMode === 'nearby' && unit.typeData.canHarvest) {
                 startHarvesting(unit);
             } else {
@@ -2762,6 +2973,8 @@ window.GameUnits = (function() {
                             continueCuttingCorridor(unit);
                         } else if (unit.harvestMode === 'cutChain') {
                             continueCuttingChain(unit);
+                        } else if (unit.harvestMode === 'pointHarvest') {
+                            startPointHarvest(unit);
                         } else {
                             startHarvesting(unit);
                         }
@@ -2780,6 +2993,8 @@ window.GameUnits = (function() {
                         continueCuttingCorridor(unit);
                     } else if (unit.harvestMode === 'cutChain' && unit.typeData.canHarvest) {
                         continueCuttingChain(unit);
+                    } else if (unit.harvestMode === 'pointHarvest' && unit.typeData.canHarvest) {
+                        startPointHarvest(unit);
                     } else if (unit.patrolPathId) {
                         continuePatrol(unit);
                     } else if (unit.guardPosition) {
@@ -2840,6 +3055,7 @@ window.GameUnits = (function() {
         commandMove,
         commandMoveMultiple,
         commandCutCorridor,
+        commandHarvestAtPoint,
         update,
         selectUnit,
         selectAllVisibleOfType,
