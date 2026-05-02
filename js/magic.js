@@ -32,11 +32,11 @@ window.GameMagic = (function() {
     const AIM_ASSIST_RANGE         = 25;     // tiles, max range to consider an enemy
     const AIM_ASSIST_CONE_DEG      = 30;     // half-angle of forward cone
 
-    // Shotgun spread. 5 shots spanning 30° total (so ±15° around the
-    // center direction) reads as a clear "fan" — wide enough to carve
-    // through forest, tight enough that aim still matters.
-    const SHOT_COUNT               = 5;
-    const SHOT_SPREAD_DEG          = 30;
+    // Shotgun spread. 10 shots spanning 20° total (so ±10° around the
+    // center direction) for a tight, dense fan that reliably chews
+    // through the front line of trees instead of bypassing them.
+    const SHOT_COUNT               = 10;
+    const SHOT_SPREAD_DEG          = 20;
 
     let projectiles = [];
     let lastFireTime = 0;
@@ -166,8 +166,8 @@ window.GameMagic = (function() {
 
         // Spawn the fan. Spread is purely horizontal: rotate the
         // center direction around the world Y axis by symmetric
-        // angles. With SHOT_COUNT=5 and SHOT_SPREAD_DEG=30, offsets
-        // are -15°, -7.5°, 0°, +7.5°, +15° (linear distribution).
+        // angles. With SHOT_COUNT=10 and SHOT_SPREAD_DEG=20, offsets
+        // are evenly distributed from -10° to +10°.
         const halfSpread = (SHOT_SPREAD_DEG / 2) * Math.PI / 180;
         for (let i = 0; i < SHOT_COUNT; i++) {
             const t = SHOT_COUNT === 1 ? 0
@@ -321,21 +321,56 @@ window.GameMagic = (function() {
         return null;
     }
 
+    // Returns the closest tree within HIT_RADIUS of the projectile's
+    // position, or null. The previous implementation only checked the
+    // exact cell the projectile was in, which meant orbs could squeeze
+    // between adjacent trees (the cell collision was ~0.5×0.5 with no
+    // thickness). With 13.5-tall sprites that *visually* look like a
+    // wall, that felt wrong. Now we sample the projectile's cell plus
+    // its 8 neighbors and pick the closest tree among them.
+    const HIT_RADIUS = 0.7;
     function checkTreeHit(p) {
         if (!CELL || !gameState.grid) return null;
-        const cx = Math.floor(p.x);
-        const cz = Math.floor(p.z);
-        if (cx < 0 || cx >= CONFIG.GRID_WIDTH || cz < 0 || cz >= CONFIG.GRID_HEIGHT) return null;
         // Don't damage trees if the projectile is high above the canopy
         // (the player aimed up over the forest). Trees now reach ~13.5
         // high (3× original height), so under y=14 counts as "still in
         // the forest".
         if (p.y > 14) return null;
-        const cell = gameState.grid[cx]?.[cz];
-        if (cell === CELL.TREE_NORMAL || cell === CELL.TREE_HIGH_YIELD || cell === CELL.TREE_ENERGY) {
-            return { x: cx, z: cz, type: cell };
+
+        const cx = Math.floor(p.x);
+        const cz = Math.floor(p.z);
+        if (cx < 0 || cx >= CONFIG.GRID_WIDTH || cz < 0 || cz >= CONFIG.GRID_HEIGHT) return null;
+
+        let bestTree = null;
+        let bestDistSq = HIT_RADIUS * HIT_RADIUS;
+
+        // Sample the 3×3 grid centered on the projectile's cell. Each
+        // tree cell has its center at (cellX + 0.5, cellZ + 0.5) since
+        // grid cells are 1×1 anchored at their integer corners. We
+        // measure squared distance from the projectile to that center
+        // and pick the closest tree within HIT_RADIUS.
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) {
+                const tx = cx + dx;
+                const tz = cz + dz;
+                if (tx < 0 || tx >= CONFIG.GRID_WIDTH || tz < 0 || tz >= CONFIG.GRID_HEIGHT) continue;
+                const cell = gameState.grid[tx]?.[tz];
+                if (cell !== CELL.TREE_NORMAL &&
+                    cell !== CELL.TREE_HIGH_YIELD &&
+                    cell !== CELL.TREE_ENERGY) continue;
+                const treeCenterX = tx + 0.5;
+                const treeCenterZ = tz + 0.5;
+                const ddx = p.x - treeCenterX;
+                const ddz = p.z - treeCenterZ;
+                const distSq = ddx * ddx + ddz * ddz;
+                if (distSq < bestDistSq) {
+                    bestDistSq = distSq;
+                    bestTree = { x: tx, z: tz, type: cell };
+                }
+            }
         }
-        return null;
+
+        return bestTree;
     }
 
     function outOfBounds(x, z) {
