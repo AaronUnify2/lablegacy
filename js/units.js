@@ -59,6 +59,20 @@ window.GameUnits = (function() {
             harvestSpeed: 1500, carryCapacity: 5,
             canHarvest: true, scale: 1.0
         },
+        scout: {
+            // Upgraded woodsman variant. Trained at the Tavern.
+            // Same harvest stats as a woodsman but better combat
+            // numbers (more HP, more damage, faster) and a larger
+            // vision radius. The vision boost is consumed by the
+            // fog-of-war system whenever we add it; for now it just
+            // sits as a stat for future use.
+            id: 'scout', name: 'Scout',
+            health: 80, damage: 14, speed: 0.04,
+            attackRange: 1.8, attackSpeed: 1100,
+            harvestSpeed: 1500, carryCapacity: 5,
+            canHarvest: true, scale: 1.0,
+            visionRadius: 18           // woodsman is implicitly ~10
+        },
         archer: {
             id: 'archer', name: 'Archer',
             health: 50, damage: 12, speed: 0.045,
@@ -294,6 +308,13 @@ window.GameUnits = (function() {
     function createUnitMaterial(unitType) {
         switch (unitType.id) {
             case 'woodsman': return createWoodsmanMaterial();
+            // Scout reuses the woodsman sprite with a blue palette.
+            // Same axe-and-cap silhouette so they read as "the same
+            // family of unit" — just an upgraded version visually.
+            case 'scout':    return createWoodsmanMaterial({
+                shirtColor:  '#4477cc',
+                shirtShadow: '#2255aa'
+            });
             case 'knight': return createKnightMaterial();
             case 'archer': return createArcherMaterial();
             case 'hero': return createHeroMaterial();
@@ -1109,7 +1130,7 @@ window.GameUnits = (function() {
     //   they need a higher-value task.
     // ============================================
 
-    const HARVEST_POINT_RADIUS = 8;       // tiles around the tap point
+    const HARVEST_POINT_RADIUS = 24;      // tiles around the tap point
 
     // Public command: kick off Harvest at Point for the given units
     // toward (targetX, targetZ). Each unit gets its own corridor; once
