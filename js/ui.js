@@ -323,6 +323,13 @@ window.GameUI = (function() {
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
             const anyCuttingChain = units.some(u => u.harvestMode === 'cutChain');
             const anyPointHarvest = units.some(u => u.harvestMode === 'pointHarvest');
+            // Auto-scout state lives in unit.autoScout (also harvestMode
+            // briefly hits 'autoScout' between phases). Probe both.
+            const anyAutoScouting = units.some(u =>
+                u.harvestMode === 'autoScout' ||
+                u.harvestSubMode === 'autoScoutLeg' ||
+                u.harvestSubMode === 'autoScoutClear'
+            );
             
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
@@ -399,6 +406,25 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🔁</span>
                     <span style="flex: 1; text-align: left;">Cut Path</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingChain ? 'ACTIVE' : 'Multi-tap'}</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="autoScout" style="
+                    background: ${anyAutoScouting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyAutoScouting ? '#d4a84a' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🧭</span>
+                    <span style="flex: 1; text-align: left;">Auto-Scout</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyAutoScouting ? 'ACTIVE' : 'Sweep north'}</span>
                 </button>
             `;
         }
@@ -654,6 +680,16 @@ window.GameUI = (function() {
                     ? `Tap area for ${units.length} woodsmen to clear (24-tile radius)`
                     : 'Tap area to clear (24-tile radius)';
                 showCommandIndicator(haText);
+                hideMenuVisuals();
+                break;
+
+            case 'autoScout':
+                // Auto-scout starts from the unit's current position —
+                // no tap target. Fire it directly. Each selected
+                // worker enters the algorithmic explore pattern.
+                if (window.GameUnits) {
+                    GameUnits.commandAutoScout(units);
+                }
                 hideMenuVisuals();
                 break;
 
