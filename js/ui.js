@@ -315,6 +315,7 @@ window.GameUI = (function() {
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
             const anyCuttingChain = units.some(u => u.harvestMode === 'cutChain');
+            const anyPointHarvest = units.some(u => u.harvestMode === 'pointHarvest');
             
             commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvest" style="
@@ -334,6 +335,25 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🪓</span>
                     <span style="flex: 1; text-align: left;">Harvest Nearby</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyHarvesting ? 'ACTIVE' : 'Auto-chop'}</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="harvestAtPoint" style="
+                    background: ${anyPointHarvest ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyPointHarvest ? '#d4a84a' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">🎯</span>
+                    <span style="flex: 1; text-align: left;">Harvest at Point</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyPointHarvest ? 'ACTIVE' : 'Tap area'}</span>
                 </button>
                 
                 <button class="unit-cmd-btn" data-cmd="cutLane" style="
@@ -612,6 +632,21 @@ window.GameUI = (function() {
                     ? `Tap destination for ${units.length} woodsmen to cut lane`
                     : 'Tap destination to cut lane (4 wide)';
                 showCommandIndicator(laneText);
+                hideMenuVisuals();
+                break;
+
+            case 'harvestAtPoint':
+                // Enter point-harvest mode. The player taps a destination
+                // and each selected woodsman cuts a path there, then
+                // clears an 8-tile radius circle around the tap point,
+                // then walks to the center and idles.
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('harvestAtPoint');
+                }
+                const haText = units.length > 1
+                    ? `Tap area for ${units.length} woodsmen to clear (8-tile radius)`
+                    : 'Tap area to clear (8-tile radius)';
+                showCommandIndicator(haText);
                 hideMenuVisuals();
                 break;
 
