@@ -1049,6 +1049,17 @@ window.GameUnits = (function() {
         if (distToTarget < 2) {
             console.log(`${unit.typeData.name} reached corridor destination`);
             unit.corridorTarget = null;
+
+            // Auto-scout was using the corridor for one of its sweep
+            // or step legs. Now that the leg is done, hand control back
+            // to the state machine to pick the next phase.
+            if (unit.harvestSubMode === 'autoScoutLeg') {
+                unit.harvestSubMode = null;
+                unit.harvestMode = 'autoScout';
+                advanceAutoScoutPhase(unit);
+                return;
+            }
+
             // If this woodsman was running a "Harvest at Point" command,
             // the corridor was just the path TO the harvest area. Now
             // switch into pointHarvest mode and start clearing the
@@ -1278,10 +1289,22 @@ window.GameUnits = (function() {
     // a new task — that idle stack at the destination IS the signal.
     function finishPointHarvest(unit) {
         const dest = unit.harvestPoint;
+        const wasAutoScoutClear = unit.harvestSubMode === 'autoScoutClear';
+
         unit.harvestMode = null;
         unit.harvestPoint = null;
         unit.harvestRadius = null;
         unit.targetTree = null;
+
+        // Auto-scout was using point-harvest as its CLEAR phase. Now
+        // that the radius is empty, advance to the next phase
+        // (sweep east) instead of idling at the center.
+        if (wasAutoScoutClear) {
+            unit.harvestSubMode = null;
+            unit.harvestMode = 'autoScout';
+            advanceAutoScoutPhase(unit);
+            return;
+        }
 
         if (!dest) {
             unit.state = 'idle';
@@ -1300,6 +1323,175 @@ window.GameUnits = (function() {
         } else {
             unit.state = 'idle';
         }
+    }
+
+    // ============================================
+    // AUTO-SCOUT (Slice 4)
+    //   Algorithmic explore-and-clear pattern. The unit cycles through
+    //   four phases on a loop:
+    //
+    //     PHASE_CLEAR       - point-harvest a small radius around itself
+    //     PHASE_SWEEP_EAST  - cut a corridor east for sweepLength tiles
+    //     PHASE_SWEEP_WEST  - cut a corridor west for sweepLength tiles
+    //     PHASE_STEP_NORTH  - cut a corridor north for stepLength tiles
+    //
+    //   Repeats until cyclesRemaining hits 0, the unit hits combat, or
+    //   a phase fails (wall hit, no path). On any termination the unit
+    //   goes idle — that idle stack is the player's "I've explored my
+    //   zone, give me orders" signal.
+    //
+    //   Both woodsmen and scouts can run this; scouts get a longer
+    //   sweep length and more cycles (set in commandAutoScout).
+    // ============================================
+
+    const AUTOSCOUT_CLEAR_RADIUS   = 4;
+    const AUTOSCOUT_STEP_LENGTH    = 10;     // tiles per northern step
+    const AUTOSCOUT_MIN_LEG_LENGTH = 8;      // skip a sweep leg shorter than this (wall too close)
+
+    // Phase tags (string constants, just for readability)
+    const AS_PHASE_CLEAR      = 'clear';
+    const AS_PHASE_SWEEP_EAST = 'sweepEast';
+    const AS_PHASE_SWEEP_WEST = 'sweepWest';
+    const AS_PHASE_STEP_NORTH = 'stepNorth';
+
+    // Public command. Each selected worker enters auto-scout at their
+    // current position. Scouts get a longer sweep & more cycles than
+    // woodsmen — that's the differentiator that justifies their cost.
+    function commandAutoScout(units) {
+        for (const unit of units) {
+            if (!unit.typeData.canHarvest) continue;
+            // Cancel any other assignment cleanly
+            unit.harvestPoint = null;
+            unit.harvestRadius = null;
+            unit.patrolPathId = null;
+            unit.guardPosition = null;
+            unit.attackTarget = null;
+
+            // Tune the pattern by unit class.
+            const isScout = unit.type === 'scout';
+            unit.autoScout = {
+                phase: AS_PHASE_CLEAR,
+                cyclesRemaining: isScout ? 8 : 5,
+                sweepLength:     isScout ? 30 : 20
+            };
+            unit.harvestMode = 'autoScout';
+            advanceAutoScoutPhase(unit, /* justEntered */ true);
+        }
+    }
+
+    // Move the unit's auto-scout state machine forward by one phase.
+    // Called: when the player issues the command (justEntered=true),
+    // and whenever a sub-phase finishes (justEntered=false).
+    function advanceAutoScoutPhase(unit, justEntered = false) {
+        const CONFIG = getCONFIG();
+        const as = unit.autoScout;
+        if (!as) {
+            unit.harvestMode = null;
+            unit.state = 'idle';
+            return;
+        }
+
+        // First call (just entered) starts at PHASE_CLEAR, so don't
+        // advance the cursor. Every subsequent call rotates to the
+        // next phase before deciding what to do.
+        if (!justEntered) {
+            as.phase = nextAutoScoutPhase(as.phase);
+            // Each return to PHASE_CLEAR completes a cycle.
+            if (as.phase === AS_PHASE_CLEAR) {
+                as.cyclesRemaining--;
+                if (as.cyclesRemaining <= 0) {
+                    finishAutoScout(unit);
+                    return;
+                }
+            }
+        }
+
+        const here = unit.position;
+
+        switch (as.phase) {
+            case AS_PHASE_CLEAR: {
+                // Point-harvest a small radius around current position,
+                // reusing the Slice 2 machinery. We hand-build the
+                // harvest assignment instead of going through
+                // commandHarvestAtPoint to avoid the corridor-cut step
+                // (we're already AT the harvest center).
+                unit.harvestPoint = { x: here.x, z: here.z };
+                unit.harvestRadius = AUTOSCOUT_CLEAR_RADIUS;
+                // Use a sub-mode flag so when point-harvest finishes
+                // it returns to auto-scout instead of staying in
+                // pointHarvest mode forever.
+                unit.harvestMode = 'pointHarvest';
+                unit.harvestSubMode = 'autoScoutClear';
+                startPointHarvest(unit);
+                return;
+            }
+            case AS_PHASE_SWEEP_EAST: {
+                tryAutoScoutLeg(unit, +1, 0, as.sweepLength);
+                return;
+            }
+            case AS_PHASE_SWEEP_WEST: {
+                tryAutoScoutLeg(unit, -1, 0, as.sweepLength);
+                return;
+            }
+            case AS_PHASE_STEP_NORTH: {
+                // North = decreasing z (player base is south now)
+                tryAutoScoutLeg(unit, 0, -1, AUTOSCOUT_STEP_LENGTH);
+                return;
+            }
+        }
+    }
+
+    function nextAutoScoutPhase(current) {
+        switch (current) {
+            case AS_PHASE_CLEAR:      return AS_PHASE_SWEEP_EAST;
+            case AS_PHASE_SWEEP_EAST: return AS_PHASE_SWEEP_WEST;
+            case AS_PHASE_SWEEP_WEST: return AS_PHASE_STEP_NORTH;
+            case AS_PHASE_STEP_NORTH: return AS_PHASE_CLEAR;
+        }
+        return AS_PHASE_CLEAR;
+    }
+
+    // Try to cut a corridor in the (dirX, dirZ) direction for `length`
+    // tiles. If the leg would be shorter than AUTOSCOUT_MIN_LEG_LENGTH
+    // (wall too close), skip it and advance to the next phase. If it
+    // can run at all, start cutting; the corridor finish hook will
+    // call advanceAutoScoutPhase again.
+    function tryAutoScoutLeg(unit, dirX, dirZ, length) {
+        const CONFIG = getCONFIG();
+        const here = unit.position;
+
+        // Clamp the leg to map bounds
+        const targetX = Math.max(2, Math.min(CONFIG.GRID_WIDTH - 3, here.x + dirX * length));
+        const targetZ = Math.max(2, Math.min(CONFIG.GRID_HEIGHT - 3, here.z + dirZ * length));
+
+        const dx = targetX - here.x;
+        const dz = targetZ - here.z;
+        const actualLength = Math.sqrt(dx * dx + dz * dz);
+
+        if (actualLength < AUTOSCOUT_MIN_LEG_LENGTH) {
+            // Wall too close in this direction. Skip the leg and try
+            // the next phase. Recurse via advance.
+            advanceAutoScoutPhase(unit);
+            return;
+        }
+
+        // Use the existing corridor-cut machinery (1-wide path).
+        // When the corridor finishes, continueCuttingCorridor sees
+        // the autoScout flag and advances the phase instead of going
+        // to nearby harvest.
+        unit.harvestSubMode = 'autoScoutLeg';
+        startCuttingCorridor(unit, targetX, targetZ, 1);
+    }
+
+    // Pattern complete (cycles exhausted). Clear all state and idle.
+    function finishAutoScout(unit) {
+        unit.harvestMode = null;
+        unit.harvestSubMode = null;
+        unit.harvestPoint = null;
+        unit.harvestRadius = null;
+        unit.autoScout = null;
+        unit.targetTree = null;
+        unit.state = 'idle';
     }
 
     function findNextReachableCorridorTree(unit) {
@@ -2567,6 +2759,11 @@ window.GameUnits = (function() {
             continueCuttingChain(unit);
         } else if (unit.harvestMode === 'pointHarvest') {
             startPointHarvest(unit);
+        } else if (unit.harvestMode === 'autoScout') {
+            // Resume the pattern from wherever we are. Don't re-run
+            // the current phase (we already cleared part of it before
+            // the inventory filled); just advance to next phase.
+            advanceAutoScoutPhase(unit);
         } else if (unit.harvestMode) {
             startHarvesting(unit);
         } else {
@@ -2988,7 +3185,16 @@ window.GameUnits = (function() {
                     harvestTree(unit, deltaTime);
                     break;
                 case 'attacking':
-                    // No longer in combat - resume previous activity
+                    // No longer in combat - resume previous activity.
+                    // Auto-scout pattern is special: combat breaks it
+                    // (per design — once combat happens the player's
+                    // attention is needed). Detect it via harvestSubMode
+                    // and terminate cleanly.
+                    if (unit.harvestSubMode === 'autoScoutLeg' ||
+                        unit.harvestSubMode === 'autoScoutClear') {
+                        finishAutoScout(unit);
+                        break;
+                    }
                     if (unit.harvestMode && unit.typeData.canHarvest) {
                         if (unit.harvestMode === 'cutPath' || unit.harvestMode === 'cutLane') {
                             continueCuttingCorridor(unit);
@@ -3077,6 +3283,7 @@ window.GameUnits = (function() {
         commandMoveMultiple,
         commandCutCorridor,
         commandHarvestAtPoint,
+        commandAutoScout,
         update,
         selectUnit,
         selectAllVisibleOfType,
