@@ -162,7 +162,14 @@ window.GameUI = (function() {
         const firstUnit = units[0];
         const unitCount = units.length;
         const isMultiSelect = unitCount > 1;
+        // "Worker" = woodsman OR scout. Scouts share all woodsman
+        // commands (Harvest Nearby / Harvest at Point / Cut Lane /
+        // Cut Path) plus an Auto-Scout pattern that's coming in
+        // Slice 4. Treating them as one category here keeps the
+        // command code branchless.
         const isWoodsman = firstUnit.type === 'woodsman';
+        const isScout = firstUnit.type === 'scout';
+        const isWorker = isWoodsman || isScout;
         const isKnight = firstUnit.type === 'knight';
         const isArcher = firstUnit.type === 'archer';
         const isCombatUnit = isKnight || isArcher;
@@ -190,8 +197,8 @@ window.GameUI = (function() {
                 </div>
             `;
             
-            // Woodsman inventory
-            if (isWoodsman) {
+            // Worker inventory (woodsmen + scouts)
+            if (isWorker) {
                 const carryPercent = ((firstUnit.inventory.wood + firstUnit.inventory.energy) / firstUnit.carryCapacity) * 100;
                 statusInfo += `
                     <div style="margin-bottom: 10px;">
@@ -310,7 +317,7 @@ window.GameUI = (function() {
                 </button>
         `;
         
-        if (isWoodsman) {
+        if (isWorker) {
             // Check if any unit has harvest mode active
             const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
@@ -644,8 +651,8 @@ window.GameUI = (function() {
                     GameUnits.setCommandMode('harvestAtPoint');
                 }
                 const haText = units.length > 1
-                    ? `Tap area for ${units.length} woodsmen to clear (8-tile radius)`
-                    : 'Tap area to clear (8-tile radius)';
+                    ? `Tap area for ${units.length} woodsmen to clear (24-tile radius)`
+                    : 'Tap area to clear (24-tile radius)';
                 showCommandIndicator(haText);
                 hideMenuVisuals();
                 break;
@@ -1047,6 +1054,14 @@ window.GameUI = (function() {
         `;
         
         Object.entries(buildings).forEach(([key, building]) => {
+            // Prerequisite gate: skip buildings whose `requires` building
+            // isn't owned yet. They're hidden from the menu entirely
+            // (rather than greyed out) so the menu stays clean early-game.
+            if (building.requires && window.GameBuildings &&
+                !GameBuildings.playerOwnsBuilding(building.requires)) {
+                return;
+            }
+
             const canAfford = gameState.resources.wood >= building.cost.wood && 
                              gameState.resources.energy >= building.cost.energy;
             const opacity = canAfford ? '1' : '0.5';
@@ -1147,7 +1162,11 @@ window.GameUI = (function() {
             return;
         }
         
-        const canAffordUnit = gameState.resources.energy >= building.typeData.unitCost.energy;
+        // Some unit costs include wood (e.g. Tavern's scout costs wood + energy).
+        // Check both resource types when present.
+        const _uc = building.typeData.unitCost || {};
+        const canAffordUnit = (!_uc.energy || gameState.resources.energy >= _uc.energy) &&
+                              (!_uc.wood   || gameState.resources.wood   >= _uc.wood);
         
         // Production status — wrapped in a container we can update live.
         // The tick() function rewrites the inner contents each frame so the
@@ -1270,7 +1289,7 @@ window.GameUI = (function() {
                     opacity: ${canAffordUnit ? '1' : '0.6'};
                 ">
                     <span>Train ${building.typeData.unitType}</span>
-                    <span>⚡ ${building.typeData.unitCost.energy}</span>
+                    <span>${_uc.wood ? `🪵 ${_uc.wood} ` : ''}${_uc.energy ? `⚡ ${_uc.energy}` : ''}</span>
                 </button>
                 
                 ${upgradesHtml}
