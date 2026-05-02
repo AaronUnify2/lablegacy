@@ -45,19 +45,9 @@ window.GameBuildings = (function() {
             description: 'Trains Knights',
             category: 'military'
         },
-        FARM: {
-            id: 'farm',
-            name: 'Farm',
-            cost: { wood: 40, energy: 15 },
-            unitType: 'planter',
-            unitCost: { energy: 12 },
-            productionTime: 2500,
-            description: 'Trains Planters to grow trees',
-            category: 'economy'
-        },
-        ARROW_TOWER: {
-            id: 'arrow_tower',
-            name: 'Arrow Tower',
+        ARCHER_RANGE: {
+            id: 'archer_range',
+            name: 'Archer Range',
             cost: { wood: 60, energy: 25 },
             unitType: 'archer',
             unitCost: { energy: 12 },
@@ -65,36 +55,6 @@ window.GameBuildings = (function() {
             description: 'Trains Archers. Spawns 3 on destruction',
             category: 'military',
             onDestroy: { spawnUnit: 'archer', count: 3 }
-        },
-        GREENHOUSE: {
-            id: 'greenhouse',
-            name: 'Alchemist Hut',
-            cost: { wood: 55, energy: 30 },
-            unitType: 'botanist',
-            unitCost: { energy: 18 },
-            productionTime: 3500,
-            description: 'Trains Botanists to grow magical plants',
-            category: 'support'
-        },
-        HIVE: {
-            id: 'hive',
-            name: 'Hive',
-            cost: { wood: 65, energy: 35 },
-            unitType: 'dragonfly',
-            unitCost: { energy: 20 },
-            productionTime: 4000,
-            description: 'Breeds Dragonflies that fly over trees',
-            category: 'military'
-        },
-        MAGE_TOWER: {
-            id: 'mage_tower',
-            name: 'Mage Tower',
-            cost: { wood: 70, energy: 40 },
-            unitType: 'mage',
-            unitCost: { energy: 25 },
-            productionTime: 4000,
-            description: 'Trains Mages with powerful attacks',
-            category: 'military'
         },
         FURNACE: {
             id: 'furnace',
@@ -139,23 +99,13 @@ window.GameBuildings = (function() {
             case 'lodge':
                 drawLodge(ctx);
                 break;
-            case 'farm':
-                drawFarm(ctx);
-                break;
-            case 'arrow_tower':
+            case 'archer_range':
+                // Renamed from 'arrow_tower' but reuses the existing
+                // sprite. We'll redraw it as an actual range later.
                 drawArrowTower(ctx);
                 break;
             case 'sawmill':
                 drawSawmill(ctx);
-                break;
-            case 'greenhouse':
-                drawGreenhouse(ctx);
-                break;
-            case 'hive':
-                drawHive(ctx);
-                break;
-            case 'mage_tower':
-                drawMageTower(ctx);
                 break;
             case 'furnace':
                 drawFurnace(ctx);
