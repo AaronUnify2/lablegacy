@@ -318,39 +318,15 @@ window.GameUI = (function() {
         `;
         
         if (isWorker) {
-            // Check if any unit has harvest mode active
-            const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
+            // Worker commands. Move is already shown above (common to
+            // all units); workers also get Harvest at Point and Cut
+            // Lane. Harvest Nearby / Cut Path / Auto-Scout were removed
+            // in the simplification pass — the underlying code is still
+            // there but unused.
             const anyCuttingLane = units.some(u => u.harvestMode === 'cutLane');
-            const anyCuttingChain = units.some(u => u.harvestMode === 'cutChain');
             const anyPointHarvest = units.some(u => u.harvestMode === 'pointHarvest');
-            // Auto-scout state lives in unit.autoScout (also harvestMode
-            // briefly hits 'autoScout' between phases). Probe both.
-            const anyAutoScouting = units.some(u =>
-                u.harvestMode === 'autoScout' ||
-                u.harvestSubMode === 'autoScoutLeg' ||
-                u.harvestSubMode === 'autoScoutClear'
-            );
-            
-            commandsHtml += `
-                <button class="unit-cmd-btn" data-cmd="harvest" style="
-                    background: ${anyHarvesting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${anyHarvesting ? '#d4a84a' : '#4a7c3f'};
-                    border-radius: 6px;
-                    color: #c8f0c8;
-                    padding: 12px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    transition: all 0.15s ease;
-                ">
-                    <span style="font-size: 18px;">🪓</span>
-                    <span style="flex: 1; text-align: left;">Harvest Nearby</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${anyHarvesting ? 'ACTIVE' : 'Auto-chop'}</span>
-                </button>
 
+            commandsHtml += `
                 <button class="unit-cmd-btn" data-cmd="harvestAtPoint" style="
                     background: ${anyPointHarvest ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
                     border: 1px solid ${anyPointHarvest ? '#d4a84a' : '#4a7c3f'};
@@ -369,7 +345,7 @@ window.GameUI = (function() {
                     <span style="flex: 1; text-align: left;">Harvest at Point</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyPointHarvest ? 'ACTIVE' : 'Tap area'}</span>
                 </button>
-                
+
                 <button class="unit-cmd-btn" data-cmd="cutLane" style="
                     background: ${anyCuttingLane ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
                     border: 1px solid ${anyCuttingLane ? '#d4a84a' : '#4a7c3f'};
@@ -388,49 +364,12 @@ window.GameUI = (function() {
                     <span style="flex: 1; text-align: left;">Cut Lane</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingLane ? 'ACTIVE' : '4 wide'}</span>
                 </button>
-
-                <button class="unit-cmd-btn" data-cmd="cutChain" style="
-                    background: ${anyCuttingChain ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${anyCuttingChain ? '#d4a84a' : '#4a7c3f'};
-                    border-radius: 6px;
-                    color: #c8f0c8;
-                    padding: 12px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    transition: all 0.15s ease;
-                ">
-                    <span style="font-size: 18px;">🔁</span>
-                    <span style="flex: 1; text-align: left;">Cut Path</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${anyCuttingChain ? 'ACTIVE' : 'Multi-tap'}</span>
-                </button>
-
-                <button class="unit-cmd-btn" data-cmd="autoScout" style="
-                    background: ${anyAutoScouting ? 'rgba(139, 105, 20, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
-                    border: 1px solid ${anyAutoScouting ? '#d4a84a' : '#4a7c3f'};
-                    border-radius: 6px;
-                    color: #c8f0c8;
-                    padding: 12px 16px;
-                    cursor: pointer;
-                    font-family: inherit;
-                    font-size: 13px;
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    transition: all 0.15s ease;
-                ">
-                    <span style="font-size: 18px;">🧭</span>
-                    <span style="flex: 1; text-align: left;">Auto-Scout</span>
-                    <span style="color: #7a9a7a; font-size: 11px;">${anyAutoScouting ? 'ACTIVE' : 'Sweep north'}</span>
-                </button>
             `;
         }
 
         if (isCombatUnit) {
-            const anyPatrolling = units.some(u => u.patrolPathId);
+            const anyPatrolling = units.some(u => u.patrolPathId && u.patrolMode !== 'random');
+            const anyRandomWalking = units.some(u => u.patrolPathId && u.patrolMode === 'random');
             const anyGuarding = units.some(u => u.guardPosition);
 
             commandsHtml += `
@@ -451,6 +390,25 @@ window.GameUI = (function() {
                     <span style="font-size: 18px;">🛡️</span>
                     <span style="flex: 1; text-align: left;">Patrol Path</span>
                     <span style="color: #7a9a7a; font-size: 11px;">${anyPatrolling ? 'ACTIVE' : 'Tap a path'}</span>
+                </button>
+
+                <button class="unit-cmd-btn" data-cmd="randomWalk" style="
+                    background: ${anyRandomWalking ? 'rgba(139, 80, 200, 0.4)' : 'rgba(74, 124, 63, 0.3)'};
+                    border: 1px solid ${anyRandomWalking ? '#b070f0' : '#4a7c3f'};
+                    border-radius: 6px;
+                    color: #c8f0c8;
+                    padding: 12px 16px;
+                    cursor: pointer;
+                    font-family: inherit;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    transition: all 0.15s ease;
+                ">
+                    <span style="font-size: 18px;">👻</span>
+                    <span style="flex: 1; text-align: left;">Random Walk</span>
+                    <span style="color: #7a9a7a; font-size: 11px;">${anyRandomWalking ? 'ACTIVE' : 'Tap a path'}</span>
                 </button>
 
                 <button class="unit-cmd-btn" data-cmd="customPatrol" style="
@@ -631,31 +589,7 @@ window.GameUI = (function() {
                 showCommandIndicator(moveText);
                 hideMenuVisuals();
                 break;
-                
-            case 'harvest':
-                // Toggle harvest mode for all selected units
-                const anyHarvesting = units.some(u => u.harvestMode === 'nearby');
-                
-                units.forEach(unit => {
-                    if (anyHarvesting) {
-                        // Turn off for all
-                        unit.harvestMode = null;
-                        unit.corridorTarget = null;
-                        unit.state = 'idle';
-                    } else {
-                        // Turn on for all
-                        unit.harvestMode = 'nearby';
-                        unit.corridorTarget = null;
-                        if (window.GameUnits) {
-                            GameUnits.startHarvesting(unit);
-                        }
-                    }
-                });
-                
-                // Refresh menu
-                showUnitMenu(units);
-                break;
-                
+
             case 'cutLane':
                 // Enter cut lane mode (4 wide)
                 if (window.GameUnits) {
@@ -671,7 +605,7 @@ window.GameUI = (function() {
             case 'harvestAtPoint':
                 // Enter point-harvest mode. The player taps a destination
                 // and each selected woodsman cuts a path there, then
-                // clears an 8-tile radius circle around the tap point,
+                // clears a 24-tile radius circle around the tap point,
                 // then walks to the center and idles.
                 if (window.GameUnits) {
                     GameUnits.setCommandMode('harvestAtPoint');
@@ -680,28 +614,6 @@ window.GameUI = (function() {
                     ? `Tap area for ${units.length} woodsmen to clear (24-tile radius)`
                     : 'Tap area to clear (24-tile radius)';
                 showCommandIndicator(haText);
-                hideMenuVisuals();
-                break;
-
-            case 'autoScout':
-                // Auto-scout starts from the unit's current position —
-                // no tap target. Fire it directly. Each selected
-                // worker enters the algorithmic explore pattern.
-                if (window.GameUnits) {
-                    GameUnits.commandAutoScout(units);
-                }
-                hideMenuVisuals();
-                break;
-
-            case 'cutChain':
-                // Enter cut path mode - tap multiple points to draw an open chain
-                if (window.GameUnits) {
-                    GameUnits.setCommandMode('cutChain');
-                }
-                const chainText = units.length > 1
-                    ? `Tap waypoints for ${units.length} woodsmen to cut path`
-                    : 'Tap waypoints to draw path. Confirm when done.';
-                showCommandIndicator(chainText);
                 hideMenuVisuals();
                 break;
 
@@ -715,6 +627,20 @@ window.GameUI = (function() {
                     ? `Tap an existing path for ${units.length} units to patrol`
                     : 'Tap an existing path to patrol it';
                 showCommandIndicator(patrolText);
+                hideMenuVisuals();
+                break;
+
+            case 'randomWalk':
+                // Same path selection as patrolPath, but assigns a
+                // random-walk patrol — the unit wanders the path
+                // pac-man-ghost style instead of marching forward.
+                if (window.GameUnits) {
+                    GameUnits.setCommandMode('randomWalk');
+                }
+                const rwText = units.length > 1
+                    ? `Tap a path for ${units.length} units to wander`
+                    : 'Tap a path for the unit to wander';
+                showCommandIndicator(rwText);
                 hideMenuVisuals();
                 break;
 
