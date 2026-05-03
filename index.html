@@ -1656,6 +1656,7 @@
                                       commandMode === 'cutLane' ||
                                       commandMode === 'cutChain' ||
                                       commandMode === 'patrolPath' ||
+                                      commandMode === 'randomWalk' ||
                                       commandMode === 'customPatrol' ||
                                       commandMode === 'guard' ||
                                       commandMode === 'harvestAtPoint';
@@ -1704,6 +1705,26 @@
                                     }
                                 } else {
                                     // No path under tap - keep waiting, give a hint.
+                                    if (window.GameUI) {
+                                        GameUI.showCommandIndicator('No path here. Tap on a yellow or purple line.');
+                                    }
+                                }
+                            } else if (commandMode === 'randomWalk') {
+                                // Same path selection as patrolPath, but
+                                // assigns random-walk mode (pac-man ghost
+                                // wandering) instead of forward cycling.
+                                const path = GameUnits.findPathAtPoint(intersectPoint.x, intersectPoint.z, 2.5);
+                                if (path) {
+                                    for (const unit of selectedUnits) {
+                                        GameUnits.assignUnitToRandomWalk(unit, path);
+                                    }
+                                    GameUnits.createRipple(intersectPoint.x, intersectPoint.z);
+                                    GameUnits.setCommandMode(null);
+                                    if (window.GameUI) {
+                                        GameUI.hideCommandIndicator();
+                                        GameUI.showUnitMenu(selectedUnits);
+                                    }
+                                } else {
                                     if (window.GameUI) {
                                         GameUI.showCommandIndicator('No path here. Tap on a yellow or purple line.');
                                     }
@@ -2181,10 +2202,10 @@
     </script>
     <!-- ?v= query strings bust the browser cache when JS changes.
          Bump these numbers anytime a JS file changes meaningfully. -->
-    <script src="js/buildings.js?v=11" onerror="debug('FAILED to load buildings.js')"></script>
-    <script src="js/units.js?v=11" onerror="debug('FAILED to load units.js')"></script>
-    <script src="js/ui.js?v=11" onerror="debug('FAILED to load ui.js')"></script>
-    <script src="js/magic.js?v=11" onerror="debug('FAILED to load magic.js')"></script>
-    <script src="js/sky.js?v=11" onerror="debug('FAILED to load sky.js')"></script>
+    <script src="js/buildings.js?v=13" onerror="debug('FAILED to load buildings.js')"></script>
+    <script src="js/units.js?v=13" onerror="debug('FAILED to load units.js')"></script>
+    <script src="js/ui.js?v=13" onerror="debug('FAILED to load ui.js')"></script>
+    <script src="js/magic.js?v=13" onerror="debug('FAILED to load magic.js')"></script>
+    <script src="js/sky.js?v=13" onerror="debug('FAILED to load sky.js')"></script>
 </body>
 </html>
