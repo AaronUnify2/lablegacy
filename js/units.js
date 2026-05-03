@@ -654,6 +654,9 @@ window.GameUnits = (function() {
             chainSegmentIndex: 0,     // Current segment index (for cutChain mode)
             patrolPathId: null,       // ID of path being patrolled (knights/archers)
             patrolWaypointIndex: 0,   // current waypoint in patrol cycle
+            patrolMode: 'forward',    // 'forward' (cycle through) or 'random' (pac-man wandering)
+            patrolDirection: 1,       // +1 or -1; only consulted in 'random' patrol mode
+            patrolPauseUntil: 0,      // timestamp; while now < this the unit pauses (random mode only)
             guardPosition: null,      // { x, z } when on guard duty
             attackTarget: null,
             // Unified ability system. `abilities` is a Set<string> of
@@ -2381,6 +2384,9 @@ window.GameUnits = (function() {
         }
 
         unit.patrolPathId = path.id;
+        unit.patrolMode = 'forward';      // standard cycle-through patrol
+        unit.patrolDirection = 1;
+        unit.patrolPauseUntil = 0;
         unit.guardPosition = null;       // patrol overrides guard
         unit.harvestMode = null;
         unit.targetTree = null;
@@ -2393,6 +2399,34 @@ window.GameUnits = (function() {
         releaseTreeClaim(unit);
         clearPathLine(unit);
         console.log(`${unit.typeData.name} assigned to patrol ${path.id} (entering at WP ${startIdx})`);
+    }
+
+    // Random Walk patrol — same path assignment as forward patrol, but
+    // continuePatrol applies coin-flip direction changes and occasional
+    // pauses at each waypoint. Feels like a wandering guard rather
+    // than a marching one.
+    function assignUnitToRandomWalk(unit, path) {
+        if (!isPatrollable(path)) {
+            console.warn(`Cannot random-walk path ${path?.id} in state ${path?.state}`);
+            return;
+        }
+
+        unit.patrolPathId = path.id;
+        unit.patrolMode = 'random';
+        // Initial direction is random so multiple units don't all
+        // start by going the same way.
+        unit.patrolDirection = Math.random() < 0.5 ? 1 : -1;
+        unit.patrolPauseUntil = 0;
+        unit.guardPosition = null;
+        unit.harvestMode = null;
+        unit.targetTree = null;
+
+        const startIdx = nearestWaypointIndex(unit, path);
+        unit.patrolWaypointIndex = startIdx;
+        unit.state = 'idle';
+        releaseTreeClaim(unit);
+        clearPathLine(unit);
+        console.log(`${unit.typeData.name} assigned to random-walk ${path.id} (entering at WP ${startIdx}, dir ${unit.patrolDirection})`);
     }
 
     function assignUnitToGuard(unit, x, z) {
@@ -2446,6 +2480,14 @@ window.GameUnits = (function() {
             return;
         }
 
+        // Random-walk mode: ghosts-style wandering. Pause sometimes,
+        // flip direction sometimes, bounce off endpoints on open paths.
+        if (unit.patrolMode === 'random') {
+            continueRandomWalk(unit, path);
+            return;
+        }
+
+        // Standard forward-cycle patrol (default mode).
         // Where are we now? If we're close to the current waypoint, advance.
         const wp = path.waypoints[unit.patrolWaypointIndex];
         const dx = wp.x - unit.position.x;
@@ -2467,6 +2509,88 @@ window.GameUnits = (function() {
             // Path blocked - try advancing to the next waypoint instead
             unit.patrolWaypointIndex = (unit.patrolWaypointIndex + 1) % path.waypoints.length;
             unit.state = 'idle';  // try again next tick
+        }
+    }
+
+    // Tunables for random walk. Reverse_chance is the coin-flip — at
+    // each waypoint, this probability we reverse direction; otherwise
+    // keep going. Pause_chance/duration give the unit moments of
+    // standing still, which sells the "wandering, not patrolling" feel.
+    const RANDOM_WALK_REVERSE_CHANCE = 0.30;     // 30% chance to reverse at each waypoint
+    const RANDOM_WALK_PAUSE_CHANCE   = 0.10;     // 10% chance to pause at each waypoint
+    const RANDOM_WALK_PAUSE_MS_MIN   = 400;
+    const RANDOM_WALK_PAUSE_MS_MAX   = 900;
+
+    function continueRandomWalk(unit, path) {
+        const now = Date.now();
+
+        // Pause window? Stand still until it elapses.
+        if (unit.patrolPauseUntil && now < unit.patrolPauseUntil) {
+            unit.state = 'idle';
+            return;
+        }
+        unit.patrolPauseUntil = 0;
+
+        const n = path.waypoints.length;
+        if (n === 0) {
+            unit.state = 'idle';
+            return;
+        }
+
+        // Are we at our current waypoint? If so, decide what to do
+        // next: maybe pause, maybe reverse, then pick the next index.
+        const wp = path.waypoints[unit.patrolWaypointIndex];
+        const dx = wp.x - unit.position.x;
+        const dz = wp.z - unit.position.z;
+        const distToWp = Math.sqrt(dx * dx + dz * dz);
+
+        if (distToWp < 1.5) {
+            // Maybe pause briefly
+            if (Math.random() < RANDOM_WALK_PAUSE_CHANCE) {
+                const pauseMs = RANDOM_WALK_PAUSE_MS_MIN +
+                    Math.random() * (RANDOM_WALK_PAUSE_MS_MAX - RANDOM_WALK_PAUSE_MS_MIN);
+                unit.patrolPauseUntil = now + pauseMs;
+                unit.state = 'idle';
+                return;
+            }
+
+            // Maybe reverse direction
+            if (Math.random() < RANDOM_WALK_REVERSE_CHANCE) {
+                unit.patrolDirection = -unit.patrolDirection;
+            }
+
+            // Step in the current direction. On a closed loop just
+            // wrap; on an open chain, bounce off the endpoints
+            // (force the direction outward).
+            let next = unit.patrolWaypointIndex + unit.patrolDirection;
+            if (path.closed) {
+                next = ((next % n) + n) % n;     // proper modulo for negatives
+            } else {
+                if (next < 0)  { next = 1; unit.patrolDirection = +1; }
+                if (next >= n) { next = n - 2; unit.patrolDirection = -1; }
+                if (next < 0)  next = 0;       // tiny path safety net
+            }
+            unit.patrolWaypointIndex = next;
+        }
+
+        const target = path.waypoints[unit.patrolWaypointIndex];
+        const newPath = findPath(unit.position.x, unit.position.z, target.x, target.z, false, false);
+        if (newPath && newPath.length > 0) {
+            unit.path = newPath;
+            unit.pathIndex = 0;
+            unit.state = 'moving';
+        } else {
+            // Path blocked. Just nudge index and try again next tick.
+            let next = unit.patrolWaypointIndex + unit.patrolDirection;
+            if (path.closed) {
+                next = ((next % n) + n) % n;
+            } else {
+                if (next < 0)  { next = 1; unit.patrolDirection = +1; }
+                if (next >= n) { next = n - 2; unit.patrolDirection = -1; }
+                if (next < 0)  next = 0;
+            }
+            unit.patrolWaypointIndex = next;
+            unit.state = 'idle';
         }
     }
 
@@ -3312,6 +3436,7 @@ window.GameUnits = (function() {
         cancelPatrolCommand,
         hasDraftPatrolPath,
         assignUnitToPatrol,
+        assignUnitToRandomWalk,
         assignUnitToGuard,
         findPathAtPoint,
         isPatrollable,
